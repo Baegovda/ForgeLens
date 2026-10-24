@@ -1,0 +1,28 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        x:Class="LibSaber.SM2Browser.ExportWindow"
+        Title="Export"
+        Width="460"
+        Height="420"
+        WindowStartupLocation="CenterOwner"
+        CanResize="False">
+  <StackPanel Margin="16" Spacing="8">
+    <TextBlock TextWrapping="Wrap" Text="DDS keeps the original BC blocks. PNG and TGA are decoded images. glTF is Y-up meters. FBX follows the target below. Source units are assumed to be centimeters, Z-up." />
+    <ComboBox x:Name="SpaceBox" SelectedIndex="0">
+      <ComboBoxItem Content="Unreal (FBX Z-up centimeters)" />
+      <ComboBoxItem Content="Blender (FBX Z-up meters)" />
+    </ComboBox>
+    <CheckBox x:Name="DdsBox" Content="Textures as DDS" IsChecked="True" />
+    <CheckBox x:Name="PngBox" Content="Textures as PNG" IsChecked="True" />
+    <CheckBox x:Name="TgaBox" Content="Textures as TGA" IsChecked="True" />
+    <CheckBox x:Name="GltfBox" Content="Models and animations as glTF (.glb)" IsChecked="True" />
+    <CheckBox x:Name="FbxBox" Content="Models as FBX" IsChecked="True" />
+    <CheckBox x:Name="MaterialBox" Content="Material slots as JSON" IsChecked="True" />
+    <CheckBox x:Name="RawBox" Content="Also copy original bytes" />
+    <TextBlock TextWrapping="Wrap" Opacity="0.75" Text="Effects (.ps, .sfx) are copied raw, with any texture or model names found inside them. Particle systems are not converted." />
+    <StackPanel Orientation="Horizontal" Spacing="8" HorizontalAlignment="Right">
+      <Button Content="Cancel" Click="CancelClicked" />
+      <Button Content="Export" Click="ExportClicked" />
+    </StackPanel>
+  </StackPanel>
+</Window>

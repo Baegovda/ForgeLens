@@ -42,6 +42,11 @@ public abstract class m3dSPL
     get => _data.Count;
   }
 
+  /// <summary>
+  ///   The serialized keys. Accessors on the derived spline types are still stubs.
+  /// </summary>
+  public SplineData RawData => _data;
+
   #endregion
 
   #region Constructor

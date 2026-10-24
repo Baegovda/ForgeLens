@@ -1,0 +1,74 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:tdg="using:Avalonia.Controls"
+        xmlns:local="using:LibSaber.SM2Browser"
+        x:Class="LibSaber.SM2Browser.MainWindow"
+        Title="Space Marine 2 assets"
+        Width="1280"
+        Height="800"
+        MinWidth="960"
+        MinHeight="640">
+  <DockPanel>
+    <Border DockPanel.Dock="Top" Padding="8" Background="#1C1E22">
+      <Grid ColumnDefinitions="Auto,*,Auto,220,140,Auto">
+        <Button x:Name="OpenButton" Content="Open client_pc" Click="OpenClicked" Margin="0,0,8,0" />
+        <TextBlock x:Name="FolderText" Grid.Column="1" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" Margin="0,0,8,0" />
+        <TextBox x:Name="SearchBox" Grid.Column="2" Watermark="Search path" Width="220" TextChanged="SearchChanged" Margin="0,0,8,0" />
+        <ComboBox x:Name="FilterBox" Grid.Column="3" SelectedIndex="0" SelectionChanged="FilterChanged">
+          <ComboBoxItem Content="All types" />
+          <ComboBoxItem Content="Textures" />
+          <ComboBoxItem Content="Models" />
+          <ComboBoxItem Content="Animations" />
+          <ComboBoxItem Content="Effects" />
+          <ComboBoxItem Content="Text / YAML" />
+        </ComboBox>
+        <Button x:Name="ExportButton" Grid.Column="4" Content="Export selected" Click="ExportClicked" IsEnabled="False" />
+      </Grid>
+    </Border>
+    <Border DockPanel.Dock="Bottom" Padding="8,4" Background="#16181C">
+      <TextBlock x:Name="StatusText" Text="Open the game folder (the one that contains the .pak files)." />
+    </Border>
+    <Grid ColumnDefinitions="280,*,420">
+      <tdg:TreeDataGrid x:Name="FolderTree" Grid.Column="0" />
+      <DockPanel Grid.Column="1">
+        <Grid DockPanel.Dock="Top" ColumnDefinitions="*,110,80,150" Margin="8,4">
+          <TextBlock Text="Path" FontWeight="SemiBold" />
+          <TextBlock Grid.Column="1" Text="Type" FontWeight="SemiBold" />
+          <TextBlock Grid.Column="2" Text="Size" FontWeight="SemiBold" />
+          <TextBlock Grid.Column="3" Text="Archive" FontWeight="SemiBold" />
+        </Grid>
+        <ListBox x:Name="FileList" SelectionMode="Multiple" SelectionChanged="FileSelectionChanged">
+          <ListBox.ItemTemplate>
+            <DataTemplate x:DataType="local:FileRow">
+              <Grid ColumnDefinitions="*,110,80,150">
+                <TextBlock Text="{Binding Path}" TextTrimming="CharacterEllipsis" />
+                <TextBlock Grid.Column="1" Text="{Binding Extension}" />
+                <TextBlock Grid.Column="2" Text="{Binding SizeText}" />
+                <TextBlock Grid.Column="3" Text="{Binding Archive}" TextTrimming="CharacterEllipsis" />
+              </Grid>
+            </DataTemplate>
+          </ListBox.ItemTemplate>
+        </ListBox>
+      </DockPanel>
+      <DockPanel Grid.Column="2" Margin="8">
+        <StackPanel DockPanel.Dock="Top" Orientation="Horizontal" Spacing="6">
+          <TextBlock Text="Mip" VerticalAlignment="Center" />
+          <ComboBox x:Name="MipBox" Width="64" SelectionChanged="MipChanged" />
+          <TextBlock Text="Face" VerticalAlignment="Center" />
+          <ComboBox x:Name="FaceBox" Width="64" SelectionChanged="MipChanged" />
+          <ToggleButton x:Name="SkeletonToggle" Content="Skeleton" IsChecked="True" IsVisible="False" Click="ViewChanged" />
+          <Button x:Name="PlayButton" Content="Play" IsVisible="False" Click="PlayClicked" />
+        </StackPanel>
+        <TextBlock x:Name="PreviewNote" DockPanel.Dock="Bottom" TextWrapping="Wrap" Margin="0,8,0,0" />
+        <Border x:Name="ViewBorder" Background="#121418" ClipToBounds="True"
+                PointerPressed="ViewPressed" PointerMoved="ViewMoved" PointerReleased="ViewReleased" PointerWheelChanged="ViewWheel">
+          <Grid>
+            <Image x:Name="PreviewImage" Stretch="Uniform" />
+            <TextBox x:Name="PreviewText" IsReadOnly="True" AcceptsReturn="True" TextWrapping="NoWrap"
+                     FontFamily="Consolas,Courier New,monospace" FontSize="12" Background="Transparent" BorderThickness="0" />
+          </Grid>
+        </Border>
+      </DockPanel>
+    </Grid>
+  </DockPanel>
+</Window>

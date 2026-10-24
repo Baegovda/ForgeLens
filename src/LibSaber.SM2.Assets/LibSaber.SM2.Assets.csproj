@@ -1,0 +1,18 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <RootNamespace>LibSaber.SM2.Assets</RootNamespace>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\LibSaber.SpaceMarine2\LibSaber.SpaceMarine2.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="BCnEncoder.Net" Version="2.1.0" />
+  </ItemGroup>
+
+</Project>

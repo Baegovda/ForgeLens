@@ -188,6 +188,7 @@ publish/
 *.publishproj
 # This profile only selects a local self-contained win-x64 folder publish. It has no secrets.
 !src/LibSaber.SM2Extractor/Properties/PublishProfiles/win-x64.pubxml
+!src/LibSaber.SM2Browser/Properties/PublishProfiles/win-x64.pubxml
 
 # Microsoft Azure Web App publish settings. Comment the next line if you want to
 # checkin your Azure Web App publish settings, but sensitive information contained
