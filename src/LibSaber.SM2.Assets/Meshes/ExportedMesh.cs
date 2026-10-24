@@ -17,6 +17,8 @@ public sealed class Bone
   public int Parent { get; set; } = -1;
   public Matrix4x4 Local { get; set; } = Matrix4x4.Identity;
   public Matrix4x4 InverseBind { get; set; } = Matrix4x4.Identity;
+  public bool FileBind { get; set; }
+  public bool Influences { get; set; }
 }
 
 public struct SkinWeights
@@ -31,6 +33,18 @@ public sealed class MeshPart
   public int IndexStart { get; set; }
   public int IndexCount { get; set; }
   public string? Texture { get; set; }
+}
+
+/// <summary>A lower detail level. LOD0 lives on <see cref="ExportedMesh"/> itself.</summary>
+public sealed class MeshLod
+{
+  public string Name { get; set; } = "LOD1";
+  public List<Vector3> Positions { get; } = new();
+  public List<Vector3> Normals { get; } = new();
+  public List<Vector2> Uvs { get; } = new();
+  public List<int> Indices { get; } = new();
+  public List<SkinWeights> Skin { get; } = new();
+  public List<MeshPart> Parts { get; } = new();
 }
 
 public sealed class MaterialSlot
@@ -57,6 +71,7 @@ public sealed class ExportedMesh
   public List<Bone> Bones { get; } = new();
   public List<SkinWeights> Skin { get; } = new();
   public List<MeshPart> Parts { get; } = new();
+  public List<MeshLod> Levels { get; } = new();
   public MaterialDocument? Material { get; set; }
   public AnimationClip? Clip { get; set; }
   public string Message { get; set; } = "";
@@ -69,7 +84,7 @@ public static class AxisConvert
 {
 
   public const string Assumption =
-    "Source units are treated as meters, Z-up. A retail helmet's bounds are about 0.32 units tall, which matches meters. Unreal FBX is scaled by 100 into centimeters. The axis swap is still an assumption.";
+    "Source units are meters, Y-up. A retail character is about 2.6 units on Y, which is a standing height, and a helmet is about 0.3 units. glTF stays Y-up meters. Unreal FBX is Z-up centimeters (times 100). Blender FBX is Z-up meters.";
 
   public static float Scale(ExportSpace space, bool gltf)
     => !gltf && space == ExportSpace.Unreal ? 100f : 1f;
@@ -77,13 +92,11 @@ public static class AxisConvert
   public static Vector3 Point(Vector3 value, ExportSpace space, bool gltf)
   {
     var scale = Scale(space, gltf);
-    if (!gltf)
-      return value * scale;
-    return new Vector3(value.X * scale, value.Z * scale, -value.Y * scale);
+    return Direction(value, gltf) * scale;
   }
 
   public static Vector3 Direction(Vector3 value, bool gltf)
-    => gltf ? new Vector3(value.X, value.Z, -value.Y) : value;
+    => gltf ? value : new Vector3(value.X, -value.Z, value.Y);
 
   public static Matrix4x4 Matrix(Matrix4x4 source, ExportSpace space, bool gltf)
   {

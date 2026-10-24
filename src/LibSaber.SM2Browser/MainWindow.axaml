@@ -28,9 +28,10 @@
     <Border DockPanel.Dock="Bottom" Padding="8,4" Background="#16181C">
       <TextBlock x:Name="StatusText" Text="Open the game folder (the one that contains the .pak files)." />
     </Border>
-    <Grid ColumnDefinitions="280,*,420">
-      <tdg:TreeDataGrid x:Name="FolderTree" Grid.Column="0" Background="#14161A" />
-      <DockPanel Grid.Column="1">
+    <Grid ColumnDefinitions="240,6,*,6,2*">
+      <tdg:TreeDataGrid x:Name="FolderTree" Grid.Column="0" MinWidth="160" Background="#14161A" />
+      <GridSplitter Grid.Column="1" Width="6" Background="#2C3138" ResizeDirection="Columns" />
+      <DockPanel Grid.Column="2" MinWidth="220">
         <StackPanel DockPanel.Dock="Top" Margin="8,4">
           <CheckBox x:Name="SubfoldersBox" Content="Include subfolders" Click="SubfoldersChanged" ToolTip.Tip="List every file under the selected folder." />
           <Grid ColumnDefinitions="*,100,70,170" Margin="0,4,0,0">
@@ -53,13 +54,19 @@
           </ListBox.ItemTemplate>
         </ListBox>
       </DockPanel>
-      <DockPanel Grid.Column="2" Margin="8">
+      <GridSplitter Grid.Column="3" Width="6" Background="#2C3138" ResizeDirection="Columns" />
+      <DockPanel Grid.Column="4" Margin="8" MinWidth="320">
         <StackPanel DockPanel.Dock="Top" Orientation="Horizontal" Spacing="6">
           <TextBlock Text="Mip" VerticalAlignment="Center" />
           <ComboBox x:Name="MipBox" Width="64" SelectionChanged="MipChanged" />
           <TextBlock Text="Face" VerticalAlignment="Center" />
           <ComboBox x:Name="FaceBox" Width="64" SelectionChanged="MipChanged" />
-          <ToggleButton x:Name="SkeletonToggle" Content="Skeleton" IsChecked="True" IsVisible="False" Click="ViewChanged" />
+          <TextBlock x:Name="LodLabel" Text="LOD" VerticalAlignment="Center" IsVisible="False" />
+          <ComboBox x:Name="LodBox" Width="150" IsVisible="False" SelectionChanged="LodChanged" />
+          <TextBlock x:Name="PartLabel" Text="Part" VerticalAlignment="Center" IsVisible="False" />
+          <ComboBox x:Name="PartBox" Width="220" IsVisible="False" SelectionChanged="ViewChanged" />
+          <ToggleButton x:Name="WireToggle" Content="Wireframe" IsChecked="False" IsVisible="False" Click="ViewChanged" />
+          <ToggleButton x:Name="SkeletonToggle" Content="Skeleton" IsChecked="False" IsVisible="False" Click="ViewChanged" />
           <Button x:Name="PlayButton" Content="Play" IsVisible="False" Click="PlayClicked" />
         </StackPanel>
         <TextBlock x:Name="PreviewNote" DockPanel.Dock="Bottom" TextWrapping="Wrap" Margin="0,8,0,0" />

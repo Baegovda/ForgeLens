@@ -190,12 +190,63 @@ public class AssetTests
   {
     var point = AxisConvert.Point(new Vector3(0, 2, 0), ExportSpace.Unreal, gltf: true);
     Assert.True(MathF.Abs(point.X) < 0.0001f);
-    Assert.True(MathF.Abs(point.Y) < 0.0001f);
-    Assert.True(MathF.Abs(point.Z + 2f) < 0.0001f);
+    Assert.True(MathF.Abs(point.Y - 2f) < 0.0001f);
+    Assert.True(MathF.Abs(point.Z) < 0.0001f);
     var unreal = AxisConvert.Point(new Vector3(0, 2, 0), ExportSpace.Unreal, gltf: false);
-    Assert.True(MathF.Abs(unreal.Y - 200f) < 0.0001f);
+    Assert.True(MathF.Abs(unreal.Z - 200f) < 0.0001f);
     var blender = AxisConvert.Point(new Vector3(0, 2, 0), ExportSpace.Blender, gltf: false);
-    Assert.True(MathF.Abs(blender.Y - 2f) < 0.0001f);
+    Assert.True(MathF.Abs(blender.Z - 2f) < 0.0001f);
+  }
+
+  [Fact]
+  public void Preview_FramesAStandingMeshAndSamplesDiffuse()
+  {
+    var mesh = new ExportedMesh { Name = "post" };
+    mesh.Positions.Add(new Vector3(-0.15f, 0f, 0f));
+    mesh.Positions.Add(new Vector3(0.15f, 0f, 0f));
+    mesh.Positions.Add(new Vector3(0.15f, 2f, 0f));
+    mesh.Positions.Add(new Vector3(-0.15f, 2f, 0f));
+    for (var i = 0; i < 4; i++)
+      mesh.Normals.Add(Vector3.UnitZ);
+    mesh.Uvs.Add(new Vector2(0, 1));
+    mesh.Uvs.Add(new Vector2(1, 1));
+    mesh.Uvs.Add(new Vector2(1, 0));
+    mesh.Uvs.Add(new Vector2(0, 0));
+    mesh.Indices.AddRange(new[] { 0, 1, 2, 0, 2, 3 });
+    mesh.Parts.Add(new MeshPart { Name = "plate", IndexStart = 0, IndexCount = 6, Texture = "plate" });
+    var albedo = new Dictionary<string, PreviewImage>
+    {
+      ["plate"] = new PreviewImage { Width = 1, Height = 1, Bgra = new byte[] { 20, 30, 220, 255 } },
+    };
+
+    var image = MeshPreview.Render(
+      mesh, 160, 320,
+      new OrbitCamera { Yaw = 0f, Pitch = 0.05f, Distance = 0f },
+      false, 0, out _,
+      new PreviewSettings { Albedo = albedo, Part = -1 });
+
+    var minY = int.MaxValue;
+    var maxY = int.MinValue;
+    var red = 0;
+    var lit = 0;
+    for (var y = 0; y < 320; y++)
+    {
+      for (var x = 0; x < 160; x++)
+      {
+        var pixel = (y * 160 + x) * 4;
+        if (image[pixel] == 22 && image[pixel + 1] == 24 && image[pixel + 2] == 28)
+          continue;
+        lit++;
+        minY = Math.Min(minY, y);
+        maxY = Math.Max(maxY, y);
+        if (image[pixel + 2] > image[pixel] + 40 && image[pixel + 2] > image[pixel + 1] + 40)
+          red++;
+      }
+    }
+
+    Assert.True(lit > 400, $"standing quad should fill the frame, lit {lit}");
+    Assert.True(maxY - minY > 200, $"auto-frame should use the height, span {maxY - minY}");
+    Assert.True(red > 200, $"diffuse sample should read red, red pixels {red}");
   }
 
   [Fact]
@@ -233,7 +284,7 @@ public class AssetTests
     Assert.Contains("Vertices:", fbxText);
     Assert.Contains("LimbNode", fbxText);
 
-    var image = MeshPreview.Render(mesh, 128, 128, new OrbitCamera { Yaw = 0, Pitch = 0.3f, Distance = 4 }, true, 0, out _);
+    var image = MeshPreview.Render(mesh, 128, 128, new OrbitCamera { Yaw = 0.4f, Pitch = 1.0f, Distance = 4 }, true, 0, out _);
     var lit = 0;
     for (var i = 0; i < image.Length; i += 4)
     {

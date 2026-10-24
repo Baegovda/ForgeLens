@@ -111,31 +111,127 @@ public static class TemplateMeshReader
     if (objects is null || objects.Count == 0)
       return;
 
+    var usedNames = new HashSet<string>(StringComparer.Ordinal);
     for (var i = 0; i < objects.Count; i++)
     {
       var obj = objects[i];
-      var name = obj.GetBoneName();
+      var name = obj.GetName();
       if (string.IsNullOrWhiteSpace(name))
-        name = obj.GetName();
+        name = "bone" + i;
+      if (!usedNames.Add(name))
+      {
+        var suffix = 2;
+        while (!usedNames.Add(name + "_" + suffix))
+          suffix++;
+        name = name + "_" + suffix;
+      }
+
       var parent = obj.parentId;
       mesh.Bones.Add(new Bone
       {
-        Name = string.IsNullOrWhiteSpace(name) ? "bone" + i : name,
+        Name = name,
         Parent = parent >= 0 && parent < objects.Count && parent != i ? parent : -1,
-        Local = obj.MatrixLT,
+        Local = obj.MatrixModel,
       });
     }
 
+    // Retail inverse binds match Inverse(world) when MatrixModel is the local
+    // matrix and a child is applied before its parent (local * parentWorld).
+    var worlds = new Matrix4x4[objects.Count];
+    var done = new bool[objects.Count];
+    for (var guard = 0; guard < objects.Count; guard++)
+    {
+      var progress = false;
+      for (var i = 0; i < objects.Count; i++)
+      {
+        if (done[i])
+          continue;
+        var parent = mesh.Bones[i].Parent;
+        if (parent >= 0 && !done[parent])
+          continue;
+        var local = mesh.Bones[i].Local;
+        worlds[i] = parent >= 0 ? local * worlds[parent] : local;
+        done[i] = true;
+        progress = true;
+      }
+
+      if (!progress)
+        break;
+    }
+
     var inverse = template?.skin?.boneInvBindMatrList;
-    if (inverse is not null && inverse.Length == mesh.Bones.Count)
+    var paired = 0;
+    for (var i = 0; i < mesh.Bones.Count; i++)
     {
-      for (var i = 0; i < inverse.Length; i++)
+      var computed = Matrix4x4.Identity;
+      var haveComputed = done[i] && Matrix4x4.Invert(worlds[i], out computed);
+      if (inverse is not null && i < inverse.Length && haveComputed && MatrixDiff(computed, inverse[i]) < 0.05f)
+      {
         mesh.Bones[i].InverseBind = inverse[i];
+        mesh.Bones[i].FileBind = true;
+        paired++;
+      }
+      else
+      {
+        mesh.Bones[i].InverseBind = computed;
+      }
     }
-    else if (inverse is { Length: > 0 })
+
+    if (inverse is { Length: > 0 })
     {
-      notes.Add($"Skin has {inverse.Length} inverse binds and the object list has {mesh.Bones.Count} nodes; they were not paired.");
+      notes.Add(paired == inverse.Length
+        ? $"Paired all {paired} inverse binds to the first {paired} of {mesh.Bones.Count} nodes (MatrixModel, child before parent)."
+        : $"Paired {paired} of {inverse.Length} inverse binds by matrix match against {mesh.Bones.Count} nodes. Unmatched nodes use the inverse of their composed world so the bind pose stays put.");
     }
+  }
+
+  private static void MarkInfluences(ExportedMesh mesh)
+  {
+    void Mark(IReadOnlyList<SkinWeights> skin)
+    {
+      foreach (var weights in skin)
+      {
+        void One(ushort joint, float weight)
+        {
+          if (weight > 0.02f && joint < mesh.Bones.Count)
+            mesh.Bones[joint].Influences = true;
+        }
+
+        One(weights.J0, weights.W0);
+        One(weights.J1, weights.W1);
+        One(weights.J2, weights.W2);
+        One(weights.J3, weights.W3);
+      }
+    }
+
+    Mark(mesh.Skin);
+    foreach (var level in mesh.Levels)
+      Mark(level.Skin);
+
+    for (var i = 0; i < mesh.Bones.Count; i++)
+    {
+      if (!mesh.Bones[i].Influences)
+        continue;
+      var parent = mesh.Bones[i].Parent;
+      var guard = 0;
+      while (parent >= 0 && parent < mesh.Bones.Count && guard++ < mesh.Bones.Count)
+      {
+        if (mesh.Bones[parent].Influences)
+          break;
+        mesh.Bones[parent].Influences = true;
+        parent = mesh.Bones[parent].Parent;
+      }
+    }
+  }
+
+  private static float MatrixDiff(Matrix4x4 a, Matrix4x4 b)
+  {
+    float d = 0;
+    d += MathF.Abs(a.M11 - b.M11) + MathF.Abs(a.M12 - b.M12) + MathF.Abs(a.M13 - b.M13) + MathF.Abs(a.M14 - b.M14);
+    d += MathF.Abs(a.M21 - b.M21) + MathF.Abs(a.M22 - b.M22) + MathF.Abs(a.M23 - b.M23) + MathF.Abs(a.M24 - b.M24);
+    d += MathF.Abs(a.M31 - b.M31) + MathF.Abs(a.M32 - b.M32) + MathF.Abs(a.M33 - b.M33) + MathF.Abs(a.M34 - b.M34);
+    d += MathF.Abs(a.M41 - b.M41) + MathF.Abs(a.M42 - b.M42) + MathF.Abs(a.M43 - b.M43) + MathF.Abs(a.M44 - b.M44);
+    return d;
   }
 
   private static void ReadGraph(
@@ -168,88 +264,250 @@ public static class TemplateMeshReader
       reader = new NativeReader(new MemoryStream(external, writable: false), Endianness.LittleEndian);
     }
 
-    var chosen = ChooseMesh(graph);
-    if (chosen < 0)
+    var groups = GroupByVertexBuffer(graph);
+    if (groups.Count == 0)
     {
       notes.Add("The .tpl has buffers but no mesh that points at them.");
       return;
     }
 
-    var source = graph.Meshes![chosen];
-    GeometryBuffer? vertexBuffer = null;
-    GeometryBuffer? faceBuffer = null;
-    GeometryBuffer? uvBuffer = null;
-    if (source.Buffers is not null)
-    {
-      foreach (var info in source.Buffers)
-      {
-        if ((uint)info.BufferId >= (uint)graph.Buffers.Count)
-          continue;
-        var buffer = graph.Buffers[info.BufferId];
-        if (buffer.ElementSize <= 0 || buffer.Count <= 0)
-          continue;
-        if (buffer.ElementType == GeometryElementType.Vertex && vertexBuffer is null)
-          vertexBuffer = buffer;
-        else if (buffer.ElementType == GeometryElementType.Face && faceBuffer is null)
-          faceBuffer = buffer;
-        else if (buffer.ElementType == GeometryElementType.Interleaved && uvBuffer is null)
-          uvBuffer = buffer;
-      }
-    }
-
-    if (vertexBuffer is null || faceBuffer is null)
-    {
-      notes.Add("The chosen mesh has no vertex or index buffer.");
-      return;
-    }
-
-    Face[] faces;
-    Vector2[] uvs;
+    var rejected = 0;
     try
     {
-      faces = new FaceSerializer(faceBuffer).DeserializeRange(reader, 0, faceBuffer.Count).ToArray();
-      uvs = uvBuffer is null
-        ? Array.Empty<Vector2>()
-        : new InterleavedDataSerializer(uvBuffer).DeserializeRange(reader, 0, uvBuffer.Count)
-          .Select(data => new Vector2(data.UV0.X, data.UV0.Y))
-          .ToArray();
+      for (var lod = 0; lod < groups.Count; lod++)
+      {
+        var group = groups[lod];
+        var target = new Surface(lod == 0 ? "LOD0" : "LOD" + lod);
+        var skinned = (group.Vertex.Flags & (FVFFlags.WEIGHT4 | FVFFlags.WEIGHT8)) != 0;
+        foreach (var slice in group.Slices)
+          DecodeSlice(mesh, graph, reader, slice, target, skinned, ref rejected);
+        if (skinned && target.Skin.Count != target.Positions.Count)
+          target.Skin.Clear();
+        if (lod == 0)
+          target.CopyTo(mesh);
+        else if (target.Indices.Count >= 3)
+          mesh.Levels.Add(target.ToLod());
+      }
     }
     catch (Exception ex)
     {
-      notes.Add("Index or UV buffer could not be decoded (" + ex.Message + ").");
+      notes.Add("Vertex buffer was present but could not be decoded (" + ex.Message + ").");
       return;
     }
 
-    var subs = graph.SubMeshes?.Where(sub => sub.MeshId == chosen).ToList() ?? new List<GeometrySubMesh>();
+    if (mesh.Skin.Count == 0)
+      notes.Add("This mesh has no per-vertex skin weights.");
+    else
+      MarkInfluences(mesh);
+    notes.Add($"LOD0 is every part on the largest vertex pool: {mesh.Positions.Count:N0} vertices, {mesh.Indices.Count / 3:N0} triangles, {mesh.Parts.Count} parts.");
+    if (mesh.Levels.Count > 0)
+      notes.Add("Other LODs: " + string.Join(", ", mesh.Levels.Select(level => level.Positions.Count.ToString("N0"))) + " vertices.");
+    if (rejected > 0)
+      notes.Add($"{rejected:N0} triangles sat outside their submesh range and were dropped.");
+
+    var textureNames = mesh.Parts.Concat(mesh.Levels.SelectMany(level => level.Parts))
+      .Select(part => part.Texture)
+      .Where(name => !string.IsNullOrWhiteSpace(name))
+      .Distinct(StringComparer.OrdinalIgnoreCase)
+      .ToList();
+    if (textureNames.Count > 0)
+    {
+      var resolved = textureNames.Count(name => ResolveTexture(catalog, fileIndex, name!) >= 0);
+      notes.Add(resolved == 0
+        ? "Part materials name diffuse textures, and none of them are in this folder, so the preview stays a lit solid color."
+        : $"Resolved {resolved} of {textureNames.Count} diffuse textures for the preview.");
+    }
+
+    var box = template.bbox;
+    notes.Add($"File bounds {box.Min.X:0.###},{box.Min.Y:0.###},{box.Min.Z:0.###} .. {box.Max.X:0.###},{box.Max.Y:0.###},{box.Max.Z:0.###}.");
+  }
+
+  private readonly struct MeshSlice
+  {
+    public int MeshIndex { get; init; }
+    public int VertBase { get; init; }
+    public int FaceBase { get; init; }
+    public int UvBase { get; init; }
+    public GeometryBuffer Vertex { get; init; }
+    public GeometryBuffer Face { get; init; }
+    public GeometryBuffer? Uv { get; init; }
+  }
+
+  private sealed class MeshGroup
+  {
+    public GeometryBuffer Vertex { get; init; } = null!;
+    public List<MeshSlice> Slices { get; } = new();
+  }
+
+  private sealed class Surface
+  {
+    public Surface(string name) => Name = name;
+    public string Name { get; }
+    public List<Vector3> Positions { get; } = new();
+    public List<Vector3> Normals { get; } = new();
+    public List<Vector2> Uvs { get; } = new();
+    public List<int> Indices { get; } = new();
+    public List<SkinWeights> Skin { get; } = new();
+    public List<MeshPart> Parts { get; } = new();
+    public HashSet<string> Names { get; } = new(StringComparer.OrdinalIgnoreCase);
+
+    public void CopyTo(ExportedMesh mesh)
+    {
+      mesh.Positions.AddRange(Positions);
+      mesh.Normals.AddRange(Normals);
+      mesh.Uvs.AddRange(Uvs);
+      mesh.Indices.AddRange(Indices);
+      mesh.Skin.AddRange(Skin);
+      mesh.Parts.AddRange(Parts);
+    }
+
+    public MeshLod ToLod()
+    {
+      var lod = new MeshLod { Name = Name };
+      lod.Positions.AddRange(Positions);
+      lod.Normals.AddRange(Normals);
+      lod.Uvs.AddRange(Uvs);
+      lod.Indices.AddRange(Indices);
+      lod.Skin.AddRange(Skin);
+      lod.Parts.AddRange(Parts);
+      return lod;
+    }
+  }
+
+  private static List<MeshGroup> GroupByVertexBuffer(objGEOM_MNG graph)
+  {
+    var groups = new List<MeshGroup>();
+    if (graph.Meshes is not { Count: > 0 } || graph.Buffers is null)
+      return groups;
+
+    var byBuffer = new Dictionary<int, MeshGroup>();
+    for (var meshIndex = 0; meshIndex < graph.Meshes.Count; meshIndex++)
+    {
+      if (!TrySlice(graph, meshIndex, out var slice))
+        continue;
+      if (!byBuffer.TryGetValue(BufferId(graph, graph.Meshes[meshIndex]), out var group))
+      {
+        group = new MeshGroup { Vertex = slice.Vertex };
+        byBuffer.Add(BufferId(graph, graph.Meshes[meshIndex]), group);
+        groups.Add(group);
+      }
+
+      group.Slices.Add(slice);
+    }
+
+    groups.Sort((a, b) => b.Vertex.Count.CompareTo(a.Vertex.Count));
+    return groups;
+  }
+
+  private static int BufferId(objGEOM_MNG graph, GeometryMesh mesh)
+  {
+    if (mesh.Buffers is null || graph.Buffers is null)
+      return -1;
+    foreach (var info in mesh.Buffers)
+    {
+      if ((uint)info.BufferId >= (uint)graph.Buffers.Count)
+        continue;
+      if (graph.Buffers[info.BufferId].ElementType == GeometryElementType.Vertex)
+        return info.BufferId;
+    }
+
+    return -1;
+  }
+
+  private static bool TrySlice(objGEOM_MNG graph, int meshIndex, out MeshSlice slice)
+  {
+    slice = default;
+    var source = graph.Meshes![meshIndex];
+    if (source.Buffers is null || graph.Buffers is null)
+      return false;
+
+    GeometryMeshBufferInfo vertexInfo = default;
+    GeometryMeshBufferInfo faceInfo = default;
+    GeometryMeshBufferInfo uvInfo = default;
+    GeometryBuffer? vertex = null;
+    GeometryBuffer? face = null;
+    GeometryBuffer? uv = null;
+    foreach (var info in source.Buffers)
+    {
+      if ((uint)info.BufferId >= (uint)graph.Buffers.Count)
+        continue;
+      var buffer = graph.Buffers[info.BufferId];
+      if (buffer.ElementSize <= 0 || buffer.Count <= 0)
+        continue;
+      if (buffer.ElementType == GeometryElementType.Vertex && vertex is null)
+      {
+        vertex = buffer;
+        vertexInfo = info;
+      }
+      else if (buffer.ElementType == GeometryElementType.Face && face is null)
+      {
+        face = buffer;
+        faceInfo = info;
+      }
+      else if (buffer.ElementType == GeometryElementType.Interleaved && uv is null)
+      {
+        uv = buffer;
+        uvInfo = info;
+      }
+    }
+
+    if (vertex is null || face is null)
+      return false;
+
+    slice = new MeshSlice
+    {
+      MeshIndex = meshIndex,
+      VertBase = vertexInfo.SubBufferOffset / vertex.ElementSize,
+      FaceBase = faceInfo.SubBufferOffset / face.ElementSize,
+      UvBase = uv is null ? 0 : uvInfo.SubBufferOffset / uv.ElementSize,
+      Vertex = vertex,
+      Face = face,
+      Uv = uv,
+    };
+    return slice.VertBase >= 0 && slice.VertBase <= vertex.Count && slice.FaceBase >= 0 && slice.FaceBase <= face.Count;
+  }
+
+  private static void DecodeSlice(ExportedMesh mesh, objGEOM_MNG graph, NativeReader reader, MeshSlice slice, Surface target, bool skinned, ref int rejected)
+  {
+    var subs = graph.SubMeshes?.Where(sub => sub.MeshId == slice.MeshIndex).ToList() ?? new List<GeometrySubMesh>();
     if (subs.Count == 0)
     {
+      var vertCount = Math.Min(ushort.MaxValue, Math.Max(0, slice.Vertex.Count - slice.VertBase));
+      var faceCount = Math.Min(ushort.MaxValue, Math.Max(0, slice.Face.Count - slice.FaceBase));
+      if (vertCount == 0 || faceCount == 0)
+        return;
       subs.Add(new GeometrySubMesh
       {
-        MeshId = chosen,
+        MeshId = slice.MeshIndex,
         BufferInfo = new GeometrySubMeshBufferInfo
         {
           VertexOffset = 0,
-          VertexCount = (ushort)Math.Min(ushort.MaxValue, vertexBuffer.Count),
+          VertexCount = (ushort)vertCount,
           FaceOffset = 0,
-          FaceCount = (ushort)Math.Min(ushort.MaxValue, faces.Length),
+          FaceCount = (ushort)faceCount,
         },
       });
     }
 
-    var anySkin = false;
-    var decodedVertices = 0;
-    try
+    foreach (var sub in subs)
     {
-      foreach (var sub in subs)
+      var info = sub.BufferInfo;
+      if (info.VertexCount == 0 || info.FaceCount == 0)
+        continue;
+      var vertexStart = slice.VertBase + info.VertexOffset;
+      var vertexEnd = vertexStart + info.VertexCount;
+      if (vertexStart < 0 || vertexEnd > slice.Vertex.Count)
+        continue;
+      var faceStart = slice.FaceBase + info.FaceOffset;
+      var faceEnd = faceStart + info.FaceCount;
+      if (faceStart < 0 || faceEnd > slice.Face.Count)
+        continue;
+
+      var vertices = new VertexSerializer(slice.Vertex, sub.Position, sub.Scale)
+        .DeserializeRange(reader, vertexStart, vertexEnd)
+        .ToArray();
+      if (!skinned)
       {
-        var info = sub.BufferInfo;
-        if (info.VertexCount == 0 || info.VertexOffset + info.VertexCount > vertexBuffer.Count)
-          continue;
-        var vertices = new VertexSerializer(vertexBuffer, sub.Position, sub.Scale)
-          .DeserializeRange(reader, info.VertexOffset, info.VertexOffset + info.VertexCount)
-          .ToArray();
-        if (vertices.Any(vertex => vertex.HasSkinningData))
-          anySkin = true;
         var matrix = NodeMatrix(graph, sub.NodeId);
         if (matrix is { } transform)
         {
@@ -267,73 +525,70 @@ public static class TemplateMeshReader
             vertices[i] = vertex;
           }
         }
-
-        var sliceUvs = new Vector2[vertices.Length];
-        for (var i = 0; i < sliceUvs.Length; i++)
-        {
-          var sourceIndex = info.VertexOffset + i;
-          sliceUvs[i] = (uint)sourceIndex < (uint)uvs.Length ? uvs[sourceIndex] : Vector2.Zero;
-        }
-
-        AppendRange(mesh, vertices, sliceUvs, faces, info.VertexOffset, info.FaceOffset, info.FaceCount, anySkin, sub.BoneIds, "part" + sub.MeshId + "_" + sub.NodeId, sub.Material);
-        decodedVertices += vertices.Length;
       }
-    }
-    catch (Exception ex)
-    {
-      notes.Add("Vertex buffer was present but could not be decoded (" + ex.Message + ").");
-      return;
-    }
 
-    if (anySkin && mesh.Skin.Count != mesh.Positions.Count)
-      mesh.Skin.Clear();
-    else if (!anySkin)
-      notes.Add("This mesh has no per-vertex skin weights.");
-
-    if (graph.Meshes.Count > 1)
-    {
-      var lods = graph.Meshes.Select(item => VertexCount(graph, item)).ToArray();
-      notes.Add($"Exported the densest mesh ({decodedVertices} vertices). Other meshes in the file: {string.Join(", ", lods)}.");
+      var uvs = ReadUvs(reader, slice, info.VertexOffset, vertices.Length);
+      var faces = new FaceSerializer(slice.Face).DeserializeRange(reader, faceStart, faceEnd).ToArray();
+      var partName = PartName(graph, sub, slice.MeshIndex);
+      AppendRange(mesh, target, vertices, uvs, faces, info.VertexOffset, skinned, sub.BoneIds, partName, sub.Material, ref rejected);
     }
-
-    var box = template.bbox;
-    notes.Add($"File bounds {box.Min.X:0.###},{box.Min.Y:0.###},{box.Min.Z:0.###} .. {box.Max.X:0.###},{box.Max.Y:0.###},{box.Max.Z:0.###}.");
   }
 
-  private static int ChooseMesh(objGEOM_MNG graph)
+  private static Vector2[] ReadUvs(NativeReader reader, MeshSlice slice, int vertexOffset, int count)
   {
-    if (graph.Meshes is not { Count: > 0 })
+    var uvs = new Vector2[count];
+    if (slice.Uv is null || count == 0)
+      return uvs;
+    var start = slice.UvBase + vertexOffset;
+    var end = start + count;
+    if (start < 0 || end > slice.Uv.Count)
+      return uvs;
+    var index = 0;
+    foreach (var data in new InterleavedDataSerializer(slice.Uv).DeserializeRange(reader, start, end))
+    {
+      if (index >= uvs.Length)
+        break;
+      uvs[index++] = new Vector2(data.UV0.X, data.UV0.Y);
+    }
+
+    return uvs;
+  }
+
+  private static string PartName(objGEOM_MNG graph, GeometrySubMesh sub, int meshIndex)
+  {
+    var texture = FirstTexture(sub.Material);
+    if (!string.IsNullOrWhiteSpace(texture))
+      return texture!;
+    if (graph.objects is not null && (uint)sub.NodeId < (uint)graph.objects.Count)
+    {
+      var name = graph.objects[sub.NodeId].GetName();
+      if (!string.IsNullOrWhiteSpace(name))
+        return name;
+    }
+
+    return "part" + meshIndex + "_" + sub.NodeId;
+  }
+
+  public static int ResolveTexture(GameCatalog catalog, int hint, string name)
+  {
+    if (string.IsNullOrWhiteSpace(name))
       return -1;
-
-    var best = 0;
-    var count = -1;
-    for (var i = 0; i < graph.Meshes.Count; i++)
+    var candidates = new[]
     {
-      var vertices = VertexCount(graph, graph.Meshes[i]);
-      if (vertices > count)
-      {
-        count = vertices;
-        best = i;
-      }
+      name,
+      name + ".pct.resource",
+      name + ".pct",
+      "pct/" + name + ".pct.resource",
+      "pct/" + name + ".pct",
+    };
+    foreach (var candidate in candidates)
+    {
+      var index = catalog.ResolveReference(candidate, hint);
+      if (index >= 0)
+        return index;
     }
 
-    return count > 0 ? best : -1;
-  }
-
-  private static int VertexCount(objGEOM_MNG graph, GeometryMesh mesh)
-  {
-    if (mesh.Buffers is null || graph.Buffers is null)
-      return 0;
-    foreach (var info in mesh.Buffers)
-    {
-      if ((uint)info.BufferId >= (uint)graph.Buffers.Count)
-        continue;
-      var buffer = graph.Buffers[info.BufferId];
-      if (buffer.ElementType == GeometryElementType.Vertex)
-        return buffer.Count;
-    }
-
-    return 0;
+    return -1;
   }
 
   private static byte[]? FindGeometryPayload(GameCatalog catalog, ArchiveStore store, int fileIndex, resDESC_TPL? description)
@@ -359,47 +614,59 @@ public static class TemplateMeshReader
 
   private static void AppendRange(
     ExportedMesh mesh,
+    Surface target,
     Vertex[] vertices,
     Vector2[] uvs,
     Face[] faces,
     int indexBase,
-    int faceOffset,
-    int faceCount,
     bool anySkin,
     short[]? boneIds,
     string partName,
-    SaberMaterial? material)
+    SaberMaterial? material,
+    ref int rejected)
   {
-    if (vertices.Length == 0 || faceCount <= 0)
+    if (vertices.Length == 0 || faces.Length == 0)
       return;
 
-    var baseVertex = mesh.Positions.Count;
+    var baseVertex = target.Positions.Count;
     for (var i = 0; i < vertices.Length; i++)
     {
       var uv = (uint)i < (uint)uvs.Length ? uvs[i] : Vector2.Zero;
-      AddVertex(mesh, vertices[i], uv, anySkin, boneIds);
+      AddVertex(target, vertices[i], uv, anySkin, boneIds);
     }
 
-    var indexStart = mesh.Indices.Count;
-    var faceEnd = Math.Min(faces.Length, faceOffset + faceCount);
-    for (var i = Math.Max(0, faceOffset); i < faceEnd; i++)
+    var indexStart = target.Indices.Count;
+    foreach (var face in faces)
     {
-      if (!TryLocal(faces[i].A, indexBase, vertices.Length, out var a)
-        || !TryLocal(faces[i].B, indexBase, vertices.Length, out var b)
-        || !TryLocal(faces[i].C, indexBase, vertices.Length, out var c))
-        continue;
-      mesh.Indices.Add(baseVertex + a);
-      mesh.Indices.Add(baseVertex + b);
-      mesh.Indices.Add(baseVertex + c);
-    }
-
-    if (mesh.Indices.Count > indexStart)
-    {
-      mesh.Parts.Add(new MeshPart
+      if (!TryLocal(face.A, indexBase, vertices.Length, out var a)
+        || !TryLocal(face.B, indexBase, vertices.Length, out var b)
+        || !TryLocal(face.C, indexBase, vertices.Length, out var c))
       {
-        Name = partName,
+        rejected++;
+        continue;
+      }
+
+      target.Indices.Add(baseVertex + a);
+      target.Indices.Add(baseVertex + b);
+      target.Indices.Add(baseVertex + c);
+    }
+
+    if (target.Indices.Count > indexStart)
+    {
+      var display = partName;
+      if (!target.Names.Add(display))
+      {
+        var suffix = 2;
+        while (!target.Names.Add(partName + " (" + suffix + ")"))
+          suffix++;
+        display = partName + " (" + suffix + ")";
+      }
+
+      target.Parts.Add(new MeshPart
+      {
+        Name = display,
         IndexStart = indexStart,
-        IndexCount = mesh.Indices.Count - indexStart,
+        IndexCount = target.Indices.Count - indexStart,
         Texture = FirstTexture(material),
       });
     }
@@ -435,16 +702,16 @@ public static class TemplateMeshReader
     return local >= 0 && local < vertexCount;
   }
 
-  private static void AddVertex(ExportedMesh mesh, Vertex vertex, Vector2 uv, bool anySkin, short[]? boneIds)
+  private static void AddVertex(Surface target, Vertex vertex, Vector2 uv, bool anySkin, short[]? boneIds)
   {
-    mesh.Positions.Add(new Vector3(vertex.Position.X, vertex.Position.Y, vertex.Position.Z));
+    target.Positions.Add(new Vector3(vertex.Position.X, vertex.Position.Y, vertex.Position.Z));
     var normal = vertex.HasNormal
       ? new Vector3(vertex.Normal.X, vertex.Normal.Y, vertex.Normal.Z)
-      : Vector3.UnitZ;
+      : Vector3.UnitY;
     if (normal.LengthSquared() < 1e-8f)
-      normal = Vector3.UnitZ;
-    mesh.Normals.Add(Vector3.Normalize(normal));
-    mesh.Uvs.Add(uv);
+      normal = Vector3.UnitY;
+    target.Normals.Add(Vector3.Normalize(normal));
+    target.Uvs.Add(uv);
     if (!anySkin)
       return;
 
@@ -453,10 +720,23 @@ public static class TemplateMeshReader
     Take(vertex.Index1, vertex.Weight1, vertex.HasWeight1, boneIds, ref skin, ref slot);
     Take(vertex.Index2, vertex.Weight2, vertex.HasWeight2, boneIds, ref skin, ref slot);
     Take(vertex.Index3, vertex.Weight3, vertex.HasWeight3, boneIds, ref skin, ref slot);
-    Take(vertex.Index4, vertex.Weight4, vertex.HasWeight4, boneIds, ref skin, ref slot);
-    if (slot == 0)
+    var fourth = vertex.HasWeight4
+      && !(vertex.Weight4 > 0.99f && vertex.Weight1 + vertex.Weight2 + vertex.Weight3 > 0.97f);
+    Take(vertex.Index4, vertex.Weight4, fourth, boneIds, ref skin, ref slot);
+    var sum = skin.W0 + skin.W1 + skin.W2 + skin.W3;
+    if (sum <= 0.0001f)
+    {
       skin.W0 = 1;
-    mesh.Skin.Add(skin);
+    }
+    else if (MathF.Abs(sum - 1f) > 0.02f)
+    {
+      skin.W0 /= sum;
+      skin.W1 /= sum;
+      skin.W2 /= sum;
+      skin.W3 /= sum;
+    }
+
+    target.Skin.Add(skin);
   }
 
   private static void Take(short index, float weight, bool present, short[]? boneIds, ref SkinWeights skin, ref int slot)

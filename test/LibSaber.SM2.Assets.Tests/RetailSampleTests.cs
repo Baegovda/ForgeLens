@@ -122,6 +122,87 @@ public class RetailSampleTests
     Assert.Contains("LayerElementNormal", fbx);
   }
 
+  [Fact]
+  public void RetailTitus_DecodesEveryPartAndPairsSkin()
+  {
+    var root = Environment.GetEnvironmentVariable("LIBSABER_SM2_TITUS");
+    // Same runner limitation as the other retail test: an unset path returns and is reported as passed.
+    if (string.IsNullOrWhiteSpace(root) || !Directory.Exists(root))
+      return;
+
+    using var dir = new TempDirectory();
+    var entries = Directory.EnumerateFiles(root, "*", SearchOption.AllDirectories)
+      .Select(path => new CacheFile.Entry(Path.GetRelativePath(root, path).Replace('\\', '/'), File.ReadAllBytes(path)))
+      .ToArray();
+    CacheFile.Create(dir.Path, "titus.pak", entries);
+    var catalog = GameCatalog.Load(dir.Path);
+    using var store = new ArchiveStore(catalog);
+    var mesh = LoadMesh(catalog, store, "tpl/cc_titus_assault.tpl/cc_titus_assault.tpl");
+
+    Assert.Equal(413472, mesh.Positions.Count);
+    Assert.Equal(309390, mesh.Indices.Count / 3);
+    Assert.Equal(mesh.Positions.Count, mesh.Uvs.Count);
+    Assert.Equal(mesh.Positions.Count, mesh.Normals.Count);
+    Assert.Equal(mesh.Positions.Count, mesh.Skin.Count);
+    Assert.True(mesh.HasSkin);
+    Assert.InRange(mesh.Parts.Count, 30, 60);
+    Assert.InRange(mesh.Levels.Count, 4, 12);
+    Assert.Contains("Paired all 199", mesh.Message);
+    Assert.Contains(mesh.Bones, bone => bone.Name == "CENTRE" || bone.Name.StartsWith("CENTRE"));
+    var inverse = mesh.Bones[0].InverseBind;
+    Assert.True(MathF.Abs(inverse.M41) + MathF.Abs(inverse.M42) + MathF.Abs(inverse.M43) > 0.5f);
+
+    var (min, max) = Bounds(mesh);
+    Assert.InRange(max.Y - min.Y, 2.4f, 2.8f);
+    Assert.InRange(max.X - min.X, 1.6f, 2.2f);
+    var unit = 0;
+    var dropped = 0;
+    var maxJoint = 0;
+    foreach (var skin in mesh.Skin)
+    {
+      var sum = skin.W0 + skin.W1 + skin.W2 + skin.W3;
+      if (MathF.Abs(sum - 1f) < 0.05f)
+        unit++;
+      if (skin.W0 > 0)
+        maxJoint = Math.Max(maxJoint, skin.J0);
+      if (skin.W1 > 0)
+        maxJoint = Math.Max(maxJoint, skin.J1);
+      if (skin.W2 > 0)
+        maxJoint = Math.Max(maxJoint, skin.J2);
+      if (skin.W3 > 0)
+        maxJoint = Math.Max(maxJoint, skin.J3);
+      if (skin.J0 >= mesh.Bones.Count || skin.J1 >= mesh.Bones.Count || skin.J2 >= mesh.Bones.Count || skin.J3 >= mesh.Bones.Count)
+        dropped++;
+    }
+
+    Assert.True(unit > mesh.Skin.Count * 9 / 10, $"weights should sum to 1, {unit} of {mesh.Skin.Count}");
+    Assert.Equal(0, dropped);
+    Assert.InRange(maxJoint, 100, mesh.Bones.Count - 1);
+
+    var image = MeshPreview.Render(
+      mesh, 480, 720,
+      new OrbitCamera { Yaw = 0.65f, Pitch = 0.16f, Distance = 0 },
+      false, 0, out _);
+    var minY = int.MaxValue;
+    var maxY = int.MinValue;
+    var lit = 0;
+    for (var y = 0; y < 720; y++)
+    {
+      for (var x = 0; x < 480; x++)
+      {
+        var pixel = (y * 480 + x) * 4;
+        if (image[pixel] == 22 && image[pixel + 1] == 24 && image[pixel + 2] == 28)
+          continue;
+        lit++;
+        minY = Math.Min(minY, y);
+        maxY = Math.Max(maxY, y);
+      }
+    }
+
+    Assert.True(lit > 20000, $"Titus should fill the preview, lit {lit}");
+    Assert.True(maxY - minY > 500, $"Titus should stand in frame, span {maxY - minY}");
+  }
+
   private static TextureDocument LoadTexture(GameCatalog catalog, ArchiveStore store, string path)
   {
     var index = catalog.FindByPath(path).Single();

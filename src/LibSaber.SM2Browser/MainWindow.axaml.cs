@@ -29,13 +29,19 @@ public partial class MainWindow : Window
   private ExportedMesh? _mesh;
   private AnimationClip? _clip;
   private float _yaw = 0.7f;
-  private float _pitch = 0.35f;
+  private float _pitch = 0.18f;
   private float _distance;
   private float _time;
   private bool _dragging;
   private Point _lastPoint;
   private bool _suppressMip;
+  private bool _suppressView;
   private int _listGeneration;
+  private int _drawGeneration;
+  private bool _drawBusy;
+  private bool _drawAgain;
+  private bool _drawFast;
+  private Dictionary<string, PreviewImage>? _albedo;
 
   public MainWindow()
   {
@@ -243,7 +249,13 @@ public partial class MainWindow : Window
     if (file.Kind != AssetKind.Animation)
       _mesh = null;
     SkeletonToggle.IsVisible = false;
+    WireToggle.IsVisible = false;
+    LodBox.IsVisible = false;
+    LodLabel.IsVisible = false;
+    PartBox.IsVisible = false;
+    PartLabel.IsVisible = false;
     PlayButton.IsVisible = false;
+    _albedo = null;
     PreviewImage.IsVisible = false;
     PreviewText.IsVisible = true;
     PreviewText.Text = "Reading " + file.Path + "…";
@@ -264,13 +276,24 @@ public partial class MainWindow : Window
 
       if (file.Kind is AssetKind.Model)
       {
-        var mesh = await Task.Run(() => TemplateMeshReader.Load(_catalog, _store, row.Index));
+        var loaded = await Task.Run(() =>
+        {
+          var decoded = TemplateMeshReader.Load(_catalog, _store, row.Index);
+          return (decoded, ResolveAlbedo(_catalog, _store, decoded, row.Index));
+        });
         if (generation != _previewGeneration)
           return;
+        var mesh = loaded.decoded;
         _mesh = mesh;
+        _albedo = loaded.Item2;
         _distance = 0;
         _time = 0;
+        _yaw = 0.7f;
+        _pitch = 0.18f;
+        FillModelControls(mesh);
         SkeletonToggle.IsVisible = mesh.Bones.Count > 0;
+        SkeletonToggle.IsChecked = false;
+        WireToggle.IsVisible = mesh.HasTriangles;
         PreviewNote.Text = mesh.Message;
         if (mesh.HasTriangles || mesh.Bones.Count > 0)
         {
@@ -373,21 +396,165 @@ public partial class MainWindow : Window
     _suppressMip = false;
   }
 
+  private void FillModelControls(ExportedMesh mesh)
+  {
+    _suppressView = true;
+    LodBox.Items.Clear();
+    LodBox.Items.Add($"LOD 0 · {mesh.Positions.Count:N0}");
+    foreach (var level in mesh.Levels)
+      LodBox.Items.Add($"{level.Name} · {level.Positions.Count:N0}");
+    LodBox.SelectedIndex = 0;
+    LodBox.IsVisible = mesh.HasTriangles;
+    LodLabel.IsVisible = mesh.HasTriangles;
+    FillParts(mesh, 0);
+    _suppressView = false;
+  }
+
+  private void FillParts(ExportedMesh mesh, int lod)
+  {
+    _suppressView = true;
+    PartBox.Items.Clear();
+    PartBox.Items.Add("All parts");
+    var parts = lod <= 0 ? mesh.Parts : (uint)(lod - 1) < (uint)mesh.Levels.Count ? mesh.Levels[lod - 1].Parts : mesh.Parts;
+    foreach (var part in parts)
+      PartBox.Items.Add($"{part.Name} ({part.IndexCount / 3:N0})");
+    PartBox.SelectedIndex = 0;
+    var show = mesh.HasTriangles && parts.Count > 0;
+    PartBox.IsVisible = show;
+    PartLabel.IsVisible = show;
+    _suppressView = false;
+  }
+
+  private void LodChanged(object? sender, SelectionChangedEventArgs e)
+  {
+    if (_suppressView || _mesh is null || LodBox.SelectedIndex < 0)
+      return;
+    FillParts(_mesh, LodBox.SelectedIndex);
+    DrawMesh(false);
+  }
+
   private void DrawMesh()
+    => DrawMesh(false);
+
+  private void DrawMesh(bool fast)
   {
     if (_mesh is null)
       return;
-    var pixels = MeshPreview.Render(
-      _mesh,
-      480,
-      480,
-      new OrbitCamera { Yaw = _yaw, Pitch = _pitch, Distance = _distance },
-      SkeletonToggle.IsChecked == true,
-      _time,
-      out var note);
-    ShowPixels(pixels, 480, 480);
-    if (!string.IsNullOrEmpty(note))
-      PreviewNote.Text = note;
+    _drawFast = fast;
+    _drawAgain = true;
+    if (_drawBusy)
+      return;
+    _drawBusy = true;
+    PumpDraw();
+  }
+
+  private void PumpDraw()
+  {
+    if (_mesh is null)
+    {
+      _drawBusy = false;
+      _drawAgain = false;
+      return;
+    }
+
+    _drawAgain = false;
+    var generation = ++_drawGeneration;
+    var mesh = _mesh;
+    var fast = _drawFast;
+    var yaw = _yaw;
+    var pitch = _pitch;
+    var distance = _distance;
+    var time = _time;
+    var skeleton = SkeletonToggle.IsChecked == true;
+    var wire = WireToggle.IsChecked == true;
+    var lod = LodBox.SelectedIndex < 0 ? 0 : LodBox.SelectedIndex;
+    var part = PartBox.SelectedIndex <= 0 ? -1 : PartBox.SelectedIndex - 1;
+    var albedo = _albedo;
+    var bounds = ViewBorder.Bounds;
+    var width = bounds.Width < 64 ? 720 : (int)bounds.Width;
+    var height = bounds.Height < 64 ? 900 : (int)bounds.Height;
+    if (fast)
+    {
+      width /= 2;
+      height /= 2;
+    }
+
+    width = Math.Clamp(width, 32, 1100);
+    height = Math.Clamp(height, 32, 1400);
+    Task.Run(() =>
+    {
+      var pixels = MeshPreview.Render(
+        mesh,
+        width,
+        height,
+        new OrbitCamera { Yaw = yaw, Pitch = pitch, Distance = distance },
+        skeleton,
+        time,
+        out var note,
+        new PreviewSettings { Lod = lod, Part = part, Wireframe = wire, Albedo = albedo, MaxEdge = 1400 });
+      return (pixels, width, height, note);
+    }).ContinueWith(task =>
+    {
+      Dispatcher.UIThread.Post(() =>
+      {
+        if (generation == _drawGeneration && task.Status == TaskStatus.RanToCompletion)
+        {
+          ShowPixels(task.Result.pixels, task.Result.width, task.Result.height);
+          if (!string.IsNullOrEmpty(task.Result.note))
+            PreviewNote.Text = task.Result.note;
+        }
+        else if (generation == _drawGeneration && task.IsFaulted)
+        {
+          PreviewNote.Text = task.Exception?.GetBaseException().Message ?? "Preview failed.";
+        }
+
+        if (_drawAgain && _mesh is not null)
+          PumpDraw();
+        else
+          _drawBusy = false;
+      });
+    });
+  }
+
+  private static Dictionary<string, PreviewImage> ResolveAlbedo(GameCatalog catalog, ArchiveStore store, ExportedMesh mesh, int hint)
+  {
+    var map = new Dictionary<string, PreviewImage>(StringComparer.OrdinalIgnoreCase);
+    var names = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+    foreach (var part in mesh.Parts)
+    {
+      if (!string.IsNullOrWhiteSpace(part.Texture))
+        names.Add(part.Texture);
+    }
+
+    foreach (var level in mesh.Levels)
+    {
+      foreach (var part in level.Parts)
+      {
+        if (!string.IsNullOrWhiteSpace(part.Texture))
+          names.Add(part.Texture);
+      }
+    }
+
+    foreach (var name in names)
+    {
+      var index = TemplateMeshReader.ResolveTexture(catalog, hint, name);
+      if (index < 0)
+        continue;
+      try
+      {
+        var document = TextureLoader.Load(catalog, store, index);
+        if (!document.CanDecode)
+          continue;
+        var pixels = document.Decode(0, 0, out var width, out var height, out _);
+        map[name] = new PreviewImage { Width = width, Height = height, Bgra = pixels };
+      }
+      catch (Exception)
+      {
+        // A missing or unsupported texture leaves that part as a lit solid.
+      }
+    }
+
+    return map;
   }
 
   private void ShowPixels(byte[] pixels, int width, int height)
@@ -416,7 +583,11 @@ public partial class MainWindow : Window
   }
 
   private void ViewChanged(object? sender, RoutedEventArgs e)
-    => DrawMesh();
+  {
+    if (_suppressView)
+      return;
+    DrawMesh(false);
+  }
 
   private void PlayClicked(object? sender, RoutedEventArgs e)
   {
@@ -445,7 +616,12 @@ public partial class MainWindow : Window
   }
 
   private void ViewReleased(object? sender, PointerReleasedEventArgs e)
-    => _dragging = false;
+  {
+    if (!_dragging)
+      return;
+    _dragging = false;
+    DrawMesh(false);
+  }
 
   private void ViewMoved(object? sender, PointerEventArgs e)
   {
@@ -455,16 +631,25 @@ public partial class MainWindow : Window
     _yaw += (float)(point.X - _lastPoint.X) * 0.01f;
     _pitch += (float)(point.Y - _lastPoint.Y) * 0.01f;
     _lastPoint = point;
-    DrawMesh();
+    DrawMesh(true);
   }
 
   private void ViewWheel(object? sender, PointerWheelEventArgs e)
   {
     if (_mesh is null)
       return;
-    var step = _distance <= 0 ? 0.5f : _distance * 0.1f;
-    _distance = Math.Max(0.2f, (_distance <= 0 ? 4f : _distance) - (float)e.Delta.Y * step);
-    DrawMesh();
+    if (_distance <= 0 && _mesh is not null)
+    {
+      var bounds = ViewBorder.Bounds;
+      var aspect = bounds.Height < 32 ? 0.8f : (float)(bounds.Width / Math.Max(1, bounds.Height));
+      var lod = LodBox.SelectedIndex < 0 ? 0 : LodBox.SelectedIndex;
+      var part = PartBox.SelectedIndex <= 0 ? -1 : PartBox.SelectedIndex - 1;
+      _distance = MeshPreview.FitDistance(_mesh, aspect, lod, part);
+    }
+
+    var step = _distance * 0.1f;
+    _distance = Math.Max(0.15f, _distance - (float)e.Delta.Y * step);
+    DrawMesh(true);
   }
 
   private async void ExportClicked(object? sender, RoutedEventArgs e)
