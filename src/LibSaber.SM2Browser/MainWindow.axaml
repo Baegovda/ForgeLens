@@ -11,7 +11,7 @@
   <DockPanel>
     <Border DockPanel.Dock="Top" Padding="8" Background="#1C1E22">
       <Grid ColumnDefinitions="Auto,*,Auto,220,140,Auto">
-        <Button x:Name="OpenButton" Content="Open client_pc" Click="OpenClicked" Margin="0,0,8,0" />
+        <Button x:Name="OpenButton" Content="Open game folder" Click="OpenClicked" Margin="0,0,8,0" ToolTip.Tip="The game root or client_pc. Caches are found in subfolders." />
         <TextBlock x:Name="FolderText" Grid.Column="1" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" Margin="0,0,8,0" />
         <TextBox x:Name="SearchBox" Grid.Column="2" Watermark="Search path" Width="220" TextChanged="SearchChanged" Margin="0,0,8,0" />
         <ComboBox x:Name="FilterBox" Grid.Column="3" SelectedIndex="0" SelectionChanged="FilterChanged">
@@ -29,22 +29,25 @@
       <TextBlock x:Name="StatusText" Text="Open the game folder (the one that contains the .pak files)." />
     </Border>
     <Grid ColumnDefinitions="280,*,420">
-      <tdg:TreeDataGrid x:Name="FolderTree" Grid.Column="0" />
+      <tdg:TreeDataGrid x:Name="FolderTree" Grid.Column="0" Background="#14161A" />
       <DockPanel Grid.Column="1">
-        <Grid DockPanel.Dock="Top" ColumnDefinitions="*,110,80,150" Margin="8,4">
-          <TextBlock Text="Path" FontWeight="SemiBold" />
-          <TextBlock Grid.Column="1" Text="Type" FontWeight="SemiBold" />
-          <TextBlock Grid.Column="2" Text="Size" FontWeight="SemiBold" />
-          <TextBlock Grid.Column="3" Text="Archive" FontWeight="SemiBold" />
-        </Grid>
+        <StackPanel DockPanel.Dock="Top" Margin="8,4">
+          <CheckBox x:Name="SubfoldersBox" Content="Include subfolders" Click="SubfoldersChanged" ToolTip.Tip="List every file under the selected folder." />
+          <Grid ColumnDefinitions="*,100,70,170" Margin="0,4,0,0">
+            <TextBlock Text="Path" FontWeight="SemiBold" VerticalAlignment="Center" />
+            <TextBlock Grid.Column="1" Text="Type" FontWeight="SemiBold" VerticalAlignment="Center" />
+            <TextBlock Grid.Column="2" Text="Size" FontWeight="SemiBold" VerticalAlignment="Center" />
+            <TextBlock Grid.Column="3" Text="Archive" FontWeight="SemiBold" VerticalAlignment="Center" />
+          </Grid>
+        </StackPanel>
         <ListBox x:Name="FileList" SelectionMode="Multiple" SelectionChanged="FileSelectionChanged">
           <ListBox.ItemTemplate>
             <DataTemplate x:DataType="local:FileRow">
-              <Grid ColumnDefinitions="*,110,80,150">
+              <Grid ColumnDefinitions="*,100,70,170">
                 <TextBlock Text="{Binding Path}" TextTrimming="CharacterEllipsis" />
                 <TextBlock Grid.Column="1" Text="{Binding Extension}" />
                 <TextBlock Grid.Column="2" Text="{Binding SizeText}" />
-                <TextBlock Grid.Column="3" Text="{Binding Archive}" TextTrimming="CharacterEllipsis" />
+                <TextBlock Grid.Column="3" Text="{Binding Archive}" TextTrimming="CharacterEllipsis" ToolTip.Tip="{Binding Archive}" />
               </Grid>
             </DataTemplate>
           </ListBox.ItemTemplate>

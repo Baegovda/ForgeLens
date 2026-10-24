@@ -35,6 +35,7 @@ public partial class MainWindow : Window
   private bool _dragging;
   private Point _lastPoint;
   private bool _suppressMip;
+  private int _listGeneration;
 
   public MainWindow()
   {
@@ -66,7 +67,7 @@ public partial class MainWindow : Window
   {
     var folders = await StorageProvider.OpenFolderPickerAsync(new FolderPickerOpenOptions
     {
-      Title = "Space Marine 2 client_pc folder",
+      Title = "Space Marine 2 folder (game root or client_pc)",
       AllowMultiple = false,
     });
     if (folders.Count == 0)
@@ -107,8 +108,6 @@ public partial class MainWindow : Window
       _settings.LastFolder = path;
       _settings.Save();
       BindTree(catalog);
-      var skipped = catalog.ArchivesSkipped == 0 ? "" : $", {catalog.ArchivesSkipped} caches skipped";
-      StatusText.Text = $"{catalog.Archives.Count} archives, {catalog.FileCount:N0} files{skipped}. Folders are on the left; files stay in the list so 486k entries are not tree nodes.";
       ExportButton.IsEnabled = catalog.FileCount > 0;
     }
     catch (OperationCanceledException)
@@ -132,7 +131,7 @@ public partial class MainWindow : Window
       Columns =
       {
         new HierarchicalExpanderColumn<CatalogDirectory>(
-          new TextColumn<CatalogDirectory, string>("Folder", directory => directory.Path.Length == 0 ? directory.Name : directory.Name, width: new GridLength(1, GridUnitType.Star)),
+          new TextColumn<CatalogDirectory, string>("Folder", directory => directory.Name, width: new GridLength(1, GridUnitType.Star)),
           directory => directory.Children,
           directory => directory.Children.Length > 0),
       },
@@ -140,11 +139,16 @@ public partial class MainWindow : Window
     source.RowSelection!.SingleSelect = true;
     source.RowSelection.SelectionChanged += (_, _) =>
     {
-      _directory = source.RowSelection.SelectedItem;
+      if (source.RowSelection.SelectedItem is not CatalogDirectory directory)
+        return;
+      _directory = directory;
       RefreshFiles();
     };
     FolderTree.Source = source;
     _directory = catalog.Root;
+    var root = new IndexPath(0);
+    source.Expand(root);
+    source.RowSelection.Select(root);
     RefreshFiles();
   }
 
@@ -161,11 +165,20 @@ public partial class MainWindow : Window
     RefreshFiles();
   }
 
-  private void RefreshFiles()
+  private void SubfoldersChanged(object? sender, RoutedEventArgs e)
+  {
+    if (_catalog is null)
+      return;
+    RefreshFiles();
+  }
+
+  private async void RefreshFiles()
   {
     if (_catalog is null)
       return;
 
+    var catalog = _catalog;
+    var directory = _directory ?? catalog.Root;
     var filter = FilterBox.SelectedIndex switch
     {
       1 => AssetFilter.Textures,
@@ -175,10 +188,34 @@ public partial class MainWindow : Window
       5 => AssetFilter.Text,
       _ => AssetFilter.All,
     };
-    var directory = string.IsNullOrWhiteSpace(SearchBox.Text) ? _directory ?? _catalog.Root : null;
-    var query = _catalog.Query(directory, SearchBox.Text, filter);
-    FileList.ItemsSource = new FileRowList(_catalog, query);
-    StatusText.Text = $"{query.Length:N0} shown of {_catalog.FileCount:N0} files in {_catalog.Archives.Count} archives.";
+    var search = SearchBox.Text;
+    var includeSubfolders = SubfoldersBox?.IsChecked == true;
+    var scoped = string.IsNullOrWhiteSpace(search) ? directory : null;
+    var generation = ++_listGeneration;
+    FileQuery query;
+    try
+    {
+      query = await Task.Run(() => catalog.Query(scoped, search, filter, includeSubfolders && scoped is not null));
+    }
+    catch (Exception ex)
+    {
+      if (generation == _listGeneration)
+        StatusText.Text = ex.Message;
+      return;
+    }
+
+    if (generation != _listGeneration)
+      return;
+
+    FileList.ItemsSource = new FileRowList(catalog, query);
+    var scope = scoped is null
+      ? "search"
+      : includeSubfolders ? directory.Name + " and subfolders" : directory.Name;
+    var hidden = catalog.DuplicatesCollapsed == 0
+      ? ""
+      : $" {catalog.DuplicatesCollapsed:N0} duplicate paths hidden; the later archive is shown.";
+    var skipped = catalog.ArchivesSkipped == 0 ? "" : $" {catalog.ArchivesSkipped} caches skipped.";
+    StatusText.Text = $"{query.Length:N0} shown in {scope}. {directory.Children.Length:N0} subfolders here. {catalog.FileCount:N0} files in {catalog.Archives.Count} archives.{hidden}{skipped}";
   }
 
   private async void FileSelectionChanged(object? sender, SelectionChangedEventArgs e)

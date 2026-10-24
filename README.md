@@ -48,9 +48,9 @@ The extractor is covered by synthetic `.pak` / `.pck` archives in `test/LibSaber
 
 ## Space Marine 2 browser
 
-`LibSaber.SM2Browser` is the desktop browser on top of the same archive reader. Open a `client_pc` folder. The app reads `.pak.cache` / `.pck.cache` files only, builds a folder tree, and leaves the payloads on disk until a preview or export asks for one file. The last folder is stored under `%LocalAppData%\LibSaber\SM2Browser\settings.json`.
+`LibSaber.SM2Browser` is the desktop browser on top of the same archive reader. Open the game folder or a `client_pc` folder. The app reads `.pak.cache` / `.pck.cache` files under that folder, builds one folder tree merged across those archives, and leaves the payloads on disk until a preview or export asks for one file. The last folder is stored under `%LocalAppData%\LibSaber\SM2Browser\settings.json`.
 
-The tree is folders. Files stay in a virtualized list (name, type, size, archive) because a retail install is on the order of 486,000 entries, most of them `.pct_mip`. Search matches the path. The type filter covers textures, models, animations, effects, and text.
+The folder tree starts expanded at the root you opened. Files stay in a virtualized list (path, type, size, archive) because a retail install is on the order of 486,000 entries, most of them `.pct_mip`. "Include subfolders" lists every file under the selected folder. Search matches the path. The type filter covers textures, models, animations, effects, and text. The same internal path in more than one archive keeps the last archive in path order, and the archive column is that archive's path relative to the folder you opened.
 
 Preview, in priority order:
 

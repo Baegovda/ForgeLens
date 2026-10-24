@@ -45,6 +45,12 @@ public sealed class GameCatalog
   public CatalogDirectory Root { get; }
   public int FileCount => _files.Length;
   public int ArchivesSkipped { get; }
+
+  /// <summary>
+  ///   Identical internal paths were collapsed. The last archive in path order is the one kept.
+  /// </summary>
+  public int DuplicatesCollapsed { get; }
+
   public IReadOnlyList<string> Warnings { get; }
 
   private GameCatalog(
@@ -60,6 +66,7 @@ public sealed class GameCatalog
     Dictionary<string, int> nameFirst,
     Dictionary<string, int[]> nameAll,
     int archivesSkipped,
+    int duplicatesCollapsed,
     IReadOnlyList<string> warnings)
   {
     RootPath = rootPath;
@@ -74,6 +81,7 @@ public sealed class GameCatalog
     _nameFirst = nameFirst;
     _nameAll = nameAll;
     ArchivesSkipped = archivesSkipped;
+    DuplicatesCollapsed = duplicatesCollapsed;
     Warnings = warnings;
   }
 
@@ -98,17 +106,20 @@ public sealed class GameCatalog
     };
   }
 
-  public FileQuery Query(CatalogDirectory? directory, string? nameContains, AssetFilter filter)
+  public FileQuery Query(CatalogDirectory? directory, string? nameContains, AssetFilter filter, bool includeSubfolders = false)
   {
     var text = string.IsNullOrWhiteSpace(nameContains) ? null : nameContains.Trim();
     var global = text is not null;
+    var span = directory is null
+      ? 0
+      : includeSubfolders ? directory.SubtreeFileCount : directory.FileCount;
     if (!global && filter == AssetFilter.All && directory is not null)
-      return new FileQuery(directory.FirstFile, directory.FileCount, null);
+      return new FileQuery(directory.FirstFile, span, null);
 
     var matches = new List<int>();
     if (!global && directory is not null)
     {
-      var end = directory.FirstFile + directory.FileCount;
+      var end = directory.FirstFile + span;
       for (var i = directory.FirstFile; i < end; i++)
       {
         if (AssetClassification.Matches(filter, KindOf(i)))
@@ -232,7 +243,7 @@ public sealed class GameCatalog
       cancellation.ThrowIfCancellationRequested();
       var cachePath = caches[i];
       var pakPath = cachePath[..^".cache".Length];
-      var archiveName = Path.GetFileName(pakPath);
+      var archiveName = RelativeArchiveName(directory, pakPath);
       progress?.Report(new CatalogProgress(i, caches.Length, raw.Count, archiveName));
 
       fioZIP_CACHE_FILE cache;
@@ -288,6 +299,7 @@ public sealed class GameCatalog
       archives.Add(new ArchiveRecord(archiveName, pakPath, hasPayload, added));
     }
 
+    var duplicatesCollapsed = CollapseDuplicates(raw);
     progress?.Report(new CatalogProgress(caches.Length, caches.Length, raw.Count, "Building folders"));
 
     var rootNode = new DirNode(Path.GetFileName(directory.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar)), "");
@@ -329,6 +341,7 @@ public sealed class GameCatalog
       nameFirst,
       Freeze(nameLists),
       skipped,
+      duplicatesCollapsed,
       warnings);
   }
 
@@ -430,7 +443,55 @@ public sealed class GameCatalog
     foreach (var child in node.Children.Values.OrderBy(c => c.Name, StringComparer.OrdinalIgnoreCase))
       children[childIndex++] = Flatten(child, raw, files, paths, names, ref next);
 
-    return new CatalogDirectory(node.Name, node.Path, children, first, node.Files.Count);
+    var subtree = node.Files.Count;
+    for (var i = 0; i < children.Length; i++)
+      subtree += children[i].SubtreeFileCount;
+
+    return new CatalogDirectory(node.Name, node.Path, children, first, node.Files.Count, subtree);
+  }
+
+  /// <summary>
+  ///   Same internal path in more than one archive keeps the last copy. Archives are
+  ///   read in path order, so the later path wins, matching extract-without-prefix.
+  /// </summary>
+  private static int CollapseDuplicates(List<RawFile> raw)
+  {
+    var winner = new Dictionary<string, int>(raw.Count, StringComparer.OrdinalIgnoreCase);
+    var drop = new bool[raw.Count];
+    var dropped = 0;
+    for (var i = 0; i < raw.Count; i++)
+    {
+      var path = raw[i].Path;
+      if (!winner.TryGetValue(path, out var previous))
+      {
+        winner.Add(path, i);
+        continue;
+      }
+
+      drop[previous] = true;
+      winner[path] = i;
+      dropped++;
+    }
+
+    if (dropped == 0)
+      return 0;
+
+    var compact = new List<RawFile>(raw.Count - dropped);
+    for (var i = 0; i < raw.Count; i++)
+    {
+      if (!drop[i])
+        compact.Add(raw[i]);
+    }
+
+    raw.Clear();
+    raw.AddRange(compact);
+    return dropped;
+  }
+
+  private static string RelativeArchiveName(string root, string pakPath)
+  {
+    var relative = Path.GetRelativePath(root, pakPath);
+    return relative.Replace('\\', '/');
   }
 
   internal static string Normalize(string path)

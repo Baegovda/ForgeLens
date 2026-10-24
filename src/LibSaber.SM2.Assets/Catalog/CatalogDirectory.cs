@@ -13,13 +13,20 @@ public sealed class CatalogDirectory
   public int FirstFile { get; }
   public int FileCount { get; }
 
-  internal CatalogDirectory(string name, string path, CatalogDirectory[] children, int firstFile, int fileCount)
+  /// <summary>
+  ///   Direct files plus every file under a child folder. Those entries are contiguous
+  ///   in the catalog, starting at <see cref="FirstFile"/>.
+  /// </summary>
+  public int SubtreeFileCount { get; }
+
+  internal CatalogDirectory(string name, string path, CatalogDirectory[] children, int firstFile, int fileCount, int subtreeFileCount)
   {
     Name = name;
     Path = path;
     Children = children;
     FirstFile = firstFile;
     FileCount = fileCount;
+    SubtreeFileCount = subtreeFileCount;
   }
 
 }

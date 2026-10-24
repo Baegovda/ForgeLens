@@ -4,5 +4,7 @@
              RequestedThemeVariant="Dark">
   <Application.Styles>
     <FluentTheme />
+    <!-- Without this include the folder grid has no template and draws as an empty pane. -->
+    <StyleInclude Source="avares://Avalonia.Controls.TreeDataGrid/Themes/Fluent.axaml" />
   </Application.Styles>
 </Application>

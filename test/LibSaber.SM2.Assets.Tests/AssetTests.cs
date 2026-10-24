@@ -41,14 +41,17 @@ public class AssetTests
 
     var catalog = GameCatalog.Load(dir.Path);
     Assert.Equal(5, catalog.FileCount);
+    Assert.Equal(5, catalog.Root.SubtreeFileCount);
     Assert.Equal(1, catalog.Archives.Count);
     Assert.Equal(0, catalog.Root.FileCount);
 
     var folderA = catalog.Root.Children.Single(child => child.Name == "a");
     Assert.Equal(1, folderA.FileCount);
+    Assert.Equal(3, folderA.SubtreeFileCount);
     Assert.Equal("d.txt", catalog.GetFile(folderA.FirstFile).Name);
     var folderB = folderA.Children.Single();
     Assert.Equal(2, folderB.FileCount);
+    Assert.Equal(3, catalog.Query(folderA, null, AssetFilter.All, includeSubfolders: true).Length);
     Assert.DoesNotContain(folderA.Children, child => child.Name.EndsWith(".txt"));
 
     var textures = catalog.Query(null, "hero", AssetFilter.Textures);
@@ -77,11 +80,23 @@ public class AssetTests
   public void Catalog_KeepsDuplicatePathsFromLaterArchives()
   {
     using var dir = new TempDirectory();
-    CacheFile.Create(dir.Path, "a.pak", new[] { new CacheFile.Entry("same/file.txt", new byte[] { 1 }) });
+    CacheFile.Create(dir.Path, "a.pak", new[]
+    {
+      new CacheFile.Entry("same/file.txt", new byte[] { 1 }),
+      new CacheFile.Entry("foo/bar.txt", new byte[] { 8 }),
+      new CacheFile.Entry("foo\\bar.txt", new byte[] { 9 }),
+    });
     CacheFile.Create(dir.Path, "b.pak", new[] { new CacheFile.Entry("same/file.txt", new byte[] { 2 }) });
     var catalog = GameCatalog.Load(dir.Path);
-    Assert.Equal(2, catalog.FindByPath("same/file.txt").Count);
+    Assert.Equal(2, catalog.DuplicatesCollapsed);
+    Assert.Single(catalog.FindByPath("same/file.txt"));
     Assert.Equal(2, catalog.FileCount);
+    var kept = catalog.GetFile(catalog.FindByPath("same/file.txt")[0]);
+    Assert.Equal("b.pak", kept.ArchiveName);
+    using var store = new ArchiveStore(catalog);
+    Assert.Equal(new byte[] { 2 }, store.Read(kept.Index));
+    var slash = catalog.GetFile(catalog.FindByPath("foo/bar.txt")[0]);
+    Assert.Equal(new byte[] { 9 }, store.Read(slash.Index));
   }
 
   [Fact]
