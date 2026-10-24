@@ -346,9 +346,28 @@ public class AssetTests
     var json = Encoding.UTF8.GetString(glbBytes, 20, jsonLength).TrimEnd();
     Assert.Contains("\"meshes\"", json);
     Assert.Contains("\"animations\"", json);
-    var fbxText = File.ReadAllText(fbx);
-    Assert.Contains("Vertices:", fbxText);
-    Assert.Contains("LimbNode", fbxText);
+    var fbxBytes = File.ReadAllBytes(fbx);
+    Assert.Equal("Kaydara FBX Binary  "u8.ToArray(), fbxBytes[..20]);
+    Assert.Equal(7400, BitConverter.ToInt32(fbxBytes, 23));
+    Assert.True(fbxBytes.AsSpan().IndexOf("Vertices"u8) >= 0);
+    Assert.True(fbxBytes.AsSpan().IndexOf("LimbNode"u8) >= 0);
+    Assert.True(fbxBytes.AsSpan().IndexOf("DiffuseColor"u8) >= 0);
+    Assert.True(fbxBytes.AsSpan().IndexOf("TransformLink"u8) < 0);
+
+    var source = Matrix4x4.CreateRotationX(0.4f) * Matrix4x4.CreateRotationY(-0.3f) * Matrix4x4.CreateRotationZ(0.5f);
+    var euler = FbxWriter.EulerXYZDegrees(source);
+    var back = Matrix4x4.CreateRotationX(euler.X * MathF.PI / 180f)
+      * Matrix4x4.CreateRotationY(euler.Y * MathF.PI / 180f)
+      * Matrix4x4.CreateRotationZ(euler.Z * MathF.PI / 180f);
+    Assert.Equal(source.M11, back.M11, 0.001f);
+    Assert.Equal(source.M12, back.M12, 0.001f);
+    Assert.Equal(source.M13, back.M13, 0.001f);
+    Assert.Equal(source.M21, back.M21, 0.001f);
+    Assert.Equal(source.M22, back.M22, 0.001f);
+    Assert.Equal(source.M23, back.M23, 0.001f);
+    Assert.Equal(source.M31, back.M31, 0.001f);
+    Assert.Equal(source.M32, back.M32, 0.001f);
+    Assert.Equal(source.M33, back.M33, 0.001f);
 
     var image = MeshPreview.Render(mesh, 128, 128, new OrbitCamera { Yaw = 0.4f, Pitch = 1.0f, Distance = 4 }, true, 0, out _);
     var lit = 0;
@@ -361,6 +380,111 @@ public class AssetTests
     Assert.True(lit > 20, $"lit pixels {lit}");
     var sampled = AnimationClip.Sample(mesh.Clip.Tracks[0].Translation, Vector3.Zero, 0.5f);
     Assert.Equal(1.5f, sampled.Z, 3f);
+  }
+
+  [Fact]
+  public void SkinnedFbx_RoundTripsThroughBlenderAndAssimp()
+  {
+    var mesh = new ExportedMesh { Name = "plate" };
+    mesh.Positions.Add(new Vector3(-0.2f, 0, 0));
+    mesh.Positions.Add(new Vector3(0.2f, 0, 0));
+    mesh.Positions.Add(new Vector3(0.2f, 2, 0));
+    mesh.Positions.Add(new Vector3(-0.2f, 2, 0));
+    for (var i = 0; i < 4; i++)
+      mesh.Normals.Add(Vector3.UnitZ);
+    mesh.Uvs.Add(new Vector2(0, 0));
+    mesh.Uvs.Add(new Vector2(1, 0));
+    mesh.Uvs.Add(new Vector2(1, 1));
+    mesh.Uvs.Add(new Vector2(0, 1));
+    mesh.Indices.AddRange(new[] { 0, 1, 2, 0, 2, 3 });
+    mesh.Parts.Add(new MeshPart { Name = "plate", IndexStart = 0, IndexCount = 6, Texture = "plate_color" });
+    var root = Matrix4x4.CreateTranslation(0, 0, 0);
+    var tip = Matrix4x4.CreateRotationZ(0.4f) * Matrix4x4.CreateTranslation(0, 1, 0);
+    Matrix4x4.Invert(tip, out var tipInverse);
+    mesh.Bones.Add(new Bone { Name = "root", Local = root, InverseBind = Matrix4x4.Identity });
+    mesh.Bones.Add(new Bone { Name = "tip", Parent = 0, Local = tip, InverseBind = tipInverse });
+    mesh.Skin.Add(new SkinWeights { J0 = 0, W0 = 1 });
+    mesh.Skin.Add(new SkinWeights { J0 = 0, W0 = 1 });
+    mesh.Skin.Add(new SkinWeights { J0 = 1, W0 = 1 });
+    mesh.Skin.Add(new SkinWeights { J0 = 1, W0 = 1 });
+
+    using var dir = new TempDirectory();
+    var fbx = Path.Combine(dir.Path, "plate.fbx");
+    var glb = Path.Combine(dir.Path, "plate.glb");
+    FbxWriter.Write(fbx, mesh, ExportSpace.Unreal);
+    GltfWriter.Write(glb, mesh, ExportSpace.Unreal);
+    var fbxBytes = File.ReadAllBytes(fbx);
+    Assert.True(fbxBytes.AsSpan().IndexOf("TransformLink"u8) >= 0);
+    Assert.True(fbxBytes.AsSpan().IndexOf("BindPose"u8) >= 0);
+    Assert.True(fbxBytes.AsSpan().IndexOf("plate_color.png"u8) >= 0);
+    Assert.True(fbxBytes.AsSpan().IndexOf("\0\u0001Geometry"u8) >= 0 || fbxBytes.AsSpan().IndexOf("Geometry"u8) >= 0);
+
+    if (!File.Exists("/usr/bin/blender") || !File.Exists("/usr/bin/assimp"))
+      return;
+
+    var assimp = RunTool("/usr/bin/assimp", "info", fbx);
+    Assert.Contains("Vertices:           4", assimp);
+    Assert.Contains("Faces:              2", assimp);
+    Assert.Contains("Bones:              2", assimp);
+    Assert.Contains("plate_color.png", assimp);
+
+    var script = Path.Combine(dir.Path, "check.py");
+    File.WriteAllText(script, """
+      import bpy, sys
+      kind, path = sys.argv[sys.argv.index("--") + 1:]
+      bpy.ops.wm.read_factory_settings(use_empty=True)
+      if kind == "fbx":
+          bpy.ops.import_scene.fbx(filepath=path)
+      else:
+          bpy.ops.import_scene.gltf(filepath=path)
+      def display_only(obj):
+          return any(col.name == "glTF_not_exported" for col in obj.users_collection)
+      meshes = [o for o in bpy.data.objects if o.type == "MESH" and not display_only(o)]
+      arms = [o for o in bpy.data.objects if o.type == "ARMATURE"]
+      verts = sum(len(o.data.vertices) for o in meshes)
+      polys = sum(len(o.data.polygons) for o in meshes)
+      bones = sum(len(o.data.bones) for o in arms)
+      groups = sum(len(o.vertex_groups) for o in meshes)
+      uvs = len(meshes[0].data.uv_layers) if meshes else 0
+      uvset = ""
+      if uvs:
+          layer = meshes[0].data.uv_layers[0].data
+          uvset = "|".join(sorted({f"{loop.uv.x:.2f},{loop.uv.y:.2f}" for loop in layer}))
+      names = ",".join(f"{o.name}:{len(o.data.vertices)}:{len(o.data.polygons)}" for o in meshes)
+      print(f"RESULT verts={verts} polys={polys} bones={bones} groups={groups} uvs={uvs} uvset={uvset} meshes={len(meshes)} arms={len(arms)} detail={names}")
+      """);
+    var fbxImport = RunTool("/usr/bin/blender", "--background", "--python", script, "--", "fbx", fbx);
+    Assert.Contains("RESULT verts=4 polys=2 bones=2", fbxImport);
+    Assert.Contains("uvs=1 uvset=0.00,0.00|0.00,1.00|1.00,0.00|1.00,1.00", fbxImport);
+    Assert.DoesNotContain("mapping type unsupported", fbxImport);
+    var glbImport = RunTool("/usr/bin/blender", "--background", "--python", script, "--", "glb", glb);
+    Assert.Contains("RESULT verts=4 polys=2 bones=2", glbImport);
+    Assert.Contains("uvs=1 uvset=0.00,0.00|0.00,1.00|1.00,0.00|1.00,1.00", glbImport);
+
+    var validator = "/tmp/gltfval/gltf_validator";
+    if (!File.Exists(validator))
+      return;
+    RunTool(validator, glb);
+    var report = File.ReadAllText(glb + ".report.json");
+    Assert.Contains("\"numErrors\": 0", report);
+  }
+
+  private static string RunTool(string file, params string[] args)
+  {
+    var info = new ProcessStartInfo(file)
+    {
+      RedirectStandardOutput = true,
+      RedirectStandardError = true,
+      UseShellExecute = false,
+    };
+    foreach (var arg in args)
+      info.ArgumentList.Add(arg);
+    var process = Process.Start(info)!;
+    var stdout = process.StandardOutput.ReadToEnd();
+    var stderr = process.StandardError.ReadToEnd();
+    process.WaitForExit();
+    Assert.True(process.ExitCode == 0, stdout + stderr);
+    return stdout + stderr;
   }
 
   [Fact]

@@ -723,20 +723,72 @@ public static class TemplateMeshReader
     var fourth = vertex.HasWeight4
       && !(vertex.Weight4 > 0.99f && vertex.Weight1 + vertex.Weight2 + vertex.Weight3 > 0.97f);
     Take(vertex.Index4, vertex.Weight4, fourth, boneIds, ref skin, ref slot);
-    var sum = skin.W0 + skin.W1 + skin.W2 + skin.W3;
+    // Byte weights such as 128+128 sum to 256/255, and a vertex can list the same
+    // bone twice. glTF requires unique joints and a sum of 1.
+    NormalizeSkin(ref skin);
+    target.Skin.Add(skin);
+  }
+
+  private static void NormalizeSkin(ref SkinWeights skin)
+  {
+    Span<(ushort Joint, float Weight)> slots = stackalloc (ushort, float)[4];
+    var count = 0;
+    count = Accumulate(slots, count, skin.J0, skin.W0);
+    count = Accumulate(slots, count, skin.J1, skin.W1);
+    count = Accumulate(slots, count, skin.J2, skin.W2);
+    count = Accumulate(slots, count, skin.J3, skin.W3);
+
+    var sum = 0f;
+    for (var i = 0; i < count; i++)
+      sum += slots[i].Weight;
+
+    skin = default;
     if (sum <= 0.0001f)
     {
       skin.W0 = 1;
-    }
-    else if (MathF.Abs(sum - 1f) > 0.02f)
-    {
-      skin.W0 /= sum;
-      skin.W1 /= sum;
-      skin.W2 /= sum;
-      skin.W3 /= sum;
+      return;
     }
 
-    target.Skin.Add(skin);
+    var scale = 1f / sum;
+    if (count > 0)
+    {
+      skin.J0 = slots[0].Joint;
+      skin.W0 = slots[0].Weight * scale;
+    }
+
+    if (count > 1)
+    {
+      skin.J1 = slots[1].Joint;
+      skin.W1 = slots[1].Weight * scale;
+    }
+
+    if (count > 2)
+    {
+      skin.J2 = slots[2].Joint;
+      skin.W2 = slots[2].Weight * scale;
+    }
+
+    if (count > 3)
+    {
+      skin.J3 = slots[3].Joint;
+      skin.W3 = slots[3].Weight * scale;
+    }
+  }
+
+  private static int Accumulate(Span<(ushort Joint, float Weight)> slots, int count, ushort joint, float weight)
+  {
+    if (weight <= 0)
+      return count;
+    for (var i = 0; i < count; i++)
+    {
+      if (slots[i].Joint != joint)
+        continue;
+      slots[i].Weight += weight;
+      return count;
+    }
+
+    slots[count] = (joint, weight);
+    return count + 1;
   }
 
   private static void Take(short index, float weight, bool present, short[]? boneIds, ref SkinWeights skin, ref int slot)

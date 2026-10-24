@@ -117,9 +117,11 @@ public class RetailSampleTests
     Assert.Equal(new byte[] { (byte)'g', (byte)'l', (byte)'T', (byte)'F' }, glb[..4]);
     var json = System.Text.Encoding.UTF8.GetString(glb);
     Assert.Contains("TEXCOORD_0", json);
-    var fbx = File.ReadAllText(Directory.GetFiles(output, "*.fbx", SearchOption.AllDirectories).Single());
-    Assert.Contains("LayerElementUV", fbx);
-    Assert.Contains("LayerElementNormal", fbx);
+    var fbx = File.ReadAllBytes(Directory.GetFiles(output, "*.fbx", SearchOption.AllDirectories).Single());
+    Assert.Equal("Kaydara FBX Binary  "u8.ToArray(), fbx[..20]);
+    Assert.Equal(7400, BitConverter.ToInt32(fbx, 23));
+    Assert.True(fbx.AsSpan().IndexOf("LayerElementUV"u8) >= 0);
+    Assert.True(fbx.AsSpan().IndexOf("LayerElementNormal"u8) >= 0);
   }
 
   [Fact]

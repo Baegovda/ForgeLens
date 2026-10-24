@@ -13,13 +13,15 @@ public static class GltfWriter
     var views = new List<string>();
     var accessors = new List<string>();
 
-    int Add(ReadOnlySpan<byte> bytes, int componentSize)
+    int Add(ReadOnlySpan<byte> bytes, int componentSize, int target)
     {
       while (bin.Length % componentSize != 0)
         bin.WriteByte(0);
       var offset = (int)bin.Length;
       bin.Write(bytes);
-      views.Add($"{{\"buffer\":0,\"byteOffset\":{offset},\"byteLength\":{bytes.Length}}}");
+      views.Add(target == 0
+        ? $"{{\"buffer\":0,\"byteOffset\":{offset},\"byteLength\":{bytes.Length}}}"
+        : $"{{\"buffer\":0,\"byteOffset\":{offset},\"byteLength\":{bytes.Length},\"target\":{target}}}");
       return views.Count - 1;
     }
 
@@ -53,7 +55,7 @@ public static class GltfWriter
         max = Vector3.Max(max, point);
       }
 
-      var view = Add(AsBytes(floats), 4);
+      var view = Add(AsBytes(floats), 4, 34962);
       positionAccessor = Accessor(view, "VEC3", mesh.Positions.Count, "5126",
         $",\"min\":[{F(min.X)},{F(min.Y)},{F(min.Z)}],\"max\":[{F(max.X)},{F(max.Y)},{F(max.Z)}]");
     }
@@ -71,7 +73,7 @@ public static class GltfWriter
         floats[i * 3 + 2] = normal.Z;
       }
 
-      normalAccessor = Accessor(Add(AsBytes(floats), 4), "VEC3", mesh.Normals.Count, "5126");
+      normalAccessor = Accessor(Add(AsBytes(floats), 4, 34962), "VEC3", mesh.Normals.Count, "5126");
     }
 
     if (mesh.Uvs.Count == mesh.Positions.Count && mesh.Positions.Count > 0)
@@ -83,7 +85,7 @@ public static class GltfWriter
         floats[i * 2 + 1] = mesh.Uvs[i].Y;
       }
 
-      uvAccessor = Accessor(Add(AsBytes(floats), 4), "VEC2", mesh.Uvs.Count, "5126");
+      uvAccessor = Accessor(Add(AsBytes(floats), 4, 34962), "VEC2", mesh.Uvs.Count, "5126");
     }
 
     if (mesh.HasSkin)
@@ -103,13 +105,22 @@ public static class GltfWriter
         weights[i * 4 + 3] = skin.W3;
       }
 
-      jointAccessor = Accessor(Add(MemoryMarshalBytes(joints), 4), "VEC4", mesh.Skin.Count, "5123");
-      weightAccessor = Accessor(Add(AsBytes(weights), 4), "VEC4", mesh.Skin.Count, "5126");
+      jointAccessor = Accessor(Add(MemoryMarshalBytes(joints), 4, 34962), "VEC4", mesh.Skin.Count, "5123");
+      weightAccessor = Accessor(Add(AsBytes(weights), 4, 34962), "VEC4", mesh.Skin.Count, "5126");
 
       var matrices = new float[mesh.Bones.Count * 16];
       for (var i = 0; i < mesh.Bones.Count; i++)
-        WriteColumnMajor(matrices, i * 16, AxisConvert.Matrix(mesh.Bones[i].InverseBind, space, gltf: true));
-      inverseAccessor = Accessor(Add(AsBytes(matrices), 4), "MAT4", mesh.Bones.Count, "5126");
+      {
+        // Inverse binds come from a float inverse, so M44 drifts off 1 by ~1e-7.
+        // glTF requires an affine matrix: perspective row 0,0,0 and M44 exactly 1.
+        var bind = AxisConvert.Matrix(mesh.Bones[i].InverseBind, space, gltf: true);
+        bind.M14 = 0;
+        bind.M24 = 0;
+        bind.M34 = 0;
+        bind.M44 = 1;
+        WriteColumnMajor(matrices, i * 16, bind);
+      }
+      inverseAccessor = Accessor(Add(AsBytes(matrices), 4, 0), "MAT4", mesh.Bones.Count, "5126");
     }
 
     if (mesh.Indices.Count > 0)
@@ -117,7 +128,7 @@ public static class GltfWriter
       var indices = new uint[mesh.Indices.Count];
       for (var i = 0; i < indices.Length; i++)
         indices[i] = (uint)mesh.Indices[i];
-      indexAccessor = Accessor(Add(MemoryMarshalBytes(indices), 4), "SCALAR", indices.Length, "5125");
+      indexAccessor = Accessor(Add(MemoryMarshalBytes(indices), 4, 34963), "SCALAR", indices.Length, "5125");
     }
 
     var nodes = new List<string>();
@@ -343,21 +354,23 @@ public static class GltfWriter
 
   private static void WriteColumnMajor(float[] destination, int offset, Matrix4x4 matrix)
   {
+    // glTF stores column vectors. System.Numerics is a row-vector matrix, so the
+    // matching column-major array is the row-major dump: translation sits in the last column.
     destination[offset] = matrix.M11;
-    destination[offset + 1] = matrix.M21;
-    destination[offset + 2] = matrix.M31;
-    destination[offset + 3] = matrix.M41;
-    destination[offset + 4] = matrix.M12;
+    destination[offset + 1] = matrix.M12;
+    destination[offset + 2] = matrix.M13;
+    destination[offset + 3] = matrix.M14;
+    destination[offset + 4] = matrix.M21;
     destination[offset + 5] = matrix.M22;
-    destination[offset + 6] = matrix.M32;
-    destination[offset + 7] = matrix.M42;
-    destination[offset + 8] = matrix.M13;
-    destination[offset + 9] = matrix.M23;
+    destination[offset + 6] = matrix.M23;
+    destination[offset + 7] = matrix.M24;
+    destination[offset + 8] = matrix.M31;
+    destination[offset + 9] = matrix.M32;
     destination[offset + 10] = matrix.M33;
-    destination[offset + 11] = matrix.M43;
-    destination[offset + 12] = matrix.M14;
-    destination[offset + 13] = matrix.M24;
-    destination[offset + 14] = matrix.M34;
+    destination[offset + 11] = matrix.M34;
+    destination[offset + 12] = matrix.M41;
+    destination[offset + 13] = matrix.M42;
+    destination[offset + 14] = matrix.M43;
     destination[offset + 15] = matrix.M44;
   }
 

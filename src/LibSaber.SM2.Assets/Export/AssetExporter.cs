@@ -433,7 +433,7 @@ public static class AssetExporter
       + space + Environment.NewLine
       + "DDS keeps the original block compression. PNG and TGA are decoded previews." + Environment.NewLine
       + "Most textures are .pct.resource plus .pct_mip. A bare .pct is uncommon." + Environment.NewLine
-      + "Models are .tpl plus .tpl_data. Export keeps every part of the largest vertex pool, and the textures those parts name when they are in the catalog. .lods_base, .geom_dbg, and .cdt are not mesh payloads." + Environment.NewLine
+      + "Models are .tpl plus .tpl_data. Export keeps every part of the largest vertex pool, and the textures those parts name when they are in the catalog. FBX is binary 7.4, Z-up, with a skinned limb hierarchy. .lods_base, .geom_dbg, and .cdt are not mesh payloads." + Environment.NewLine
       + "Animations: retail .sani is an ETNA clip (bone names, duration, events). Packed curves and .sani_data are not expanded into glTF channels." + Environment.NewLine
       + "Particle systems (.ps, .sfx) are not converted. Their raw bytes and any named meshes or textures are copied." + Environment.NewLine;
   }
