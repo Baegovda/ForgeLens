@@ -45,6 +45,9 @@ public static class AssetExporter
     var notePath = Path.Combine(outputDirectory, "export-notes.txt");
     File.WriteAllText(notePath, Notes(settings));
     report.Written++;
+    var batch = new string[files.Count];
+    for (var i = 0; i < files.Count; i++)
+      batch[i] = catalog.GetFile(files[i]).Path;
 
     foreach (var index in files)
     {
@@ -56,16 +59,16 @@ public static class AssetExporter
         switch (file.Kind)
         {
           case AssetKind.Texture:
-            ExportTexture(catalog, store, index, file, outputDirectory, settings, report);
+            ExportTexture(catalog, store, index, file, outputDirectory, settings, report, batch);
             break;
           case AssetKind.Model:
-            ExportModel(catalog, store, index, file, outputDirectory, settings, report);
+            ExportModel(catalog, store, index, file, outputDirectory, settings, report, batch);
             break;
           case AssetKind.Animation:
-            ExportAnimation(catalog, store, index, file, outputDirectory, settings, report);
+            ExportAnimation(catalog, store, index, file, outputDirectory, settings, report, batch);
             break;
           case AssetKind.Effect:
-            ExportEffect(catalog, store, index, file, outputDirectory, settings, report);
+            ExportEffect(catalog, store, index, file, outputDirectory, settings, report, batch);
             break;
           default:
             WriteOriginal(store, index, file, outputDirectory, report, file.Kind == AssetKind.TextureMip
@@ -94,7 +97,8 @@ public static class AssetExporter
     CatalogFileInfo file,
     string outputDirectory,
     ExportSettings settings,
-    ExportReport report)
+    ExportReport report,
+    IReadOnlyList<string> batch)
   {
     var document = TextureLoader.Load(catalog, store, index);
     if (document.Payload.Length == 0)
@@ -112,7 +116,7 @@ public static class AssetExporter
 
     if (settings.WriteDds)
     {
-      var path = OutputPaths.Map(outputDirectory, file.Path, ".dds");
+      var path = Destination(outputDirectory, file.Path, ".dds", batch);
       DdsWriter.Write(
         path,
         document.Payload,
@@ -135,13 +139,13 @@ public static class AssetExporter
         report.Messages.Add(file.Path + ": " + note);
       if (settings.WritePng)
       {
-        ImageWriters.WritePng(OutputPaths.Map(outputDirectory, file.Path, ".png"), pixels, width, height);
+        ImageWriters.WritePng(Destination(outputDirectory, file.Path, ".png", batch), pixels, width, height);
         report.Written++;
       }
 
       if (settings.WriteTga)
       {
-        ImageWriters.WriteTga(OutputPaths.Map(outputDirectory, file.Path, ".tga"), pixels, width, height);
+        ImageWriters.WriteTga(Destination(outputDirectory, file.Path, ".tga", batch), pixels, width, height);
         report.Written++;
       }
     }
@@ -158,7 +162,8 @@ public static class AssetExporter
     CatalogFileInfo file,
     string outputDirectory,
     ExportSettings settings,
-    ExportReport report)
+    ExportReport report,
+    IReadOnlyList<string> batch)
   {
     var mesh = TemplateMeshReader.Load(catalog, store, index);
     if (mesh.Message.Length > 0)
@@ -174,17 +179,17 @@ public static class AssetExporter
 
     if (settings.WriteGltf)
     {
-      GltfWriter.Write(OutputPaths.Map(outputDirectory, file.Path, ".glb"), mesh, settings.Space);
+      GltfWriter.Write(Destination(outputDirectory, file.Path, ".glb", batch), mesh, settings.Space);
       report.Written++;
     }
 
     if (settings.WriteFbx && mesh.HasTriangles)
     {
-      FbxWriter.Write(OutputPaths.Map(outputDirectory, file.Path, ".fbx"), mesh, settings.Space);
+      FbxWriter.Write(Destination(outputDirectory, file.Path, ".fbx", batch), mesh, settings.Space);
       report.Written++;
     }
 
-    WriteMaterial(outputDirectory, file.Path, mesh.Material, settings, report);
+    WriteMaterial(outputDirectory, file.Path, mesh.Material, settings, report, batch);
   }
 
   private static void ExportAnimation(
@@ -194,15 +199,20 @@ public static class AssetExporter
     CatalogFileInfo file,
     string outputDirectory,
     ExportSettings settings,
-    ExportReport report)
+    ExportReport report,
+    IReadOnlyList<string> batch)
   {
     var clip = SaniReader.Load(catalog, store, index);
-    var jsonPath = OutputPaths.Map(outputDirectory, file.Path, ".anim.json");
+    var jsonPath = Destination(outputDirectory, file.Path, ".anim.json", batch);
     File.WriteAllText(jsonPath, JsonSerializer.Serialize(new
     {
       clip.Name,
       clip.Duration,
-      note = "Retail .sani / .sani_data pairing is unverified. Particle systems are unrelated and are not converted.",
+      clip.SampleRate,
+      bones = clip.Bones,
+      note = clip.Notes.Count == 0
+        ? "No curves were produced. Particle systems are unrelated and are not converted."
+        : string.Join(" ", clip.Notes),
       sequences = clip.Sequences,
       notes = clip.Notes,
       tracks = clip.Tracks.Select(track => new
@@ -235,7 +245,7 @@ public static class AssetExporter
           mesh.Bones[mapped].Name = track.BoneName.Length == 0 ? mesh.Bones[mapped].Name : track.BoneName;
       }
 
-      GltfWriter.Write(OutputPaths.Map(outputDirectory, file.Path, ".glb"), mesh, settings.Space);
+      GltfWriter.Write(Destination(outputDirectory, file.Path, ".glb", batch), mesh, settings.Space);
       report.Written++;
     }
     else if (clip.Notes.Count > 0)
@@ -251,7 +261,8 @@ public static class AssetExporter
     CatalogFileInfo file,
     string outputDirectory,
     ExportSettings settings,
-    ExportReport report)
+    ExportReport report,
+    IReadOnlyList<string> batch)
   {
     WriteOriginal(store, index, file, outputDirectory, report, null);
     var bytes = store.Read(index);
@@ -267,7 +278,7 @@ public static class AssetExporter
       copied.Add(linked.Path);
     }
 
-    var note = OutputPaths.Map(outputDirectory, file.Path, ".effects.txt");
+    var note = Destination(outputDirectory, file.Path, ".effects.txt", batch);
     var builder = new StringBuilder();
     builder.AppendLine("Particle systems and effects are not converted to Unreal or Blender.");
     builder.AppendLine("This folder contains the original effect bytes and any texture or model names found as plain text inside them.");
@@ -281,12 +292,12 @@ public static class AssetExporter
     report.Written++;
   }
 
-  private static void WriteMaterial(string outputDirectory, string relative, MaterialDocument? material, ExportSettings settings, ExportReport report)
+  private static void WriteMaterial(string outputDirectory, string relative, MaterialDocument? material, ExportSettings settings, ExportReport report, IReadOnlyList<string> batch)
   {
     if (!settings.WriteMaterials || material is null || (material.Slots.Count == 0 && material.Notes.Count == 0))
       return;
 
-    var path = OutputPaths.Map(outputDirectory, relative, ".material.json");
+    var path = Destination(outputDirectory, relative, ".material.json", batch);
     File.WriteAllText(path, JsonSerializer.Serialize(new
     {
       material.Name,
@@ -295,6 +306,20 @@ public static class AssetExporter
       notes = material.Notes,
     }, JsonOptions));
     report.Written++;
+  }
+
+  private static string Destination(string outputDirectory, string relative, string extension, IReadOnlyList<string> batch)
+  {
+    var plain = OutputPaths.Map(outputDirectory, relative, extension);
+    foreach (var other in batch)
+    {
+      if (string.Equals(other, relative, StringComparison.OrdinalIgnoreCase))
+        continue;
+      if (OutputPaths.Map(outputDirectory, other, extension) == plain)
+        return OutputPaths.Map(outputDirectory, relative, extension, keepFileName: true);
+    }
+
+    return plain;
   }
 
   private static void WriteOriginal(ArchiveStore store, int index, CatalogFileInfo file, string outputDirectory, ExportReport report, string? note)
@@ -347,14 +372,14 @@ public static class AssetExporter
   private static string Notes(ExportSettings settings)
   {
     var space = settings.Space == ExportSpace.Blender
-      ? "Blender: FBX is Z-up meters (0.01). glTF is Y-up meters."
-      : "Unreal: FBX is Z-up centimeters. glTF is Y-up meters, which both Unreal and Blender import.";
+      ? "Blender: FBX is Z-up meters. glTF is Y-up meters."
+      : "Unreal: FBX is Z-up centimeters (source meters times 100). glTF is Y-up meters, which both Unreal and Blender import.";
     return AxisConvert.Assumption + Environment.NewLine
       + space + Environment.NewLine
       + "DDS keeps the original block compression. PNG and TGA are decoded previews." + Environment.NewLine
       + "Most textures are .pct.resource plus .pct_mip. A bare .pct is uncommon." + Environment.NewLine
-      + "Models are .tpl / .tpl_data / .lods_base (.geom_dbg is debug geometry). External buffer decoding is unverified." + Environment.NewLine
-      + "Animations are .sani / .sani_data. Curve sampling is best-effort." + Environment.NewLine
+      + "Models are .tpl plus .tpl_data. The densest mesh in the file is exported. .lods_base, .geom_dbg, and .cdt are not mesh payloads in the retail sample." + Environment.NewLine
+      + "Animations: retail .sani is an ETNA clip (bone names, duration, events). Packed curves and .sani_data are not expanded into glTF channels." + Environment.NewLine
       + "Particle systems (.ps, .sfx) are not converted. Their raw bytes and any named meshes or textures are copied." + Environment.NewLine;
   }
 
@@ -363,7 +388,7 @@ public static class AssetExporter
 public static class OutputPaths
 {
 
-  public static string Map(string root, string relative, string extensionWithDot)
+  public static string Map(string root, string relative, string extensionWithDot, bool keepFileName = false)
   {
     if (!extensionWithDot.StartsWith('.'))
       extensionWithDot = "." + extensionWithDot;
@@ -389,7 +414,7 @@ public static class OutputPaths
     }
 
     var fileName = safe[^1];
-    var baseName = AssetClassification.BaseName(fileName);
+    var baseName = keepFileName ? fileName : AssetClassification.BaseName(fileName);
     if (string.IsNullOrWhiteSpace(baseName))
       baseName = "file";
 

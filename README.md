@@ -55,11 +55,11 @@ The folder tree starts expanded at the root you opened. Files stay in a virtuali
 Preview, in priority order:
 
 - `.pct.resource` plus the `.pct_mip` files named by its YAML. A bare `.pct` is uncommon. Block formats BC1, BC3, BC4, BC5, BC6, and BC7 decode for the image pane, with mip and cubemap face selection. DDS export keeps the original blocks. PNG and TGA are the decoded image.
-- `.tpl` / `.tpl.resource` for a skeleton and, when the vertex buffer is inside the `.tpl`, a mesh. Orbit and zoom are in the preview pane. `.tpl_data`, `.lods_base`, and `.geom_dbg` are the external geometry buffers; they are not decoded on their own.
-- `.sani` / `.sani_data` for sequence names and best-effort curves. Play poses the skeleton of the model you opened before the clip.
+- `.tpl` / `.tpl.resource` plus the sibling `.tpl_data`. Retail templates keep positions, normals, UVs, and indices in `.tpl_data`, addressed by the buffers inside the `.tpl`. The preview and export use the densest mesh. `.lods_base`, `.geom_dbg`, and `.cdt` in the sample are not the vertex payload.
+- `.sani` is an ETNA clip: bone names, duration, frame rate, and event names. The packed curve blocks and `.sani_data` are not expanded into glTF channels. Play still needs curves, so these retail clips do not pose a mesh yet.
 - Everything else falls back to text or hex. `.ps` and `.sfx` are not converted.
 
-Export writes DDS, PNG, TGA, glTF (`.glb`), FBX, and a material JSON sidecar. glTF is Y-up meters. Unreal FBX is Z-up centimeters. Blender FBX is Z-up meters (scale 0.01). Those units assume the game is centimeters and Z-up. Effects export the raw file plus any texture or model names found as plain text, and a note that particle systems are not converted.
+Export writes DDS, PNG, TGA, glTF (`.glb`), FBX, and a material JSON sidecar. glTF is Y-up meters. Unreal FBX is Z-up centimeters (source times 100). Blender FBX is Z-up meters. Source units are treated as meters and Z-up because a retail helmet's bounds are about 0.32 units tall. A folder export that would otherwise write `.tpl` and `.tpl.resource`, or `.sani`, `.sani.resource`, and `.sani_data`, onto the same file keeps the source file name so the siblings do not overwrite each other. Effects export the raw file plus any texture or model names found as plain text, and a note that particle systems are not converted.
 
 ```
 dotnet run --project src/LibSaber.SM2Browser
@@ -68,4 +68,4 @@ dotnet publish src/LibSaber.SM2Browser -c Release -p:PublishProfile=win-x64
 
 The publish profile is a self-contained single-file `win-x64` build (`PublishSingleFile`, `SelfContained`, `IncludeNativeLibrariesForSelfExtract`), same idea as the extractor. `publish-win-x64.ps1` runs it. Skia is packed into the exe, so the Windows machine does not need a .NET install.
 
-What is still unverified against the retail files, because this environment has no `client_pc` payloads: the exact mip packing inside `.pct_mip`, whether `.tpl_data` / `.lods_base` hold the vertex bytes the `.tpl` describes, skin weights and inverse binds, `.sani` curve layout, and the centimeter Z-up assumption. The browser still opens those files, shows the bytes, and says when a decoder does not recognize them.
+A small retail extract can be checked by setting `LIBSABER_SM2_SAMPLE` to that folder and running `LibSaber.SM2.Assets.Tests`. The game bytes are not in the repo. When the variable is unset the retail test returns without reading files, because this test runner reports a dynamic skip as a failure. The checked sample covers BC3 and BC5 textures (a normal map and a specular map that share the DXN format), `.tpl` plus `.tpl_data` for a helmet and a shield, and two ETNA `.sani` clips. Still open on those files: expanding the packed animation curves, skin weights (these meshes have none), and whether every other texture format or a skinned character matches the same path. `.lods_base`, `.geom_dbg`, and `.cdt` in the sample are not the vertex buffer.

@@ -186,16 +186,16 @@ public class AssetTests
   }
 
   [Fact]
-  public void Axis_GltfTurnsZUpCentimetersIntoYUpMeters()
+  public void Axis_GltfKeepsMetersAndUnrealScalesToCentimeters()
   {
     var point = AxisConvert.Point(new Vector3(0, 2, 0), ExportSpace.Unreal, gltf: true);
     Assert.True(MathF.Abs(point.X) < 0.0001f);
     Assert.True(MathF.Abs(point.Y) < 0.0001f);
-    Assert.True(MathF.Abs(point.Z + 0.02f) < 0.0001f);
+    Assert.True(MathF.Abs(point.Z + 2f) < 0.0001f);
     var unreal = AxisConvert.Point(new Vector3(0, 2, 0), ExportSpace.Unreal, gltf: false);
-    Assert.True(MathF.Abs(unreal.Y - 2f) < 0.0001f);
+    Assert.True(MathF.Abs(unreal.Y - 200f) < 0.0001f);
     var blender = AxisConvert.Point(new Vector3(0, 2, 0), ExportSpace.Blender, gltf: false);
-    Assert.True(MathF.Abs(blender.Y - 0.02f) < 0.0001f);
+    Assert.True(MathF.Abs(blender.Y - 2f) < 0.0001f);
   }
 
   [Fact]
@@ -254,6 +254,48 @@ public class AssetTests
     Assert.Contains("textures/body.pct.resource", names);
     Assert.Contains("models/marine.tpl", names);
     Assert.Throws<InvalidDataException>(() => OutputPaths.Map(Path.GetTempPath(), "../outside.txt", ".dds"));
+  }
+
+  [Fact]
+  public void OutputPaths_KeepFileName_SeparatesSiblingExports()
+  {
+    var root = Path.Combine(Path.GetTempPath(), "libsaber-out-" + Guid.NewGuid().ToString("N"));
+    try
+    {
+      var sani = OutputPaths.Map(root, "animation/clip.sani", ".anim.json", keepFileName: true);
+      var resource = OutputPaths.Map(root, "animation/clip.sani.resource", ".anim.json", keepFileName: true);
+      var data = OutputPaths.Map(root, "animation/clip.sani_data", ".anim.json", keepFileName: true);
+      Assert.NotEqual(sani, resource);
+      Assert.NotEqual(sani, data);
+      Assert.EndsWith(Path.Combine("animation", "clip.sani.anim.json"), sani);
+      Assert.EndsWith(Path.Combine("animation", "clip.sani.resource.anim.json"), resource);
+      Assert.EndsWith(Path.Combine("animation", "clip.sani_data.anim.json"), data);
+    }
+    finally
+    {
+      if (Directory.Exists(root))
+        Directory.Delete(root, true);
+    }
+  }
+
+  [Fact]
+  public void Export_SiblingAnimationsDoNotOverwrite()
+  {
+    using var dir = new TempDirectory();
+    CacheFile.Create(dir.Path, "clips.pak", new[]
+    {
+      new CacheFile.Entry("animation/clip.sani", Encoding.ASCII.GetBytes("not a clip")),
+      new CacheFile.Entry("animation/clip.sani_data", Encoding.ASCII.GetBytes("payload")),
+    });
+    var catalog = GameCatalog.Load(dir.Path);
+    using var store = new ArchiveStore(catalog);
+    var output = Path.Combine(dir.Path, "out");
+    var indices = Enumerable.Range(0, catalog.FileCount).ToArray();
+    AssetExporter.Export(catalog, store, indices, output, new ExportSettings());
+    var sani = File.ReadAllText(Path.Combine(output, "animation", "clip.sani.anim.json"));
+    var data = File.ReadAllText(Path.Combine(output, "animation", "clip.sani_data.anim.json"));
+    Assert.DoesNotContain("external animation payload", sani);
+    Assert.Contains("external animation payload", data);
   }
 
   [Fact]

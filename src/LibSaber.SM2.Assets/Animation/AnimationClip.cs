@@ -30,6 +30,8 @@ public sealed class AnimationClip
   public List<BoneTrack> Tracks { get; } = new();
   public List<string> Notes { get; } = new();
   public List<string> Sequences { get; } = new();
+  public List<string> Bones { get; } = new();
+  public float SampleRate { get; set; }
 
   public bool HasCurves => Tracks.Exists(track => track.Translation.Count + track.Rotation.Count + track.Scale.Count > 0);
 

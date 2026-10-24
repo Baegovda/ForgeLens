@@ -89,10 +89,31 @@ public static class FbxWriter
         builder.AppendLine("\t\t}");
       }
 
+      if (mesh.Uvs.Count == mesh.Positions.Count && mesh.Positions.Count > 0)
+      {
+        builder.AppendLine("\t\tLayerElementUV: 0 {");
+        builder.AppendLine("\t\t\tVersion: 101");
+        builder.AppendLine("\t\t\tName: \"UVMap\"");
+        builder.AppendLine("\t\t\tMappingInformationType: \"ByControlPoint\"");
+        builder.AppendLine("\t\t\tReferenceInformationType: \"Direct\"");
+        builder.Append("\t\t\tUV: *").Append(mesh.Uvs.Count * 2).Append(" {\n\t\t\t\ta: ");
+        for (var i = 0; i < mesh.Uvs.Count; i++)
+        {
+          if (i > 0)
+            builder.Append(',');
+          builder.Append(mesh.Uvs[i].X.ToString("R", culture)).Append(',').Append(mesh.Uvs[i].Y.ToString("R", culture));
+        }
+
+        builder.AppendLine("\n\t\t\t}");
+        builder.AppendLine("\t\t}");
+      }
+
       builder.AppendLine("\t\tLayer: 0 {");
       builder.AppendLine("\t\t\tVersion: 100");
       if (mesh.Normals.Count == mesh.Positions.Count)
         builder.AppendLine("\t\t\tLayerElement:  { Type: \"LayerElementNormal\", TypedIndex: 0 }");
+      if (mesh.Uvs.Count == mesh.Positions.Count && mesh.Positions.Count > 0)
+        builder.AppendLine("\t\t\tLayerElement:  { Type: \"LayerElementUV\", TypedIndex: 0 }");
       builder.AppendLine("\t\t}");
       builder.AppendLine("\t}");
     }

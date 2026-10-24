@@ -7,9 +7,9 @@
         WindowStartupLocation="CenterOwner"
         CanResize="False">
   <StackPanel Margin="16" Spacing="8">
-    <TextBlock TextWrapping="Wrap" Text="DDS keeps the original BC blocks. PNG and TGA are decoded images. glTF is Y-up meters. FBX follows the target below. Source units are assumed to be centimeters, Z-up." />
+    <TextBlock TextWrapping="Wrap" Text="DDS keeps the original BC blocks. PNG and TGA are decoded images. glTF is Y-up meters. FBX follows the target below. Source units are treated as meters, Z-up, from the retail helmet bounds." />
     <ComboBox x:Name="SpaceBox" SelectedIndex="0">
-      <ComboBoxItem Content="Unreal (FBX Z-up centimeters)" />
+      <ComboBoxItem Content="Unreal (FBX Z-up centimeters, x100)" />
       <ComboBoxItem Content="Blender (FBX Z-up meters)" />
     </ComboBox>
     <CheckBox x:Name="DdsBox" Content="Textures as DDS" IsChecked="True" />

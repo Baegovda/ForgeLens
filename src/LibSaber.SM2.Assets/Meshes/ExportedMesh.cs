@@ -5,9 +5,9 @@ namespace LibSaber.SM2.Assets.Meshes;
 
 public enum ExportSpace
 {
-  /// <summary>FBX stays Z-up centimeters. glTF is still Y-up meters, which is what glTF requires.</summary>
+  /// <summary>FBX is Z-up centimeters (source meters times 100). glTF is Y-up meters.</summary>
   Unreal = 0,
-  /// <summary>FBX is Z-up meters (scale 0.01). glTF is Y-up meters.</summary>
+  /// <summary>FBX is Z-up meters. glTF is Y-up meters.</summary>
   Blender = 1,
 }
 
@@ -69,10 +69,10 @@ public static class AxisConvert
 {
 
   public const string Assumption =
-    "Source units are treated as centimeters, Z-up. That scale and axis are an assumption, not a measurement from the retail files.";
+    "Source units are treated as meters, Z-up. A retail helmet's bounds are about 0.32 units tall, which matches meters. Unreal FBX is scaled by 100 into centimeters. The axis swap is still an assumption.";
 
   public static float Scale(ExportSpace space, bool gltf)
-    => gltf || space == ExportSpace.Blender ? 0.01f : 1f;
+    => !gltf && space == ExportSpace.Unreal ? 100f : 1f;
 
   public static Vector3 Point(Vector3 value, ExportSpace space, bool gltf)
   {
