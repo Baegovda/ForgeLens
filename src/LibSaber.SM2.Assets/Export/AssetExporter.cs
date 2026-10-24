@@ -15,6 +15,7 @@ public sealed class ExportSettings
   public bool WriteGltf { get; init; } = true;
   public bool WriteFbx { get; init; } = true;
   public bool WriteMaterials { get; init; } = true;
+  public bool WriteModelTextures { get; init; } = true;
   public bool CopyOriginalBytes { get; init; }
   public ExportSpace Space { get; init; } = ExportSpace.Unreal;
 }
@@ -190,6 +191,60 @@ public static class AssetExporter
     }
 
     WriteMaterial(outputDirectory, file.Path, mesh.Material, settings, report, batch);
+    if (settings.WriteModelTextures)
+      ExportModelTextures(catalog, store, index, mesh, outputDirectory, settings, report, batch);
+  }
+
+  internal static void ExportModelTextures(
+    GameCatalog catalog,
+    ArchiveStore store,
+    int index,
+    ExportedMesh mesh,
+    string outputDirectory,
+    ExportSettings settings,
+    ExportReport report,
+    IReadOnlyList<string> batch)
+  {
+    var names = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+    void Take(string? name)
+    {
+      if (!string.IsNullOrWhiteSpace(name))
+        names.Add(name);
+    }
+
+    foreach (var part in mesh.Parts)
+      Take(part.Texture);
+    foreach (var level in mesh.Levels)
+    {
+      foreach (var part in level.Parts)
+        Take(part.Texture);
+    }
+
+    if (mesh.Material is not null)
+    {
+      foreach (var slot in mesh.Material.Slots)
+        Take(slot.Texture);
+    }
+
+    var selected = new HashSet<string>(batch, StringComparer.OrdinalIgnoreCase);
+    var seen = new HashSet<int>();
+    foreach (var name in names)
+    {
+      var resolved = TemplateMeshReader.ResolveTexture(catalog, index, name);
+      if (resolved < 0 || !seen.Add(resolved))
+        continue;
+      var linked = catalog.GetFile(resolved);
+      if (linked.Kind != AssetKind.Texture || selected.Contains(linked.Path))
+        continue;
+      try
+      {
+        ExportTexture(catalog, store, resolved, linked, outputDirectory, settings, report, batch);
+      }
+      catch (Exception ex)
+      {
+        report.Messages.Add(name + ": " + ex.Message);
+      }
+    }
   }
 
   private static void ExportAnimation(
@@ -378,7 +433,7 @@ public static class AssetExporter
       + space + Environment.NewLine
       + "DDS keeps the original block compression. PNG and TGA are decoded previews." + Environment.NewLine
       + "Most textures are .pct.resource plus .pct_mip. A bare .pct is uncommon." + Environment.NewLine
-      + "Models are .tpl plus .tpl_data. The densest mesh in the file is exported. .lods_base, .geom_dbg, and .cdt are not mesh payloads in the retail sample." + Environment.NewLine
+      + "Models are .tpl plus .tpl_data. Export keeps every part of the largest vertex pool, and the textures those parts name when they are in the catalog. .lods_base, .geom_dbg, and .cdt are not mesh payloads." + Environment.NewLine
       + "Animations: retail .sani is an ETNA clip (bone names, duration, events). Packed curves and .sani_data are not expanded into glTF channels." + Environment.NewLine
       + "Particle systems (.ps, .sfx) are not converted. Their raw bytes and any named meshes or textures are copied." + Environment.NewLine;
   }

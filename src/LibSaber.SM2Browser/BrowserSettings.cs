@@ -6,6 +6,7 @@ public sealed class BrowserSettings
 {
 
   public string? LastFolder { get; set; }
+  public string? LastExportFolder { get; set; }
 
   public static BrowserSettings Load()
   {

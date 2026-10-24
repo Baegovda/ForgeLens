@@ -186,6 +186,72 @@ public class AssetTests
   }
 
   [Fact]
+  public void ModelExport_WritesResolvedTexturesOnceAndSkipsMissingNames()
+  {
+    Assert.True(new ExportSettings().WriteModelTextures);
+    var yaml = """
+      __type: res_desc_pct
+      header:
+        faceSize: 8
+        format: 12
+        mipLevel:
+        - {offset: 0, size: 8}
+        nFaces: 1
+        nMipMap: 1
+        sign: 0
+        size: 8
+        sx: 4
+        sy: 4
+        sz: 1
+      mipMaps:
+      - hero.pct_mip
+      texName: hero
+      texType: color
+      """;
+    using var dir = new TempDirectory();
+    CacheFile.Create(dir.Path, "resources.pak", new[]
+    {
+      new CacheFile.Entry("textures/hero.pct.resource", Encoding.ASCII.GetBytes(yaml)),
+      new CacheFile.Entry("textures/hero.pct_mip", new byte[] { 0xFF, 0xFF, 0xFF, 0xFF, 0x00, 0x00, 0x00, 0x00 }),
+      new CacheFile.Entry("tpl/hero.tpl", new byte[] { 1 }),
+    });
+
+    var catalog = GameCatalog.Load(dir.Path);
+    Assert.True(catalog.TryGetByPath("tpl/hero.tpl", out var model));
+    using var store = new ArchiveStore(catalog);
+    var mesh = new ExportedMesh { Name = "hero" };
+    mesh.Parts.Add(new MeshPart { Name = "body", Texture = "hero" });
+    mesh.Parts.Add(new MeshPart { Name = "cloth", Texture = "missing_cloth" });
+    mesh.Levels.Add(new MeshLod
+    {
+      Name = "LOD1",
+      Parts = { new MeshPart { Name = "body_lod", Texture = "textures/hero.pct.resource" } },
+    });
+    mesh.Material = new MaterialDocument { Name = "hero" };
+    mesh.Material.Slots.Add(new MaterialSlot { Slot = "diffuse", Texture = "hero" });
+
+    var output = Path.Combine(dir.Path, "out");
+    var report = new ExportReport();
+    AssetExporter.ExportModelTextures(
+      catalog, store, model, mesh, output, new ExportSettings(), report, new[] { "tpl/hero.tpl" });
+
+    Assert.Empty(report.Messages);
+    Assert.Equal(3, report.Written);
+    Assert.True(File.Exists(Path.Combine(output, "textures", "hero.dds")));
+    Assert.True(File.Exists(Path.Combine(output, "textures", "hero.png")));
+    Assert.True(File.Exists(Path.Combine(output, "textures", "hero.tga")));
+    Assert.Equal(3, Directory.GetFiles(output, "*", SearchOption.AllDirectories).Length);
+
+    var skipped = Path.Combine(dir.Path, "skip");
+    var skipReport = new ExportReport();
+    AssetExporter.ExportModelTextures(
+      catalog, store, model, mesh, skipped, new ExportSettings(), skipReport,
+      new[] { "tpl/hero.tpl", "textures/hero.pct.resource" });
+    Assert.Equal(0, skipReport.Written);
+    Assert.False(Directory.Exists(skipped));
+  }
+
+  [Fact]
   public void Axis_GltfKeepsMetersAndUnrealScalesToCentimeters()
   {
     var point = AxisConvert.Point(new Vector3(0, 2, 0), ExportSpace.Unreal, gltf: true);

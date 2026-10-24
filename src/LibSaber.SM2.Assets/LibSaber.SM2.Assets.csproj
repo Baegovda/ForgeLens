@@ -15,4 +15,10 @@
     <PackageReference Include="BCnEncoder.Net" Version="2.1.0" />
   </ItemGroup>
 
+  <ItemGroup>
+    <AssemblyAttribute Include="System.Runtime.CompilerServices.InternalsVisibleTo">
+      <_Parameter1>LibSaber.SM2.Assets.Tests</_Parameter1>
+    </AssemblyAttribute>
+  </ItemGroup>
+
 </Project>

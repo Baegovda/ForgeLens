@@ -663,27 +663,18 @@ public partial class MainWindow : Window
       return;
     }
 
-    var folders = await StorageProvider.OpenFolderPickerAsync(new FolderPickerOpenOptions
-    {
-      Title = "Export folder",
-      AllowMultiple = false,
-    });
-    if (folders.Count == 0)
-      return;
-    var output = folders[0].TryGetLocalPath();
-    if (string.IsNullOrWhiteSpace(output))
-      return;
-
     var window = new ExportWindow();
-    var settings = await window.Choose(this);
-    if (settings is null)
+    var choice = await window.Choose(this, _settings.LastExportFolder);
+    if (choice is null)
       return;
+    _settings.LastExportFolder = choice.Folder;
+    _settings.Save();
 
     ExportButton.IsEnabled = false;
     try
     {
       var progress = new Progress<string>(path => StatusText.Text = "Exporting " + path);
-      var report = await Task.Run(() => AssetExporter.Export(_catalog, _store, indices, output, settings, progress));
+      var report = await Task.Run(() => AssetExporter.Export(_catalog, _store, indices, choice.Folder, choice.Settings, progress));
       StatusText.Text = $"Exported {report.Written} files, skipped {report.Skipped}. {string.Join(" ", report.Messages.Take(3))}";
     }
     catch (Exception ex)
