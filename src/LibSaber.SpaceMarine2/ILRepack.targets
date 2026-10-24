@@ -1,0 +1,8 @@
+<Project>
+  <!--
+    This file exists so ILRepack.Lib.MSBuild.Task skips its default target.
+    That default merges every DLL in the output directory, including LibSaber,
+    and a second target of the same name in the package replaces anything
+    defined here. The real merge lives in the csproj as InternalizeYamlDotNet.
+  -->
+</Project>

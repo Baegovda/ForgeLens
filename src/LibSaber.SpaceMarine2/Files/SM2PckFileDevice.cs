@@ -15,6 +15,12 @@ public class SM2PckFileDevice : FileSystemDevice
 
   #endregion
 
+  #region Properties
+
+  public string FilePath => _filePath;
+
+  #endregion
+
   #region Constructor
 
   public SM2PckFileDevice(string filePath)

@@ -1,0 +1,17 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net8.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <RootNamespace>LibSaber.SM2Extractor</RootNamespace>
+    <AssemblyName>LibSaber.SM2Extractor</AssemblyName>
+    <Platforms>AnyCPU;x64</Platforms>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\LibSaber.SpaceMarine2\LibSaber.SpaceMarine2.csproj" />
+  </ItemGroup>
+
+</Project>

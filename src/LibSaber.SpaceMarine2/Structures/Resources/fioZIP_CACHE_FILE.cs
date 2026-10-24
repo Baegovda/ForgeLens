@@ -24,9 +24,12 @@ namespace LibSaber.SpaceMarine2.Structures.Resources
       _entries = new Dictionary<string, ENTRY>();
     }
 
-    internal void AddEntry(ENTRY entry)
+    internal bool AddEntry(ENTRY entry)
     {
-      _entries.Add(entry.FileName, entry);
+      if (string.IsNullOrEmpty(entry.FileName))
+        return false;
+
+      return _entries.TryAdd(entry.FileName, entry);
     }
 
     public bool ContainsKey(string key)
