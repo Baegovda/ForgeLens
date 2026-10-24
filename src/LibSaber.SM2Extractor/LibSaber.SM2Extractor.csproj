@@ -14,4 +14,8 @@
     <ProjectReference Include="..\LibSaber.SpaceMarine2\LibSaber.SpaceMarine2.csproj" />
   </ItemGroup>
 
+  <ItemGroup>
+    <None Include="extract-all.bat" CopyToPublishDirectory="Always" />
+  </ItemGroup>
+
 </Project>
