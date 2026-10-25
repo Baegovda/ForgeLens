@@ -16,6 +16,9 @@ public sealed class ExtractorEngine
 
   public int Execute(ExtractorOptions options)
   {
+    if (options.Verb == ExtractorVerb.Export)
+      return ModelExport.Run(options, _stdout, _stderr);
+
     var archives = ArchiveLocator.Find(options.InputPath, options.Recursive);
     if (archives.Count == 0)
     {

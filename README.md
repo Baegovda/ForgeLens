@@ -8,12 +8,15 @@ A work-in-progress library for parsing game files used by Saber Interactive's Sa
 
 `LibSaber.SM2Extractor` lists and extracts Warhammer 40,000: Space Marine 2 archives. It reads the `.pak` / `.pck` payload together with the sibling cache the game ships next to it (`something.pak` and `something.pak.cache`). Point it at one archive or at a folder such as `client_pc`.
 
-The retail game uses `.pak` files. `.pck` is accepted when it uses the same cache layout. This step writes the archived bytes only. It does not convert textures, models, or animations.
+The retail game uses `.pak` files. `.pck` is accepted when it uses the same cache layout. `list` and `extract` write the archived bytes only. `export` converts one model the same way the browser's Export does: Index's default mesh visibility, the same UVs, and the textures that model names.
 
 ```
 LibSaber.SM2Extractor list <archive-or-folder> [--filter <pattern>]
 LibSaber.SM2Extractor extract <archive-or-folder> --output <folder> [--filter <pattern>]
+LibSaber.SM2Extractor export <game-folder> --asset <path> --format fbx-unreal|gltf|both --lod 0 --output <folder>
 ```
+
+`export` reads the game folder the way the browser does (every `.pak.cache` / `.pck.cache` under it) and writes the model plus the PNG, TGA, and DDS for the textures it uses. `--asset tpl/cc_titus_assault.tpl` is the path shown in the browser and resolves to `tpl/cc_titus_assault.tpl/cc_titus_assault.tpl`. `--format fbx-unreal` is Z-up centimeters for Unreal. `gltf` is Y-up meters. `both` writes the two of them. `--lod 0` keeps the meshes Index leaves checked. FBX gives each of those parts a material whose diffuse, and the `_nm` normal when that texture is in the folder, is a path relative to the FBX.
 
 Filters are globs or extensions, and can be repeated (`*.pct`, `.tpl`, `characters/**/*.lg`). A failure to open one archive, or to decompress one file, is logged and skipped. The process still prints a summary. Exit code `0` means nothing was skipped, `1` means the arguments or input path were unusable, and `2` means the run finished with at least one skip.
 

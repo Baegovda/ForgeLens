@@ -20,7 +20,7 @@ public static class FbxWriter
   private static readonly byte[] FootMagic = { 0xF8, 0x5A, 0x8C, 0x6A, 0xDE, 0xF5, 0xD9, 0x7E, 0xEC, 0xE9, 0x0C, 0xE3, 0x75, 0x8F, 0x29, 0x0B };
   private const string CreationStamp = "1970-01-01 10:00:00:000";
 
-  public static void Write(string path, ExportedMesh mesh, ExportSpace space)
+  public static void Write(string path, ExportedMesh mesh, ExportSpace space, IReadOnlyDictionary<string, string>? textureFiles = null)
   {
     var root = new Node("");
     var ids = new IdSource();
@@ -32,7 +32,7 @@ public static class FbxWriter
     WriteDocuments(root, ids.Next());
     root.Add("References");
     WriteDefinitions(root, mesh, bones);
-    WriteObjects(root, mesh, space, ids, bones);
+    WriteObjects(root, mesh, space, ids, bones, textureFiles);
     WriteConnections(root, mesh, ids, bones);
     var takes = root.Add("Takes");
     takes.Add("Current").String("");
@@ -200,7 +200,7 @@ public static class FbxWriter
     ObjectType(definitions, "Pose", poses, null, null);
   }
 
-  private static void WriteObjects(Node root, ExportedMesh mesh, ExportSpace space, IdSource ids, BoneTables bones)
+  private static void WriteObjects(Node root, ExportedMesh mesh, ExportSpace space, IdSource ids, BoneTables bones, IReadOnlyDictionary<string, string>? textureFiles)
   {
     var objects = root.Add("Objects");
     var materials = CollectMaterials(mesh);
@@ -216,7 +216,7 @@ public static class FbxWriter
     foreach (var material in materials)
       WriteMaterial(objects, material, ids);
     foreach (var texture in textures)
-      WriteTexture(objects, texture, ids);
+      WriteTexture(objects, texture, ids, textureFiles);
 
     if (mesh.HasSkin && mesh.HasTriangles)
       WriteSkin(objects, mesh, bones, ids);
@@ -316,12 +316,14 @@ public static class FbxWriter
       else
       {
         var assigned = new int[triangles];
+        var ordinal = 0;
         foreach (var part in mesh.Parts)
         {
-          var key = MaterialKey(part);
-          var material = materials.FindIndex(item => item.Key == key);
-          if (material < 0)
+          if (part.IndexCount < 3)
             continue;
+          var material = ordinal++;
+          if (material >= materials.Count)
+            break;
           var start = Math.Max(0, part.IndexStart / 3);
           var end = Math.Min(triangles, start + Math.Max(0, part.IndexCount / 3));
           for (var triangle = start; triangle < end; triangle++)
@@ -433,9 +435,9 @@ public static class FbxWriter
     PropNumber(props, "TransparencyFactor", 0);
   }
 
-  private static void WriteTexture(Node objects, TextureRef texture, IdSource ids)
+  private static void WriteTexture(Node objects, TextureRef texture, IdSource ids, IReadOnlyDictionary<string, string>? textureFiles)
   {
-    var file = TextureFile(texture.Name);
+    var file = TextureFile(texture.Name, textureFiles);
     var tex = objects.Add("Texture");
     tex.Int64(ids.Textures[texture.Name]);
     tex.String(NameClass(texture.Name, "Texture"));
@@ -554,16 +556,17 @@ public static class FbxWriter
 
     var materials = CollectMaterials(mesh);
     foreach (var material in materials)
-      Connect(connections, "OO", ids.Materials[material.Key], ids.MeshModel);
+    {
+      var materialId = ids.Materials[material.Key];
+      Connect(connections, "OO", materialId, ids.MeshModel);
+      if (!string.IsNullOrWhiteSpace(material.Diffuse) && ids.Textures.TryGetValue(material.Diffuse, out var diffuseId))
+        Connect(connections, "OP", diffuseId, materialId, "DiffuseColor");
+      if (!string.IsNullOrWhiteSpace(material.Normal) && ids.Textures.TryGetValue(material.Normal, out var normalId))
+        Connect(connections, "OP", normalId, materialId, "NormalMap");
+    }
 
     foreach (var texture in CollectTextures(mesh))
-    {
-      if (!ids.Materials.TryGetValue(texture.Name, out var materialId))
-        materialId = materials.Count > 0 ? ids.Materials[materials[0].Key] : 0;
-      if (materialId != 0)
-        Connect(connections, "OP", ids.Textures[texture.Name], materialId, "DiffuseColor");
       Connect(connections, "OO", ids.Videos[texture.Name], ids.Textures[texture.Name]);
-    }
 
     if (!mesh.HasSkin || !mesh.HasTriangles)
       return;
@@ -641,24 +644,23 @@ public static class FbxWriter
   private static List<MaterialRef> CollectMaterials(ExportedMesh mesh)
   {
     var list = new List<MaterialRef>();
-    var seen = new HashSet<string>(StringComparer.Ordinal);
-    void Add(string? key, string? name)
-    {
-      if (string.IsNullOrWhiteSpace(key) || !seen.Add(key))
-        return;
-      list.Add(new MaterialRef(key, string.IsNullOrWhiteSpace(name) ? key : name));
-    }
-
+    var used = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+    var partIndex = 0;
     foreach (var part in mesh.Parts)
-      Add(MaterialKey(part), string.IsNullOrWhiteSpace(part.Texture) ? part.Name : part.Texture);
-    if (mesh.Material is not null)
     {
-      foreach (var slot in mesh.Material.Slots)
-        Add(slot.Texture, slot.Texture);
+      if (part.IndexCount < 3)
+        continue;
+      var baseName = string.IsNullOrWhiteSpace(part.Name) ? "part" + partIndex : part.Name;
+      var name = baseName;
+      var suffix = 2;
+      while (!used.Add(name))
+        name = baseName + "_" + suffix++;
+      list.Add(new MaterialRef(name, name, string.IsNullOrWhiteSpace(part.Texture) ? null : part.Texture, string.IsNullOrWhiteSpace(part.Normal) ? null : part.Normal));
+      partIndex++;
     }
 
     if (list.Count == 0 && mesh.HasTriangles)
-      list.Add(new MaterialRef(mesh.Name, mesh.Name));
+      list.Add(new MaterialRef(string.IsNullOrWhiteSpace(mesh.Name) ? "mesh" : mesh.Name, mesh.Name, null, null));
     return list;
   }
 
@@ -673,28 +675,20 @@ public static class FbxWriter
       list.Add(new TextureRef(name));
     }
 
-    foreach (var part in mesh.Parts)
-      Add(part.Texture);
-    foreach (var level in mesh.Levels)
+    foreach (var material in CollectMaterials(mesh))
     {
-      foreach (var part in level.Parts)
-        Add(part.Texture);
-    }
-
-    if (mesh.Material is not null)
-    {
-      foreach (var slot in mesh.Material.Slots)
-        Add(slot.Texture);
+      Add(material.Diffuse);
+      Add(material.Normal);
     }
 
     return list;
   }
 
-  private static string MaterialKey(MeshPart part)
-    => !string.IsNullOrWhiteSpace(part.Texture) ? part.Texture! : part.Name;
-
-  private static string TextureFile(string name)
+  private static string TextureFile(string name, IReadOnlyDictionary<string, string>? textureFiles)
   {
+    if (textureFiles is not null && textureFiles.TryGetValue(name, out var mapped) && !string.IsNullOrWhiteSpace(mapped))
+      return mapped.Replace('\\', '/');
+
     var file = name.Replace('\\', '/');
     var slash = file.LastIndexOf('/');
     if (slash >= 0)
@@ -923,7 +917,7 @@ public static class FbxWriter
     return builder.Length == 0 ? "object" : builder.ToString();
   }
 
-  private readonly record struct MaterialRef(string Key, string Name);
+  private readonly record struct MaterialRef(string Key, string Name, string? Diffuse, string? Normal);
   private readonly record struct TextureRef(string Name);
 
   private sealed class BoneTables

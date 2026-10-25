@@ -18,6 +18,11 @@ public sealed class ExportSettings
   public bool WriteModelTextures { get; init; } = true;
   public bool CopyOriginalBytes { get; init; }
   public ExportSpace Space { get; init; } = ExportSpace.Unreal;
+  /// <summary>
+  ///   0 exports the meshes Index leaves checked (LOD0 plus shells such as <c>_SIM</c>).
+  ///   1 and up export that smaller vertex pool, which Index hides as a lower LOD or a collision shell.
+  /// </summary>
+  public int Lod { get; init; }
   /// <summary>Checked meshes for a previewed catalog index. Other files keep Index's defaults.</summary>
   public Dictionary<int, MeshVisibility>? PartVisibility { get; set; }
 }
@@ -173,7 +178,8 @@ public static class AssetExporter
       report.Messages.Add(file.Path + ": " + mesh.Message);
     if (settings.PartVisibility is not null && settings.PartVisibility.TryGetValue(index, out var visibility))
       visibility.Apply(mesh);
-    var exportMesh = mesh.VisibleGeometry();
+    var exportMesh = SelectExportGeometry(mesh, settings.Lod);
+    AttachResolvedNormals(catalog, index, exportMesh);
 
     if (!exportMesh.HasTriangles && exportMesh.Bones.Count == 0)
     {
@@ -191,13 +197,113 @@ public static class AssetExporter
 
     if (settings.WriteFbx && exportMesh.HasTriangles)
     {
-      FbxWriter.Write(Destination(outputDirectory, file.Path, ".fbx", batch), exportMesh, settings.Space);
+      var fbxPath = Destination(outputDirectory, file.Path, ".fbx", batch);
+      var textureFiles = TextureFiles(catalog, index, exportMesh, fbxPath, outputDirectory, settings, batch);
+      FbxWriter.Write(fbxPath, exportMesh, settings.Space, textureFiles);
       report.Written++;
     }
 
     WriteMaterial(outputDirectory, file.Path, exportMesh.Material, settings, report, batch);
     if (settings.WriteModelTextures)
       ExportModelTextures(catalog, store, index, exportMesh, outputDirectory, settings, report, batch);
+  }
+
+  internal static ExportedMesh SelectExportGeometry(ExportedMesh mesh, int lod)
+  {
+    if (lod < 0)
+      throw new InvalidDataException("LOD is negative.");
+    if (lod == 0)
+      return mesh.VisibleGeometry();
+    if (lod > mesh.Levels.Count)
+      throw new InvalidDataException($"LOD {lod} is not in this model. Lod 0 is the Index-visible set, and this model has {mesh.Levels.Count} smaller vertex pools.");
+
+    var level = mesh.Levels[lod - 1];
+    var copy = new ExportedMesh
+    {
+      Name = mesh.Name,
+      Material = mesh.Material,
+      Clip = mesh.Clip,
+      Message = mesh.Message,
+    };
+    copy.Bones.AddRange(mesh.Bones);
+    copy.Positions.AddRange(level.Positions);
+    copy.Normals.AddRange(level.Normals);
+    copy.Uvs.AddRange(level.Uvs);
+    copy.Indices.AddRange(level.Indices);
+    copy.Skin.AddRange(level.Skin);
+    foreach (var part in level.Parts)
+    {
+      if (part.IndexCount < 3)
+        continue;
+      copy.Parts.Add(new MeshPart
+      {
+        Name = part.Name,
+        Texture = part.Texture,
+        Normal = part.Normal,
+        Visible = true,
+        HideReason = part.HideReason,
+        IndexStart = part.IndexStart,
+        IndexCount = part.IndexCount,
+      });
+    }
+
+    return copy;
+  }
+
+  private static void AttachResolvedNormals(GameCatalog catalog, int index, ExportedMesh mesh)
+  {
+    foreach (var part in mesh.Parts)
+    {
+      if (!string.IsNullOrWhiteSpace(part.Normal) || string.IsNullOrWhiteSpace(part.Texture))
+        continue;
+      var candidate = part.Texture + "_nm";
+      if (TemplateMeshReader.ResolveTexture(catalog, index, candidate) >= 0)
+        part.Normal = candidate;
+    }
+  }
+
+  internal static string RelativeTexturePath(string modelFile, string textureFile)
+  {
+    var modelDir = Path.GetDirectoryName(Path.GetFullPath(modelFile))!;
+    return Path.GetRelativePath(modelDir, Path.GetFullPath(textureFile)).Replace('\\', '/');
+  }
+
+  private static Dictionary<string, string> TextureFiles(
+    GameCatalog catalog,
+    int index,
+    ExportedMesh mesh,
+    string modelFile,
+    string outputDirectory,
+    ExportSettings settings,
+    IReadOnlyList<string> batch)
+  {
+    var map = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+    var extension = settings.WritePng ? ".png" : settings.WriteTga ? ".tga" : settings.WriteDds ? ".dds" : null;
+    if (extension is null)
+      return map;
+
+    var names = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+    foreach (var part in mesh.Parts)
+    {
+      if (!string.IsNullOrWhiteSpace(part.Texture))
+        names.Add(part.Texture);
+      if (!string.IsNullOrWhiteSpace(part.Normal))
+        names.Add(part.Normal);
+    }
+
+    foreach (var name in names)
+    {
+      var resolved = TemplateMeshReader.ResolveTexture(catalog, index, name);
+      if (resolved < 0)
+        continue;
+      var linked = catalog.GetFile(resolved);
+      if (linked.Kind != AssetKind.Texture)
+        continue;
+      var destination = Destination(outputDirectory, linked.Path, extension, batch);
+      map[name] = RelativeTexturePath(modelFile, destination);
+    }
+
+    return map;
   }
 
   internal static void ExportModelTextures(
@@ -218,11 +324,18 @@ public static class AssetExporter
     }
 
     foreach (var part in mesh.Parts)
+    {
       Take(part.Texture);
+      Take(part.Normal);
+    }
+
     foreach (var level in mesh.Levels)
     {
       foreach (var part in level.Parts)
+      {
         Take(part.Texture);
+        Take(part.Normal);
+      }
     }
 
     if (mesh.Material is not null)
@@ -438,7 +551,7 @@ public static class AssetExporter
       + space + Environment.NewLine
       + "DDS keeps the original block compression. PNG and TGA are decoded previews." + Environment.NewLine
       + "Most textures are .pct.resource plus .pct_mip. A bare .pct is uncommon." + Environment.NewLine
-      + "Models are .tpl plus .tpl_data. Export keeps every part of the largest vertex pool, and the textures those parts name when they are in the catalog. FBX is binary 7.4, Z-up, with a skinned limb hierarchy. .lods_base, .geom_dbg, and .cdt are not mesh payloads." + Environment.NewLine
+      + "Models are .tpl plus .tpl_data. Lod 0 keeps the meshes Index leaves checked (the largest pool, plus a shell such as _SIM) and drops _LOD and collision. A higher lod writes that smaller vertex pool. FBX is binary 7.4, Z-up, with a skinned limb hierarchy. Each exported part gets a material whose diffuse (and _nm normal, when that texture is in the catalog) is a path relative to the FBX, pointing at the PNG or TGA written beside it. .lods_base, .geom_dbg, and .cdt are not mesh payloads." + Environment.NewLine
       + "Animations: retail .sani is an ETNA clip (bone names, duration, events). Packed curves and .sani_data are not expanded into glTF channels." + Environment.NewLine
       + "Particle systems (.ps, .sfx) are not converted. Their raw bytes and any named meshes or textures are copied." + Environment.NewLine;
   }

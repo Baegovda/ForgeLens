@@ -4,5 +4,6 @@ public enum ExtractorVerb
 {
   Help,
   List,
-  Extract
+  Extract,
+  Export
 }

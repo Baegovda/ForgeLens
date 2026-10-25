@@ -33,6 +33,8 @@ public sealed class MeshPart
   public int IndexStart { get; set; }
   public int IndexCount { get; set; }
   public string? Texture { get; set; }
+  /// <summary>Normal map named by a material layer, when the texture name is a normal (<c>_nm</c> and the same suffixes).</summary>
+  public string? Normal { get; set; }
   /// <summary>Index leaves LOD and collision shells unchecked. Defaults on so hand-built meshes still export whole.</summary>
   public bool Visible { get; set; } = true;
   /// <summary>"LOD" or "volume" when <see cref="Visible"/> was cleared by Index's default filter.</summary>
@@ -220,6 +222,7 @@ public sealed class ExportedMesh
       {
         Name = part.Name,
         Texture = part.Texture,
+        Normal = part.Normal,
         Visible = true,
         HideReason = part.HideReason,
         IndexStart = indexStart,

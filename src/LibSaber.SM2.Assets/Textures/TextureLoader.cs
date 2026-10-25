@@ -148,28 +148,57 @@ public static class TextureLoader
       if (names.Length == 0)
         throw new InvalidDataException("The texture resource has no mipMaps and no pct. There is nothing to decode.");
 
-      using var concat = new MemoryStream();
+      var loaded = new byte[names.Length][];
       var missing = new List<string>();
-      foreach (var name in names)
+      for (var i = 0; i < names.Length; i++)
       {
-        var mipIndex = catalog.ResolveReference(name, fileIndex);
+        var mipIndex = catalog.ResolveReference(names[i], fileIndex);
         if (mipIndex < 0)
         {
-          missing.Add(name);
+          missing.Add(names[i]);
           continue;
         }
 
         var mipBytes = store.Read(mipIndex);
-        concat.Write(mipBytes);
+        var expect = TextureInfo.MipByteSize(format, Math.Max(1, width >> i), Math.Max(1, height >> i));
+        if (expect > 0 && mipBytes.Length < expect)
+        {
+          missing.Add(names[i]);
+          continue;
+        }
+
+        loaded[i] = mipBytes;
       }
 
-      if (missing.Count == names.Length)
+      var start = 0;
+      while (start < loaded.Length && loaded[start] is null)
+        start++;
+      if (start == loaded.Length)
         throw new FileNotFoundException($"None of the {names.Length} mip files named by this resource are in the catalog.");
 
+      var count = 0;
+      while (start + count < loaded.Length && loaded[start + count] is not null)
+        count++;
+
+      using var concat = new MemoryStream();
+      for (var i = 0; i < count; i++)
+        concat.Write(loaded[start + i]);
+
+      // A partial extract often lacks the largest mips. The bytes we have are the next
+      // complete mip, so the image size has to match that mip or the block decoder reads off the end.
+      if (start > 0)
+      {
+        width = Math.Max(1, width >> start);
+        height = Math.Max(1, height >> start);
+      }
+
+      mips = count;
       payload = concat.ToArray();
       message = $"{format}, {width}x{height}, {mips} mip(s), {faces} face(s), {names.Length} mip file(s)";
       if (missing.Count > 0)
         message += $", {missing.Count} missing";
+      if (start > 0)
+        message += $". The first {start} mip file(s) are not in this folder, so the image starts at this size";
       message += ". Pixels come from .pct_mip payloads, not from a .pct.";
     }
 

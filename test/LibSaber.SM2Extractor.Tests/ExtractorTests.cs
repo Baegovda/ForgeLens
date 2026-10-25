@@ -294,6 +294,45 @@ public class ExtractorTests
   }
 
   [Fact]
+  public void Export_requires_output_asset_and_format()
+  {
+    var stderr = new StringWriter();
+    var code = ExtractorHost.Run(new[] { "export", "game" }, new StringWriter(), stderr);
+    Assert.Equal(1, code);
+    Assert.Contains("--output", stderr.ToString());
+  }
+
+  [Fact]
+  public void Export_resolves_the_nested_model_path_the_browser_lists()
+  {
+    using var temp = new TempDirectory();
+    var game = Path.Combine(temp.Path, "game");
+    var output = Path.Combine(temp.Path, "out");
+    SyntheticPak.Create(
+      game,
+      "characters.pak",
+      new[] { new SyntheticPak.Entry("tpl/hero.tpl/hero.tpl", Encoding.ASCII.GetBytes("not-a-model")) });
+
+    var stdout = new StringWriter();
+    var stderr = new StringWriter();
+    var code = ExtractorHost.Run(
+      new[] { "export", game, "--asset", "tpl/hero.tpl", "--format", "gltf", "--lod", "0", "-o", output },
+      stdout,
+      stderr);
+
+    Assert.Equal(1, code);
+    var text = stdout.ToString();
+    Assert.Contains("Exporting tpl/hero.tpl/hero.tpl as gltf lod 0", text);
+    Assert.Contains("filesSkipped=1", text);
+    Assert.DoesNotContain("No model named", stderr.ToString());
+    Assert.Equal(1, ExtractorHost.Run(
+      new[] { "export", game, "--asset", "missing.tpl", "--format", "both", "-o", output },
+      new StringWriter(),
+      stderr));
+    Assert.Contains("No model named 'missing.tpl'", stderr.ToString());
+  }
+
+  [Fact]
   public void Program_main_prints_help()
   {
     var previousOut = Console.Out;

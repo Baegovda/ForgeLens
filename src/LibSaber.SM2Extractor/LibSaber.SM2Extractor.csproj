@@ -12,6 +12,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\LibSaber.SpaceMarine2\LibSaber.SpaceMarine2.csproj" />
+    <ProjectReference Include="..\LibSaber.SM2.Assets\LibSaber.SM2.Assets.csproj" />
   </ItemGroup>
 
   <ItemGroup>

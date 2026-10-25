@@ -10,19 +10,27 @@ LibSaber.SM2Extractor — list and extract Warhammer 40,000: Space Marine 2 arch
 Usage:
   LibSaber.SM2Extractor list <archive-or-folder> [options]
   LibSaber.SM2Extractor extract <archive-or-folder> --output <folder> [options]
+  LibSaber.SM2Extractor export <game-folder> --asset <path> --format <fbx-unreal|gltf|both> --output <folder> [--lod <n>]
 
 The game ships .pak archives with a sibling cache of the same name plus ".cache"
 (client_pc\something.pak and client_pc\something.pak.cache). .pck files with a
 sibling .pck.cache are accepted too.
 
 Options:
-  -o, --output <folder>   Destination directory. Required for extract.
+  -o, --output <folder>   Destination directory. Required for extract and export.
   -f, --filter <pattern>  Include filter, matched against the archive-relative path.
                           Repeat to combine with OR. A leading dot is an extension
                           (".pct" matches "*.pct"). Examples: *.pct, .tpl, characters/**/*.lg
+                          list and extract only.
+  --asset <path>          Model to export, as the browser shows it. export only.
+                          tpl/cc_titus_assault.tpl finds tpl/cc_titus_assault.tpl/cc_titus_assault.tpl.
+  --format <name>         fbx-unreal, gltf, or both. export only. FBX is Z-up centimeters.
+                          glTF is Y-up meters. Textures are written next to the model.
+  --lod <n>               0 (default) exports the meshes Index leaves checked.
+                          1 and up export that smaller vertex pool. export only.
   --no-recursive          When the input is a folder, do not search subfolders.
-  --prefix-archive        Write each archive under <output>\<archive name>\.
-  --no-overwrite          Leave files that are already in the output folder.
+  --prefix-archive        Write each archive under <output>\<archive name>\. extract only.
+  --no-overwrite          Leave files that are already in the output folder. extract only.
   -q, --quiet             Print the summary only. Failures still go to stderr.
   -h, --help              Show this help.
 
@@ -34,6 +42,7 @@ Exit codes:
 Examples:
   LibSaber.SM2Extractor list "C:\Program Files (x86)\Steam\steamapps\common\Warhammer 40000 Space Marine 2\client_pc" --filter *.pct
   LibSaber.SM2Extractor extract "C:\Program Files (x86)\Steam\steamapps\common\Warhammer 40000 Space Marine 2\client_pc" --output C:\sm2\extract --filter *.pct --filter *.tpl
+  LibSaber.SM2Extractor export "C:\Program Files (x86)\Steam\steamapps\common\Warhammer 40000 Space Marine 2\client_pc" --asset tpl/cc_titus_assault.tpl --format fbx-unreal --lod 0 -o C:\sm2\titus
 """;
 
   public ExtractorVerb Verb { get; private init; }
@@ -44,6 +53,9 @@ Examples:
   public bool PrefixArchive { get; private init; }
   public bool Overwrite { get; private init; } = true;
   public bool Quiet { get; private init; }
+  public string? Asset { get; private init; }
+  public string? Format { get; private init; }
+  public int Lod { get; private init; }
 
   public static ExtractorOptions Help()
     => new() { Verb = ExtractorVerb.Help };
@@ -75,6 +87,10 @@ Examples:
 
     var filters = new List<string>();
     string? output = null;
+    string? asset = null;
+    string? format = null;
+    var lod = 0;
+    var lodSet = false;
     var recursive = true;
     var prefixArchive = false;
     var overwrite = true;
@@ -132,6 +148,60 @@ Examples:
         continue;
       }
 
+      if (TryTakeValue(args, ref i, arg, "--asset", "--asset", out var assetValue))
+      {
+        if (asset is not null)
+        {
+          error = "Asset specified more than once.";
+          return false;
+        }
+
+        if (string.IsNullOrWhiteSpace(assetValue))
+        {
+          error = "Asset path is empty.";
+          return false;
+        }
+
+        asset = assetValue;
+        continue;
+      }
+
+      if (TryTakeValue(args, ref i, arg, "--format", "--format", out var formatValue))
+      {
+        if (format is not null)
+        {
+          error = "Format specified more than once.";
+          return false;
+        }
+
+        if (string.IsNullOrWhiteSpace(formatValue))
+        {
+          error = "Format is empty.";
+          return false;
+        }
+
+        format = formatValue;
+        continue;
+      }
+
+      if (TryTakeValue(args, ref i, arg, "--lod", "--lod", out var lodValue))
+      {
+        if (lodSet)
+        {
+          error = "LOD specified more than once.";
+          return false;
+        }
+
+        if (!int.TryParse(lodValue, out lod) || lod < 0)
+        {
+          error = "LOD must be 0 or a positive integer.";
+          return false;
+        }
+
+        lodSet = true;
+        continue;
+      }
+
       if (TryTakeValue(args, ref i, arg, "-f", "--filter", out var filterValue))
       {
         if (string.IsNullOrWhiteSpace(filterValue))
@@ -155,7 +225,7 @@ Examples:
 
     if (positionals.Count == 0)
     {
-      error = "Missing command. Expected 'list' or 'extract'.";
+      error = "Missing command. Expected 'list', 'extract', or 'export'.";
       return false;
     }
 
@@ -175,12 +245,13 @@ Examples:
     {
       "list" => ExtractorVerb.List,
       "extract" => ExtractorVerb.Extract,
+      "export" => ExtractorVerb.Export,
       _ => (ExtractorVerb?)null
     };
 
     if (verb is null)
     {
-      error = $"Unknown command '{positionals[0]}'. Expected 'list' or 'extract'.";
+      error = $"Unknown command '{positionals[0]}'. Expected 'list', 'extract', or 'export'.";
       return false;
     }
 
@@ -192,8 +263,47 @@ Examples:
 
     if (verb == ExtractorVerb.List && output is not null)
     {
-      error = "--output is only valid with extract.";
+      error = "--output is only valid with extract and export.";
       return false;
+    }
+
+    if (verb != ExtractorVerb.Export && (asset is not null || format is not null || lodSet))
+    {
+      error = "--asset, --format, and --lod are only valid with export.";
+      return false;
+    }
+
+    if (verb == ExtractorVerb.Export)
+    {
+      if (string.IsNullOrWhiteSpace(output))
+      {
+        error = "export requires --output <folder>.";
+        return false;
+      }
+
+      if (string.IsNullOrWhiteSpace(asset))
+      {
+        error = "export requires --asset <path>.";
+        return false;
+      }
+
+      if (string.IsNullOrWhiteSpace(format))
+      {
+        error = "export requires --format fbx-unreal|gltf|both.";
+        return false;
+      }
+
+      if (format.ToLowerInvariant() is not ("fbx-unreal" or "gltf" or "both"))
+      {
+        error = $"Unknown format '{format}'. Expected fbx-unreal, gltf, or both.";
+        return false;
+      }
+
+      if (filters.Count > 0 || prefixArchive || !overwrite)
+      {
+        error = "export does not use --filter, --prefix-archive, or --no-overwrite.";
+        return false;
+      }
     }
 
     options = new ExtractorOptions
@@ -205,7 +315,10 @@ Examples:
       Recursive = recursive,
       PrefixArchive = prefixArchive,
       Overwrite = overwrite,
-      Quiet = quiet
+      Quiet = quiet,
+      Asset = asset,
+      Format = format?.ToLowerInvariant(),
+      Lod = lod
     };
     return true;
   }

@@ -186,6 +186,51 @@ public class AssetTests
   }
 
   [Fact]
+  public void TextureResource_UsesTheLargestMipThatIsActuallyPresent()
+  {
+    var yaml = """
+      __type: res_desc_pct
+      header:
+        faceSize: 40
+        format: 12
+        mipLevel:
+        - {offset: 0, size: 32}
+        - {offset: 32, size: 8}
+        nFaces: 1
+        nMipMap: 2
+        sign: 0
+        size: 40
+        sx: 8
+        sy: 8
+        sz: 1
+      mipMaps:
+      - hero_1.pct_mip
+      - hero_2.pct_mip
+      texName: hero
+      texType: color
+      """;
+    using var dir = new TempDirectory();
+    CacheFile.Create(dir.Path, "resources.pak", new[]
+    {
+      new CacheFile.Entry("textures/hero.pct.resource", Encoding.ASCII.GetBytes(yaml)),
+      new CacheFile.Entry("textures/hero_2.pct_mip", new byte[] { 0xFF, 0xFF, 0xFF, 0xFF, 0x00, 0x00, 0x00, 0x00 }),
+    });
+
+    var catalog = GameCatalog.Load(dir.Path);
+    Assert.True(catalog.TryGetByPath("textures/hero.pct.resource", out var index));
+    using var store = new ArchiveStore(catalog);
+    var document = TextureLoader.Load(catalog, store, index);
+    Assert.Equal(4, document.Width);
+    Assert.Equal(4, document.Height);
+    Assert.Equal(1, document.MipCount);
+    Assert.Equal(8, document.Payload.Length);
+    var pixels = document.Decode(0, 0, out var width, out var height, out _);
+    Assert.Equal(4, width);
+    Assert.Equal(4, height);
+    Assert.Equal(255, pixels[2]);
+  }
+
+  [Fact]
   public void ModelExport_WritesResolvedTexturesOnceAndSkipsMissingNames()
   {
     Assert.True(new ExportSettings().WriteModelTextures);
@@ -547,6 +592,69 @@ public class AssetTests
     process.WaitForExit();
     Assert.True(process.ExitCode == 0, stdout + stderr);
     return stdout + stderr;
+  }
+
+  [Fact]
+  public void Fbx_LinksEachPartToItsDiffuseAndNormalByRelativePath()
+  {
+    var mesh = new ExportedMesh { Name = "armor" };
+    mesh.Positions.Add(new Vector3(0, 0, 0));
+    mesh.Positions.Add(new Vector3(1, 0, 0));
+    mesh.Positions.Add(new Vector3(0, 1, 0));
+    mesh.Indices.AddRange(new[] { 0, 1, 2, 0, 2, 1, 0, 1, 2 });
+    mesh.Parts.Add(new MeshPart { Name = "torso", IndexStart = 0, IndexCount = 3, Texture = "ch_titus_body", Normal = "ch_titus_body_nm" });
+    mesh.Parts.Add(new MeshPart { Name = "head_01", IndexStart = 3, IndexCount = 3, Texture = "ch_titus_head", Normal = "ch_titus_head_nm" });
+    mesh.Parts.Add(new MeshPart { Name = "head_01", IndexStart = 6, IndexCount = 3, Texture = "ch_titus_head" });
+    mesh.Material = new MaterialDocument { Name = "armor" };
+    mesh.Material.Slots.Add(new MaterialSlot { Slot = "torso.layer2", Texture = "ch_titus_body_spec" });
+
+    using var dir = new TempDirectory();
+    var fbx = Path.Combine(dir.Path, "armor.fbx");
+    var files = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+    {
+      ["ch_titus_body"] = "../../pct/ch_titus_body.png",
+      ["ch_titus_body_nm"] = "../../pct/ch_titus_body_nm.png",
+      ["ch_titus_head"] = "../../pct/ch_titus_head.png",
+      ["ch_titus_head_nm"] = "../../pct/ch_titus_head_nm.png",
+    };
+    FbxWriter.Write(fbx, mesh, ExportSpace.Unreal, files);
+    var bytes = File.ReadAllBytes(fbx);
+    Assert.Contains("../../pct/ch_titus_body.png", Encoding.ASCII.GetString(bytes));
+    Assert.Contains("../../pct/ch_titus_body_nm.png", Encoding.ASCII.GetString(bytes));
+    Assert.Contains("NormalMap", Encoding.ASCII.GetString(bytes));
+    Assert.Contains("head_01_2", Encoding.ASCII.GetString(bytes));
+    Assert.DoesNotContain("ch_titus_body_spec", Encoding.ASCII.GetString(bytes));
+  }
+
+  [Fact]
+  public void SelectExportGeometry_Lod0KeepsTheCheckedSetAndLod1TakesTheNextPool()
+  {
+    var mesh = new ExportedMesh { Name = "split" };
+    mesh.Positions.Add(Vector3.Zero);
+    mesh.Positions.Add(Vector3.UnitX);
+    mesh.Positions.Add(Vector3.UnitY);
+    mesh.Indices.AddRange(new[] { 0, 1, 2 });
+    mesh.Parts.Add(new MeshPart { Name = "body", IndexStart = 0, IndexCount = 3, Texture = "body", Visible = true });
+    var level = new MeshLod { Name = "LOD1" };
+    level.Positions.Add(new Vector3(2, 0, 0));
+    level.Positions.Add(new Vector3(3, 0, 0));
+    level.Positions.Add(new Vector3(2, 1, 0));
+    level.Indices.AddRange(new[] { 0, 1, 2 });
+    level.Parts.Add(new MeshPart { Name = "body_LOD1", IndexStart = 0, IndexCount = 3, Texture = "body", Visible = false, HideReason = "LOD" });
+    mesh.Levels.Add(level);
+
+    var visible = AssetExporter.SelectExportGeometry(mesh, 0);
+    Assert.Equal("body", Assert.Single(visible.Parts).Name);
+    var lod1 = AssetExporter.SelectExportGeometry(mesh, 1);
+    Assert.Equal("body_LOD1", Assert.Single(lod1.Parts).Name);
+    Assert.True(lod1.Parts[0].Visible);
+    Assert.Equal(3, lod1.Positions.Count);
+
+    var model = Path.Combine(Path.GetTempPath(), "tpl", "hero.tpl", "hero.fbx");
+    var texture = Path.Combine(Path.GetTempPath(), "pct", "body.png");
+    Assert.Equal("../../pct/body.png", AssetExporter.RelativeTexturePath(model, texture));
+    Assert.True(TemplateMeshReader.IsNormalMapName("ch_titus_body_nm"));
+    Assert.False(TemplateMeshReader.IsNormalMapName("ch_titus_body"));
   }
 
   [Fact]

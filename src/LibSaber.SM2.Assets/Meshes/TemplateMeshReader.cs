@@ -723,6 +723,7 @@ public static class TemplateMeshReader
         IndexStart = indexStart,
         IndexCount = target.Indices.Count - indexStart,
         Texture = FirstTexture(material),
+        Normal = NormalTexture(material),
         Visible = visible,
         HideReason = hideReason,
       });
@@ -893,6 +894,46 @@ public static class TemplateMeshReader
     return new[] { material.Layer0, material.Layer1, material.Layer2, material.Layer3 }
       .Select(layer => layer?.TextureName)
       .FirstOrDefault(name => !string.IsNullOrWhiteSpace(name));
+  }
+
+  private static string? NormalTexture(SaberMaterial? material)
+  {
+    if (material is null)
+      return null;
+    var diffuse = FirstTexture(material);
+    foreach (var layer in new[] { material.Layer0, material.Layer1, material.Layer2, material.Layer3 })
+    {
+      var name = layer?.TextureName;
+      if (string.IsNullOrWhiteSpace(name) || string.Equals(name, diffuse, StringComparison.OrdinalIgnoreCase))
+        continue;
+      if (IsNormalMapName(name))
+        return name;
+    }
+
+    var relief = material.ExtraParams?.ReliefNormalMaps;
+    foreach (var name in new[] { relief?.Macro?.TextureName, relief?.Micro1?.TextureName, relief?.Micro2?.TextureName })
+    {
+      if (!string.IsNullOrWhiteSpace(name) && IsNormalMapName(name))
+        return name;
+    }
+
+    return null;
+  }
+
+  internal static bool IsNormalMapName(string name)
+  {
+    var file = name.Replace('\\', '/');
+    var slash = file.LastIndexOf('/');
+    if (slash >= 0)
+      file = file[(slash + 1)..];
+    if (file.EndsWith(".pct.resource", StringComparison.OrdinalIgnoreCase))
+      file = file[..^".pct.resource".Length];
+    else if (file.EndsWith(".pct", StringComparison.OrdinalIgnoreCase))
+      file = file[..^".pct".Length];
+    return file.EndsWith("_nm", StringComparison.OrdinalIgnoreCase)
+      || file.EndsWith("_normal", StringComparison.OrdinalIgnoreCase)
+      || file.EndsWith("_nrm", StringComparison.OrdinalIgnoreCase)
+      || file.EndsWith("_ddn", StringComparison.OrdinalIgnoreCase);
   }
 
   private static resDESC_TPL? ReadDescription(byte[] bytes, List<string> notes)
