@@ -15,6 +15,8 @@ public sealed class PreviewImage
   public int Width { get; init; }
   public int Height { get; init; }
   public byte[] Bgra { get; init; } = Array.Empty<byte>();
+  /// <summary><c>.td</c> format_descr when this image is a packed mask.</summary>
+  public string Channels { get; init; } = "";
 }
 
 public sealed class PreviewSettings
@@ -24,6 +26,10 @@ public sealed class PreviewSettings
   public int Part { get; init; } = -1;
   public bool Wireframe { get; init; }
   public IReadOnlyDictionary<string, PreviewImage>? Albedo { get; init; }
+  /// <summary>Normal maps keyed by texture name. Sampled in tangent space and lit with the albedo.</summary>
+  public IReadOnlyDictionary<string, PreviewImage>? Normals { get; init; }
+  /// <summary>Packed specular maps. <see cref="PreviewImage.Channels"/> selects metal, roughness, and AO.</summary>
+  public IReadOnlyDictionary<string, PreviewImage>? Specular { get; init; }
   public int MaxEdge { get; init; } = 1280;
 }
 
@@ -152,11 +158,18 @@ public static class MeshPreview
           byte bg = (byte)Math.Clamp(118 + shift / 2, 48, 210);
           byte bb = (byte)Math.Clamp(156 + shift, 48, 230);
           PreviewImage? albedo = null;
-          if (partIndex < parts.Count
-            && settings?.Albedo is { } textures
-            && parts[partIndex].Texture is { } textureName
-            && textures.TryGetValue(textureName, out var image))
-            albedo = image;
+          PreviewImage? normalMap = null;
+          PreviewImage? specularMap = null;
+          if (partIndex < parts.Count)
+          {
+            var part = parts[partIndex];
+            if (settings?.Albedo is { } textures && part.Texture is { } textureName && textures.TryGetValue(textureName, out var image))
+              albedo = image;
+            if (settings?.Normals is { } normalTextures && part.Normal is { } normalName && normalTextures.TryGetValue(normalName, out var normalImage))
+              normalMap = normalImage;
+            if (settings?.Specular is { } specTextures && part.Specular is { } specName && specTextures.TryGetValue(specName, out var specImage))
+              specularMap = specImage;
+          }
 
           if (albedo is null)
           {
@@ -171,8 +184,18 @@ public static class MeshPreview
             var bv = (uint)b < (uint)uvs.Count ? uvs[b].Y : 0;
             var cu = (uint)c < (uint)uvs.Count ? uvs[c].X : 0;
             var cv = (uint)c < (uint)uvs.Count ? uvs[c].Y : 0;
-            FillTextured(pixels, depth, width, height, ax, ay, az, bx, by, bz, cx, cy, cz,
-              au, av, bu, bv, cu, cv, albedo, shade);
+            if (normalMap is null && specularMap is null)
+            {
+              FillTextured(pixels, depth, width, height, ax, ay, az, bx, by, bz, cx, cy, cz,
+                au, av, bu, bv, cu, cv, albedo, shade);
+            }
+            else
+            {
+              var geometric = normals.Count == posed.Count ? normals[a] : normal;
+              FillLit(pixels, depth, width, height, ax, ay, az, bx, by, bz, cx, cy, cz,
+                au, av, bu, bv, cu, cv, albedo, normalMap, specularMap,
+                posed[a], posed[b], posed[c], geometric, key, eye);
+            }
           }
         }
       }
@@ -664,6 +687,116 @@ public static class MeshPreview
     }
   }
 
+  private static void FillLit(
+    byte[] pixels, float[] depth, int width, int height,
+    float ax, float ay, float az, float bx, float by, float bz, float cx, float cy, float cz,
+    float au, float av, float bu, float bv, float cu, float cv,
+    PreviewImage albedo, PreviewImage? normalMap, PreviewImage? specular,
+    Vector3 p0, Vector3 p1, Vector3 p2, Vector3 geometric, Vector3 key, Vector3 eye)
+  {
+    var minX = Math.Clamp((int)MathF.Floor(MathF.Min(ax, MathF.Min(bx, cx))), 0, width - 1);
+    var maxX = Math.Clamp((int)MathF.Ceiling(MathF.Max(ax, MathF.Max(bx, cx))), 0, width - 1);
+    var minY = Math.Clamp((int)MathF.Floor(MathF.Min(ay, MathF.Min(by, cy))), 0, height - 1);
+    var maxY = Math.Clamp((int)MathF.Ceiling(MathF.Max(ay, MathF.Max(by, cy))), 0, height - 1);
+    var area = Edge(ax, ay, bx, by, cx, cy);
+    var absArea = MathF.Abs(area);
+    if (absArea < 0.0001f || albedo.Width <= 0 || albedo.Height <= 0 || albedo.Bgra.Length < albedo.Width * albedo.Height * 4)
+      return;
+
+    geometric = geometric.LengthSquared() < 1e-8f ? Vector3.UnitY : Vector3.Normalize(geometric);
+    var tangent = Vector3.UnitX;
+    var bitangent = Vector3.UnitZ;
+    var e1 = p1 - p0;
+    var e2 = p2 - p0;
+    var d1 = new Vector2(bu - au, bv - av);
+    var d2 = new Vector2(cu - au, cv - av);
+    var det = d1.X * d2.Y - d1.Y * d2.X;
+    if (MathF.Abs(det) > 1e-8f)
+    {
+      var invDet = 1f / det;
+      var rawT = (e1 * d2.Y - e2 * d1.Y) * invDet;
+      var rawB = (e2 * d1.X - e1 * d2.X) * invDet;
+      rawT -= geometric * Vector3.Dot(rawT, geometric);
+      if (rawT.LengthSquared() > 1e-8f)
+        tangent = Vector3.Normalize(rawT);
+      rawB -= geometric * Vector3.Dot(rawB, geometric);
+      bitangent = rawB.LengthSquared() > 1e-8f ? Vector3.Normalize(rawB) : Vector3.Normalize(Vector3.Cross(geometric, tangent));
+    }
+
+    var view = eye - (p0 + p1 + p2) / 3f;
+    view = view.LengthSquared() < 1e-8f ? Vector3.UnitZ : Vector3.Normalize(view);
+    var half = Vector3.Normalize(key + view);
+    var channels = specular?.Channels ?? "";
+    var roughInAlpha = channels.Contains("Roughness(a)", StringComparison.OrdinalIgnoreCase);
+    var aoInBlue = channels.Contains("AO(b)", StringComparison.OrdinalIgnoreCase) || channels.Length == 0;
+
+    for (var y = minY; y <= maxY; y++)
+    {
+      var row = y * width;
+      for (var x = minX; x <= maxX; x++)
+      {
+        var px = x + 0.5f;
+        var py = y + 0.5f;
+        var w0 = Edge(bx, by, cx, cy, px, py);
+        var w1 = Edge(cx, cy, ax, ay, px, py);
+        var w2 = Edge(ax, ay, bx, by, px, py);
+        if (area < 0)
+        {
+          w0 = -w0;
+          w1 = -w1;
+          w2 = -w2;
+        }
+
+        if (w0 < 0 || w1 < 0 || w2 < 0)
+          continue;
+
+        var inv = 1f / absArea;
+        var z = (w0 * az + w1 * bz + w2 * cz) * inv;
+        var index = row + x;
+        if (z >= depth[index])
+          continue;
+        depth[index] = z;
+        var u = (w0 * au + w1 * bu + w2 * cu) * inv;
+        var v = (w0 * av + w1 * bv + w2 * cv) * inv;
+        Sample(albedo, u, v, out var tb, out var tg, out var tr);
+        var lit = geometric;
+        if (normalMap is not null && normalMap.Width > 0)
+        {
+          Sample(normalMap, u, v, out var nb, out var ng, out var nr);
+          var nx = nr / 255f * 2f - 1f;
+          var ny = ng / 255f * 2f - 1f;
+          var nz = nb / 255f * 2f - 1f;
+          var mapped = tangent * nx + bitangent * ny + geometric * nz;
+          if (mapped.LengthSquared() > 1e-6f)
+            lit = Vector3.Normalize(mapped);
+        }
+
+        var metal = 0f;
+        var rough = 0.45f;
+        var ao = 1f;
+        if (specular is not null && specular.Width > 0)
+        {
+          Sample(specular, u, v, out var sb, out var sg, out var sr);
+          var sa = Alpha(specular, u, v);
+          metal = sr / 255f;
+          rough = roughInAlpha ? sa / 255f : sg / 255f;
+          ao = aoInBlue ? sb / 255f : 1f;
+        }
+
+        var ndotl = Math.Clamp(Vector3.Dot(lit, key), 0f, 1f);
+        var ndoth = Math.Clamp(Vector3.Dot(lit, half), 0f, 1f);
+        var shine = MathF.Pow(ndoth, 8f + (1f - Math.Clamp(rough, 0f, 1f)) * 56f);
+        var spec = shine * (0.04f + metal * 0.85f) * ndotl;
+        var diffuse = (0.18f + 0.82f * ndotl) * (0.25f + 0.75f * ao);
+        var pixel = index * 4;
+        pixels[pixel] = (byte)Math.Clamp(tb * diffuse + spec * 255f, 0, 255);
+        pixels[pixel + 1] = (byte)Math.Clamp(tg * diffuse + spec * 255f, 0, 255);
+        pixels[pixel + 2] = (byte)Math.Clamp(tr * diffuse + spec * 255f, 0, 255);
+        pixels[pixel + 3] = 255;
+      }
+    }
+  }
+
   private static void Sample(PreviewImage image, float u, float v, out byte b, out byte g, out byte r)
   {
     u -= MathF.Floor(u);
@@ -674,6 +807,16 @@ public static class MeshPreview
     b = image.Bgra[texel];
     g = image.Bgra[texel + 1];
     r = image.Bgra[texel + 2];
+  }
+
+  private static byte Alpha(PreviewImage image, float u, float v)
+  {
+    u -= MathF.Floor(u);
+    v -= MathF.Floor(v);
+    var x = Math.Clamp((int)(u * image.Width), 0, image.Width - 1);
+    var y = Math.Clamp((int)(v * image.Height), 0, image.Height - 1);
+    var texel = (y * image.Width + x) * 4;
+    return image.Bgra.Length > texel + 3 ? image.Bgra[texel + 3] : (byte)255;
   }
 
   private static float Edge(float ax, float ay, float bx, float by, float cx, float cy)

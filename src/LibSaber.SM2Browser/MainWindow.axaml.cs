@@ -44,6 +44,8 @@ public partial class MainWindow : Window
   private bool _drawAgain;
   private bool _drawFast;
   private Dictionary<string, PreviewImage>? _albedo;
+  private Dictionary<string, PreviewImage>? _normals;
+  private Dictionary<string, PreviewImage>? _specular;
   private HierarchicalTreeDataGridSource<CatalogDirectory>? _tree;
   private int _pendingFileIndex = -1;
   private string _pendingDirectory = "";
@@ -278,6 +280,8 @@ public partial class MainWindow : Window
     PartLabel.IsVisible = false;
     PlayButton.IsVisible = false;
     _albedo = null;
+    _normals = null;
+    _specular = null;
     PreviewImage.IsVisible = false;
     PreviewText.IsVisible = true;
     PreviewText.Text = "Reading " + file.Path + "…";
@@ -302,14 +306,16 @@ public partial class MainWindow : Window
         var loaded = await Task.Run(() =>
         {
           var decoded = TemplateMeshReader.Load(_catalog, _store, row.Index);
-          return (decoded, ResolveAlbedo(_catalog, _store, decoded, row.Index));
+          return (decoded, ResolvePreview(_catalog, _store, decoded, row.Index));
         });
         if (generation != _previewGeneration)
           return;
         var mesh = loaded.decoded;
         _mesh = mesh;
         _previewFileIndex = row.Index;
-        _albedo = loaded.Item2;
+        _albedo = loaded.Item2.Albedo;
+        _normals = loaded.Item2.Normals;
+        _specular = loaded.Item2.Specular;
         _distance = 0;
         _time = 0;
         _yaw = 0.7f;
@@ -556,6 +562,8 @@ public partial class MainWindow : Window
     var lod = LodBox.SelectedIndex < 0 ? 0 : LodBox.SelectedIndex;
     var part = PartBox.SelectedIndex <= 0 ? -1 : PartBox.SelectedIndex - 1;
     var albedo = _albedo;
+    var normals = _normals;
+    var specular = _specular;
     var previewGeneration = _previewGeneration;
     var bounds = ViewBorder.Bounds;
     var width = bounds.Width < 64 ? 720 : (int)bounds.Width;
@@ -578,7 +586,7 @@ public partial class MainWindow : Window
         skeleton,
         time,
         out var note,
-        new PreviewSettings { Lod = lod, Part = part, Wireframe = wire, Albedo = albedo, MaxEdge = 1400 });
+        new PreviewSettings { Lod = lod, Part = part, Wireframe = wire, Albedo = albedo, Normals = normals, Specular = specular, MaxEdge = 1400 });
       return (pixels, width, height, note);
     }).ContinueWith(task =>
     {
@@ -605,28 +613,53 @@ public partial class MainWindow : Window
     });
   }
 
-  private static Dictionary<string, PreviewImage> ResolveAlbedo(GameCatalog catalog, ArchiveStore store, ExportedMesh mesh, int hint)
+  private readonly record struct PreviewTextures(
+    Dictionary<string, PreviewImage> Albedo,
+    Dictionary<string, PreviewImage> Normals,
+    Dictionary<string, PreviewImage> Specular);
+
+  private static PreviewTextures ResolvePreview(GameCatalog catalog, ArchiveStore store, ExportedMesh mesh, int hint)
   {
-    var map = new Dictionary<string, PreviewImage>(StringComparer.OrdinalIgnoreCase);
-    var names = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-    foreach (var part in mesh.Parts)
+    var albedo = new Dictionary<string, PreviewImage>(StringComparer.OrdinalIgnoreCase);
+    var normals = new Dictionary<string, PreviewImage>(StringComparer.OrdinalIgnoreCase);
+    var specular = new Dictionary<string, PreviewImage>(StringComparer.OrdinalIgnoreCase);
+    var wanted = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+
+    void Take(string? name, string channels)
     {
-      if (!string.IsNullOrWhiteSpace(part.Texture))
-        names.Add(part.Texture);
+      if (!string.IsNullOrWhiteSpace(name))
+        wanted[name] = channels;
     }
 
-    foreach (var level in mesh.Levels)
+    void TakePart(MeshPart part)
     {
-      foreach (var part in level.Parts)
+      Take(part.Texture, "");
+      Take(part.Normal, "Normalmap(rgb)");
+      Take(part.Specular, part.SpecularChannels);
+      if (MaterialMaps.TrySolid(part.Texture ?? "", out var r, out var g, out var b, out var a)
+        && !string.IsNullOrWhiteSpace(part.Texture)
+        && !albedo.ContainsKey(part.Texture))
       {
-        if (!string.IsNullOrWhiteSpace(part.Texture))
-          names.Add(part.Texture);
+        albedo[part.Texture] = new PreviewImage
+        {
+          Width = 1,
+          Height = 1,
+          Bgra = new[] { b, g, r, a },
+        };
       }
     }
 
-    foreach (var name in names)
+    foreach (var part in mesh.Parts)
+      TakePart(part);
+    foreach (var level in mesh.Levels)
     {
-      var index = TemplateMeshReader.ResolveTexture(catalog, hint, name);
+      foreach (var part in level.Parts)
+        TakePart(part);
+    }
+
+    foreach (var pair in wanted)
+    {
+      var index = TemplateMeshReader.ResolveTexture(catalog, hint, pair.Key);
       if (index < 0)
         continue;
       try
@@ -635,7 +668,15 @@ public partial class MainWindow : Window
         if (!document.CanDecode)
           continue;
         var pixels = document.Decode(0, 0, out var width, out var height, out _);
-        map[name] = new PreviewImage { Width = width, Height = height, Bgra = pixels };
+        var image = new PreviewImage { Width = width, Height = height, Bgra = pixels, Channels = pair.Value };
+        if (pair.Value.Contains("Normal", StringComparison.OrdinalIgnoreCase))
+          normals[pair.Key] = image;
+        else if (pair.Value.Contains("Metal", StringComparison.OrdinalIgnoreCase)
+          || pair.Value.Contains("Rough", StringComparison.OrdinalIgnoreCase)
+          || pair.Value.Contains("MetGray", StringComparison.OrdinalIgnoreCase))
+          specular[pair.Key] = image;
+        else
+          albedo[pair.Key] = image;
       }
       catch (Exception)
       {
@@ -643,7 +684,7 @@ public partial class MainWindow : Window
       }
     }
 
-    return map;
+    return new PreviewTextures(albedo, normals, specular);
   }
 
   private void ShowPixels(byte[] pixels, int width, int height)

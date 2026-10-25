@@ -784,4 +784,148 @@ public class AssetTests
     Assert.Equal(0, document.Width);
   }
 
+  [Fact]
+  public void MaterialMaps_PacksChannelsFromTheTextureDefinition()
+  {
+    var armor = MaterialMaps.Pack("Metalness(r)+Roughness(g)+AO(b)");
+    Assert.Equal(new[] { "r", "g", "b" }, armor.Select(pack => pack.Channel).ToArray());
+    Assert.Equal(new[] { "metalness", "roughness", "ao" }, armor.Select(pack => pack.Meaning).ToArray());
+    Assert.False(MaterialMaps.IsSrgb(armor));
+    var skin = MaterialMaps.Pack("MetGray(r)+Roughness(a)");
+    Assert.Equal("a", skin[1].Channel);
+    Assert.Equal("roughness", skin[1].Meaning);
+    var diffuse = MaterialMaps.Pack("Diff(rgb)+AKill(a)");
+    Assert.True(MaterialMaps.IsSrgb(diffuse));
+    Assert.Equal("alphaTest", diffuse[1].Meaning);
+    Assert.False(MaterialMaps.IsSrgb(MaterialMaps.Pack("Normalmap(rgb)")));
+    Assert.False(MaterialMaps.IsSrgb(MaterialMaps.Pack("AO(a)")));
+    Assert.True(MaterialMaps.IsSrgb(MaterialMaps.Pack("RGBEm(rgb)+AO(a)")));
+  }
+
+  [Fact]
+  public void MaterialMaps_ReadsTheDefaultVariantFromAnotherArchive()
+  {
+    const string definition = """
+      convert_settings = {
+         format_descr = "Diff(rgb)"
+         format_name = "MD"
+      }
+      materials = {
+         default = {
+            shaders = {
+               glt = {
+                  covering = {
+                     coveringMask = "ch_seal_hdetm"
+                  }
+               }
+            }
+         }
+         damaged = {
+            shaders = {
+               glt = {
+                  tex = {
+                     NM = "ch_seal_damaged_nm"
+                     spec = "ch_seal_damaged_spec"
+                     diffOverride = "ch_seal_damaged"
+                  }
+               }
+            }
+         }
+      }
+      """;
+    using var dir = new TempDirectory();
+    CacheFile.Create(dir.Path, "model.pak", new[]
+    {
+      new CacheFile.Entry("tpl/hero.tpl", new byte[] { 1 }),
+    });
+    CacheFile.Create(dir.Path, "shared.pak", new[]
+    {
+      new CacheFile.Entry("pct/ch_seal.pct.resource", Encoding.ASCII.GetBytes("diffuse")),
+      new CacheFile.Entry("pct/ch_seal_nm.pct.resource", Encoding.ASCII.GetBytes("normal")),
+      new CacheFile.Entry("pct/ch_seal_spec.pct.resource", Encoding.ASCII.GetBytes("spec")),
+      new CacheFile.Entry("td/ch_seal.td", Encoding.UTF8.GetBytes(definition)),
+      new CacheFile.Entry("td/ch_seal_nm.td", Encoding.UTF8.GetBytes("format_descr = \"Normalmap(rgb)\"\n")),
+      new CacheFile.Entry("td/ch_seal_spec.td", Encoding.UTF8.GetBytes("format_descr = \"Metalness(r)+Roughness(g)+AO(b)\"\n")),
+      new CacheFile.Entry("td/ch_seal_hdetm.td", Encoding.UTF8.GetBytes("format_descr = \"DetMask(g)\"\n")),
+      new CacheFile.Entry("pct/ch_seal_ao.pct.resource", Encoding.ASCII.GetBytes("not-ao")),
+      new CacheFile.Entry("td/ch_seal_ao.td", Encoding.UTF8.GetBytes("format_descr = \"Diff(rgb)\"\n")),
+      new CacheFile.Entry("pct/ch_seal_em.pct.resource", Encoding.ASCII.GetBytes("ao")),
+      new CacheFile.Entry("td/ch_seal_em.td", Encoding.UTF8.GetBytes("format_descr = \"AO(a)\"\n")),
+    });
+    var catalog = GameCatalog.Load(dir.Path);
+    using var store = new ArchiveStore(catalog);
+    Assert.True(catalog.TryGetByPath("tpl/hero.tpl", out var hint));
+    var mesh = new ExportedMesh { Name = "hero" };
+    mesh.Parts.Add(new MeshPart { Name = "seal", Texture = "res://pct/ch_seal.pct.resource", Variant = "default" });
+    mesh.Parts.Add(new MeshPart { Name = "grey", Texture = "sc_grey_90", Variant = "default" });
+    mesh.Parts.Add(new MeshPart { Name = "gone", Texture = "ch_purity_seals_01", Variant = "default" });
+    MaterialMaps.Attach(catalog, store, hint, mesh);
+
+    var seal = mesh.Parts[0];
+    Assert.Equal("ch_seal", seal.Texture);
+    Assert.Equal("ch_seal_nm", seal.Normal);
+    Assert.Equal("ch_seal_spec", seal.Specular);
+    Assert.Contains("Metalness(r)", seal.SpecularChannels);
+    Assert.DoesNotContain(seal.Maps, map => map.Name.Contains("damaged", StringComparison.Ordinal));
+    var mask = seal.Maps.Single(map => map.Role == "detailMask");
+    Assert.True(mask.Missing);
+    Assert.Equal("DetMask(g)", mask.Channels);
+    Assert.False(seal.Maps.Single(map => map.Role == "normal").Srgb);
+    Assert.True(seal.Maps.Single(map => map.Role == "diffuse").Srgb);
+    Assert.DoesNotContain(seal.Maps, map => map.Name == "ch_seal_ao");
+    var ao = seal.Maps.Single(map => map.Role == "ao");
+    Assert.Equal("ch_seal_em", ao.Name);
+    Assert.Equal("AO(a)", ao.Channels);
+    Assert.False(ao.Srgb);
+
+    var grey = mesh.Parts[1].Maps.Single(map => map.Role == "diffuse");
+    Assert.True(grey.Generated);
+    Assert.Equal(230, grey.SolidR);
+    Assert.True(mesh.Parts[2].Maps.Single(map => map.Role == "diffuse").Missing);
+  }
+
+  [Fact]
+  public void Fbx_LinksSpecularAndWritesTheUnrealSidecar()
+  {
+    var mesh = new ExportedMesh { Name = "armor" };
+    mesh.Positions.Add(new Vector3(0, 0, 0));
+    mesh.Positions.Add(new Vector3(1, 0, 0));
+    mesh.Positions.Add(new Vector3(0, 1, 0));
+    mesh.Indices.AddRange(new[] { 0, 1, 2 });
+    var part = new MeshPart
+    {
+      Name = "torso",
+      IndexStart = 0,
+      IndexCount = 3,
+      Texture = "ch_titus_body",
+      Normal = "ch_titus_body_nm",
+      Specular = "ch_titus_body_spec",
+      SpecularChannels = "Metalness(r)+Roughness(g)+AO(b)",
+      Variant = "default",
+      Blend = "opaque",
+    };
+    part.Maps.Add(new MaterialMap { Role = "diffuse", Name = "ch_titus_body", Channels = "Diff(rgb)", Srgb = true });
+    part.Maps.Add(new MaterialMap { Role = "normal", Name = "ch_titus_body_nm", Channels = "Normalmap(rgb)", Srgb = false });
+    var spec = new MaterialMap { Role = "specular", Name = "ch_titus_body_spec", Channels = part.SpecularChannels, Srgb = false };
+    spec.Packing.Add(new ChannelPack("r", "metalness"));
+    spec.Packing.Add(new ChannelPack("g", "roughness"));
+    spec.Packing.Add(new ChannelPack("b", "ao"));
+    part.Maps.Add(spec);
+    mesh.Parts.Add(part);
+
+    using var dir = new TempDirectory();
+    var fbx = Path.Combine(dir.Path, "armor.fbx");
+    var files = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+    {
+      ["ch_titus_body"] = "../../pct/ch_titus_body.png",
+      ["ch_titus_body_nm"] = "../../pct/ch_titus_body_nm.png",
+      ["ch_titus_body_spec"] = "../../pct/ch_titus_body_spec.png",
+    };
+    FbxWriter.Write(fbx, mesh, ExportSpace.Unreal, files);
+    var text = Encoding.ASCII.GetString(File.ReadAllBytes(fbx));
+    Assert.Contains("SpecularColor", text);
+    Assert.Contains("../../pct/ch_titus_body_spec.png", text);
+    Assert.Contains("NormalMap", text);
+  }
+
 }

@@ -608,6 +608,10 @@ public static class FbxWriter
         Connect(connections, "OP", diffuseId, materialId, "DiffuseColor");
       if (!string.IsNullOrWhiteSpace(material.Normal) && ids.Textures.TryGetValue(material.Normal, out var normalId))
         Connect(connections, "OP", normalId, materialId, "NormalMap");
+      if (!string.IsNullOrWhiteSpace(material.Specular) && ids.Textures.TryGetValue(material.Specular, out var specularId))
+        Connect(connections, "OP", specularId, materialId, "SpecularColor");
+      if (!string.IsNullOrWhiteSpace(material.Emissive) && ids.Textures.TryGetValue(material.Emissive, out var emissiveId))
+        Connect(connections, "OP", emissiveId, materialId, "EmissiveColor");
     }
 
     foreach (var texture in CollectTextures(mesh))
@@ -689,23 +693,20 @@ public static class FbxWriter
   private static List<MaterialRef> CollectMaterials(ExportedMesh mesh)
   {
     var list = new List<MaterialRef>();
-    var used = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-    var partIndex = 0;
-    foreach (var part in mesh.Parts)
+    foreach (var slot in MaterialMaps.Slots(mesh))
     {
-      if (part.IndexCount < 3)
-        continue;
-      var baseName = string.IsNullOrWhiteSpace(part.Name) ? "part" + partIndex : part.Name;
-      var name = baseName;
-      var suffix = 2;
-      while (!used.Add(name))
-        name = baseName + "_" + suffix++;
-      list.Add(new MaterialRef(name, name, string.IsNullOrWhiteSpace(part.Texture) ? null : part.Texture, string.IsNullOrWhiteSpace(part.Normal) ? null : part.Normal));
-      partIndex++;
+      var part = slot.Part;
+      list.Add(new MaterialRef(
+        slot.Name,
+        slot.Name,
+        string.IsNullOrWhiteSpace(part.Texture) ? null : part.Texture,
+        string.IsNullOrWhiteSpace(part.Normal) ? null : part.Normal,
+        string.IsNullOrWhiteSpace(part.Specular) ? null : part.Specular,
+        string.IsNullOrWhiteSpace(part.Emissive) ? null : part.Emissive));
     }
 
     if (list.Count == 0 && mesh.HasTriangles)
-      list.Add(new MaterialRef(string.IsNullOrWhiteSpace(mesh.Name) ? "mesh" : mesh.Name, mesh.Name, null, null));
+      list.Add(new MaterialRef(string.IsNullOrWhiteSpace(mesh.Name) ? "mesh" : mesh.Name, mesh.Name, null, null, null, null));
     return list;
   }
 
@@ -724,6 +725,8 @@ public static class FbxWriter
     {
       Add(material.Diffuse);
       Add(material.Normal);
+      Add(material.Specular);
+      Add(material.Emissive);
     }
 
     return list;
@@ -974,7 +977,7 @@ public static class FbxWriter
     return builder.Length == 0 ? "object" : builder.ToString();
   }
 
-  private readonly record struct MaterialRef(string Key, string Name, string? Diffuse, string? Normal);
+  private readonly record struct MaterialRef(string Key, string Name, string? Diffuse, string? Normal, string? Specular, string? Emissive);
   private readonly record struct TextureRef(string Name);
 
   private sealed class BoneTables

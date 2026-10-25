@@ -198,9 +198,14 @@ public static class AssetExporter
     if (settings.WriteFbx && exportMesh.HasTriangles)
     {
       var fbxPath = Destination(outputDirectory, file.Path, ".fbx", batch);
-      var textureFiles = TextureFiles(catalog, index, exportMesh, fbxPath, outputDirectory, settings, batch);
+      var textureFiles = TextureFiles(catalog, store, index, exportMesh, fbxPath, outputDirectory, settings, report, batch);
       FbxWriter.Write(fbxPath, exportMesh, settings.Space, textureFiles);
       report.Written++;
+      if (settings.WriteMaterials)
+      {
+        WriteMaterialSidecar(fbxPath, exportMesh, textureFiles, report);
+        WriteUnrealScript(Path.Combine(Path.GetDirectoryName(fbxPath)!, "import_sm2_materials.py"), report);
+      }
     }
 
     WriteMaterial(outputDirectory, file.Path, exportMesh.Material, settings, report, batch);
@@ -235,16 +240,9 @@ public static class AssetExporter
     {
       if (part.IndexCount < 3)
         continue;
-      copy.Parts.Add(new MeshPart
-      {
-        Name = part.Name,
-        Texture = part.Texture,
-        Normal = part.Normal,
-        Visible = true,
-        HideReason = part.HideReason,
-        IndexStart = part.IndexStart,
-        IndexCount = part.IndexCount,
-      });
+      var copied = part.Copy(part.IndexStart, part.IndexCount);
+      copied.Visible = true;
+      copy.Parts.Add(copied);
     }
 
     return copy;
@@ -270,11 +268,13 @@ public static class AssetExporter
 
   private static Dictionary<string, string> TextureFiles(
     GameCatalog catalog,
+    ArchiveStore store,
     int index,
     ExportedMesh mesh,
     string modelFile,
     string outputDirectory,
     ExportSettings settings,
+    ExportReport report,
     IReadOnlyList<string> batch)
   {
     var map = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
@@ -282,28 +282,107 @@ public static class AssetExporter
     if (extension is null)
       return map;
 
-    var names = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-    foreach (var part in mesh.Parts)
-    {
-      if (!string.IsNullOrWhiteSpace(part.Texture))
-        names.Add(part.Texture);
-      if (!string.IsNullOrWhiteSpace(part.Normal))
-        names.Add(part.Normal);
-    }
-
-    foreach (var name in names)
+    foreach (var name in TextureNames(mesh))
     {
       var resolved = TemplateMeshReader.ResolveTexture(catalog, index, name);
-      if (resolved < 0)
+      var linkedKind = resolved < 0 ? AssetKind.Other : catalog.GetFile(resolved).Kind;
+      if (resolved < 0 || linkedKind != AssetKind.Texture || !PixelsPresent(catalog, store, resolved))
+      {
+        if (!IsGenerated(mesh, name))
+          ForgetTexture(mesh, name);
         continue;
+      }
+
       var linked = catalog.GetFile(resolved);
-      if (linked.Kind != AssetKind.Texture)
-        continue;
       var destination = Destination(outputDirectory, linked.Path, extension, batch);
       map[name] = RelativeTexturePath(modelFile, destination);
     }
 
+    foreach (var solid in GeneratedSolids(mesh))
+    {
+      if (map.ContainsKey(solid.Name))
+        continue;
+      var destination = Destination(outputDirectory, "pct/" + solid.Name + ".pct.resource", extension, batch);
+      WriteSolid(destination, solid, extension);
+      map[solid.Name] = RelativeTexturePath(modelFile, destination);
+      report.Written++;
+    }
+
     return map;
+  }
+
+  private static bool PixelsPresent(GameCatalog catalog, ArchiveStore store, int index)
+  {
+    try
+    {
+      var document = TextureLoader.Load(catalog, store, index);
+      return document.CanDecode && document.Payload.Length > 0;
+    }
+    catch (Exception)
+    {
+      return false;
+    }
+  }
+
+  private static bool IsGenerated(ExportedMesh mesh, string name)
+  {
+    foreach (var part in mesh.Parts)
+    {
+      if (part.Maps.Any(map => map.Generated && string.Equals(map.Name, name, StringComparison.OrdinalIgnoreCase)))
+        return true;
+    }
+
+    return false;
+  }
+
+  private static void ForgetTexture(ExportedMesh mesh, string name)
+  {
+    foreach (var part in mesh.Parts)
+    {
+      if (string.Equals(part.Texture, name, StringComparison.OrdinalIgnoreCase))
+        part.Texture = null;
+      if (string.Equals(part.Normal, name, StringComparison.OrdinalIgnoreCase))
+        part.Normal = null;
+      if (string.Equals(part.Specular, name, StringComparison.OrdinalIgnoreCase))
+        part.Specular = null;
+      if (string.Equals(part.Emissive, name, StringComparison.OrdinalIgnoreCase))
+        part.Emissive = null;
+      foreach (var map in part.Maps)
+      {
+        if (!map.Generated && string.Equals(map.Name, name, StringComparison.OrdinalIgnoreCase))
+          map.Missing = true;
+      }
+    }
+  }
+
+  private static void WriteSolid(string path, MaterialMap solid, string extension)
+  {
+    var pixels = new byte[4 * 4 * 4];
+    for (var i = 0; i < pixels.Length; i += 4)
+    {
+      pixels[i] = solid.SolidB;
+      pixels[i + 1] = solid.SolidG;
+      pixels[i + 2] = solid.SolidR;
+      pixels[i + 3] = solid.SolidA;
+    }
+
+    if (extension.Equals(".tga", StringComparison.OrdinalIgnoreCase))
+      ImageWriters.WriteTga(path, pixels, 4, 4);
+    else
+      ImageWriters.WritePng(path, pixels, 4, 4);
+  }
+
+  private static IEnumerable<MaterialMap> GeneratedSolids(ExportedMesh mesh)
+  {
+    var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+    foreach (var part in mesh.Parts)
+    {
+      foreach (var map in part.Maps)
+      {
+        if (map.Generated && seen.Add(map.Name))
+          yield return map;
+      }
+    }
   }
 
   internal static void ExportModelTextures(
@@ -316,32 +395,14 @@ public static class AssetExporter
     ExportReport report,
     IReadOnlyList<string> batch)
   {
-    var names = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-    void Take(string? name)
-    {
-      if (!string.IsNullOrWhiteSpace(name))
-        names.Add(name);
-    }
-
-    foreach (var part in mesh.Parts)
-    {
-      Take(part.Texture);
-      Take(part.Normal);
-    }
-
-    foreach (var level in mesh.Levels)
-    {
-      foreach (var part in level.Parts)
-      {
-        Take(part.Texture);
-        Take(part.Normal);
-      }
-    }
-
+    var names = TextureNames(mesh);
     if (mesh.Material is not null)
     {
       foreach (var slot in mesh.Material.Slots)
-        Take(slot.Texture);
+      {
+        if (!string.IsNullOrWhiteSpace(slot.Texture))
+          names.Add(slot.Texture);
+      }
     }
 
     var selected = new HashSet<string>(batch, StringComparer.OrdinalIgnoreCase);
@@ -462,6 +523,84 @@ public static class AssetExporter
     if (copied.Count == 0)
       builder.AppendLine("No linked asset names were found in the effect bytes.");
     File.WriteAllText(note, builder.ToString());
+    report.Written++;
+  }
+
+  private static HashSet<string> TextureNames(ExportedMesh mesh)
+  {
+    var names = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+    void Take(string? name)
+    {
+      if (!string.IsNullOrWhiteSpace(name))
+        names.Add(name);
+    }
+
+    void TakePart(MeshPart part)
+    {
+      Take(part.Texture);
+      Take(part.Normal);
+      Take(part.Specular);
+      Take(part.Emissive);
+      foreach (var map in part.Maps)
+      {
+        if (!map.Missing)
+          Take(map.Name);
+      }
+    }
+
+    foreach (var part in mesh.Parts)
+      TakePart(part);
+    foreach (var level in mesh.Levels)
+    {
+      foreach (var part in level.Parts)
+        TakePart(part);
+    }
+
+    return names;
+  }
+
+  private static void WriteMaterialSidecar(string fbxPath, ExportedMesh mesh, IReadOnlyDictionary<string, string> files, ExportReport report)
+  {
+    var slots = MaterialMaps.Slots(mesh).Select(slot => new
+    {
+      slot = slot.Name,
+      variant = slot.Part.Variant,
+      blend = slot.Part.Blend,
+      maps = slot.Part.Maps.Select(map => new
+      {
+        role = map.Role,
+        name = map.Name,
+        file = files.TryGetValue(map.Name, out var file) ? file : null,
+        channels = map.Channels,
+        srgb = map.Srgb,
+        generated = map.Generated,
+        missing = map.Missing,
+        packing = map.Packing.Select(pack => new { channel = pack.Channel, meaning = pack.Meaning }),
+      }),
+    });
+    var jsonPath = Path.Combine(Path.GetDirectoryName(fbxPath)!, Path.GetFileNameWithoutExtension(fbxPath) + ".materials.json");
+    File.WriteAllText(jsonPath, JsonSerializer.Serialize(new
+    {
+      mesh = mesh.Name,
+      fbx = Path.GetFileName(fbxPath),
+      note = "Each map's channels are the .td format_descr. srgb false is a normal or a packed mask, so Unreal imports it linear. The FBX links diffuse, normal, and specular. import_sm2_materials.py builds a master material and one instance per slot from this file.",
+      slots,
+    }, JsonOptions));
+    report.Written++;
+  }
+
+  private static void WriteUnrealScript(string path, ExportReport report)
+  {
+    var assembly = typeof(AssetExporter).Assembly;
+    var name = assembly.GetManifestResourceNames().FirstOrDefault(item => item.EndsWith("import_sm2_materials.py", StringComparison.Ordinal));
+    if (name is null)
+      return;
+    using var stream = assembly.GetManifestResourceStream(name);
+    if (stream is null)
+      return;
+    using var reader = new StreamReader(stream);
+    Directory.CreateDirectory(Path.GetDirectoryName(path)!);
+    File.WriteAllText(path, reader.ReadToEnd().Replace("\r\n", "\n"));
     report.Written++;
   }
 

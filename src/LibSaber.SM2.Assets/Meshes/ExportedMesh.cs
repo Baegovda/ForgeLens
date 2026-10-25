@@ -33,12 +33,43 @@ public sealed class MeshPart
   public int IndexStart { get; set; }
   public int IndexCount { get; set; }
   public string? Texture { get; set; }
-  /// <summary>Normal map named by a material layer, when the texture name is a normal (<c>_nm</c> and the same suffixes).</summary>
+  /// <summary>Normal map named by a material layer, a <c>.td</c> shader, or the <c>_nm</c> sibling Index assigns.</summary>
   public string? Normal { get; set; }
+  /// <summary>Packed specular map (<c>_spec</c>). Channel layout is <see cref="SpecularChannels"/>.</summary>
+  public string? Specular { get; set; }
+  public string? Emissive { get; set; }
+  /// <summary><c>.td</c> <c>format_descr</c> of <see cref="Specular"/>, for example <c>Metalness(r)+Roughness(g)+AO(b)</c>.</summary>
+  public string SpecularChannels { get; set; } = "";
+  /// <summary>Shader variant inside the texture definition. Empty shading materials are <c>default</c>.</summary>
+  public string Variant { get; set; } = "default";
+  /// <summary><c>opaque</c>, <c>masked</c> (alpha kill), or <c>translucent</c>.</summary>
+  public string Blend { get; set; } = "opaque";
   /// <summary>Index leaves LOD and collision shells unchecked. Defaults on so hand-built meshes still export whole.</summary>
   public bool Visible { get; set; } = true;
   /// <summary>"LOD" or "volume" when <see cref="Visible"/> was cleared by Index's default filter.</summary>
   public string? HideReason { get; set; }
+  public List<MaterialMap> Maps { get; } = new();
+
+  public MeshPart Copy(int indexStart, int indexCount)
+  {
+    var copy = new MeshPart
+    {
+      Name = Name,
+      IndexStart = indexStart,
+      IndexCount = indexCount,
+      Texture = Texture,
+      Normal = Normal,
+      Specular = Specular,
+      Emissive = Emissive,
+      SpecularChannels = SpecularChannels,
+      Variant = Variant,
+      Blend = Blend,
+      Visible = Visible,
+      HideReason = HideReason,
+    };
+    copy.Maps.AddRange(Maps);
+    return copy;
+  }
 }
 
 /// <summary>Checkbox state for one catalog file, in surface order: LOD0, then each lower level.</summary>
@@ -218,16 +249,9 @@ public sealed class ExportedMesh
       var indexStart = copy.Indices.Count;
       for (var i = start; i < end; i++)
         copy.Indices.Add(indices[i] + baseVertex);
-      copy.Parts.Add(new MeshPart
-      {
-        Name = part.Name,
-        Texture = part.Texture,
-        Normal = part.Normal,
-        Visible = true,
-        HideReason = part.HideReason,
-        IndexStart = indexStart,
-        IndexCount = copy.Indices.Count - indexStart,
-      });
+      var copied = part.Copy(indexStart, copy.Indices.Count - indexStart);
+      copied.Visible = true;
+      copy.Parts.Add(copied);
     }
   }
 }

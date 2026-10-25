@@ -98,6 +98,9 @@ public static class TemplateMeshReader
     else
       notes.Add($"Decoded {mesh.Positions.Count} vertices and {mesh.Indices.Count / 3} triangles.");
 
+    if (mesh.Parts.Count > 0 || mesh.Levels.Count > 0)
+      MaterialMaps.Attach(catalog, store, fileIndex, mesh, notes);
+
     if (mesh.Bones.Count > 0)
       notes.Add($"{mesh.Bones.Count} bones.");
 
@@ -631,10 +634,16 @@ public static class TemplateMeshReader
     return "part" + meshIndex + "_" + sub.NodeId;
   }
 
+  private static string? EmptyToNull(string? value)
+    => string.IsNullOrWhiteSpace(value) ? null : value;
+
   public static int ResolveTexture(GameCatalog catalog, int hint, string name)
   {
     if (string.IsNullOrWhiteSpace(name))
       return -1;
+    name = name.Replace('\\', '/').Trim();
+    if (name.StartsWith("res://", StringComparison.OrdinalIgnoreCase))
+      name = name[6..];
     var candidates = new[]
     {
       name,
@@ -722,8 +731,9 @@ public static class TemplateMeshReader
         Name = partName,
         IndexStart = indexStart,
         IndexCount = target.Indices.Count - indexStart,
-        Texture = FirstTexture(material),
+        Texture = FirstTexture(material) ?? EmptyToNull(material?.ShadingMaterialTexture),
         Normal = NormalTexture(material),
+        Variant = string.IsNullOrWhiteSpace(material?.ShadingMaterialMaterial) ? "default" : material.ShadingMaterialMaterial,
         Visible = visible,
         HideReason = hideReason,
       });
