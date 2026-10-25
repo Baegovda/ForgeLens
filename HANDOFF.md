@@ -63,8 +63,9 @@ For any agent continuing this work: read this whole file before you do anything.
 - **Type tests:** Tyranid, weapon, prop and vehicle all import. Results are in `Desktop\SM2_TypeTest`.
 
 ## Open items (do them in order, one at a time)
-1. **Tyranid color.** The Hormagaunt comes out grey-pink because of a runtime tint/dye step.
-   - Work in progress: commit ef29997 carries `albedo_tint` through. Check how far that got and verify it in Unreal.
+1. **Tyranid color: resolved.** The grey look came from a capture taken before the textures had loaded; the diffuse textures themselves carry the real colors.
+   - Commit ef29997 applies the material data's `albedo_tint` (stored as [A, R, G, B]) as the M_SM2 `AlbedoTint` parameter.
+   - Not done yet: the second_spec (gold metallicTint) and anisotropic highlight layers.
 2. **Transparent face slots.** Titus's head_01* slots are marked transparent. Confirm in the game what their alpha means before using the translucent parent on them.
 3. **VFX.** There is no `.sfx` to Niagara conversion; files are extracted raw only.
 4. **Rhino parts.** Check whether destroyed or variant parts are stacked on the hull.
