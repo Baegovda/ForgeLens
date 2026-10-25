@@ -718,6 +718,17 @@ public class AssetTests
   }
 
   [Fact]
+  public void SaniIndex_CountsSharedBoneNames()
+  {
+    var skeleton = new[] { "CENTRE", "HEAD", "ARM1L", "ARM1R", "LEG1L", "LEG1R", "TAIL1", "TAIL6" };
+    var clip = new[] { "CENTRE", "HEAD", "ARM1L", "other" };
+    Assert.Equal(3, SaniIndex.SharedBones(skeleton, clip));
+    Assert.Empty(SaniIndex.Compatible(new[] { new SaniIndex.Header(0, "a.sani", 1, 30, clip) }, skeleton));
+    Assert.Single(SaniIndex.Compatible(new[] { new SaniIndex.Header(0, "a.sani", 1, 30, skeleton) }, skeleton, minimum: 8));
+    Assert.Single(SaniIndex.Match(new[] { new SaniIndex.Header(0, "animation/idle_marine.sani", 1, 30, clip) }, "idle_marine"));
+  }
+
+  [Fact]
   public void EffectScan_FindsTextureNamesAndRefusesParentPaths()
   {
     var bytes = Encoding.ASCII.GetBytes("textures/body.pct.resource\0models/marine.tpl");

@@ -294,6 +294,30 @@ public class ExtractorTests
   }
 
   [Fact]
+  public void Export_accepts_anim_and_rejects_it_on_list()
+  {
+    Assert.True(ExtractorOptions.TryParse(
+      new[] { "export", "game", "--asset", "tpl/hero.tpl", "--format", "fbx-unreal", "--anim", "idle", "-o", "out" },
+      out var options,
+      out var error));
+    Assert.Equal("", error);
+    Assert.Equal("idle", options.Animation);
+    Assert.Equal("fbx-unreal", options.Format);
+
+    Assert.True(ExtractorOptions.TryParse(
+      new[] { "export", "game", "--asset", "tpl/hero.tpl", "--format", "both", "--anim", "all", "-o", "out" },
+      out options,
+      out error));
+    Assert.Equal("all", options.Animation);
+
+    Assert.False(ExtractorOptions.TryParse(
+      new[] { "list", "game", "--anim", "idle" },
+      out _,
+      out error));
+    Assert.Contains("--anim", error);
+  }
+
+  [Fact]
   public void Export_requires_output_asset_and_format()
   {
     var stderr = new StringWriter();

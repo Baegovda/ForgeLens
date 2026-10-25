@@ -10,7 +10,7 @@ LibSaber.SM2Extractor — list and extract Warhammer 40,000: Space Marine 2 arch
 Usage:
   LibSaber.SM2Extractor list <archive-or-folder> [options]
   LibSaber.SM2Extractor extract <archive-or-folder> --output <folder> [options]
-  LibSaber.SM2Extractor export <game-folder> --asset <path> --format <fbx-unreal|gltf|both> --output <folder> [--lod <n>]
+  LibSaber.SM2Extractor export <game-folder> --asset <path> --format <fbx-unreal|gltf|both> --output <folder> [--lod <n>] [--anim <name|all>]
 
 The game ships .pak archives with a sibling cache of the same name plus ".cache"
 (client_pc\something.pak and client_pc\something.pak.cache). .pck files with a
@@ -28,6 +28,11 @@ Options:
                           glTF is Y-up meters. Textures are written next to the model.
   --lod <n>               0 (default) exports the meshes Index leaves checked.
                           1 and up export that smaller vertex pool. export only.
+  --anim <name|all>       Also write {model}__{clip}.fbx / .glb with that clip on this
+                          skeleton. <name> matches the .sani path (one token, or several
+                          clips when it is a substring). all writes every .sani that
+                          shares at least 8 bone names with the model. export only.
+                          Bones the clip does not name stay on the bind pose.
   --no-recursive          When the input is a folder, do not search subfolders.
   --prefix-archive        Write each archive under <output>\<archive name>\. extract only.
   --no-overwrite          Leave files that are already in the output folder. extract only.
@@ -43,6 +48,7 @@ Examples:
   LibSaber.SM2Extractor list "C:\Program Files (x86)\Steam\steamapps\common\Warhammer 40000 Space Marine 2\client_pc" --filter *.pct
   LibSaber.SM2Extractor extract "C:\Program Files (x86)\Steam\steamapps\common\Warhammer 40000 Space Marine 2\client_pc" --output C:\sm2\extract --filter *.pct --filter *.tpl
   LibSaber.SM2Extractor export "C:\Program Files (x86)\Steam\steamapps\common\Warhammer 40000 Space Marine 2\client_pc" --asset tpl/cc_titus_assault.tpl --format fbx-unreal --lod 0 -o C:\sm2\titus
+  LibSaber.SM2Extractor export "D:\Steam\steamapps\common\Space Marine 2\client_pc" --asset tpl/cc_titus_assault.tpl --anim all --format both -o D:\export\tpl
 """;
 
   public ExtractorVerb Verb { get; private init; }
@@ -56,6 +62,7 @@ Examples:
   public string? Asset { get; private init; }
   public string? Format { get; private init; }
   public int Lod { get; private init; }
+  public string? Animation { get; private init; }
 
   public static ExtractorOptions Help()
     => new() { Verb = ExtractorVerb.Help };
@@ -89,6 +96,7 @@ Examples:
     string? output = null;
     string? asset = null;
     string? format = null;
+    string? animation = null;
     var lod = 0;
     var lodSet = false;
     var recursive = true;
@@ -184,6 +192,24 @@ Examples:
         continue;
       }
 
+      if (TryTakeValue(args, ref i, arg, "--anim", "--anim", out var animValue))
+      {
+        if (animation is not null)
+        {
+          error = "Animation specified more than once.";
+          return false;
+        }
+
+        if (string.IsNullOrWhiteSpace(animValue))
+        {
+          error = "Animation name is empty.";
+          return false;
+        }
+
+        animation = animValue;
+        continue;
+      }
+
       if (TryTakeValue(args, ref i, arg, "--lod", "--lod", out var lodValue))
       {
         if (lodSet)
@@ -267,9 +293,9 @@ Examples:
       return false;
     }
 
-    if (verb != ExtractorVerb.Export && (asset is not null || format is not null || lodSet))
+    if (verb != ExtractorVerb.Export && (asset is not null || format is not null || lodSet || animation is not null))
     {
-      error = "--asset, --format, and --lod are only valid with export.";
+      error = "--asset, --format, --lod, and --anim are only valid with export.";
       return false;
     }
 
@@ -318,7 +344,8 @@ Examples:
       Quiet = quiet,
       Asset = asset,
       Format = format?.ToLowerInvariant(),
-      Lod = lod
+      Lod = lod,
+      Animation = animation,
     };
     return true;
   }

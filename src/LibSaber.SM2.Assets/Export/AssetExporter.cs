@@ -25,6 +25,8 @@ public sealed class ExportSettings
   public int Lod { get; init; }
   /// <summary>Checked meshes for a previewed catalog index. Other files keep Index's defaults.</summary>
   public Dictionary<int, MeshVisibility>? PartVisibility { get; set; }
+  /// <summary>Clips written beside the bind mesh as <c>{model}__{clip}.fbx</c> and <c>.glb</c>. The bind file itself stays unanimated.</summary>
+  public IReadOnlyList<AnimationClip> Clips { get; init; } = Array.Empty<AnimationClip>();
 }
 
 public sealed class ExportReport
@@ -189,6 +191,8 @@ public static class AssetExporter
       return;
     }
 
+    exportMesh.Clip = null;
+    IReadOnlyDictionary<string, string>? textureFiles = null;
     if (settings.WriteGltf)
     {
       GltfWriter.Write(Destination(outputDirectory, file.Path, ".glb", batch), exportMesh, settings.Space);
@@ -198,7 +202,7 @@ public static class AssetExporter
     if (settings.WriteFbx && exportMesh.HasTriangles)
     {
       var fbxPath = Destination(outputDirectory, file.Path, ".fbx", batch);
-      var textureFiles = TextureFiles(catalog, store, index, exportMesh, fbxPath, outputDirectory, settings, report, batch);
+      textureFiles = TextureFiles(catalog, store, index, exportMesh, fbxPath, outputDirectory, settings, report, batch);
       FbxWriter.Write(fbxPath, exportMesh, settings.Space, textureFiles);
       report.Written++;
       if (settings.WriteMaterials)
@@ -207,6 +211,37 @@ public static class AssetExporter
         WriteUnrealScript(Path.Combine(Path.GetDirectoryName(fbxPath)!, "import_sm2_materials.py"), report);
       }
     }
+
+    var usedClips = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+    foreach (var clip in settings.Clips)
+    {
+      if (!clip.HasCurves || exportMesh.Bones.Count == 0)
+        continue;
+      var token = ClipToken(clip.Name);
+      var unique = token;
+      var suffix = 2;
+      while (!usedClips.Add(unique))
+        unique = token + "_" + suffix++;
+      exportMesh.Clip = clip;
+      var relative = AnimationRelative(file.Path, unique);
+      if (settings.WriteGltf)
+      {
+        GltfWriter.Write(Destination(outputDirectory, relative, ".glb", batch), exportMesh, settings.Space);
+        report.Written++;
+      }
+
+      if (settings.WriteFbx && exportMesh.HasTriangles)
+      {
+        var fbxPath = Destination(outputDirectory, relative, ".fbx", batch);
+        FbxWriter.Write(fbxPath, exportMesh, settings.Space, textureFiles);
+        report.Written++;
+      }
+
+      var bound = clip.Tracks.Count(track => exportMesh.Bones.Exists(bone => bone.Name == track.BoneName));
+      report.Messages.Add($"{clip.Name}: {bound} of {clip.Tracks.Count} tracks match {exportMesh.Name}, {clip.Duration:0.###}s at {clip.SampleRate:0.###} fps.");
+    }
+
+    exportMesh.Clip = null;
 
     WriteMaterial(outputDirectory, file.Path, exportMesh.Material, settings, report, batch);
     if (settings.WriteModelTextures)
@@ -462,30 +497,71 @@ public static class AssetExporter
 
     if (settings.WriteGltf && clip.HasCurves)
     {
-      var mesh = new ExportedMesh { Name = clip.Name, Clip = clip };
-      var boneIds = clip.Tracks.Select(track => track.Bone).Where(bone => bone >= 0).Distinct().OrderBy(bone => bone).ToList();
-      if (boneIds.Count == 0)
-        boneIds.Add(0);
-      foreach (var bone in boneIds)
-      {
-        mesh.Bones.Add(new Bone { Name = "bone" + bone, Parent = -1 });
-      }
-
-      foreach (var track in clip.Tracks)
-      {
-        var mapped = boneIds.IndexOf(track.Bone);
-        track.Bone = mapped;
-        if (mapped >= 0)
-          mesh.Bones[mapped].Name = track.BoneName.Length == 0 ? mesh.Bones[mapped].Name : track.BoneName;
-      }
-
+      var mesh = SkeletonForClip(clip);
       GltfWriter.Write(Destination(outputDirectory, file.Path, ".glb", batch), mesh, settings.Space);
       report.Written++;
+      if (settings.WriteFbx && mesh.Bones.Count > 0)
+      {
+        FbxWriter.Write(Destination(outputDirectory, file.Path, ".fbx", batch), mesh, settings.Space);
+        report.Written++;
+      }
     }
     else if (clip.Notes.Count > 0)
     {
       report.Messages.Add(file.Path + ": " + clip.Notes[0]);
     }
+  }
+
+  private static ExportedMesh SkeletonForClip(AnimationClip clip)
+  {
+    var mesh = new ExportedMesh { Name = clip.Name, Clip = clip };
+    if (clip.Bones.Count > 0)
+    {
+      foreach (var name in clip.Bones)
+        mesh.Bones.Add(new Bone { Name = name, Parent = -1 });
+      return mesh;
+    }
+
+    var boneIds = clip.Tracks.Select(track => track.Bone).Where(bone => bone >= 0).Distinct().OrderBy(bone => bone).ToList();
+    if (boneIds.Count == 0)
+      boneIds.Add(0);
+    foreach (var bone in boneIds)
+    {
+      var track = clip.Tracks.Find(item => item.Bone == bone);
+      mesh.Bones.Add(new Bone { Name = track is { BoneName.Length: > 0 } ? track.BoneName : "bone" + bone, Parent = -1 });
+    }
+
+    foreach (var track in clip.Tracks)
+    {
+      var mapped = boneIds.IndexOf(track.Bone);
+      if (mapped >= 0)
+        track.Bone = mapped;
+    }
+
+    return mesh;
+  }
+
+  private static string AnimationRelative(string modelPath, string token)
+  {
+    var normalized = modelPath.Replace('\\', '/');
+    var slash = normalized.LastIndexOf('/');
+    var folder = slash >= 0 ? normalized[..(slash + 1)] : "";
+    return folder + AssetClassification.BaseName(normalized) + "__" + token + ".tpl";
+  }
+
+  private static string ClipToken(string name)
+  {
+    var builder = new StringBuilder(name.Length);
+    foreach (var c in name)
+    {
+      if (c is '/' or '\\' or ':' or '*' or '?' or '"' or '<' or '>' or '|' or '\0' or ' ')
+        builder.Append('_');
+      else
+        builder.Append(c);
+    }
+
+    var text = builder.ToString().Trim('_');
+    return text.Length == 0 ? "clip" : text;
   }
 
   private static void ExportEffect(
@@ -691,7 +767,7 @@ public static class AssetExporter
       + "DDS keeps the original block compression. PNG and TGA are decoded previews." + Environment.NewLine
       + "Most textures are .pct.resource plus .pct_mip. A bare .pct is uncommon." + Environment.NewLine
       + "Models are .tpl plus .tpl_data. Lod 0 keeps the meshes Index leaves checked (the largest pool, plus a shell such as _SIM) and drops _LOD and collision. A higher lod writes that smaller vertex pool. FBX is binary 7.4, Z-up, with a skinned limb hierarchy. Each exported part gets a material whose diffuse (and _nm normal, when that texture is in the catalog) is a path relative to the FBX, pointing at the PNG or TGA written beside it. .lods_base, .geom_dbg, and .cdt are not mesh payloads." + Environment.NewLine
-      + "Animations: retail .sani is an ETNA clip (bone names, duration, events). Packed curves and .sani_data are not expanded into glTF channels." + Environment.NewLine
+      + "Animations: retail .sani plus .sani_data is an ETNA clip. Rotation keys are three int16 components lerped through a per-bone min/max, with w reconstructed. Translation keys are three 10-bit components, unwrapped across frames. Bones the clip does not name stay on the model bind pose. export --anim writes {model}__{clip}.fbx and .glb beside the bind mesh." + Environment.NewLine
       + "Particle systems (.ps, .sfx) are not converted. Their raw bytes and any named meshes or textures are copied." + Environment.NewLine;
   }
 

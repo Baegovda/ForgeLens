@@ -471,26 +471,12 @@ public static class MeshPreview
   {
     var worlds = new Matrix4x4[mesh.Bones.Count];
     var local = new Matrix4x4[mesh.Bones.Count];
-    for (var i = 0; i < mesh.Bones.Count; i++)
-      local[i] = mesh.Bones[i].Local;
-
-    if (mesh.Clip is not null)
+    if (mesh.Clip is { HasCurves: true } clip)
+      ClipPose.Apply(mesh.Bones, clip, time, local);
+    else
     {
-      foreach (var track in mesh.Clip.Tracks)
-      {
-        var index = track.Bone;
-        if (index < 0)
-          index = mesh.Bones.FindIndex(bone => bone.Name == track.BoneName);
-        if ((uint)index >= (uint)local.Length)
-          continue;
-
-        var translation = AnimationClip.Sample(track.Translation, Translation(local[index]), time);
-        var rotation = AnimationClip.Sample(track.Rotation, Quaternion.Identity, time);
-        var scale = AnimationClip.Sample(track.Scale, Vector3.One, time);
-        if (track.Rotation.Count == 0)
-          rotation = QuaternionFrom(local[index]);
-        local[index] = Matrix4x4.CreateScale(scale) * Matrix4x4.CreateFromQuaternion(rotation) * Matrix4x4.CreateTranslation(translation);
-      }
+      for (var i = 0; i < mesh.Bones.Count; i++)
+        local[i] = mesh.Bones[i].Local;
     }
 
     var pending = new bool[local.Length];
@@ -566,9 +552,6 @@ public static class MeshPreview
 
   private static Vector3 Translation(Matrix4x4 matrix)
     => new(matrix.M41, matrix.M42, matrix.M43);
-
-  private static Quaternion QuaternionFrom(Matrix4x4 matrix)
-    => Quaternion.CreateFromRotationMatrix(matrix);
 
   private static bool Project(Vector3 position, Matrix4x4 viewProjection, int width, int height, out float x, out float y, out float z)
   {

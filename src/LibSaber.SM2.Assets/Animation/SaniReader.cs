@@ -31,7 +31,7 @@ public static class SaniReader
       return clip;
     }
 
-    if (TryReadEtna(bytes, clip, siblingBytes: null))
+    if (TryReadEtna(bytes, clip, SiblingData(catalog, store, fileIndex)))
       return clip;
 
     try
@@ -131,7 +131,7 @@ public static class SaniReader
 
   /// <summary>
   ///   Retail .sani files start with ETNA. The header carries duration, rate, frame count,
-  ///   and the bone name table. Curve payloads stay packed; this does not invent keys.
+  ///   and the bone name table. <see cref="EtnaCurves"/> samples the paired .sani_data.
   /// </summary>
   private static bool TryReadEtna(byte[] bytes, AnimationClip clip, byte[]? siblingBytes)
   {
@@ -184,11 +184,56 @@ public static class SaniReader
     foreach (var name in events.Distinct(StringComparer.Ordinal))
       clip.Sequences.Add(name);
 
-    var dataNote = siblingBytes is null ? "" : $" Paired .sani_data is {siblingBytes.Length:N0} bytes and is not expanded.";
-    clip.Notes.Add($"ETNA clip, {clip.Bones.Count} bones, {frames} frames, {clip.SampleRate:0.###} fps, {clip.Duration:0.###}s. Packed curve blocks total {packed:N0} bytes and were not expanded into keys.{dataNote}");
+    var expanded = EtnaCurves.TryExpand(bytes, siblingBytes, clip, frames);
+    var dataNote = siblingBytes is null ? "" : expanded ? "" : $" Paired .sani_data is {siblingBytes.Length:N0} bytes.";
+    if (!expanded && siblingBytes is not null && clip.Notes.Count == 0)
+      clip.Notes.Add("Paired .sani_data did not yield keys.");
+    clip.Notes.Insert(0, $"ETNA clip, {clip.Bones.Count} bones, {frames} frames, {clip.SampleRate:0.###} fps, {clip.Duration:0.###}s. Packed blocks total {packed:N0} bytes.{dataNote}");
     if (clip.Bones.Count != declaredBones)
       clip.Notes.Add($"The header declared {declaredBones} bones and the name table has {clip.Bones.Count}.");
     return true;
+  }
+
+  private static byte[]? SiblingData(GameCatalog catalog, ArchiveStore store, int fileIndex)
+  {
+    var path = catalog.GetFile(fileIndex).Path.Replace('\\', '/');
+    if (!path.EndsWith(".sani", StringComparison.OrdinalIgnoreCase) || path.EndsWith(".sani_data", StringComparison.OrdinalIgnoreCase))
+      return null;
+    var dataPath = path + "_data";
+    var index = catalog.ResolveReference(dataPath, fileIndex);
+    if (index < 0)
+      index = catalog.ResolveReference(System.IO.Path.GetFileName(dataPath), fileIndex);
+    return index >= 0 ? store.Read(index) : null;
+  }
+
+  /// <summary>Bone names and timing from an ETNA header, without reading curve bytes.</summary>
+  public static bool TryPeek(ReadOnlySpan<byte> bytes, out float duration, out float rate, out List<string> bones)
+  {
+    duration = 0;
+    rate = 0;
+    bones = new List<string>();
+    if (bytes.Length < 36 || bytes[0] != (byte)'E' || bytes[1] != (byte)'T' || bytes[2] != (byte)'N' || bytes[3] != (byte)'A')
+      return false;
+    var stringEnd = BitConverter.ToInt32(bytes.Slice(8, 4));
+    duration = BitConverter.ToSingle(bytes.Slice(12, 4));
+    rate = BitConverter.ToSingle(bytes.Slice(16, 4));
+    if (stringEnd < 36 || stringEnd > bytes.Length)
+      return false;
+    var offset = 32;
+    while (offset + 4 <= stringEnd && bones.Count < 4096)
+    {
+      var length = BitConverter.ToInt32(bytes.Slice(offset, 4));
+      offset += 4;
+      if (length <= 0 || length > 200 || offset + length > stringEnd)
+        break;
+      var name = Encoding.ASCII.GetString(bytes.Slice(offset, length));
+      if (name.Any(ch => ch < 32 || ch > 126))
+        break;
+      bones.Add(name);
+      offset += length;
+    }
+
+    return bones.Count > 0;
   }
 
   private static void CollectNames(ReadOnlySpan<byte> payload, List<string> names)

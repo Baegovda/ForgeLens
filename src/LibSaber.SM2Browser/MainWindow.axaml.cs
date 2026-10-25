@@ -53,6 +53,10 @@ public partial class MainWindow : Window
   private bool _suppressRecent;
   private bool _suppressMesh;
   private int _previewFileIndex = -1;
+  private int _animGeneration;
+  private bool _suppressAnim;
+  private bool _suppressScrub;
+  private List<SaniIndex.Header>? _clipHeaders;
 
   public MainWindow()
   {
@@ -73,6 +77,7 @@ public partial class MainWindow : Window
       _time += 0.033f;
       if (_clip.Duration > 0 && _time > _clip.Duration)
         _time = 0;
+      SyncScrub();
       DrawMesh();
     };
     Opened += async (_, _) =>
@@ -124,6 +129,7 @@ public partial class MainWindow : Window
       _store?.Dispose();
       _catalog = catalog;
       _store = new ArchiveStore(catalog);
+      _clipHeaders = null;
       _settings.LastFolder = path;
       _settings.Save();
       BindTree(catalog);
@@ -269,6 +275,7 @@ public partial class MainWindow : Window
     {
       _mesh = null;
       _previewFileIndex = -1;
+      AnimBar.IsVisible = false;
       if (file.Kind != AssetKind.Model)
         MeshList.ItemsSource = null;
     }
@@ -325,6 +332,10 @@ public partial class MainWindow : Window
         SkeletonToggle.IsChecked = false;
         WireToggle.IsVisible = mesh.HasTriangles;
         PreviewNote.Text = mesh.Message;
+        if (mesh.Bones.Count > 0)
+          _ = ListAnimationsAsync(++_animGeneration);
+        else
+          AnimBar.IsVisible = false;
         if (mesh.HasTriangles || mesh.Bones.Count > 0)
         {
           PreviewText.IsVisible = false;
@@ -346,11 +357,17 @@ public partial class MainWindow : Window
         if (generation != _previewGeneration)
           return;
         _clip = clip;
-        PlayButton.IsVisible = clip.HasCurves;
+        ApplyClipToMesh(clip);
         SkeletonToggle.IsVisible = _mesh is { Bones.Count: > 0 };
         PreviewText.Text = Describe(clip);
+        if (_mesh is { Bones.Count: > 0 } && clip.HasCurves)
+        {
+          PreviewText.IsVisible = false;
+          PreviewImage.IsVisible = true;
+          DrawMesh();
+        }
         PreviewNote.Text = clip.HasCurves
-          ? "Play samples the curves onto the skeleton when a model is also loaded. Retail .sani packing is unverified."
+          ? "Play or the slider samples these curves onto the loaded skeleton. Bones this clip does not name stay on the bind pose."
           : "No sampled curves. The note above is what the reader could see.";
         HideLoading(generation);
         return;
@@ -728,15 +745,122 @@ public partial class MainWindow : Window
       return;
     }
 
-    if (_mesh is null || _clip is null)
+    if (_mesh is null || _clip is null || !_clip.HasCurves)
     {
-      PreviewNote.Text = "Load a .tpl with a skeleton, then a .sani, to pose the bones. Playback of retail curves is unverified.";
+      PreviewNote.Text = "Select a model, then an animation that shares its bone names.";
       return;
     }
 
     _mesh.Clip = _clip;
     _playTimer.Start();
     PlayButton.Content = "Pause";
+  }
+
+  private async Task ListAnimationsAsync(int generation)
+  {
+    if (_catalog is null || _store is null || _mesh is null || _mesh.Bones.Count == 0)
+      return;
+    var catalog = _catalog;
+    var store = _store;
+    var names = _mesh.Bones.Select(bone => bone.Name).ToArray();
+    AnimBar.IsVisible = true;
+    _suppressAnim = true;
+    AnimBox.ItemsSource = new[] { new AnimChoice { Label = "Finding animations…", Index = -1 } };
+    AnimBox.SelectedIndex = 0;
+    _suppressAnim = false;
+    var choices = await Task.Run(() =>
+    {
+      _clipHeaders ??= SaniIndex.ReadHeaders(catalog, store);
+      var rows = new List<AnimChoice> { new() { Label = "Bind pose", Index = -1 } };
+      foreach (var header in SaniIndex.Compatible(_clipHeaders, names))
+      {
+        var file = Path.GetFileName(header.Path);
+        rows.Add(new AnimChoice { Label = $"{file}  ({header.Duration:0.00}s)", Index = header.Index });
+      }
+
+      return rows;
+    });
+    if (generation != _animGeneration || _mesh is null)
+      return;
+    _suppressAnim = true;
+    AnimBox.ItemsSource = choices;
+    AnimBox.SelectedIndex = 0;
+    _suppressAnim = false;
+    StatusText.Text = choices.Count <= 1
+      ? "No animation shares 8 or more bone names with this model."
+      : $"{choices.Count - 1:N0} animations share bone names with this model.";
+  }
+
+  private async void AnimChanged(object? sender, SelectionChangedEventArgs e)
+  {
+    if (_suppressAnim || _catalog is null || _store is null || _mesh is null)
+      return;
+    if (AnimBox.SelectedItem is not AnimChoice choice)
+      return;
+    _playTimer.Stop();
+    PlayButton.Content = "Play";
+    if (choice.Index < 0)
+    {
+      _clip = null;
+      _mesh.Clip = null;
+      _time = 0;
+      PlayButton.IsVisible = false;
+      ScrubSlider.IsEnabled = false;
+      ScrubLabel.Text = "0.00s";
+      PreviewNote.Text = "Bind pose.";
+      DrawMesh();
+      return;
+    }
+
+    var generation = ++_animGeneration;
+    var index = choice.Index;
+    var clip = await Task.Run(() => SaniReader.Load(_catalog, _store, index));
+    if (generation != _animGeneration || _mesh is null)
+      return;
+    _clip = clip;
+    ApplyClipToMesh(clip);
+    PreviewNote.Text = clip.HasCurves
+      ? $"{clip.Name}: {clip.Tracks.Count} tracks, {clip.Duration:0.###}s. Bones this clip does not name stay on the bind pose."
+      : (clip.Notes.Count == 0 ? "This clip has no curve keys." : clip.Notes[0]);
+    DrawMesh();
+  }
+
+  private void ApplyClipToMesh(AnimationClip clip)
+  {
+    _time = 0;
+    PlayButton.IsVisible = clip.HasCurves && _mesh is { Bones.Count: > 0 };
+    ScrubSlider.IsEnabled = clip.HasCurves;
+    if (_mesh is not null)
+      _mesh.Clip = clip.HasCurves ? clip : null;
+    SyncScrub();
+  }
+
+  private void ScrubChanged(object? sender, Avalonia.Controls.Primitives.RangeBaseValueChangedEventArgs e)
+  {
+    if (_suppressScrub || _clip is null || !_clip.HasCurves)
+      return;
+    _time = (float)ScrubSlider.Value;
+    ScrubLabel.Text = $"{_time:0.00} / {_clip.Duration:0.00}s";
+    DrawMesh();
+  }
+
+  private void SyncScrub()
+  {
+    _suppressScrub = true;
+    if (_clip is { HasCurves: true, Duration: > 0 })
+    {
+      ScrubSlider.Maximum = _clip.Duration;
+      ScrubSlider.Value = Math.Clamp(_time, 0, _clip.Duration);
+      ScrubLabel.Text = $"{_time:0.00} / {_clip.Duration:0.00}s";
+      ScrubSlider.IsEnabled = true;
+    }
+    else
+    {
+      ScrubSlider.Value = 0;
+      ScrubLabel.Text = "0.00s";
+    }
+
+    _suppressScrub = false;
   }
 
   private void ViewPressed(object? sender, PointerPressedEventArgs e)
@@ -974,4 +1098,11 @@ public partial class MainWindow : Window
     base.OnClosed(e);
   }
 
+}
+
+public sealed class AnimChoice
+{
+  public string Label { get; init; } = "";
+  public int Index { get; init; } = -1;
+  public override string ToString() => Label;
 }

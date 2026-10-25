@@ -1,3 +1,4 @@
+using LibSaber.SM2.Assets.Animation;
 using LibSaber.SM2.Assets.Catalog;
 using LibSaber.SM2.Assets.Export;
 using LibSaber.SM2.Assets.Meshes;
@@ -42,12 +43,19 @@ public static class ModelExport
       stdout.WriteLine($"Exporting {file.Path} as {options.Format} lod {options.Lod}");
 
     using var store = new ArchiveStore(catalog);
+    var clips = new List<AnimationClip>();
+    if (!string.IsNullOrWhiteSpace(options.Animation))
+    {
+      if (!TryResolveClips(catalog, store, index, options.Animation, clips, stdout, stderr, options.Quiet))
+        return 1;
+    }
+
     var report = AssetExporter.Export(
       catalog,
       store,
       new[] { index },
       output,
-      Settings(options),
+      Settings(options, clips),
       options.Quiet ? null : new Progress<string>(path => stdout.WriteLine(path)));
 
     foreach (var message in report.Messages)
@@ -131,7 +139,63 @@ public static class ModelExport
     return false;
   }
 
-  private static ExportSettings Settings(ExtractorOptions options)
+  private static bool TryResolveClips(
+    GameCatalog catalog,
+    ArchiveStore store,
+    int modelIndex,
+    string animation,
+    List<AnimationClip> clips,
+    TextWriter stdout,
+    TextWriter stderr,
+    bool quiet)
+  {
+    var headers = SaniIndex.ReadHeaders(catalog, store);
+    List<SaniIndex.Header> chosen;
+    if (animation.Equals("all", StringComparison.OrdinalIgnoreCase))
+    {
+      var mesh = TemplateMeshReader.Load(catalog, store, modelIndex);
+      var names = mesh.Bones.Select(bone => bone.Name).ToList();
+      chosen = SaniIndex.Compatible(headers, names);
+      if (chosen.Count == 0)
+      {
+        stderr.WriteLine($"No .sani shares at least {SaniIndex.MinimumSharedBones} bone names with this model. Pass --anim and a clip path to force one.");
+        return false;
+      }
+    }
+    else
+    {
+      chosen = SaniIndex.Match(headers, animation);
+      if (chosen.Count == 0)
+      {
+        stderr.WriteLine($"No .sani matches '{animation}'.");
+        return false;
+      }
+    }
+
+    foreach (var header in chosen)
+    {
+      var clip = SaniReader.Load(catalog, store, header.Index);
+      if (!clip.HasCurves)
+      {
+        stderr.WriteLine(header.Path + ": " + (clip.Notes.Count == 0 ? "no curve keys." : clip.Notes[0]));
+        continue;
+      }
+
+      clips.Add(clip);
+      if (!quiet)
+        stdout.WriteLine($"Animation {header.Path}  {clip.Bones.Count} bones  {clip.Duration:0.###}s  {clip.SampleRate:0.###} fps");
+    }
+
+    if (clips.Count == 0)
+    {
+      stderr.WriteLine("None of the matched .sani files produced curve keys.");
+      return false;
+    }
+
+    return true;
+  }
+
+  private static ExportSettings Settings(ExtractorOptions options, IReadOnlyList<AnimationClip> clips)
   {
     var format = options.Format ?? "";
     var fbx = format is "fbx-unreal" or "both";
@@ -148,6 +212,7 @@ public static class ModelExport
       CopyOriginalBytes = false,
       Space = ExportSpace.Unreal,
       Lod = options.Lod,
+      Clips = clips,
     };
   }
 

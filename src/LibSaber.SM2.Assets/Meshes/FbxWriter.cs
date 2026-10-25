@@ -2,6 +2,7 @@ using System.Buffers.Binary;
 using System.IO.Compression;
 using System.Numerics;
 using System.Text;
+using LibSaber.SM2.Assets.Animation;
 
 namespace LibSaber.SM2.Assets.Meshes;
 
@@ -30,17 +31,23 @@ public static class FbxWriter
     var root = new Node("");
     var ids = new IdSource();
     var bones = BuildBones(mesh, space);
+    var take = BuildTake(mesh, space, bones);
     ids.Bind(mesh, bones);
+    take?.Allocate(ids);
 
     WriteHeader(root);
     WriteGlobalSettings(root, space);
-    WriteDocuments(root, ids.Next());
+    WriteDocuments(root, ids.Next(), take?.Name ?? "");
     root.Add("References");
-    WriteDefinitions(root, mesh, bones);
+    WriteDefinitions(root, mesh, bones, take);
     WriteObjects(root, mesh, space, ids, bones, textureFiles);
+    if (take is not null)
+      WriteAnimationObjects(root, take);
     WriteConnections(root, mesh, ids, bones);
+    if (take is not null)
+      WriteAnimationConnections(root, take, ids);
     var takes = root.Add("Takes");
-    takes.Add("Current").String("");
+    takes.Add("Current").String(take?.Name ?? "");
 
     using var stream = File.Create(path);
     stream.Write(HeadMagic);
@@ -160,7 +167,7 @@ public static class FbxWriter
     PropDouble(props, "CustomFrameRate", 30);
   }
 
-  private static void WriteDocuments(Node root, long documentId)
+  private static void WriteDocuments(Node root, long documentId, string stackName)
   {
     var docs = root.Add("Documents");
     docs.Add("Count").Int32(1);
@@ -170,11 +177,11 @@ public static class FbxWriter
     doc.String("Scene");
     var props = doc.Add("Properties70");
     PropObject(props, "SourceObject");
-    PropString(props, "ActiveAnimStackName", "");
+    PropString(props, "ActiveAnimStackName", stackName);
     doc.Add("RootNode").Int64(0);
   }
 
-  private static void WriteDefinitions(Node root, ExportedMesh mesh, BoneTables bones)
+  private static void WriteDefinitions(Node root, ExportedMesh mesh, BoneTables bones, AnimTake? take)
   {
     var materials = CollectMaterials(mesh);
     var textures = CollectTextures(mesh);
@@ -183,7 +190,10 @@ public static class FbxWriter
     var attributes = mesh.Bones.Count;
     var deformers = mesh.HasSkin && mesh.HasTriangles ? 1 + bones.Clusters.Count : 0;
     var poses = 1;
-    var count = 1 + models + geometry + attributes + materials.Count + textures.Count + textures.Count + deformers + poses;
+    var curves = take?.CurveCount ?? 0;
+    var curveNodes = take?.NodeCount ?? 0;
+    var stacks = take is null ? 0 : 1;
+    var count = 1 + models + geometry + attributes + materials.Count + textures.Count + textures.Count + deformers + poses + stacks + stacks + curveNodes + curves;
 
     var definitions = root.Add("Definitions");
     definitions.Add("Version").Int32(100);
@@ -205,6 +215,13 @@ public static class FbxWriter
     if (deformers != 0)
       ObjectType(definitions, "Deformer", deformers, null, null);
     ObjectType(definitions, "Pose", poses, null, null);
+    if (take is not null)
+    {
+      ObjectType(definitions, "AnimationStack", 1, null, null);
+      ObjectType(definitions, "AnimationLayer", 1, null, null);
+      ObjectType(definitions, "AnimationCurveNode", curveNodes, null, null);
+      ObjectType(definitions, "AnimationCurve", curves, null, null);
+    }
   }
 
   private static void WriteObjects(Node root, ExportedMesh mesh, ExportSpace space, IdSource ids, BoneTables bones, IReadOnlyDictionary<string, string>? textureFiles)
@@ -977,8 +994,250 @@ public static class FbxWriter
     return builder.Length == 0 ? "object" : builder.ToString();
   }
 
+  private const double FbxTicksPerSecond = 46186158000d;
+
+  private static AnimTake? BuildTake(ExportedMesh mesh, ExportSpace space, BoneTables bind)
+  {
+    if (mesh.Clip is not { HasCurves: true } clip || mesh.Bones.Count == 0)
+      return null;
+
+    var times = new SortedSet<float>();
+    foreach (var track in clip.Tracks)
+    {
+      foreach (var key in track.Rotation)
+        times.Add(key.Time);
+      foreach (var key in track.Translation)
+        times.Add(key.Time);
+    }
+
+    if (times.Count == 0)
+      return null;
+
+    var samples = times.ToArray();
+    var count = mesh.Bones.Count;
+    var translation = new Vector3[count][];
+    var rotation = new Vector3[count][];
+    for (var bone = 0; bone < count; bone++)
+    {
+      translation[bone] = new Vector3[samples.Length];
+      rotation[bone] = new Vector3[samples.Length];
+    }
+
+    var source = new Matrix4x4[count];
+    var parents = new int[count];
+    for (var i = 0; i < count; i++)
+      parents[i] = mesh.Bones[i].Parent;
+    var local = new Matrix4x4[count];
+    var world = new Matrix4x4[count];
+    for (var frame = 0; frame < samples.Length; frame++)
+    {
+      ClipPose.Apply(mesh.Bones, clip, samples[frame], source);
+      AxisConvert.ConvertHierarchy(source, parents, space, local, world);
+      for (var bone = 0; bone < count; bone++)
+      {
+        translation[bone][frame] = new Vector3(local[bone].M41, local[bone].M42, local[bone].M43);
+        var euler = EulerXYZDegrees(local[bone]);
+        if (frame > 0)
+          euler = UnwrapEuler(rotation[bone][frame - 1], euler);
+        rotation[bone][frame] = euler;
+      }
+    }
+
+    var take = new AnimTake(Safe(clip.Name), samples);
+    for (var bone = 0; bone < count; bone++)
+    {
+      var restT = new Vector3(bind.Local[bone].M41, bind.Local[bone].M42, bind.Local[bone].M43);
+      var restR = EulerXYZDegrees(bind.Local[bone]);
+      var moveT = false;
+      var moveR = false;
+      for (var frame = 0; frame < samples.Length; frame++)
+      {
+        if (Vector3.Distance(translation[bone][frame], restT) > 0.0005f)
+          moveT = true;
+        if (EulerDistance(rotation[bone][frame], restR) > 0.05f)
+          moveR = true;
+      }
+
+      if (!moveT && !moveR)
+        continue;
+      take.Bones.Add(new AnimBone(bone, moveT ? Flatten(translation[bone]) : null, moveR ? Flatten(rotation[bone]) : null));
+    }
+
+    return take.Bones.Count == 0 ? null : take;
+  }
+
+  private static float[] Flatten(Vector3[] values)
+  {
+    var flat = new float[values.Length * 3];
+    for (var i = 0; i < values.Length; i++)
+    {
+      flat[i * 3] = values[i].X;
+      flat[i * 3 + 1] = values[i].Y;
+      flat[i * 3 + 2] = values[i].Z;
+    }
+
+    return flat;
+  }
+
+  private static Vector3 UnwrapEuler(Vector3 previous, Vector3 current)
+    => new(NearestAngle(previous.X, current.X), NearestAngle(previous.Y, current.Y), NearestAngle(previous.Z, current.Z));
+
+  private static float NearestAngle(float previous, float current)
+  {
+    while (current - previous > 180f)
+      current -= 360f;
+    while (previous - current > 180f)
+      current += 360f;
+    return current;
+  }
+
+  private static float EulerDistance(Vector3 a, Vector3 b)
+    => MathF.Abs(NearestAngle(a.X, b.X) - a.X) + MathF.Abs(NearestAngle(a.Y, b.Y) - a.Y) + MathF.Abs(NearestAngle(a.Z, b.Z) - a.Z);
+
+  private static void WriteAnimationObjects(Node root, AnimTake take)
+  {
+    var objects = root.Children.Last(node => Encoding.UTF8.GetString(node.Name) == "Objects");
+    var stop = take.Samples.Length == 0 ? 0 : (long)Math.Round(take.Samples[^1] * FbxTicksPerSecond);
+    var stack = objects.Add("AnimationStack");
+    stack.Int64(take.StackId);
+    stack.String(NameClass(take.Name, "AnimStack"));
+    stack.String("");
+    var stackProps = stack.Add("Properties70");
+    PropTime(stackProps, "LocalStart", 0);
+    PropTime(stackProps, "LocalStop", stop);
+    PropTime(stackProps, "ReferenceStart", 0);
+    PropTime(stackProps, "ReferenceStop", stop);
+
+    var layer = objects.Add("AnimationLayer");
+    layer.Int64(take.LayerId);
+    layer.String(NameClass(take.Name, "AnimLayer"));
+    layer.String("");
+
+    foreach (var bone in take.Bones)
+    {
+      if (bone.Translation is not null)
+        WriteCurveNode(objects, take, bone.TranslationId, bone.TranslationCurves, "T", bone.Translation);
+      if (bone.Rotation is not null)
+        WriteCurveNode(objects, take, bone.RotationId, bone.RotationCurves, "R", bone.Rotation);
+    }
+  }
+
+  private static void WriteCurveNode(Node objects, AnimTake take, long id, long[] curves, string channel, float[] values)
+  {
+    var node = objects.Add("AnimationCurveNode");
+    node.Int64(id);
+    node.String(NameClass(channel, "AnimCurveNode"));
+    node.String("");
+    var props = node.Add("Properties70");
+    PropNumber(props, "d|X", 0);
+    PropNumber(props, "d|Y", 0);
+    PropNumber(props, "d|Z", 0);
+    for (var axis = 0; axis < 3; axis++)
+      WriteCurve(objects, curves[axis], channel + "XYZ"[axis], take.Samples, values, axis);
+  }
+
+  private static void WriteCurve(Node objects, long id, string name, float[] samples, float[] values, int axis)
+  {
+    var curve = objects.Add("AnimationCurve");
+    curve.Int64(id);
+    curve.String(NameClass(name, "AnimCurve"));
+    curve.String("");
+    curve.Add("Default").Double(0);
+    curve.Add("KeyVer").Int32(4008);
+    var times = new long[samples.Length];
+    var axisValues = new float[samples.Length];
+    for (var i = 0; i < samples.Length; i++)
+    {
+      times[i] = (long)Math.Round(samples[i] * FbxTicksPerSecond);
+      axisValues[i] = values[i * 3 + axis];
+    }
+
+    curve.Add("KeyTime").Int64Array(times);
+    curve.Add("KeyValueFloat").FloatArray(axisValues);
+    curve.Add("KeyAttrFlags").Int32Array(new[] { 4 });
+    curve.Add("KeyAttrDataFloat").FloatArray(new float[] { 0, 0, 0, 0 });
+    curve.Add("KeyAttrRefCount").Int32Array(new[] { samples.Length });
+  }
+
+  private static void WriteAnimationConnections(Node root, AnimTake take, IdSource ids)
+  {
+    var connections = root.Children.Last(node => Encoding.UTF8.GetString(node.Name) == "Connections");
+    Connect(connections, "OO", take.LayerId, take.StackId);
+    foreach (var bone in take.Bones)
+    {
+      var model = ids.BoneModels[bone.Index];
+      if (bone.Translation is not null)
+        ConnectCurves(connections, take.LayerId, bone.TranslationId, bone.TranslationCurves, model, "Lcl Translation");
+      if (bone.Rotation is not null)
+        ConnectCurves(connections, take.LayerId, bone.RotationId, bone.RotationCurves, model, "Lcl Rotation");
+    }
+  }
+
+  private static void ConnectCurves(Node connections, long layerId, long nodeId, long[] curveIds, long model, string property)
+  {
+    Connect(connections, "OO", nodeId, layerId);
+    Connect(connections, "OP", nodeId, model, property);
+    for (var axis = 0; axis < 3; axis++)
+      Connect(connections, "OP", curveIds[axis], nodeId, axis switch { 0 => "d|X", 1 => "d|Y", _ => "d|Z" });
+  }
+
   private readonly record struct MaterialRef(string Key, string Name, string? Diffuse, string? Normal, string? Specular, string? Emissive);
   private readonly record struct TextureRef(string Name);
+
+  private sealed class AnimTake
+  {
+    public AnimTake(string name, float[] samples)
+    {
+      Name = name.Length == 0 ? "clip" : name;
+      Samples = samples;
+    }
+
+    public string Name { get; }
+    public float[] Samples { get; }
+    public long StackId { get; private set; }
+    public long LayerId { get; private set; }
+    public List<AnimBone> Bones { get; } = new();
+    public int NodeCount => Bones.Sum(bone => (bone.Translation is null ? 0 : 1) + (bone.Rotation is null ? 0 : 1));
+    public int CurveCount => NodeCount * 3;
+
+    public void Allocate(IdSource ids)
+    {
+      StackId = ids.Next();
+      LayerId = ids.Next();
+      foreach (var bone in Bones)
+      {
+        if (bone.Translation is not null)
+        {
+          bone.TranslationId = ids.Next();
+          bone.TranslationCurves = new[] { ids.Next(), ids.Next(), ids.Next() };
+        }
+
+        if (bone.Rotation is not null)
+        {
+          bone.RotationId = ids.Next();
+          bone.RotationCurves = new[] { ids.Next(), ids.Next(), ids.Next() };
+        }
+      }
+    }
+  }
+
+  private sealed class AnimBone
+  {
+    public AnimBone(int index, float[]? translation, float[]? rotation)
+    {
+      Index = index;
+      Translation = translation;
+      Rotation = rotation;
+    }
+
+    public int Index { get; }
+    public float[]? Translation { get; }
+    public float[]? Rotation { get; }
+    public long TranslationId { get; set; }
+    public long RotationId { get; set; }
+    public long[] TranslationCurves { get; set; } = Array.Empty<long>();
+    public long[] RotationCurves { get; set; } = Array.Empty<long>();
+  }
 
   private sealed class BoneTables
   {
@@ -1082,6 +1341,8 @@ public static class FbxWriter
     }
 
     public void Int32Array(int[] values) => Props.Add(('i', PackArray(values, sizeof(int), static (buffer, source) => Buffer.BlockCopy(source, 0, buffer, 0, source.Length * sizeof(int)))));
+    public void Int64Array(long[] values) => Props.Add(('l', PackArray(values, sizeof(long), static (buffer, source) => Buffer.BlockCopy(source, 0, buffer, 0, source.Length * sizeof(long)))));
+    public void FloatArray(float[] values) => Props.Add(('f', PackArray(values, sizeof(float), static (buffer, source) => Buffer.BlockCopy(source, 0, buffer, 0, source.Length * sizeof(float)))));
     public void DoubleArray(double[] values) => Props.Add(('d', PackArray(values, sizeof(double), static (buffer, source) => Buffer.BlockCopy(source, 0, buffer, 0, source.Length * sizeof(double)))));
 
     public int Measure(int offset, bool isLast)

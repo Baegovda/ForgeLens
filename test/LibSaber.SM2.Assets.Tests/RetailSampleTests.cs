@@ -107,13 +107,19 @@ public class RetailSampleTests
     Assert.Contains("TAIL6", clip.Bones);
     Assert.Contains("Footsteps", clip.Sequences);
     Assert.Contains("snd_bodyfall", clip.Sequences);
-    Assert.False(clip.HasCurves);
+    AssertCurves(clip, rotations: 22, translations: 0, frames: 107);
 
     var jump = LoadClip(catalog, store, "animation/archive/npc/zombie/jumping/jump_down_new/npc_zombie_jump_down_new_death_landing_v1_swarm_hormagaunt.sani.resource");
     Assert.InRange(jump.Duration, 1.9f, 2.1f);
     Assert.Equal(30f, jump.SampleRate);
     Assert.Equal(73, jump.Bones.Count);
-    Assert.False(jump.HasCurves);
+    AssertCurves(jump, rotations: 21, translations: 0, frames: 60);
+    var centre = jump.Tracks.Single(track => track.BoneName == "CENTRE");
+    var first = centre.Rotation[0].Value;
+    Assert.InRange(first.X, -0.83f, -0.79f);
+    Assert.InRange(first.Y, -0.02f, 0.01f);
+    Assert.InRange(first.Z, -0.09f, -0.05f);
+    Assert.InRange(first.W, 0.56f, 0.60f);
 
     var output = Path.Combine(dir.Path, "out");
     var index = catalog.FindByPath("tpl/marine_shield.tpl/marine_shield.tpl").First();
@@ -231,6 +237,80 @@ public class RetailSampleTests
 
     Assert.True(lit > 20000, $"Titus should fill the preview, lit {lit}");
     Assert.True(maxY - minY > 500, $"Titus should stand in frame, span {maxY - minY}");
+  }
+
+  [Fact]
+  public void RetailClip_WritesFbxCurvesOnTheNamedBones()
+  {
+    var root = Environment.GetEnvironmentVariable("LIBSABER_SM2_SAMPLE");
+    if (string.IsNullOrWhiteSpace(root) || !Directory.Exists(root))
+      return;
+
+    using var dir = new TempDirectory();
+    var entries = Directory.EnumerateFiles(root, "*", SearchOption.AllDirectories)
+      .Select(path => new CacheFile.Entry(Path.GetRelativePath(root, path).Replace('\\', '/'), File.ReadAllBytes(path)))
+      .ToArray();
+    CacheFile.Create(dir.Path, "sample.pak", entries);
+    var catalog = GameCatalog.Load(dir.Path);
+    using var store = new ArchiveStore(catalog);
+    var jump = LoadClip(catalog, store, "animation/archive/npc/zombie/jumping/jump_down_new/npc_zombie_jump_down_new_death_landing_v1_swarm_hormagaunt.sani");
+    var mesh = new ExportedMesh { Name = "stick", Clip = jump };
+    mesh.Bones.Add(new Bone { Name = "CharacterWorldSpaceTM", Parent = -1 });
+    mesh.Bones.Add(new Bone { Name = "CENTRE", Parent = 0, Local = Matrix4x4.CreateTranslation(0, 1, 0), InverseBind = Matrix4x4.CreateTranslation(0, -1, 0) });
+    mesh.Bones.Add(new Bone { Name = "HEAD", Parent = 1, Local = Matrix4x4.CreateTranslation(0, 0.3f, 0), InverseBind = Matrix4x4.CreateTranslation(0, -1.3f, 0) });
+    mesh.Positions.AddRange(new[] { new Vector3(0, 1, 0), new Vector3(0.1f, 1, 0), new Vector3(0, 1.2f, 0.05f) });
+    mesh.Normals.AddRange(new[] { Vector3.UnitZ, Vector3.UnitZ, Vector3.UnitZ });
+    mesh.Uvs.AddRange(new[] { Vector2.Zero, Vector2.UnitX, Vector2.UnitY });
+    mesh.Indices.AddRange(new[] { 0, 1, 2 });
+    mesh.Skin.Add(new SkinWeights { J0 = 1, W0 = 1 });
+    mesh.Skin.Add(new SkinWeights { J0 = 1, W0 = 1 });
+    mesh.Skin.Add(new SkinWeights { J0 = 2, W0 = 1 });
+    mesh.Parts.Add(new MeshPart { Name = "stick", IndexStart = 0, IndexCount = 3, Visible = true });
+
+    var fbxPath = Path.Combine(dir.Path, "stick.fbx");
+    var glbPath = Path.Combine(dir.Path, "stick.glb");
+    FbxWriter.Write(fbxPath, mesh, ExportSpace.Unreal);
+    GltfWriter.Write(glbPath, mesh, ExportSpace.Unreal);
+    var fbx = File.ReadAllBytes(fbxPath);
+    Assert.Contains("AnimationStack", System.Text.Encoding.ASCII.GetString(fbx));
+    Assert.Contains("AnimationCurve", System.Text.Encoding.ASCII.GetString(fbx));
+    Assert.Contains("CENTRE", System.Text.Encoding.ASCII.GetString(fbx));
+    Assert.Contains("Lcl Rotation", System.Text.Encoding.ASCII.GetString(fbx));
+    var glb = System.Text.Encoding.UTF8.GetString(File.ReadAllBytes(glbPath));
+    Assert.Contains("\"animations\"", glb);
+    Assert.Contains("CENTRE", glb);
+    Assert.Contains("rotation", glb);
+  }
+
+  private static void AssertCurves(AnimationClip clip, int rotations, int translations, int frames)
+  {
+    Assert.True(clip.HasCurves);
+    Assert.Equal(rotations, clip.Tracks.Count(track => track.Rotation.Count > 0));
+    Assert.Equal(translations, clip.Tracks.Count(track => track.Translation.Count > 0));
+    var steps = new List<float>();
+    foreach (var track in clip.Tracks)
+    {
+      foreach (var key in track.Rotation)
+      {
+        var length = key.Value.Length();
+        Assert.InRange(length, 0.98f, 1.02f);
+      }
+
+      Assert.Equal(track.Rotation.Count == 0 ? 0 : frames, track.Rotation.Count);
+      Assert.Equal(track.Translation.Count == 0 ? 0 : frames, track.Translation.Count);
+      for (var i = 1; i < track.Rotation.Count; i++)
+      {
+        var dot = MathF.Abs(Quaternion.Dot(track.Rotation[i - 1].Value, track.Rotation[i].Value));
+        steps.Add(MathF.Acos(Math.Clamp(dot, -1f, 1f)) * 2f * (180f / MathF.PI));
+      }
+
+      for (var i = 1; i < track.Translation.Count; i++)
+        Assert.True(Vector3.Distance(track.Translation[i - 1].Value, track.Translation[i].Value) < 0.5f);
+    }
+
+    steps.Sort();
+    Assert.True(steps.Count > 0);
+    Assert.InRange(steps[steps.Count / 2], 0f, 8f);
   }
 
   private static TextureDocument LoadTexture(GameCatalog catalog, ArchiveStore store, string path)

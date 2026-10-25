@@ -86,6 +86,12 @@
           <ToggleButton x:Name="SkeletonToggle" Content="Skeleton" IsChecked="False" IsVisible="False" Click="ViewChanged" />
           <Button x:Name="PlayButton" Content="Play" IsVisible="False" Click="PlayClicked" />
         </StackPanel>
+        <StackPanel x:Name="AnimBar" DockPanel.Dock="Top" Orientation="Horizontal" Spacing="6" Margin="0,6,0,0" IsVisible="False">
+          <TextBlock Text="Anim" VerticalAlignment="Center" />
+          <ComboBox x:Name="AnimBox" Width="420" SelectionChanged="AnimChanged" />
+          <Slider x:Name="ScrubSlider" Width="180" Minimum="0" Maximum="1" IsEnabled="False" ValueChanged="ScrubChanged" />
+          <TextBlock x:Name="ScrubLabel" VerticalAlignment="Center" Text="0.00s" />
+        </StackPanel>
         <TextBlock x:Name="PreviewNote" DockPanel.Dock="Bottom" TextWrapping="Wrap" Margin="0,8,0,0" />
         <Border x:Name="ViewBorder" Background="#121418" ClipToBounds="True"
                 PointerPressed="ViewPressed" PointerMoved="ViewMoved" PointerReleased="ViewReleased" PointerWheelChanged="ViewWheel">
