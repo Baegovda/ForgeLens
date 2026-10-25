@@ -153,9 +153,10 @@ public class RetailSampleTests
       armMaxU = MathF.Max(armMaxU, uv.X);
     }
 
-    // The arms submesh packs UVs with scale 2. Without that scale, V sits in the top half of the texture.
+    // Scale 2 is applied only to channels packed into about 1/scale. This arms part's V was packed
+    // into the top half; its U already spans the texture, and multiplying U tiles a second island.
     Assert.True(armMinV < 0.25f, $"arm V min {armMinV}");
-    Assert.True(armMaxU > 1.2f, $"arm U max {armMaxU}");
+    Assert.InRange(armMaxU, 0.85f, 1.05f);
     Assert.Equal(mesh.Positions.Count, mesh.Uvs.Count);
     Assert.Equal(mesh.Positions.Count, mesh.Normals.Count);
     Assert.Equal(mesh.Positions.Count, mesh.Skin.Count);
