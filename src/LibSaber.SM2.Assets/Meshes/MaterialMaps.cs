@@ -25,9 +25,14 @@ public sealed class MaterialMap
   public byte SolidB { get; set; }
   public byte SolidA { get; set; } = 255;
   public List<ChannelPack> Packing { get; } = new();
+  /// <summary>Stored texture format, for example <c>DXN</c> (BC5) or <c>DXT5A</c> (BC4).</summary>
+  public string Format { get; set; } = "";
+  /// <summary><see cref="Channels"/> with physical channels, for example <c>MetGray(r)->r+Roughness(a)->g</c>.</summary>
+  public string StoredChannels { get; set; } = "";
 }
 
-public readonly record struct ChannelPack(string Channel, string Meaning);
+/// <param name="Stored">Physical channel in the exported image, when the stored format moved it (BC5 a -> g, BC4 a -> r).</param>
+public readonly record struct ChannelPack(string Channel, string Meaning, string Stored = "");
 
 /// <summary>
 ///   SM2 draws a part with <c>shadingMtl_Tex</c> (the layer <c>texName</c>). That file's
@@ -151,6 +156,45 @@ public static class MaterialMaps
     return match.Success ? match.Groups[1].Value : "";
   }
 
+  /// <summary>
+  ///   Fills <see cref="MaterialMap.Format"/> and where each logical channel physically sits.
+  ///   BC5 keeps r,g and BC4 keeps r; the logical channels fill those in order
+  ///   (MetGray(r)+Roughness(a) on DXN is r,g; AO(a) on DXT5A is r). Normals stay rgb.
+  /// </summary>
+  internal static void ResolveStorage(GameCatalog catalog, ArchiveStore store, int textureIndex, MaterialMap map)
+  {
+    SpaceMarine2.Enumerations.SM2TextureFormat format;
+    try
+    {
+      format = TextureLoader.Load(catalog, store, textureIndex).Format;
+    }
+    catch
+    {
+      return;
+    }
+
+    map.Format = format.ToString();
+    var physical = TextureInfo.StoredChannels(format);
+    var next = 0;
+    var parts = new List<string>();
+    for (var i = 0; i < map.Packing.Count; i++)
+    {
+      var pack = map.Packing[i];
+      var stored = pack.Channel;
+      if (physical is not null && pack.Meaning is not ("normal" or "detnormal"))
+      {
+        if (pack.Channel.Length == 1 && next < physical.Length)
+          stored = physical[next].ToString();
+        next += pack.Channel.Length;
+      }
+
+      map.Packing[i] = pack with { Stored = stored };
+      parts.Add(pack.Meaning + "(" + pack.Channel + ")->" + stored);
+    }
+
+    map.StoredChannels = string.Join("+", parts);
+  }
+
   internal static List<ChannelPack> Pack(string channels)
   {
     var list = new List<ChannelPack>();
@@ -259,8 +303,12 @@ public static class MaterialMaps
       Srgb = IsSrgb(packing.Count == 0 ? Pack(ImpliedChannels(role)) : packing),
     };
     map.Packing.AddRange(packing.Count == 0 ? Pack(map.Channels) : packing);
-    if (TemplateMeshReader.ResolveTexture(catalog, hint, stem) >= 0)
+    var textureIndex = TemplateMeshReader.ResolveTexture(catalog, hint, stem);
+    if (textureIndex >= 0)
+    {
+      ResolveStorage(catalog, store, textureIndex, map);
       return map;
+    }
     if (allowSolid && TrySolid(stem, out var r, out var g, out var b, out var a))
     {
       map.Generated = true;

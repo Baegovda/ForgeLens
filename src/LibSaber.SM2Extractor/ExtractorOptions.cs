@@ -10,7 +10,7 @@ LibSaber.SM2Extractor — list and extract Warhammer 40,000: Space Marine 2 arch
 Usage:
   LibSaber.SM2Extractor list <archive-or-folder> [options]
   LibSaber.SM2Extractor extract <archive-or-folder> --output <folder> [options]
-  LibSaber.SM2Extractor export <game-folder> --asset <path> --format <fbx-unreal|gltf|both> --output <folder> [--lod <n>] [--anim <name|all>] [--no-root-motion]
+  LibSaber.SM2Extractor export <game-folder> --asset <path> --format <fbx-unreal|gltf|both> --output <folder> [--lod <n>] [--anim <name|all>] [--no-root-motion] [--include-cloth-sim]
 
 The game ships .pak archives with a sibling cache of the same name plus ".cache"
 (client_pc\something.pak and client_pc\something.pak.cache). .pck files with a
@@ -38,6 +38,9 @@ Options:
                           The clip's 0xF4 track is added to the skeleton root translation.
   --no-root-motion        Leave that root translation off. The bone curves are unchanged.
                           export only.
+  --include-cloth-sim     Keep *_SIM cloth simulation meshes. The game only uses them to
+                          drive the *_REND cloth (InitSimToRenderSkinning) and never draws
+                          them, so they are skipped by default. export only.
   --no-recursive          When the input is a folder, do not search subfolders.
   --prefix-archive        Write each archive under <output>\<archive name>\. extract only.
   --no-overwrite          Leave files that are already in the output folder. extract only.
@@ -69,6 +72,7 @@ Examples:
   public int Lod { get; private init; }
   public string? Animation { get; private init; }
   public bool RootMotion { get; private init; } = true;
+  public bool IncludeClothSim { get; private init; }
 
   public static ExtractorOptions Help()
     => new() { Verb = ExtractorVerb.Help };
@@ -111,6 +115,7 @@ Examples:
     var quiet = false;
     var rootMotion = true;
     var rootMotionSet = false;
+    var includeClothSim = false;
     var positionals = new List<string>();
 
     for (var i = 0; i < args.Length; i++)
@@ -143,6 +148,12 @@ Examples:
       if (arg == "--no-overwrite")
       {
         overwrite = false;
+        continue;
+      }
+
+      if (arg == "--include-cloth-sim")
+      {
+        includeClothSim = true;
         continue;
       }
 
@@ -314,9 +325,9 @@ Examples:
       return false;
     }
 
-    if (verb != ExtractorVerb.Export && (asset is not null || format is not null || lodSet || animation is not null || rootMotionSet))
+    if (verb != ExtractorVerb.Export && (asset is not null || format is not null || lodSet || animation is not null || rootMotionSet || includeClothSim))
     {
-      error = "--asset, --format, --lod, --anim, and --no-root-motion are only valid with export.";
+      error = "--asset, --format, --lod, --anim, --no-root-motion, and --include-cloth-sim are only valid with export.";
       return false;
     }
 
@@ -368,6 +379,7 @@ Examples:
       Lod = lod,
       Animation = animation,
       RootMotion = rootMotion,
+      IncludeClothSim = includeClothSim,
     };
     return true;
   }

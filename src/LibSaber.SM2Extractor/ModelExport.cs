@@ -214,6 +214,7 @@ public static class ModelExport
       Lod = options.Lod,
       Clips = clips,
       RootMotion = options.RootMotion,
+      IncludeClothSim = options.IncludeClothSim,
     };
   }
 

@@ -86,6 +86,9 @@ def param_tex(material, name, x, y, sampler):
     node = expr(material, unreal.MaterialExpressionTextureSampleParameter2D, x, y)
     node.set_editor_property("parameter_name", name)
     node.set_editor_property("sampler_type", sampler)
+    _d = {unreal.MaterialSamplerType.SAMPLERTYPE_NORMAL: "/Engine/EngineMaterials/FlatNormal", unreal.MaterialSamplerType.SAMPLERTYPE_MASKS: "/Engine/EngineMaterials/DefaultDiffuse_TC_Masks"}.get(sampler, "/Engine/EngineResources/WhiteSquareTexture")
+    _t = unreal.load_asset(_d)
+    if _t: node.set_editor_property("texture", _t)
     return node
 
 
@@ -101,7 +104,7 @@ def make_master(folder):
     mel = unreal.MaterialEditingLibrary
 
     color = unreal.MaterialSamplerType.SAMPLERTYPE_COLOR
-    linear = unreal.MaterialSamplerType.SAMPLERTYPE_LINEAR_COLOR
+    linear = unreal.MaterialSamplerType.SAMPLERTYPE_MASKS
     normal_sampler = unreal.MaterialSamplerType.SAMPLERTYPE_NORMAL
     diffuse = param_tex(material, "Diffuse", -900, -200, color)
     normal = param_tex(material, "Normal", -900, 80, normal_sampler)
@@ -123,13 +126,13 @@ def make_master(folder):
     rough_g.set_editor_property("g", True)
     rough_g.set_editor_property("b", False)
     rough_g.set_editor_property("a", False)
-    link(packed, "", rough_g, "")
+    link(packed, "RGBA", rough_g, "")
     rough_a = expr(material, unreal.MaterialExpressionComponentMask, -560, 460)
     rough_a.set_editor_property("r", False)
     rough_a.set_editor_property("g", False)
     rough_a.set_editor_property("b", False)
     rough_a.set_editor_property("a", True)
-    link(packed, "", rough_a, "")
+    link(packed, "RGBA", rough_a, "")
     rough_switch = expr(material, unreal.MaterialExpressionStaticSwitchParameter, -280, 400)
     rough_switch.set_editor_property("parameter_name", "RoughnessInAlpha")
     rough_switch.set_editor_property("default_value", False)
@@ -141,7 +144,7 @@ def make_master(folder):
     ao_b.set_editor_property("g", False)
     ao_b.set_editor_property("b", True)
     ao_b.set_editor_property("a", False)
-    link(packed, "", ao_b, "")
+    link(packed, "RGBA", ao_b, "")
     one = expr(material, unreal.MaterialExpressionConstant, -560, 640)
     one.set_editor_property("r", 1.0)
     ao_switch = expr(material, unreal.MaterialExpressionStaticSwitchParameter, -280, 560)
@@ -157,13 +160,13 @@ def make_master(folder):
     ao_from_r.set_editor_property("g", False)
     ao_from_r.set_editor_property("b", False)
     ao_from_r.set_editor_property("a", False)
-    link(ao_tex, "", ao_from_r, "")
+    link(ao_tex, "RGBA", ao_from_r, "")
     ao_from_a = expr(material, unreal.MaterialExpressionComponentMask, -760, 800)
     ao_from_a.set_editor_property("r", False)
     ao_from_a.set_editor_property("g", False)
     ao_from_a.set_editor_property("b", False)
     ao_from_a.set_editor_property("a", True)
-    link(ao_tex, "", ao_from_a, "")
+    link(ao_tex, "RGBA", ao_from_a, "")
     ao_channel = expr(material, unreal.MaterialExpressionStaticSwitchParameter, -480, 740)
     ao_channel.set_editor_property("parameter_name", "AoInAlpha")
     ao_channel.set_editor_property("default_value", True)
@@ -242,6 +245,44 @@ def packing_flags(channels):
     return rough_alpha, ao_blue
 
 
+def dds_dxgi(png_path):
+    # The game ships these maps as BC5 (DXN, DXGI 83) or BC4 (DXT5A, DXGI 80).
+    # Their .td format_descr names logical channels (r, a), but BC5 only stores
+    # two physical channels (R, G) and BC4 one (R); the engine swizzles in the
+    # shader (swizzleTexInShader). The exported PNG therefore has the "a" data in
+    # G (BC5) or R (BC4) and a constant alpha of 255. Read the DDS beside the PNG.
+    if not png_path:
+        return None
+    dds = os.path.splitext(png_path)[0] + ".dds"
+    try:
+        with open(dds, "rb") as handle:
+            head = handle.read(132)
+    except OSError:
+        return None
+    if len(head) < 132 or head[84:88] != b"DX10":
+        return None
+    return int.from_bytes(head[128:132], "little")
+
+
+def stored_channel(sidecar_path, entry, meaning):
+    # Exporters from this commit on write packing[].stored: where the logical
+    # channel physically is in the PNG (BC5 Roughness(a) -> g, BC4 AO(a) -> r).
+    for pack in (entry or {}).get("packing") or []:
+        if pack.get("meaning") == meaning and pack.get("stored"):
+            return pack["stored"]
+    # Older sidecars: fall back to the DDS written beside the PNG.
+    return logical_alpha_lives_in(texture_file(sidecar_path, entry) if entry else None)
+
+
+def logical_alpha_lives_in(png_path):
+    fmt = dds_dxgi(png_path)
+    if fmt == 83:
+        return "g"
+    if fmt == 80:
+        return "r"
+    return "a"
+
+
 def first_map(slot, role):
     for item in slot.get("maps", []):
         if item.get("role") == role and item.get("file") and not item.get("missing"):
@@ -249,11 +290,37 @@ def first_map(slot, role):
     return None
 
 
+def is_sim_proxy(slot):
+    # SM2 cloth (nvcloth PropClothSim) has a low-poly simulation mesh (simMeshName)
+    # that only drives the visible *_REND meshes via InitSimToRenderSkinning.
+    # The game never draws it; the export gives it __default_material__.
+    name = slot.get("slot", "")
+    diff = first_map(slot, "diffuse") or {}
+    return "_SIM" in name.upper() or diff.get("name") == "__default_material__"
+
+
+def make_hidden(folder):
+    tools = unreal.AssetToolsHelpers.get_asset_tools()
+    asset_name = "M_SM2_ClothSimHidden"
+    existing = folder + "/" + asset_name
+    if unreal.EditorAssetLibrary.does_asset_exist(existing):
+        unreal.EditorAssetLibrary.delete_asset(existing)
+    material = tools.create_asset(asset_name, folder, unreal.Material, unreal.MaterialFactoryNew())
+    material.set_editor_property("blend_mode", unreal.BlendMode.BLEND_MASKED)
+    zero = expr(material, unreal.MaterialExpressionConstant, -300, 0)
+    zero.set_editor_property("r", 0.0)
+    unreal.MaterialEditingLibrary.connect_material_property(zero, "", unreal.MaterialProperty.MP_OPACITY_MASK)
+    unreal.MaterialEditingLibrary.recompile_material(material)
+    unreal.EditorAssetLibrary.save_loaded_asset(material)
+    return material
+
+
 def build(sidecar_path, folder):
     data = load_sidecar(sidecar_path)
     tools = unreal.AssetToolsHelpers.get_asset_tools()
     unreal.EditorAssetLibrary.make_directory(folder)
     master = make_master(folder)
+    hidden = make_hidden(folder)
     cache = {}
     instances = {}
 
@@ -268,6 +335,13 @@ def build(sidecar_path, folder):
 
     for slot in data.get("slots", []):
         name = slot["slot"]
+        if is_sim_proxy(slot):
+            stale = folder + "/MI_" + "".join(ch if ch.isalnum() or ch == "_" else "_" for ch in name)
+            if unreal.EditorAssetLibrary.does_asset_exist(stale):
+                unreal.EditorAssetLibrary.delete_asset(stale)
+            instances[name] = hidden
+            unreal.log("SM2 hidden cloth sim proxy " + name)
+            continue
         safe = "".join(ch if ch.isalnum() or ch == "_" else "_" for ch in name)
         asset_name = "MI_" + safe
         full = folder + "/" + asset_name
@@ -301,10 +375,15 @@ def build(sidecar_path, folder):
                 unreal.MaterialEditingLibrary.set_material_instance_texture_parameter_value(instance, parameter, asset)
         rough_alpha, ao_blue = packing_flags((packed or {}).get("channels"))
         ao_channels = (ao or {}).get("channels") or ""
+        if rough_alpha and packed and stored_channel(sidecar_path, packed, "roughness") != "a":
+            rough_alpha = False  # BC5: Roughness(a) is physically in G
         unreal.MaterialEditingLibrary.set_material_instance_static_switch_parameter_value(instance, "RoughnessInAlpha", rough_alpha)
         unreal.MaterialEditingLibrary.set_material_instance_static_switch_parameter_value(instance, "AoInBlue", ao_blue if packed else False)
         unreal.MaterialEditingLibrary.set_material_instance_static_switch_parameter_value(instance, "UseSeparateAo", ao is not None)
-        unreal.MaterialEditingLibrary.set_material_instance_static_switch_parameter_value(instance, "AoInAlpha", "AO(a)" in ao_channels or "AO(A)" in ao_channels)
+        ao_in_alpha = "AO(a)" in ao_channels or "AO(A)" in ao_channels
+        if ao_in_alpha and ao and stored_channel(sidecar_path, ao, "ao") == "r":
+            ao_in_alpha = False  # BC4: AO(a) is physically in R
+        unreal.MaterialEditingLibrary.set_material_instance_static_switch_parameter_value(instance, "AoInAlpha", ao_in_alpha)
         unreal.MaterialEditingLibrary.set_material_instance_static_switch_parameter_value(instance, "HasDetail", detail is not None and detail_mask is not None)
         unreal.MaterialEditingLibrary.set_material_instance_static_switch_parameter_value(instance, "UseOpacityMask", slot.get("blend") == "masked")
         if emissive is not None:

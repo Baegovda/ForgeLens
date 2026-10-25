@@ -1,3 +1,4 @@
+using System.Text.RegularExpressions;
 using System.Text;
 using System.Text.Json;
 using LibSaber.SM2.Assets.Animation;
@@ -29,6 +30,11 @@ public sealed class ExportSettings
   public IReadOnlyList<AnimationClip> Clips { get; init; } = Array.Empty<AnimationClip>();
   /// <summary>Adds the clip's 0xF4 track to the skeleton root translation. The extractor's <c>--no-root-motion</c> turns this off.</summary>
   public bool RootMotion { get; init; } = true;
+  /// <summary>
+  ///   Keep <c>*_SIM</c> cloth simulation meshes. SM2's cloth (<c>PropClothSim</c>, <c>simMeshName</c> /
+  ///   <c>renderMeshes</c>) only skins the <c>*_REND</c> meshes from them and never draws them, so they are off by default.
+  /// </summary>
+  public bool IncludeClothSim { get; init; }
 }
 
 public sealed class ExportReport
@@ -147,6 +153,12 @@ public static class AssetExporter
     try
     {
       var pixels = document.Decode(0, 0, out var width, out var height, out var note);
+      if (document.Format == SpaceMarine2.Enumerations.SM2TextureFormat.DXN && !TextureInfo.IsNormalName(file.Path))
+      {
+        // BC5 masks (MetGray(r)+Roughness(a)) store two channels. B is not a normal Z here.
+        for (var i = 2; i < pixels.Length; i += 4)
+          pixels[i] = 0;
+      }
       if (note.Length > 0)
         report.Messages.Add(file.Path + ": " + note);
       if (settings.WritePng)
@@ -182,6 +194,8 @@ public static class AssetExporter
       report.Messages.Add(file.Path + ": " + mesh.Message);
     if (settings.PartVisibility is not null && settings.PartVisibility.TryGetValue(index, out var visibility))
       visibility.Apply(mesh);
+    if (!settings.IncludeClothSim)
+      HideClothSim(mesh);
     var exportMesh = SelectExportGeometry(mesh, settings.Lod);
     AttachResolvedNormals(catalog, index, exportMesh);
 
@@ -253,6 +267,29 @@ public static class AssetExporter
       ExportModelTextures(catalog, store, index, exportMesh, outputDirectory, settings, report, batch);
   }
 
+  /// <summary>True for a cloth simulation shell such as <c>tbrd_01_frnt_SIM_02</c> or <c>cloth_stamp_leg_SIM</c>.</summary>
+  public static bool IsClothSim(string? name)
+    => !string.IsNullOrEmpty(name) && Regex.IsMatch(name, "_SIM(_|$)", RegexOptions.IgnoreCase);
+
+  internal static void HideClothSim(ExportedMesh mesh)
+  {
+    void Hide(MeshPart part)
+    {
+      if (!IsClothSim(part.Name))
+        return;
+      part.Visible = false;
+      part.HideReason = "clothSim";
+    }
+
+    foreach (var part in mesh.Parts)
+      Hide(part);
+    foreach (var level in mesh.Levels)
+    {
+      foreach (var part in level.Parts)
+        Hide(part);
+    }
+  }
+
   internal static ExportedMesh SelectExportGeometry(ExportedMesh mesh, int lod)
   {
     if (lod < 0)
@@ -278,7 +315,7 @@ public static class AssetExporter
     copy.Skin.AddRange(level.Skin);
     foreach (var part in level.Parts)
     {
-      if (part.IndexCount < 3)
+      if (part.IndexCount < 3 || part.HideReason == "clothSim")
         continue;
       var copied = part.Copy(part.IndexStart, part.IndexCount);
       copied.Visible = true;
@@ -656,7 +693,9 @@ public static class AssetExporter
         srgb = map.Srgb,
         generated = map.Generated,
         missing = map.Missing,
-        packing = map.Packing.Select(pack => new { channel = pack.Channel, meaning = pack.Meaning }),
+        format = map.Format,
+        stored = map.StoredChannels,
+        packing = map.Packing.Select(pack => new { channel = pack.Channel, meaning = pack.Meaning, stored = pack.Stored.Length == 0 ? pack.Channel : pack.Stored }),
       }),
     });
     var jsonPath = Path.Combine(Path.GetDirectoryName(fbxPath)!, Path.GetFileNameWithoutExtension(fbxPath) + ".materials.json");
@@ -664,7 +703,7 @@ public static class AssetExporter
     {
       mesh = mesh.Name,
       fbx = Path.GetFileName(fbxPath),
-      note = "Each map's channels are the .td format_descr. srgb false is a normal or a packed mask, so Unreal imports it linear. The FBX links diffuse, normal, and specular. import_sm2_materials.py builds a master material and one instance per slot from this file.",
+      note = "Each map's channels are the .td format_descr (logical channels). stored/packing[].stored say where each one physically is in the exported PNG: BC5 (DXN) keeps two channels, so Roughness(a) is in g; BC4 (DXT5A) keeps one, so AO(a) is in r. The game swizzles these in its shader (swizzleTexInShader). srgb false is a normal or a packed mask, so Unreal imports it linear. The FBX links diffuse, normal, and specular. import_sm2_materials.py builds a master material and one instance per slot from this file.",
       slots,
     }, JsonOptions));
     report.Written++;
@@ -771,7 +810,7 @@ public static class AssetExporter
       + space + Environment.NewLine
       + "DDS keeps the original block compression. PNG and TGA are decoded previews." + Environment.NewLine
       + "Most textures are .pct.resource plus .pct_mip. A bare .pct is uncommon." + Environment.NewLine
-      + "Models are .tpl plus .tpl_data. Lod 0 keeps the meshes Index leaves checked (the largest pool, plus a shell such as _SIM) and drops _LOD and collision. A higher lod writes that smaller vertex pool. FBX is binary 7.4, Z-up, with a skinned limb hierarchy. Each exported part gets a material whose diffuse (and _nm normal, when that texture is in the catalog) is a path relative to the FBX, pointing at the PNG or TGA written beside it. .lods_base, .geom_dbg, and .cdt are not mesh payloads." + Environment.NewLine
+      + "Models are .tpl plus .tpl_data. Lod 0 keeps the meshes Index leaves checked (the largest pool) and drops _LOD, collision, and *_SIM cloth simulation shells (the game never draws them; --include-cloth-sim keeps them). A higher lod writes that smaller vertex pool. FBX is binary 7.4, Z-up, with a skinned limb hierarchy. Each exported part gets a material whose diffuse (and _nm normal, when that texture is in the catalog) is a path relative to the FBX, pointing at the PNG or TGA written beside it. .lods_base, .geom_dbg, and .cdt are not mesh payloads." + Environment.NewLine
       + "Animations: a retail .sani is an ETNA version-2 clip. 0xF2 stores the codec and every frame. 0xF6 stores the codec plus a few preview frames, and the sibling .sani_data holds the rest. Codes are unsigned (value = code * scale + min). Translation is an 11/11/10-bit word. Rotation is three codes through a modified Rodrigues quaternion, and that quaternion replaces the bone's bind rotation. Constant tracks are written for every bone the clip lists. Bones the clip does not name stay on the model bind pose. Scalar channels are not bone scale. The 0xF4 track is added to the skeleton root translation unless export is run with --no-root-motion. export --anim writes {model}__{clip}.fbx and .glb beside the bind mesh." + Environment.NewLine
       + "Particle systems (.ps, .sfx) are not converted. Their raw bytes and any named meshes or textures are copied." + Environment.NewLine;
   }

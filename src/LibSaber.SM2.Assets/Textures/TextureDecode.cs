@@ -23,6 +23,25 @@ public enum PreviewFormat
 public static class TextureInfo
 {
 
+  /// <summary>Normal and detail-normal textures (<c>_nm</c>, <c>_det</c>), whose BC5 blue is a rebuilt Z.</summary>
+  public static bool IsNormalName(string path)
+  {
+    var stem = Path.GetFileName(path).ToLowerInvariant();
+    var dot = stem.IndexOf('.');
+    if (dot > 0)
+      stem = stem[..dot];
+    return stem.EndsWith("_nm") || stem.Contains("_nm_") || stem.EndsWith("_det") || stem.Contains("normal");
+  }
+
+  /// <summary>Physical channels the stored format keeps, in order. Null when it keeps all four.</summary>
+  public static string? StoredChannels(SM2TextureFormat format)
+    => format switch
+    {
+      SM2TextureFormat.DXN or SM2TextureFormat.R16G16 or SM2TextureFormat.UV88 => "rg",
+      SM2TextureFormat.DXT5A or SM2TextureFormat.R8U or SM2TextureFormat.A8 or SM2TextureFormat.I8 or SM2TextureFormat.R16 or SM2TextureFormat.R16F => "r",
+      _ => null,
+    };
+
   public static PreviewFormat PreviewOf(SM2TextureFormat format)
     => format switch
     {
