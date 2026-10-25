@@ -11,6 +11,16 @@ if mode == "capture":
     base = unreal.Vector(300000, 300000, 50000)
     if isinstance(m, unreal.SkeletalMesh):
         a = eas.spawn_actor_from_class(unreal.SkeletalMeshActor, base); a.skeletal_mesh_component.set_skeletal_mesh_asset(m)
+        anim = next((x[5:] for x in sys.argv if x.startswith("anim=")), None)
+        if anim:
+            path, at = anim.rsplit("@", 1)
+            seq = unreal.load_asset(path); comp = a.skeletal_mesh_component
+            comp.set_animation_mode(unreal.AnimationMode.ANIMATION_SINGLE_NODE)
+            comp.set_animation(seq); comp.set_position(float(at) * seq.get_play_length(), False)
+            comp.set_play_rate(0.0)
+            for fn in ("tick_animation", "refresh_bone_transforms"):
+                try: getattr(comp, fn)(0.0, False) if fn == "tick_animation" else getattr(comp, fn)()
+                except Exception: pass
     else:
         a = eas.spawn_actor_from_class(unreal.StaticMeshActor, base); a.static_mesh_component.set_static_mesh(m)
     o, e = a.get_actor_bounds(False); r = max(e.x, e.y, e.z) * 2.2

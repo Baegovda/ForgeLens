@@ -78,6 +78,15 @@ public static class SaniReader
     return clip;
   }
 
+  /// <summary>Decode an ETNA .sani from raw bytes (and its .sani_data, when the clip is 0xF6). Used by bulk validation.</summary>
+  public static AnimationClip FromBytes(byte[] sani, byte[]? data, string name = "clip")
+  {
+    var clip = new AnimationClip { Name = name };
+    if (!TryReadEtna(sani, clip, data))
+      clip.Notes.Add("Not an ETNA clip.");
+    return clip;
+  }
+
   private static bool TryFollowResource(GameCatalog catalog, ArchiveStore store, int fileIndex, byte[] bytes, AnimationClip clip)
   {
     var text = Encoding.UTF8.GetString(bytes);

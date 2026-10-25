@@ -28,7 +28,7 @@ internal static class EtnaCurves
     }
 
     var version = BinaryPrimitives.ReadUInt16LittleEndian(sani.AsSpan(4, 2));
-    if (version != 2)
+    if (version is not (1 or 2))
     {
       clip.Notes.Add($"ETNA version {version} is not the class-A codec (version 2, subversion 2), so curve keys were not sampled.");
       return false;
@@ -67,7 +67,19 @@ internal static class EtnaCurves
       return false;
     }
 
-    if (!TryCodec(codec, external, data, frames, clip, out var sampledFrames, out var scalars))
+    // Factory FUN_142234c00(version, sub): the u16 sub-version is only read when version > 1
+    // (FUN_14222fe40 case F2/F6); version 1 defaults to sub 1. Sub 1 is the raw float class
+    // (vtbl 0x1437e71c0), sub 2 with version < 3 the quantized class A (vtbl 0x1437e73e0).
+    var codecSub = version > 1 && codec.Length >= 2 ? BinaryPrimitives.ReadUInt16LittleEndian(codec.AsSpan(0, 2)) : 1;
+    int sampledFrames, scalars;
+    if (codecSub == 1)
+    {
+      var headerBones = BinaryPrimitives.ReadInt32LittleEndian(sani.AsSpan(24, 4));
+      var headerScalars = BinaryPrimitives.ReadInt32LittleEndian(sani.AsSpan(28, 4));
+      if (!TryCodecRaw(codec, version > 1 ? 2 : 0, external, data, frames, headerBones, headerScalars, clip, out sampledFrames, out scalars))
+        return false;
+    }
+    else if (!TryCodec(codec, external, data, frames, clip, out sampledFrames, out scalars))
       return false;
 
     var rootKeys = 0;
@@ -178,14 +190,19 @@ internal static class EtnaCurves
     {
       if (data.Length < 6
         || BinaryPrimitives.ReadUInt16LittleEndian(data.AsSpan(0, 2)) != 0xF2
-        || BinaryPrimitives.ReadInt32LittleEndian(data.AsSpan(2, 4)) != data.Length)
+        || BinaryPrimitives.ReadInt32LittleEndian(data.AsSpan(2, 4)) is var mainEnd && (mainEnd < 6 || mainEnd > data.Length))
       {
-        clip.Notes.Add(".sani_data is not one 0xF2 block, so curve keys were not sampled.");
+        clip.Notes.Add(".sani_data does not start with a 0xF2 block, so curve keys were not sampled.");
         return false;
       }
 
+      // Clips with a second codec slot (0xF7 in the .sani = external 0xF3) append a 0xF3
+      // block after the 0xF2 one: {F2 main frames}{F3 second-slot frames}. The main slot is
+      // the 0xF2 block; the second slot is not sampled.
+      if (mainEnd < data.Length)
+        clip.Notes.Add(".sani_data also carries a 0xF3 second-slot block, which is not applied.");
       sampledFrames = frames;
-      frameData = data.AsSpan(6);
+      frameData = data.AsSpan(6, mainEnd - 6);
     }
     else
     {
@@ -322,6 +339,101 @@ internal static class EtnaCurves
       clip.Notes.Add($"{skipped} codec indices fell outside the name table and were skipped.");
     scalars = n2 + n5;
     return true;
+  }
+
+  /// <summary>
+  ///   Codec sub-version 1 (and every version-1 file): uncompressed floats, vtbl 0x1437e71c0.
+  ///   Header FUN_142228a70: i32 nT, nR, nS (+ i32 previewFrames for 0xF6). Carve FUN_142228dd0:
+  ///   u16 idxT[nT], idxR[nR], idxS[nS]; float4 defaultT[bones]; float4 defaultR[bones] (w,x,y,z);
+  ///   float defaultS[scalars] (bones/scalars = ETNA header +24/+28, clip+0x34/+0x38). Frames
+  ///   FUN_142228e30, sizes FUN_142228ed0: all frames of float4 T[pad4(nT)], then all frames of
+  ///   float4 R[pad4(nR)], then all frames of float S[nS]. Sampler FUN_142227680 copies the defaults
+  ///   for every bone, then lerps T and quat-blends R at the listed indices.
+  /// </summary>
+  private static bool TryCodecRaw(byte[] payload, int start, bool external, byte[]? data, int frames, int headerBones, int headerScalars,
+    AnimationClip clip, out int sampledFrames, out int scalars)
+  {
+    sampledFrames = 0;
+    scalars = 0;
+    var span = payload.AsSpan();
+    if (span.Length < start + 12) return false;
+    int I32(ReadOnlySpan<byte> b, int o) => BinaryPrimitives.ReadInt32LittleEndian(b.Slice(o, 4));
+    float F(ReadOnlySpan<byte> b, int o) => BinaryPrimitives.ReadSingleLittleEndian(b.Slice(o, 4));
+    var o = start;
+    var nT = I32(span, o); var nR = I32(span, o + 4); var nS = I32(span, o + 8); o += 12;
+    var preview = 0;
+    if (external) { preview = I32(span, o); o += 4; }
+    if (nT < 0 || nR < 0 || nS < 0 || headerBones < 0 || headerScalars < 0 || preview < 0)
+    {
+      clip.Notes.Add("The raw codec counts are not usable, so curve keys were not sampled.");
+      return false;
+    }
+
+    var header = (nT + nR + nS) * 2 + (headerScalars + headerBones * 8) * 4;
+    int Pad(int n) => (n + 3) / 4 * 4;
+    var pT = Pad(nT); var pR = Pad(nR);
+    var perFrame = (nS + (pT + pR) * 4) * 4;
+    if (span.Length < o + header)
+    {
+      clip.Notes.Add("The raw codec header is truncated, so curve keys were not sampled.");
+      return false;
+    }
+
+    var idx = new int[nT + nR];
+    for (var i = 0; i < nT + nR; i++) idx[i] = BinaryPrimitives.ReadUInt16LittleEndian(span.Slice(o + i * 2, 2));
+    var defaults = o + (nT + nR + nS) * 2;
+    var defaultR = defaults + headerBones * 16;
+
+    ReadOnlySpan<byte> frameData;
+    if (!external) { sampledFrames = frames; frameData = span.Slice(o + header); }
+    else if (data is not null && data.Length >= 6 && BinaryPrimitives.ReadUInt16LittleEndian(data.AsSpan(0, 2)) == 0xF2
+      && BinaryPrimitives.ReadInt32LittleEndian(data.AsSpan(2, 4)) is var end && end >= 6 && end <= data.Length)
+    { sampledFrames = frames; frameData = data.AsSpan(6, end - 6); }
+    else
+    {
+      sampledFrames = preview;
+      frameData = span.Slice(o + header);
+      clip.Notes.Add($"Only {preview} preview frames are in the 0xF6 block. The full clip is {frames} frames and needs the sibling .sani_data.");
+    }
+
+    if (sampledFrames < 1 || frameData.Length < sampledFrames * perFrame)
+    {
+      clip.Notes.Add($"Raw frame data is {frameData.Length} bytes; {sampledFrames} frames need {sampledFrames * perFrame}. Keys were not sampled.");
+      return false;
+    }
+
+    var bones = clip.Bones.Count;
+    var tracks = new BoneTrack[bones];
+    var tSlot = new int[bones]; var rSlot = new int[bones];
+    Array.Fill(tSlot, -1); Array.Fill(rSlot, -1);
+    for (var i = 0; i < nT; i++) if (idx[i] < bones) tSlot[idx[i]] = i;
+    for (var i = 0; i < nR; i++) if (idx[nT + i] < bones) rSlot[idx[nT + i]] = i;
+    var rBase = sampledFrames * pT * 16;
+    var rate = clip.SampleRate;
+    for (var bone = 0; bone < bones; bone++)
+      tracks[bone] = new BoneTrack { Bone = -1, BoneName = clip.Bones[bone] };
+    for (var frame = 0; frame < sampledFrames; frame++)
+    {
+      var time = frame / rate;
+      for (var bone = 0; bone < bones; bone++)
+      {
+        Vector3 t; Quaternion q;
+        if (tSlot[bone] >= 0) { var b = (frame * pT + tSlot[bone]) * 16; t = new(F(frameData, b), F(frameData, b + 4), F(frameData, b + 8)); }
+        else if (bone < headerBones) { var b = defaults + bone * 16; t = new(F(span, b), F(span, b + 4), F(span, b + 8)); }
+        else continue;
+        if (rSlot[bone] >= 0) { var b = rBase + (frame * pR + rSlot[bone]) * 16; q = new(F(frameData, b + 4), F(frameData, b + 8), F(frameData, b + 12), F(frameData, b)); }
+        else { var b = defaultR + bone * 16; q = new(F(span, b + 4), F(span, b + 8), F(span, b + 12), F(span, b)); }
+        tracks[bone].Translation.Add(new VectorKey { Time = time, Value = t });
+        tracks[bone].Rotation.Add(new QuatKey { Time = time, Value = Quaternion.Normalize(q) });
+      }
+    }
+
+    foreach (var track in tracks)
+      if (track.Translation.Count + track.Rotation.Count > 0)
+        clip.Tracks.Add(track);
+    scalars = nS;
+    clip.Notes.Add($"Raw float codec (sub-version 1): {nT} animated translations, {nR} animated rotations, defaults for {headerBones} bones.");
+    return clip.Tracks.Count > 0;
   }
 
   private static bool TryRoot(byte[] payload, int frames, AnimationClip clip)
