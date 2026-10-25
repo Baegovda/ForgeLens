@@ -1,5 +1,6 @@
 using Avalonia;
 using Avalonia.Controls;
+using Avalonia.Media;
 using Avalonia.Controls.Models.TreeDataGrid;
 using Avalonia.Input;
 using Avalonia.Interactivity;
@@ -18,6 +19,7 @@ public partial class MainWindow : Window
 {
 
   private readonly BrowserSettings _settings = BrowserSettings.Load();
+  private readonly RecentAssets _recent = RecentAssets.Load();
   private readonly DispatcherTimer _searchTimer;
   private readonly DispatcherTimer _playTimer;
   private CancellationTokenSource? _load;
@@ -42,10 +44,17 @@ public partial class MainWindow : Window
   private bool _drawAgain;
   private bool _drawFast;
   private Dictionary<string, PreviewImage>? _albedo;
+  private HierarchicalTreeDataGridSource<CatalogDirectory>? _tree;
+  private int _pendingFileIndex = -1;
+  private string _pendingDirectory = "";
+  private bool _suppressSearch;
+  private bool _suppressRecent;
 
   public MainWindow()
   {
     InitializeComponent();
+    RecentList.ItemsSource = _recent.Items;
+    ShowFiles();
     _searchTimer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(250) };
     _searchTimer.Tick += (_, _) =>
     {
@@ -151,6 +160,7 @@ public partial class MainWindow : Window
       RefreshFiles();
     };
     FolderTree.Source = source;
+    _tree = source;
     _directory = catalog.Root;
     var root = new IndexPath(0);
     source.Expand(root);
@@ -160,6 +170,8 @@ public partial class MainWindow : Window
 
   private void SearchChanged(object? sender, TextChangedEventArgs e)
   {
+    if (_suppressSearch)
+      return;
     _searchTimer.Stop();
     _searchTimer.Start();
   }
@@ -222,6 +234,7 @@ public partial class MainWindow : Window
       : $" {catalog.DuplicatesCollapsed:N0} duplicate paths hidden; the later archive is shown.";
     var skipped = catalog.ArchivesSkipped == 0 ? "" : $" {catalog.ArchivesSkipped} caches skipped.";
     StatusText.Text = $"{query.Length:N0} shown in {scope}. {directory.Children.Length:N0} subfolders here. {catalog.FileCount:N0} files in {catalog.Archives.Count} archives.{hidden}{skipped}";
+    ApplyPendingFile();
   }
 
   private async void FileSelectionChanged(object? sender, SelectionChangedEventArgs e)
@@ -243,6 +256,8 @@ public partial class MainWindow : Window
 
     var generation = ++_previewGeneration;
     var file = _catalog.GetFile(row.Index);
+    _recent.Touch(file.Path, file.ArchiveName);
+    ShowLoading();
     _playTimer.Stop();
     _texture = null;
     _clip = null;
@@ -271,6 +286,7 @@ public partial class MainWindow : Window
         _texture = document;
         FillLevels(document.MipCount, document.FaceCount);
         await ShowTextureAsync(document);
+        HideLoading(generation);
         return;
       }
 
@@ -304,6 +320,7 @@ public partial class MainWindow : Window
         else
         {
           PreviewText.Text = mesh.Message;
+          HideLoading(generation);
         }
 
         return;
@@ -321,12 +338,14 @@ public partial class MainWindow : Window
         PreviewNote.Text = clip.HasCurves
           ? "Play samples the curves onto the skeleton when a model is also loaded. Retail .sani packing is unverified."
           : "No sampled curves. The note above is what the reader could see.";
+        HideLoading(generation);
         return;
       }
 
       if (file.Size > 32L * 1024 * 1024)
       {
         PreviewText.Text = $"{file.Path} is {file.SizeText}. Preview reads are capped so a multi-megabyte buffer is not pulled into the text pane. Export copies the original bytes.";
+        HideLoading(generation);
         return;
       }
 
@@ -336,12 +355,14 @@ public partial class MainWindow : Window
       if (file.Kind == AssetKind.TextureMip)
       {
         PreviewText.Text = "Loose .pct_mip payload. Open the .pct.resource that lists this file. The first bytes are below.\n\n" + BytePreview.Hex(bytes);
+        HideLoading(generation);
         return;
       }
 
       PreviewText.Text = TextureLoader.LooksText(bytes) ? BytePreview.Text(bytes) : BytePreview.Hex(bytes);
       if (file.Kind == AssetKind.Effect)
         PreviewNote.Text = "Effects and particle systems are not converted. Export copies the raw file and any texture or model names found in it.";
+      HideLoading(generation);
     }
     catch (Exception ex)
     {
@@ -350,7 +371,17 @@ public partial class MainWindow : Window
       PreviewText.IsVisible = true;
       PreviewImage.IsVisible = false;
       PreviewText.Text = ex.Message;
+      HideLoading(generation);
     }
+  }
+
+  private void ShowLoading()
+    => LoadingOverlay.IsVisible = true;
+
+  private void HideLoading(int generation)
+  {
+    if (generation == _previewGeneration)
+      LoadingOverlay.IsVisible = false;
   }
 
   private async Task ShowTextureAsync(TextureDocument document)
@@ -371,6 +402,7 @@ public partial class MainWindow : Window
       PreviewText.IsVisible = false;
       PreviewImage.IsVisible = true;
       PreviewNote.Text = $"{document.Message} Showing mip {mip}, face {face}, {decoded.width}x{decoded.height}. {decoded.note}";
+      HideLoading(generation);
     }
     catch (Exception ex)
     {
@@ -379,6 +411,7 @@ public partial class MainWindow : Window
       PreviewImage.IsVisible = false;
       PreviewText.IsVisible = true;
       PreviewText.Text = string.IsNullOrEmpty(document.Message) ? ex.Message : document.Message + "\n\n" + ex.Message;
+      HideLoading(generation);
     }
   }
 
@@ -470,6 +503,7 @@ public partial class MainWindow : Window
     var lod = LodBox.SelectedIndex < 0 ? 0 : LodBox.SelectedIndex;
     var part = PartBox.SelectedIndex <= 0 ? -1 : PartBox.SelectedIndex - 1;
     var albedo = _albedo;
+    var previewGeneration = _previewGeneration;
     var bounds = ViewBorder.Bounds;
     var width = bounds.Width < 64 ? 720 : (int)bounds.Width;
     var height = bounds.Height < 64 ? 900 : (int)bounds.Height;
@@ -502,10 +536,12 @@ public partial class MainWindow : Window
           ShowPixels(task.Result.pixels, task.Result.width, task.Result.height);
           if (!string.IsNullOrEmpty(task.Result.note))
             PreviewNote.Text = task.Result.note;
+          HideLoading(previewGeneration);
         }
         else if (generation == _drawGeneration && task.IsFaulted)
         {
           PreviewNote.Text = task.Exception?.GetBaseException().Message ?? "Preview failed.";
+          HideLoading(previewGeneration);
         }
 
         if (_drawAgain && _mesh is not null)
@@ -650,6 +686,154 @@ public partial class MainWindow : Window
     var step = _distance * 0.1f;
     _distance = Math.Max(0.15f, _distance - (float)e.Delta.Y * step);
     DrawMesh(true);
+  }
+
+  private void FilesTabClicked(object? sender, RoutedEventArgs e)
+    => ShowFiles();
+
+  private void RecentTabClicked(object? sender, RoutedEventArgs e)
+    => ShowRecent();
+
+  private void ShowFiles()
+  {
+    FileList.IsVisible = true;
+    FileHeader.IsVisible = true;
+    RecentList.IsVisible = false;
+    FilesTab.FontWeight = FontWeight.SemiBold;
+    RecentTab.FontWeight = FontWeight.Normal;
+  }
+
+  private void ShowRecent()
+  {
+    FileList.IsVisible = false;
+    FileHeader.IsVisible = false;
+    RecentList.IsVisible = true;
+    FilesTab.FontWeight = FontWeight.Normal;
+    RecentTab.FontWeight = FontWeight.SemiBold;
+  }
+
+  private void RecentSelectionChanged(object? sender, SelectionChangedEventArgs e)
+  {
+    if (_suppressRecent || RecentList.SelectedItem is not RecentEntry entry)
+      return;
+    _suppressRecent = true;
+    RecentList.SelectedItem = null;
+    _suppressRecent = false;
+    OpenRecent(entry);
+  }
+
+  private void OpenRecent(RecentEntry entry)
+  {
+    ShowFiles();
+    if (_catalog is null || _tree is null)
+    {
+      StatusText.Text = "Open the game folder, then choose the recent file again.";
+      return;
+    }
+
+    var hits = _catalog.FindByPath(entry.Path);
+    var index = -1;
+    foreach (var hit in hits)
+    {
+      if (string.Equals(_catalog.GetFile(hit).ArchiveName, entry.Archive, StringComparison.OrdinalIgnoreCase))
+      {
+        index = hit;
+        break;
+      }
+    }
+
+    if (index < 0 && hits.Count > 0)
+      index = hits[0];
+    if (index < 0)
+    {
+      StatusText.Text = "That recent file is not in the open folder: " + entry.Path;
+      return;
+    }
+
+    var directory = ParentPath(entry.Path);
+    _pendingFileIndex = index;
+    _pendingDirectory = directory;
+    _suppressSearch = true;
+    SearchBox.Text = "";
+    _suppressSearch = false;
+    _searchTimer.Stop();
+    if (FilterBox.SelectedIndex != 0)
+      FilterBox.SelectedIndex = 0;
+    if (!TrySelectDirectory(directory))
+    {
+      _pendingFileIndex = -1;
+      StatusText.Text = "That recent file's folder is not in the open catalog: " + entry.Path;
+    }
+  }
+
+  private bool TrySelectDirectory(string directoryPath)
+  {
+    if (_catalog is null || _tree is null)
+      return false;
+
+    var indices = new List<int> { 0 };
+    var node = _catalog.Root;
+    if (directoryPath.Length > 0)
+    {
+      var start = 0;
+      for (var i = 0; i <= directoryPath.Length; i++)
+      {
+        if (i != directoryPath.Length && directoryPath[i] != '/')
+          continue;
+        var segment = directoryPath.Substring(start, i - start);
+        start = i + 1;
+        if (segment.Length == 0 || segment == ".")
+          continue;
+        var found = -1;
+        for (var child = 0; child < node.Children.Length; child++)
+        {
+          if (string.Equals(node.Children[child].Name, segment, StringComparison.OrdinalIgnoreCase))
+          {
+            found = child;
+            break;
+          }
+        }
+
+        if (found < 0)
+          return false;
+        indices.Add(found);
+        node = node.Children[found];
+      }
+    }
+
+    for (var depth = 1; depth < indices.Count; depth++)
+      _tree.Expand(new IndexPath(indices.GetRange(0, depth)));
+    var already = _directory is not null && string.Equals(_directory.Path, node.Path, StringComparison.OrdinalIgnoreCase);
+    _tree.RowSelection!.Select(new IndexPath(indices));
+    if (already)
+      RefreshFiles();
+    return true;
+  }
+
+  private void ApplyPendingFile()
+  {
+    if (_pendingFileIndex < 0 || FileList.ItemsSource is not FileRowList rows)
+      return;
+    if (_directory is null || !string.Equals(_directory.Path, _pendingDirectory, StringComparison.OrdinalIgnoreCase))
+      return;
+    var pending = _pendingFileIndex;
+    _pendingFileIndex = -1;
+    var row = rows.RowForCatalogIndex(pending);
+    if (row < 0)
+    {
+      StatusText.Text = "The recent file is not visible in the current list.";
+      return;
+    }
+
+    FileList.SelectedIndex = row;
+    FileList.ScrollIntoView(rows[row]);
+  }
+
+  private static string ParentPath(string filePath)
+  {
+    var normalized = filePath.Replace('\\', '/');
+    var slash = normalized.LastIndexOf('/');
+    return slash <= 0 ? "" : normalized[..slash];
   }
 
   private async void ExportClicked(object? sender, RoutedEventArgs e)

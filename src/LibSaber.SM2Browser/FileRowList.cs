@@ -46,6 +46,23 @@ public sealed class FileRowList : IReadOnlyList<FileRow>, IList
 
   public int Count => _cache.Length;
 
+  public int RowForCatalogIndex(int catalogIndex)
+  {
+    if (_query.Indices is null)
+    {
+      var row = catalogIndex - _query.First;
+      return row >= 0 && row < _query.Count ? row : -1;
+    }
+
+    for (var i = 0; i < _query.Indices.Length; i++)
+    {
+      if (_query.Indices[i] == catalogIndex)
+        return i;
+    }
+
+    return -1;
+  }
+
   public FileRow this[int index]
     => _cache[index] ??= new FileRow(_catalog, _query.IndexAt(index));
 

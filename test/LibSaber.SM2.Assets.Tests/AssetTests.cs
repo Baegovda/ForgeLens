@@ -265,6 +265,31 @@ public class AssetTests
   }
 
   [Fact]
+  public void Axis_BoneLocalsDoNotStackTheConversion()
+  {
+    var source = new[]
+    {
+      Matrix4x4.CreateTranslation(0, 1, 0),
+      Matrix4x4.CreateTranslation(0, 0.25f, 0),
+    };
+    var parents = new[] { -1, 0 };
+    var locals = new Matrix4x4[2];
+    var worlds = new Matrix4x4[2];
+    AxisConvert.ConvertHierarchy(source, parents, ExportSpace.Unreal, locals, worlds);
+
+    Assert.Equal(0f, worlds[0].M41, 0.001f);
+    Assert.Equal(0f, worlds[0].M42, 0.001f);
+    Assert.Equal(100f, worlds[0].M43, 0.001f);
+    Assert.Equal(125f, worlds[1].M43, 0.001f);
+    Assert.Equal(0f, locals[1].M41, 0.001f);
+    Assert.Equal(0f, locals[1].M42, 0.001f);
+    Assert.Equal(25f, locals[1].M43, 0.001f);
+    Assert.Equal(1f, locals[0].M11, 0.001f);
+    Assert.Equal(1f, locals[0].M22, 0.001f);
+    Assert.Equal(1f, locals[0].M33, 0.001f);
+  }
+
+  [Fact]
   public void Preview_FramesAStandingMeshAndSamplesDiffuse()
   {
     var mesh = new ExportedMesh { Name = "post" };

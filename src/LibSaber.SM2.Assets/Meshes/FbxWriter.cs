@@ -137,8 +137,9 @@ public static class FbxWriter
     PropInt(props, "UpAxisSign", 1);
     PropInt(props, "FrontAxis", 1);
     PropInt(props, "FrontAxisSign", 1);
+    // Z-up, -Y forward (FBX right-handed). CoordAxisSign -1 is that system; +1 mirrors it.
     PropInt(props, "CoordAxis", 0);
-    PropInt(props, "CoordAxisSign", 1);
+    PropInt(props, "CoordAxisSign", -1);
     PropInt(props, "OriginalUpAxis", 2);
     PropInt(props, "OriginalUpAxisSign", 1);
     var unit = space == ExportSpace.Blender ? 100d : 1d;
@@ -590,24 +591,17 @@ public static class FbxWriter
   {
     var local = new Matrix4x4[mesh.Bones.Count];
     var world = new Matrix4x4[mesh.Bones.Count];
-    var done = new bool[mesh.Bones.Count];
+    var source = new Matrix4x4[mesh.Bones.Count];
+    var parents = new int[mesh.Bones.Count];
     for (var i = 0; i < mesh.Bones.Count; i++)
-      local[i] = AxisConvert.Matrix(mesh.Bones[i].Local, space, gltf: false);
-
-    Matrix4x4 World(int index)
     {
-      if (done[index])
-        return world[index];
-      done[index] = true;
-      var parent = mesh.Bones[index].Parent;
-      world[index] = parent >= 0 && parent < mesh.Bones.Count && parent != index
-        ? local[index] * World(parent)
-        : local[index];
-      return world[index];
+      source[i] = mesh.Bones[i].Local;
+      parents[i] = mesh.Bones[i].Parent;
     }
 
-    for (var i = 0; i < mesh.Bones.Count; i++)
-      World(i);
+    // Convert composed worlds, then derive locals. Converting each local matrix stacks the
+    // Y-up to Z-up rotation once per bone, which is the fan of long bones Unreal draws.
+    AxisConvert.ConvertHierarchy(source, parents, space, local, world);
 
     var clusters = new List<int>();
     if (mesh.HasSkin)

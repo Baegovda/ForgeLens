@@ -32,7 +32,11 @@
       <tdg:TreeDataGrid x:Name="FolderTree" Grid.Column="0" MinWidth="160" Background="#14161A" />
       <GridSplitter Grid.Column="1" Width="6" Background="#2C3138" ResizeDirection="Columns" />
       <DockPanel Grid.Column="2" MinWidth="220">
-        <StackPanel DockPanel.Dock="Top" Margin="8,4">
+        <StackPanel DockPanel.Dock="Top" Orientation="Horizontal" Spacing="6" Margin="8,4,8,0">
+          <Button x:Name="FilesTab" Content="Files" Click="FilesTabClicked" />
+          <Button x:Name="RecentTab" Content="Recent" Click="RecentTabClicked" />
+        </StackPanel>
+        <StackPanel x:Name="FileHeader" DockPanel.Dock="Top" Margin="8,4">
           <CheckBox x:Name="SubfoldersBox" Content="Include subfolders" Click="SubfoldersChanged" ToolTip.Tip="List every file under the selected folder." />
           <Grid ColumnDefinitions="*,100,70,170" Margin="0,4,0,0">
             <TextBlock Text="Path" FontWeight="SemiBold" VerticalAlignment="Center" />
@@ -41,6 +45,7 @@
             <TextBlock Grid.Column="3" Text="Archive" FontWeight="SemiBold" VerticalAlignment="Center" />
           </Grid>
         </StackPanel>
+        <Grid>
         <ListBox x:Name="FileList" SelectionMode="Multiple" SelectionChanged="FileSelectionChanged">
           <ListBox.ItemTemplate>
             <DataTemplate x:DataType="local:FileRow">
@@ -53,6 +58,17 @@
             </DataTemplate>
           </ListBox.ItemTemplate>
         </ListBox>
+        <ListBox x:Name="RecentList" IsVisible="False" SelectionChanged="RecentSelectionChanged">
+          <ListBox.ItemTemplate>
+            <DataTemplate x:DataType="local:RecentEntry">
+              <StackPanel Margin="0,2">
+                <TextBlock Text="{Binding Path}" TextTrimming="CharacterEllipsis" />
+                <TextBlock Text="{Binding Archive}" Opacity="0.7" FontSize="11" TextTrimming="CharacterEllipsis" />
+              </StackPanel>
+            </DataTemplate>
+          </ListBox.ItemTemplate>
+        </ListBox>
+        </Grid>
       </DockPanel>
       <GridSplitter Grid.Column="3" Width="6" Background="#2C3138" ResizeDirection="Columns" />
       <DockPanel Grid.Column="4" Margin="8" MinWidth="320">
@@ -76,6 +92,12 @@
             <Image x:Name="PreviewImage" Stretch="Uniform" />
             <TextBox x:Name="PreviewText" IsReadOnly="True" AcceptsReturn="True" TextWrapping="NoWrap"
                      FontFamily="Consolas,Courier New,monospace" FontSize="12" Background="Transparent" BorderThickness="0" />
+            <Border x:Name="LoadingOverlay" IsVisible="False" Background="#CC121418">
+              <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center" Spacing="12">
+                <ProgressBar IsIndeterminate="True" Width="200" Height="8" />
+                <TextBlock Text="Loading..." HorizontalAlignment="Center" FontSize="16" />
+              </StackPanel>
+            </Border>
           </Grid>
         </Border>
       </DockPanel>

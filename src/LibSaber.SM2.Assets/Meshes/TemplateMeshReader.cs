@@ -527,14 +527,14 @@ public static class TemplateMeshReader
         }
       }
 
-      var uvs = ReadUvs(reader, slice, info.VertexOffset, vertices.Length);
+      var uvs = ReadUvs(reader, slice, sub, info.VertexOffset, vertices.Length);
       var faces = new FaceSerializer(slice.Face).DeserializeRange(reader, faceStart, faceEnd).ToArray();
       var partName = PartName(graph, sub, slice.MeshIndex);
       AppendRange(mesh, target, vertices, uvs, faces, info.VertexOffset, skinned, sub.BoneIds, partName, sub.Material, ref rejected);
     }
   }
 
-  private static Vector2[] ReadUvs(NativeReader reader, MeshSlice slice, int vertexOffset, int count)
+  private static Vector2[] ReadUvs(NativeReader reader, MeshSlice slice, GeometrySubMesh sub, int vertexOffset, int count)
   {
     var uvs = new Vector2[count];
     if (slice.Uv is null || count == 0)
@@ -543,15 +543,65 @@ public static class TemplateMeshReader
     var end = start + count;
     if (start < 0 || end > slice.Uv.Count)
       return uvs;
+
+    var layer = DiffuseLayer(sub.Material);
+    var set = layer is { UvSetIndex: >= 0 } ? layer.UvSetIndex : 0;
+    var scale = UvScale(slice.Uv.Flags, sub, set);
+    var tileU = layer is { TilingU: > 0 and < 64 } ? layer.TilingU : 1f;
+    var tileV = layer is { TilingV: > 0 and < 64 } ? layer.TilingV : 1f;
     var index = 0;
     foreach (var data in new InterleavedDataSerializer(slice.Uv).DeserializeRange(reader, start, end))
     {
       if (index >= uvs.Length)
         break;
-      uvs[index++] = new Vector2(data.UV0.X, data.UV0.Y);
+      // The serializer stores V already flipped (1 - snorm). The submesh scale was divided out
+      // before packing, so a scale of 2 leaves V in the top half of the texture until it is put back.
+      var source = UvChannel(data, set);
+      var u = source.X * scale * tileU;
+      var snormV = 1f - source.Y;
+      var v = 1f - snormV * scale * tileV;
+      uvs[index++] = new Vector2(u, v);
     }
 
     return uvs;
+  }
+
+  private static float UvScale(FVFFlags flags, GeometrySubMesh sub, int set)
+  {
+    var compressed = set switch
+    {
+      1 => (flags & FVFFlags.TEX1_COMPR) != 0,
+      2 => (flags & FVFFlags.TEX2_COMPR) != 0,
+      3 => (flags & FVFFlags.TEX3_COMPR) != 0,
+      _ => (flags & FVFFlags.TEX0_COMPR) != 0,
+    };
+    if (!compressed || !sub.UvScaling.TryGetValue((byte)set, out var raw) || raw == 0)
+      return 1f;
+    return raw;
+  }
+
+  private static Vector4 UvChannel(InterleavedData data, int set)
+  {
+    if (set == 1 && data.HasUV1)
+      return data.UV1;
+    if (set == 2 && data.HasUV2)
+      return data.UV2;
+    if (set == 3 && data.HasUV3)
+      return data.UV3;
+    return data.UV0;
+  }
+
+  private static MaterialLayer? DiffuseLayer(SaberMaterial? material)
+  {
+    if (material is null)
+      return null;
+    foreach (var layer in new[] { material.Layer0, material.Layer1, material.Layer2, material.Layer3 })
+    {
+      if (layer is not null && !string.IsNullOrWhiteSpace(layer.TextureName))
+        return layer;
+    }
+
+    return material.Layer0;
   }
 
   private static string PartName(objGEOM_MNG graph, GeometrySubMesh sub, int meshIndex)

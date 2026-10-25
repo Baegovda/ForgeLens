@@ -111,4 +111,95 @@ public static class AxisConvert
       translation.X, translation.Y, translation.Z, source.M44);
   }
 
+  /// <summary>
+  ///   Source is Y-up, X right, +Z toward the character's front. Destination FBX is
+  ///   Z-up and -Y forward: (x, y, z) maps to (x, -z, y). This is that change of basis.
+  /// </summary>
+  private static Matrix4x4 Basis()
+    => new(
+      1, 0, 0, 0,
+      0, 0, 1, 0,
+      0, -1, 0, 0,
+      0, 0, 0, 1);
+
+  /// <summary>
+  ///   Convert one world matrix. Conjugating the rotation keeps a parent and child in the
+  ///   same space; converting each local matrix on its own stacks an extra rotation per bone.
+  /// </summary>
+  public static Matrix4x4 ConvertWorld(Matrix4x4 source, ExportSpace space, bool gltf)
+  {
+    if (gltf)
+    {
+      source.M14 = 0;
+      source.M24 = 0;
+      source.M34 = 0;
+      if (source.M44 == 0)
+        source.M44 = 1;
+      return source;
+    }
+
+    var basis = Basis();
+    Matrix4x4.Invert(basis, out var inverse);
+    var linear = source;
+    linear.M14 = linear.M24 = linear.M34 = 0;
+    linear.M41 = linear.M42 = linear.M43 = 0;
+    linear.M44 = 1;
+    var converted = inverse * linear * basis;
+    var translation = Point(new Vector3(source.M41, source.M42, source.M43), space, false);
+    converted.M41 = translation.X;
+    converted.M42 = translation.Y;
+    converted.M43 = translation.Z;
+    converted.M14 = converted.M24 = converted.M34 = 0;
+    converted.M44 = 1;
+    return converted;
+  }
+
+  /// <summary>
+  ///   Source locals are parent-relative. Convert the composed worlds, then rebuild locals so
+  ///   a child translation stays a bone length instead of another copy of the world position.
+  /// </summary>
+  public static void ConvertHierarchy(ReadOnlySpan<Matrix4x4> sourceLocals, ReadOnlySpan<int> parents, ExportSpace space, Span<Matrix4x4> locals, Span<Matrix4x4> worlds)
+  {
+    var count = sourceLocals.Length;
+    var sourceWorld = new Matrix4x4[count];
+    var done = new bool[count];
+    for (var guard = 0; guard < count; guard++)
+    {
+      var progress = false;
+      for (var i = 0; i < count; i++)
+      {
+        if (done[i])
+          continue;
+        var parent = parents[i];
+        if (parent >= 0 && parent < count && parent != i && !done[parent])
+          continue;
+        var local = sourceLocals[i];
+        sourceWorld[i] = parent >= 0 && parent < count && parent != i
+          ? local * sourceWorld[parent]
+          : local;
+        done[i] = true;
+        progress = true;
+      }
+
+      if (!progress)
+        break;
+    }
+
+    for (var i = 0; i < count; i++)
+    {
+      if (!done[i])
+        sourceWorld[i] = sourceLocals[i];
+      worlds[i] = ConvertWorld(sourceWorld[i], space, false);
+    }
+
+    for (var i = 0; i < count; i++)
+    {
+      var parent = parents[i];
+      if (parent < 0 || parent >= count || parent == i || !done[parent] || !Matrix4x4.Invert(worlds[parent], out var inverse))
+        locals[i] = worlds[i];
+      else
+        locals[i] = worlds[i] * inverse;
+    }
+  }
+
 }

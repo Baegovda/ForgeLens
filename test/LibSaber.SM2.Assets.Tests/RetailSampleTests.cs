@@ -143,6 +143,19 @@ public class RetailSampleTests
 
     Assert.Equal(413472, mesh.Positions.Count);
     Assert.Equal(309390, mesh.Indices.Count / 3);
+    var arms = mesh.Parts.First(part => part.Texture == "ch_titus_arms_02");
+    float armMinV = 1, armMaxU = 0;
+    var armEnd = Math.Min(mesh.Indices.Count, arms.IndexStart + arms.IndexCount);
+    for (var i = Math.Max(0, arms.IndexStart); i < armEnd; i++)
+    {
+      var uv = mesh.Uvs[mesh.Indices[i]];
+      armMinV = MathF.Min(armMinV, uv.Y);
+      armMaxU = MathF.Max(armMaxU, uv.X);
+    }
+
+    // The arms submesh packs UVs with scale 2. Without that scale, V sits in the top half of the texture.
+    Assert.True(armMinV < 0.25f, $"arm V min {armMinV}");
+    Assert.True(armMaxU > 1.2f, $"arm U max {armMaxU}");
     Assert.Equal(mesh.Positions.Count, mesh.Uvs.Count);
     Assert.Equal(mesh.Positions.Count, mesh.Normals.Count);
     Assert.Equal(mesh.Positions.Count, mesh.Skin.Count);
