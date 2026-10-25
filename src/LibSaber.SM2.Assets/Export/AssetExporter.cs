@@ -618,6 +618,12 @@ public static class AssetExporter
   {
     WriteOriginal(store, index, file, outputDirectory, report, null);
     var bytes = store.Read(index);
+    if (Effects.SslText.LooksText(bytes))
+    {
+      ExportEffectText(catalog, store, index, file, bytes, outputDirectory, settings, report, batch);
+      return;
+    }
+
     var references = ScanReferences(bytes);
     var copied = new List<string>();
     foreach (var reference in references)
@@ -641,6 +647,74 @@ public static class AssetExporter
     if (copied.Count == 0)
       builder.AppendLine("No linked asset names were found in the effect bytes.");
     File.WriteAllText(note, builder.ToString());
+    report.Written++;
+  }
+
+  /// <summary>
+  ///   Retail .sfx are SSL text. Writes {name}.sfx.json (tree with tagged unions resolved),
+  ///   {name}.niagara.json (one record per CPU/GPU emitter: renderer, blend, spawn, shape,
+  ///   lifetime, size/color splines, gravity, textures, meshes), and exports every
+  ///   referenced texture as PNG/TGA/DDS next to them.
+  /// </summary>
+  private static void ExportEffectText(
+    GameCatalog catalog,
+    ArchiveStore store,
+    int index,
+    CatalogFileInfo file,
+    byte[] bytes,
+    string outputDirectory,
+    ExportSettings settings,
+    ExportReport report,
+    IReadOnlyList<string> batch)
+  {
+    var root = Effects.SslText.Parse(bytes);
+    var name = Path.GetFileNameWithoutExtension(file.Path);
+    var result = Effects.EffectSummary.Summarize(name, root);
+    var options = new JsonSerializerOptions { WriteIndented = true, Encoder = System.Text.Encodings.Web.JavaScriptEncoder.UnsafeRelaxedJsonEscaping };
+    var tree = Destination(outputDirectory, file.Path, ".sfx.json", batch);
+    Directory.CreateDirectory(Path.GetDirectoryName(tree)!);
+    File.WriteAllText(tree, Effects.EffectSummary.Resolve(root)!.ToJsonString(options));
+    report.Written++;
+
+    var resolvedTextures = new System.Text.Json.Nodes.JsonObject();
+    foreach (var texture in result.Textures.OrderBy(x => x))
+    {
+      var hit = TemplateMeshReader.ResolveTexture(catalog, index, texture);
+      if (hit < 0)
+      {
+        resolvedTextures[texture] = null;
+        continue;
+      }
+
+      var linked = catalog.GetFile(hit);
+      try
+      {
+        ExportTexture(catalog, store, hit, linked, outputDirectory, settings, report, batch);
+        resolvedTextures[texture] = linked.Path;
+      }
+      catch (Exception ex)
+      {
+        report.Messages.Add(linked.Path + ": " + ex.Message);
+      }
+    }
+
+    var meshes = new System.Text.Json.Nodes.JsonObject();
+    foreach (var mesh in result.Meshes.OrderBy(x => x))
+    {
+      var path = mesh.Replace('\\', '/');
+      var hit = -1;
+      foreach (var candidate in new[] { path, path + ".tpl", "tpl/" + path + ".tpl/" + Path.GetFileName(path) + ".tpl", path + ".tpl.resource" })
+      {
+        hit = catalog.ResolveReference(candidate, index);
+        if (hit >= 0) break;
+      }
+      meshes[mesh] = hit >= 0 ? catalog.GetFile(hit).Path : null;
+    }
+
+    result.Summary["textureFiles"] = resolvedTextures;
+    result.Summary["meshFiles"] = meshes;
+    var summary = Destination(outputDirectory, file.Path, ".niagara.json", batch);
+    File.WriteAllText(summary, result.Summary.ToJsonString(options));
     report.Written++;
   }
 
@@ -814,7 +888,7 @@ public static class AssetExporter
       + "Most textures are .pct.resource plus .pct_mip. A bare .pct is uncommon." + Environment.NewLine
       + "Models are .tpl plus .tpl_data. Lod 0 keeps the meshes Index leaves checked (the largest pool) and drops _LOD, collision, and *_SIM cloth simulation shells (the game never draws them; --include-cloth-sim keeps them). A higher lod writes that smaller vertex pool. FBX is binary 7.4, Z-up, with a skinned limb hierarchy. Each exported part gets a material whose diffuse (and _nm normal, when that texture is in the catalog) is a path relative to the FBX, pointing at the PNG or TGA written beside it. .lods_base, .geom_dbg, and .cdt are not mesh payloads." + Environment.NewLine
       + "Animations: a retail .sani is an ETNA version-2 clip. 0xF2 stores the codec and every frame. 0xF6 stores the codec plus a few preview frames, and the sibling .sani_data holds the rest. Codes are unsigned (value = code * scale + min). Translation is an 11/11/10-bit word. Rotation is three codes through a modified Rodrigues quaternion, and that quaternion replaces the bone's bind rotation. Constant tracks are written for every bone the clip lists. Bones the clip does not name stay on the model bind pose. Scalar channels are not bone scale. The 0xF4 track is added to the skeleton root translation unless export is run with --no-root-motion. export --anim writes {model}__{clip}.fbx and .glb beside the bind mesh." + Environment.NewLine
-      + "Particle systems (.ps, .sfx) are not converted. Their raw bytes and any named meshes or textures are copied." + Environment.NewLine;
+      + "Effects: a text .sfx (SSL) is written as {name}.sfx.json (local__X unions resolved to the live member) and {name}.niagara.json (per CPU/GPU emitter: renderer, blend, spawn, shape, lifetime, size and color splines, gravity, textures, meshes), and its textures are exported. Binary .ps/.sfx stay raw with any named files copied. Nothing is turned into a Niagara asset automatically." + Environment.NewLine;
   }
 
 }

@@ -80,7 +80,7 @@ public static class ModelExport
       return false;
     }
 
-    if (catalog.TryGetByPath(normalized, out var exact) && catalog.GetFile(exact).Kind == AssetKind.Model)
+    if (catalog.TryGetByPath(normalized, out var exact) && catalog.GetFile(exact).Kind is AssetKind.Model or AssetKind.Effect)
     {
       index = exact;
       return true;
@@ -88,14 +88,14 @@ public static class ModelExport
 
     var fileName = Path.GetFileName(normalized.Replace('/', Path.DirectorySeparatorChar));
     var nested = normalized + "/" + fileName;
-    if (catalog.TryGetByPath(nested, out var nestedIndex) && catalog.GetFile(nestedIndex).Kind == AssetKind.Model)
+    if (catalog.TryGetByPath(nested, out var nestedIndex) && catalog.GetFile(nestedIndex).Kind is AssetKind.Model or AssetKind.Effect)
     {
       index = nestedIndex;
       return true;
     }
 
     var hits = catalog.FindByFileName(fileName)
-      .Where(hit => catalog.GetFile(hit).Kind == AssetKind.Model)
+      .Where(hit => catalog.GetFile(hit).Kind is AssetKind.Model or AssetKind.Effect)
       .ToList();
     if (normalized.Contains('/'))
     {

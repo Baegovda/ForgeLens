@@ -22,7 +22,7 @@ Options:
                           Repeat to combine with OR. A leading dot is an extension
                           (".pct" matches "*.pct"). Examples: *.pct, .tpl, characters/**/*.lg
                           list and extract only.
-  --asset <path>          Model to export, as the browser shows it. export only.
+  --asset <path>          Model (.tpl) or effect (.sfx) to export, as the browser shows it. export only.
                           tpl/cc_titus_assault.tpl finds tpl/cc_titus_assault.tpl/cc_titus_assault.tpl.
   --format <name>         fbx-unreal, gltf, or both. export only. FBX is Z-up centimeters.
                           glTF is Y-up meters. Textures are written next to the model.
