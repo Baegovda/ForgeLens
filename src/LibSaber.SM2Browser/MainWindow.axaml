@@ -4,9 +4,9 @@
         xmlns:local="using:LibSaber.SM2Browser"
         x:Class="LibSaber.SM2Browser.MainWindow"
         Title="Space Marine 2 assets"
-        Width="1280"
+        Width="1440"
         Height="800"
-        MinWidth="960"
+        MinWidth="1100"
         MinHeight="640">
   <DockPanel>
     <Border DockPanel.Dock="Top" Padding="8" Background="#1C1E22">
@@ -71,7 +71,8 @@
         </Grid>
       </DockPanel>
       <GridSplitter Grid.Column="3" Width="6" Background="#2C3138" ResizeDirection="Columns" />
-      <DockPanel Grid.Column="4" Margin="8" MinWidth="320">
+      <Grid Grid.Column="4" ColumnDefinitions="*,6,240" MinWidth="320">
+      <DockPanel Grid.Column="0" Margin="8,8,4,8" MinWidth="280">
         <StackPanel DockPanel.Dock="Top" Orientation="Horizontal" Spacing="6">
           <TextBlock Text="Mip" VerticalAlignment="Center" />
           <ComboBox x:Name="MipBox" Width="64" SelectionChanged="MipChanged" />
@@ -101,6 +102,20 @@
           </Grid>
         </Border>
       </DockPanel>
+      <GridSplitter Grid.Column="1" Width="6" Background="#2C3138" ResizeDirection="Columns" />
+      <DockPanel Grid.Column="2" Margin="4,8,8,8">
+        <TextBlock DockPanel.Dock="Top" Text="Meshes" FontWeight="SemiBold" Margin="4,0,0,4" />
+        <ListBox x:Name="MeshList" Background="#14161A">
+          <ListBox.ItemTemplate>
+            <DataTemplate x:DataType="local:MeshToggle">
+              <CheckBox IsChecked="{Binding Visible}" ToolTip.Tip="{Binding Tip}" Margin="2,1">
+                <TextBlock Text="{Binding Label}" TextTrimming="CharacterEllipsis" />
+              </CheckBox>
+            </DataTemplate>
+          </ListBox.ItemTemplate>
+        </ListBox>
+      </DockPanel>
+      </Grid>
     </Grid>
   </DockPanel>
 </Window>

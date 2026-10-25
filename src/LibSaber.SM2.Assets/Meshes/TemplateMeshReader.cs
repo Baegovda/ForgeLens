@@ -272,6 +272,7 @@ public static class TemplateMeshReader
     }
 
     var rejected = 0;
+    IndexMeshVisibility.Classify(graph, out var lodNames, out var volumeNames);
     try
     {
       for (var lod = 0; lod < groups.Count; lod++)
@@ -280,7 +281,7 @@ public static class TemplateMeshReader
         var target = new Surface(lod == 0 ? "LOD0" : "LOD" + lod);
         var skinned = (group.Vertex.Flags & (FVFFlags.WEIGHT4 | FVFFlags.WEIGHT8)) != 0;
         foreach (var slice in group.Slices)
-          DecodeSlice(mesh, graph, reader, slice, target, skinned, ref rejected);
+          DecodeSlice(mesh, graph, reader, slice, target, skinned, lodNames, volumeNames, ref rejected);
         if (skinned && target.Skin.Count != target.Positions.Count)
           target.Skin.Clear();
         if (lod == 0)
@@ -299,7 +300,10 @@ public static class TemplateMeshReader
       notes.Add("This mesh has no per-vertex skin weights.");
     else
       MarkInfluences(mesh);
+    var shown = mesh.Parts.Count(part => part.Visible) + mesh.Levels.Sum(level => level.Parts.Count(part => part.Visible));
+    var listed = mesh.Parts.Count + mesh.Levels.Sum(level => level.Parts.Count);
     notes.Add($"LOD0 is every part on the largest vertex pool: {mesh.Positions.Count:N0} vertices, {mesh.Indices.Count / 3:N0} triangles, {mesh.Parts.Count} parts.");
+    notes.Add($"Index shows {shown} of {listed} submeshes. Names containing _LOD, and collision volumes (cdt, _glr, rb_, visibility affixes), start hidden. _SIM stays checked.");
     if (mesh.Levels.Count > 0)
       notes.Add("Other LODs: " + string.Join(", ", mesh.Levels.Select(level => level.Positions.Count.ToString("N0"))) + " vertices.");
     if (rejected > 0)
@@ -349,7 +353,6 @@ public static class TemplateMeshReader
     public List<int> Indices { get; } = new();
     public List<SkinWeights> Skin { get; } = new();
     public List<MeshPart> Parts { get; } = new();
-    public HashSet<string> Names { get; } = new(StringComparer.OrdinalIgnoreCase);
 
     public void CopyTo(ExportedMesh mesh)
     {
@@ -467,7 +470,16 @@ public static class TemplateMeshReader
     return slice.VertBase >= 0 && slice.VertBase <= vertex.Count && slice.FaceBase >= 0 && slice.FaceBase <= face.Count;
   }
 
-  private static void DecodeSlice(ExportedMesh mesh, objGEOM_MNG graph, NativeReader reader, MeshSlice slice, Surface target, bool skinned, ref int rejected)
+  private static void DecodeSlice(
+    ExportedMesh mesh,
+    objGEOM_MNG graph,
+    NativeReader reader,
+    MeshSlice slice,
+    Surface target,
+    bool skinned,
+    HashSet<string> lodNames,
+    HashSet<string> volumeNames,
+    ref int rejected)
   {
     var subs = graph.SubMeshes?.Where(sub => sub.MeshId == slice.MeshIndex).ToList() ?? new List<GeometrySubMesh>();
     if (subs.Count == 0)
@@ -529,8 +541,10 @@ public static class TemplateMeshReader
 
       var uvs = ReadUvs(reader, slice, sub, info.VertexOffset, vertices.Length);
       var faces = new FaceSerializer(slice.Face).DeserializeRange(reader, faceStart, faceEnd).ToArray();
-      var partName = PartName(graph, sub, slice.MeshIndex);
-      AppendRange(mesh, target, vertices, uvs, faces, info.VertexOffset, skinned, sub.BoneIds, partName, sub.Material, ref rejected);
+      var nodeName = NodeName(graph, sub.NodeId);
+      var partName = nodeName.Length > 0 ? nodeName : PartName(graph, sub, slice.MeshIndex);
+      var hidden = IndexMeshVisibility.Hidden(nodeName, lodNames, volumeNames, out var hideReason);
+      AppendRange(mesh, target, vertices, uvs, faces, info.VertexOffset, skinned, sub.BoneIds, partName, sub.Material, !hidden, hideReason, ref rejected);
     }
   }
 
@@ -554,13 +568,16 @@ public static class TemplateMeshReader
       if (index >= uvs.Length)
         break;
       var source = UvChannel(data, set);
-      // InterleavedDataSerializer already flips V (1 - snorm). Those snorms are the texture
-      // coordinates. The submesh UvScaling short is not a multiplier: the greaves and plates
-      // are packed into the lower half of the atlas on purpose. Stretching that island by the
-      // short lands it on the parchment and trim in the other half, which is the scrambled
-      // patches on the armor. Material tiling still applies, around the flipped V.
-      var u = source.X * tileU;
-      var v = tileV == 1f ? source.Y : 1f - (1f - source.Y) * tileV;
+      // Index MeshBuilder.AddVertexUV multiplies the serializer UV by the submesh UvScaling
+      // short (1 when the channel is absent). SceneViewModel then sets
+      // UVTransform(0, 1, -1, 0, 0), so the texel Index samples is (u * scale, -(v * scale)).
+      // MeshPreview wraps with floor, which is the same wrap Helix applies once the product
+      // leaves [0, 1]. Material tiling is 1 on the armor; it scales the same product.
+      var scale = 1f;
+      if (sub.UvScaling != null && (uint)set <= byte.MaxValue && sub.UvScaling.TryGetValue((byte)set, out var rawScale))
+        scale = rawScale;
+      var u = source.X * scale * tileU;
+      var v = -(source.Y * scale * tileV);
       uvs[index++] = new Vector2(u, v);
     }
 
@@ -589,6 +606,14 @@ public static class TemplateMeshReader
     }
 
     return material.Layer0;
+  }
+
+  private static string NodeName(objGEOM_MNG graph, int nodeId)
+  {
+    if (graph.objects is null || (uint)nodeId >= (uint)graph.objects.Count)
+      return "";
+    var name = graph.objects[nodeId].GetName();
+    return string.IsNullOrWhiteSpace(name) ? "" : name;
   }
 
   private static string PartName(objGEOM_MNG graph, GeometrySubMesh sub, int meshIndex)
@@ -660,6 +685,8 @@ public static class TemplateMeshReader
     short[]? boneIds,
     string partName,
     SaberMaterial? material,
+    bool visible,
+    string? hideReason,
     ref int rejected)
   {
     if (vertices.Length == 0 || faces.Length == 0)
@@ -690,21 +717,14 @@ public static class TemplateMeshReader
 
     if (target.Indices.Count > indexStart)
     {
-      var display = partName;
-      if (!target.Names.Add(display))
-      {
-        var suffix = 2;
-        while (!target.Names.Add(partName + " (" + suffix + ")"))
-          suffix++;
-        display = partName + " (" + suffix + ")";
-      }
-
       target.Parts.Add(new MeshPart
       {
-        Name = display,
+        Name = partName,
         IndexStart = indexStart,
         IndexCount = target.Indices.Count - indexStart,
         Texture = FirstTexture(material),
+        Visible = visible,
+        HideReason = hideReason,
       });
     }
 

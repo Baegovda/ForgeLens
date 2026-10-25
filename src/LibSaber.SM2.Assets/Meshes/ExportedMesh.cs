@@ -33,6 +33,48 @@ public sealed class MeshPart
   public int IndexStart { get; set; }
   public int IndexCount { get; set; }
   public string? Texture { get; set; }
+  /// <summary>Index leaves LOD and collision shells unchecked. Defaults on so hand-built meshes still export whole.</summary>
+  public bool Visible { get; set; } = true;
+  /// <summary>"LOD" or "volume" when <see cref="Visible"/> was cleared by Index's default filter.</summary>
+  public string? HideReason { get; set; }
+}
+
+/// <summary>Checkbox state for one catalog file, in surface order: LOD0, then each lower level.</summary>
+public sealed class MeshVisibility
+{
+  public List<bool[]> Surfaces { get; } = new();
+
+  public static MeshVisibility Capture(ExportedMesh mesh)
+  {
+    var visibility = new MeshVisibility();
+    visibility.Surfaces.Add(Flags(mesh.Parts));
+    foreach (var level in mesh.Levels)
+      visibility.Surfaces.Add(Flags(level.Parts));
+    return visibility;
+  }
+
+  public void Apply(ExportedMesh mesh)
+  {
+    if (Surfaces.Count > 0)
+      Apply(mesh.Parts, Surfaces[0]);
+    for (var i = 0; i < mesh.Levels.Count && i + 1 < Surfaces.Count; i++)
+      Apply(mesh.Levels[i].Parts, Surfaces[i + 1]);
+  }
+
+  private static bool[] Flags(IReadOnlyList<MeshPart> parts)
+  {
+    var flags = new bool[parts.Count];
+    for (var i = 0; i < parts.Count; i++)
+      flags[i] = parts[i].Visible;
+    return flags;
+  }
+
+  private static void Apply(IList<MeshPart> parts, bool[] flags)
+  {
+    var count = Math.Min(parts.Count, flags.Length);
+    for (var i = 0; i < count; i++)
+      parts[i].Visible = flags[i];
+  }
 }
 
 /// <summary>A lower detail level. LOD0 lives on <see cref="ExportedMesh"/> itself.</summary>
@@ -78,6 +120,113 @@ public sealed class ExportedMesh
 
   public bool HasTriangles => Indices.Count >= 3;
   public bool HasSkin => Skin.Count == Positions.Count && Bones.Count > 0 && Skin.Count > 0;
+
+  /// <summary>
+  ///   Triangles whose parts are checked. Lower levels contribute only their checked parts,
+  ///   so a visible sim shell is kept and an unchecked LOD or collision shell is not.
+  ///   Returns this instance when LOD0 is fully checked and no other level has a checked part.
+  /// </summary>
+  public ExportedMesh VisibleGeometry()
+  {
+    var levelVisible = false;
+    foreach (var level in Levels)
+    {
+      if (level.Parts.Any(part => part.Visible && part.IndexCount >= 3))
+      {
+        levelVisible = true;
+        break;
+      }
+    }
+
+    var lodHidden = Parts.Any(part => !part.Visible && part.IndexCount >= 3);
+    if (!lodHidden && !levelVisible)
+      return this;
+
+    var copy = new ExportedMesh
+    {
+      Name = Name,
+      Material = Material,
+      Clip = Clip,
+      Message = Message,
+    };
+    copy.Bones.AddRange(Bones);
+    var keepNormals = true;
+    var keepUvs = true;
+    var keepSkin = true;
+    Take(copy, Positions, Normals, Uvs, Indices, Skin, Parts, ref keepNormals, ref keepUvs, ref keepSkin);
+    foreach (var level in Levels)
+      Take(copy, level.Positions, level.Normals, level.Uvs, level.Indices, level.Skin, level.Parts, ref keepNormals, ref keepUvs, ref keepSkin);
+    if (!keepNormals)
+      copy.Normals.Clear();
+    if (!keepUvs)
+      copy.Uvs.Clear();
+    if (!keepSkin)
+      copy.Skin.Clear();
+    return copy;
+  }
+
+  private static void Take(
+    ExportedMesh copy,
+    IReadOnlyList<Vector3> positions,
+    IReadOnlyList<Vector3> normals,
+    IReadOnlyList<Vector2> uvs,
+    IReadOnlyList<int> indices,
+    IReadOnlyList<SkinWeights> skin,
+    IReadOnlyList<MeshPart> parts,
+    ref bool keepNormals,
+    ref bool keepUvs,
+    ref bool keepSkin)
+  {
+    if (!parts.Any(part => part.Visible && part.IndexCount >= 3))
+      return;
+    if (normals.Count != positions.Count)
+      keepNormals = false;
+    if (uvs.Count != positions.Count)
+      keepUvs = false;
+    if (skin.Count != positions.Count)
+      keepSkin = false;
+
+    var baseVertex = copy.Positions.Count;
+    foreach (var position in positions)
+      copy.Positions.Add(position);
+    if (keepNormals)
+    {
+      foreach (var normal in normals)
+        copy.Normals.Add(normal);
+    }
+
+    if (keepUvs)
+    {
+      foreach (var uv in uvs)
+        copy.Uvs.Add(uv);
+    }
+
+    if (keepSkin)
+    {
+      foreach (var weights in skin)
+        copy.Skin.Add(weights);
+    }
+
+    foreach (var part in parts)
+    {
+      if (!part.Visible || part.IndexCount < 3)
+        continue;
+      var start = Math.Max(0, part.IndexStart);
+      var end = Math.Min(indices.Count, start + part.IndexCount);
+      var indexStart = copy.Indices.Count;
+      for (var i = start; i < end; i++)
+        copy.Indices.Add(indices[i] + baseVertex);
+      copy.Parts.Add(new MeshPart
+      {
+        Name = part.Name,
+        Texture = part.Texture,
+        Visible = true,
+        HideReason = part.HideReason,
+        IndexStart = indexStart,
+        IndexCount = copy.Indices.Count - indexStart,
+      });
+    }
+  }
 }
 
 public static class AxisConvert

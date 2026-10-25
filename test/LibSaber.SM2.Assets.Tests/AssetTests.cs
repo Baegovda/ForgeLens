@@ -341,6 +341,43 @@ public class AssetTests
   }
 
   [Fact]
+  public void VisibleGeometry_OmitsUncheckedPartsAndKeepsACheckedSimShell()
+  {
+    var whole = new ExportedMesh { Name = "whole" };
+    whole.Positions.Add(Vector3.Zero);
+    whole.Positions.Add(Vector3.UnitX);
+    whole.Positions.Add(Vector3.UnitY);
+    whole.Indices.AddRange(new[] { 0, 1, 2 });
+    whole.Parts.Add(new MeshPart { Name = "body", IndexStart = 0, IndexCount = 3 });
+    Assert.Same(whole, whole.VisibleGeometry());
+
+    var mesh = new ExportedMesh { Name = "split" };
+    mesh.Positions.Add(new Vector3(0, 0, 0));
+    mesh.Positions.Add(new Vector3(1, 0, 0));
+    mesh.Positions.Add(new Vector3(0, 1, 0));
+    mesh.Positions.Add(new Vector3(0, 0, 1));
+    mesh.Positions.Add(new Vector3(1, 0, 1));
+    mesh.Positions.Add(new Vector3(0, 1, 1));
+    mesh.Indices.AddRange(new[] { 0, 1, 2, 3, 4, 5 });
+    mesh.Parts.Add(new MeshPart { Name = "body", IndexStart = 0, IndexCount = 3, Visible = true });
+    mesh.Parts.Add(new MeshPart { Name = "HEAD_cdt", IndexStart = 3, IndexCount = 3, Visible = false, HideReason = "volume" });
+    var level = new MeshLod { Name = "LOD5" };
+    level.Positions.Add(new Vector3(2, 0, 0));
+    level.Positions.Add(new Vector3(3, 0, 0));
+    level.Positions.Add(new Vector3(2, 1, 0));
+    level.Indices.AddRange(new[] { 0, 1, 2 });
+    level.Parts.Add(new MeshPart { Name = "cloth_stamp_leg_SIM", IndexStart = 0, IndexCount = 3, Visible = true });
+    mesh.Levels.Add(level);
+
+    var filtered = mesh.VisibleGeometry();
+    Assert.Equal(2, filtered.Indices.Count / 3);
+    Assert.Equal(9, filtered.Positions.Count);
+    Assert.Equal(new[] { 0, 1, 2, 6, 7, 8 }, filtered.Indices);
+    Assert.Equal("body", filtered.Parts[0].Name);
+    Assert.Equal("cloth_stamp_leg_SIM", filtered.Parts[1].Name);
+  }
+
+  [Fact]
   public void Mesh_WritesGlbAndFbxAndRasterizes()
   {
     var mesh = new ExportedMesh { Name = "tri" };

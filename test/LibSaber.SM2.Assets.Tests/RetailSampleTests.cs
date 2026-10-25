@@ -88,7 +88,13 @@ public class RetailSampleTests
     Assert.Equal(12416, helmet.Positions.Count);
     Assert.Equal(16300, helmet.Indices.Count / 3);
     Assert.Equal(helmet.Positions.Count, helmet.Uvs.Count);
-    Assert.True(helmet.Uvs.Exists(uv => uv.X > 0.05f && uv.X < 0.95f && uv.Y > 0.05f && uv.Y < 0.95f));
+    // Stored V is Index's on-screen coordinate (negated, then wrapped at sample time).
+    Assert.True(helmet.Uvs.Exists(uv =>
+    {
+      var u = uv.X - MathF.Floor(uv.X);
+      var v = uv.Y - MathF.Floor(uv.Y);
+      return u > 0.05f && u < 0.95f && v > 0.05f && v < 0.95f;
+    }));
     var (min, max) = Bounds(helmet);
     Assert.InRange(max.Y - min.Y, 0.25f, 0.40f);
     Assert.True(helmet.Normals.TrueForAll(normal => MathF.Abs(normal.Length() - 1f) < 0.02f));
@@ -153,11 +159,18 @@ public class RetailSampleTests
       armMaxU = MathF.Max(armMaxU, uv.X);
     }
 
-    // Compressed UVs are already texture coordinates. This arms island sits in the lower half
-    // of the atlas, which is the blue plate. Multiplying by the submesh UvScaling short would
-    // stretch it onto the parchment half and drop V's minimum near 0.
-    Assert.InRange(armMinV, 0.45f, 0.65f);
-    Assert.InRange(armMaxU, 0.95f, 1.05f);
+    // Index multiplies the serializer UV by UvScaling (2 on the first ch_titus_arms_02 island)
+    // and the viewer negates V. The stored coordinate is therefore about U in [0, 2] and
+    // V in [-2, -1]. MeshPreview wraps that into the atlas the same way Helix does.
+    Assert.InRange(armMinV, -2.05f, -0.9f);
+    Assert.InRange(armMaxU, 1.5f, 2.05f);
+    Assert.Contains(mesh.Parts, part => part.Name == "head_01" && part.Visible);
+    Assert.Contains(mesh.Parts, part => part.Name == "titus_torso_01" && part.Visible);
+    Assert.DoesNotContain(mesh.Parts, part => part.Name.Contains("_LOD", StringComparison.OrdinalIgnoreCase));
+    var lower = mesh.Levels.SelectMany(level => level.Parts).ToList();
+    Assert.Contains(lower, part => part.Name.Contains("_LOD", StringComparison.OrdinalIgnoreCase) && !part.Visible && part.HideReason == "LOD");
+    Assert.Contains(lower, part => part.Name.Contains("cdt", StringComparison.OrdinalIgnoreCase) && !part.Visible && part.HideReason == "volume");
+    Assert.Contains(lower, part => part.Name == "cloth_stamp_leg_SIM" && part.Visible);
     Assert.Equal(mesh.Positions.Count, mesh.Uvs.Count);
     Assert.Equal(mesh.Positions.Count, mesh.Normals.Count);
     Assert.Equal(mesh.Positions.Count, mesh.Skin.Count);

@@ -18,6 +18,8 @@ public sealed class ExportSettings
   public bool WriteModelTextures { get; init; } = true;
   public bool CopyOriginalBytes { get; init; }
   public ExportSpace Space { get; init; } = ExportSpace.Unreal;
+  /// <summary>Checked meshes for a previewed catalog index. Other files keep Index's defaults.</summary>
+  public Dictionary<int, MeshVisibility>? PartVisibility { get; set; }
 }
 
 public sealed class ExportReport
@@ -169,8 +171,11 @@ public static class AssetExporter
     var mesh = TemplateMeshReader.Load(catalog, store, index);
     if (mesh.Message.Length > 0)
       report.Messages.Add(file.Path + ": " + mesh.Message);
+    if (settings.PartVisibility is not null && settings.PartVisibility.TryGetValue(index, out var visibility))
+      visibility.Apply(mesh);
+    var exportMesh = mesh.VisibleGeometry();
 
-    if (!mesh.HasTriangles && mesh.Bones.Count == 0)
+    if (!exportMesh.HasTriangles && exportMesh.Bones.Count == 0)
     {
       report.Skipped++;
       if (settings.CopyOriginalBytes || file.Extension is ".tpl_data" or ".lods_base" or ".geom_dbg" or ".tpl_markup")
@@ -180,19 +185,19 @@ public static class AssetExporter
 
     if (settings.WriteGltf)
     {
-      GltfWriter.Write(Destination(outputDirectory, file.Path, ".glb", batch), mesh, settings.Space);
+      GltfWriter.Write(Destination(outputDirectory, file.Path, ".glb", batch), exportMesh, settings.Space);
       report.Written++;
     }
 
-    if (settings.WriteFbx && mesh.HasTriangles)
+    if (settings.WriteFbx && exportMesh.HasTriangles)
     {
-      FbxWriter.Write(Destination(outputDirectory, file.Path, ".fbx", batch), mesh, settings.Space);
+      FbxWriter.Write(Destination(outputDirectory, file.Path, ".fbx", batch), exportMesh, settings.Space);
       report.Written++;
     }
 
-    WriteMaterial(outputDirectory, file.Path, mesh.Material, settings, report, batch);
+    WriteMaterial(outputDirectory, file.Path, exportMesh.Material, settings, report, batch);
     if (settings.WriteModelTextures)
-      ExportModelTextures(catalog, store, index, mesh, outputDirectory, settings, report, batch);
+      ExportModelTextures(catalog, store, index, exportMesh, outputDirectory, settings, report, batch);
   }
 
   internal static void ExportModelTextures(

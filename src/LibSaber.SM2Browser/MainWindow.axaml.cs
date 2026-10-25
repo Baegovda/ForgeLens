@@ -49,6 +49,8 @@ public partial class MainWindow : Window
   private string _pendingDirectory = "";
   private bool _suppressSearch;
   private bool _suppressRecent;
+  private bool _suppressMesh;
+  private int _previewFileIndex = -1;
 
   public MainWindow()
   {
@@ -262,7 +264,12 @@ public partial class MainWindow : Window
     _texture = null;
     _clip = null;
     if (file.Kind != AssetKind.Animation)
+    {
       _mesh = null;
+      _previewFileIndex = -1;
+      if (file.Kind != AssetKind.Model)
+        MeshList.ItemsSource = null;
+    }
     SkeletonToggle.IsVisible = false;
     WireToggle.IsVisible = false;
     LodBox.IsVisible = false;
@@ -301,6 +308,7 @@ public partial class MainWindow : Window
           return;
         var mesh = loaded.decoded;
         _mesh = mesh;
+        _previewFileIndex = row.Index;
         _albedo = loaded.Item2;
         _distance = 0;
         _time = 0;
@@ -440,7 +448,52 @@ public partial class MainWindow : Window
     LodBox.IsVisible = mesh.HasTriangles;
     LodLabel.IsVisible = mesh.HasTriangles;
     FillParts(mesh, 0);
+    FillMeshes(mesh);
     _suppressView = false;
+  }
+
+  private void FillMeshes(ExportedMesh mesh)
+  {
+    _suppressMesh = true;
+    var toggles = new List<MeshToggle>();
+    void Add(IEnumerable<MeshPart> parts)
+    {
+      foreach (var part in parts)
+      {
+        var toggle = new MeshToggle(part);
+        toggle.Toggled += MeshToggled;
+        toggles.Add(toggle);
+      }
+    }
+
+    Add(mesh.Parts);
+    foreach (var level in mesh.Levels)
+      Add(level.Parts);
+    toggles.Sort((a, b) => string.Compare(a.Label, b.Label, StringComparison.OrdinalIgnoreCase));
+    MeshList.ItemsSource = toggles;
+    _suppressMesh = false;
+  }
+
+  private void MeshToggled(object? sender, EventArgs e)
+  {
+    if (_suppressMesh || _suppressView || _mesh is null)
+      return;
+    if (LodBox.SelectedIndex > 0)
+    {
+      _suppressView = true;
+      PartBox.SelectedIndex = 0;
+      _suppressView = false;
+      LodBox.SelectedIndex = 0;
+      return;
+    }
+
+    if (PartBox.SelectedIndex > 0)
+    {
+      PartBox.SelectedIndex = 0;
+      return;
+    }
+
+    DrawMesh(false);
   }
 
   private void FillParts(ExportedMesh mesh, int lod)
@@ -853,6 +906,8 @@ public partial class MainWindow : Window
       return;
     _settings.LastExportFolder = choice.Folder;
     _settings.Save();
+    if (_mesh is not null && _previewFileIndex >= 0 && indices.Contains(_previewFileIndex))
+      choice.Settings.PartVisibility = new Dictionary<int, MeshVisibility> { [_previewFileIndex] = MeshVisibility.Capture(_mesh) };
 
     ExportButton.IsEnabled = false;
     try

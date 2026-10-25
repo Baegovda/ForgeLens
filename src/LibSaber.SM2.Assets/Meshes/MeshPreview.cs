@@ -57,13 +57,15 @@ public static class MeshPreview
     note = mesh.Message;
     var lod = Math.Max(0, settings?.Lod ?? 0);
     var partFilter = settings?.Part ?? -1;
-    if (!TrySelect(mesh, lod, out var positions, out var normals, out var uvs, out var indices, out var parts, out var skin))
+    var honorVisibility = partFilter < 0 && lod <= 0;
+    var slices = CollectSlices(mesh, lod, partFilter, honorVisibility);
+    if (slices.Count == 0 && mesh.Bones.Count == 0)
     {
       note = string.IsNullOrEmpty(note) ? "Nothing to draw." : note;
       return pixels;
     }
 
-    if (!TryBounds(positions, indices, parts, partFilter, out var center, out var extent))
+    if (!TrySliceBounds(slices, partFilter, honorVisibility, out var center, out var extent))
     {
       if (mesh.Bones.Count == 0)
       {
@@ -102,95 +104,105 @@ public static class MeshPreview
     var key = Vector3.Normalize((eye - center) + Vector3.UnitY * distance * 0.45f);
     var fill = Vector3.Normalize(Vector3.Cross(Vector3.UnitY, eye - center) + Vector3.UnitY * 0.25f);
 
-    var posed = PosedPositions(mesh, positions, skin, timeSeconds);
-    if (indices.Count >= 3)
+    foreach (var slice in slices)
     {
-      var partIndex = 0;
-      for (var i = 0; i + 2 < indices.Count; i += 3)
+      var posed = PosedPositions(mesh, slice.Positions, slice.Skin, timeSeconds);
+      var indices = slice.Indices;
+      var parts = slice.Parts;
+      var normals = slice.Normals;
+      var uvs = slice.Uvs;
+      if (indices.Count >= 3)
       {
-        while (partIndex < parts.Count && i >= parts[partIndex].IndexStart + parts[partIndex].IndexCount)
-          partIndex++;
-        if (partFilter >= 0 && partIndex != partFilter)
-          continue;
-        if (partIndex < parts.Count && i < parts[partIndex].IndexStart)
-          continue;
-
-        var a = indices[i];
-        var b = indices[i + 1];
-        var c = indices[i + 2];
-        if ((uint)a >= (uint)posed.Count || (uint)b >= (uint)posed.Count || (uint)c >= (uint)posed.Count)
-          continue;
-        if (!Project(posed[a], viewProjection, width, height, out var ax, out var ay, out var az))
-          continue;
-        if (!Project(posed[b], viewProjection, width, height, out var bx, out var by, out var bz))
-          continue;
-        if (!Project(posed[c], viewProjection, width, height, out var cx, out var cy, out var cz))
-          continue;
-
-        var normal = normals.Count == posed.Count
-          ? normals[a] + normals[b] + normals[c]
-          : Vector3.Cross(posed[b] - posed[a], posed[c] - posed[a]);
-        if (normal.LengthSquared() < 1e-8f)
-          normal = Vector3.UnitY;
-        else
-          normal = Vector3.Normalize(normal);
-        var shade = Math.Clamp(
-          0.24f + 0.68f * Math.Clamp(Vector3.Dot(normal, key), 0f, 1f) + 0.22f * Math.Clamp(Vector3.Dot(normal, fill), 0f, 1f),
-          0f, 1f);
-        var shift = partIndex * 17 % 36 - 12;
-        byte br = (byte)Math.Clamp(96 + shift / 3, 48, 200);
-        byte bg = (byte)Math.Clamp(118 + shift / 2, 48, 210);
-        byte bb = (byte)Math.Clamp(156 + shift, 48, 230);
-        PreviewImage? albedo = null;
-        if (partIndex < parts.Count
-          && settings?.Albedo is { } textures
-          && parts[partIndex].Texture is { } textureName
-          && textures.TryGetValue(textureName, out var image))
-          albedo = image;
-
-        if (albedo is null)
+        var partIndex = 0;
+        for (var i = 0; i + 2 < indices.Count; i += 3)
         {
-          Fill(pixels, depth, width, height, ax, ay, az, bx, by, bz, cx, cy, cz,
-            (byte)(bb * shade), (byte)(bg * shade), (byte)(br * shade));
-        }
-        else
-        {
-          var au = (uint)a < (uint)uvs.Count ? uvs[a].X : 0;
-          var av = (uint)a < (uint)uvs.Count ? uvs[a].Y : 0;
-          var bu = (uint)b < (uint)uvs.Count ? uvs[b].X : 0;
-          var bv = (uint)b < (uint)uvs.Count ? uvs[b].Y : 0;
-          var cu = (uint)c < (uint)uvs.Count ? uvs[c].X : 0;
-          var cv = (uint)c < (uint)uvs.Count ? uvs[c].Y : 0;
-          FillTextured(pixels, depth, width, height, ax, ay, az, bx, by, bz, cx, cy, cz,
-            au, av, bu, bv, cu, cv, albedo, shade);
-        }
+          while (partIndex < parts.Count && i >= parts[partIndex].IndexStart + parts[partIndex].IndexCount)
+            partIndex++;
+          if (partFilter >= 0 && partIndex != partFilter)
+            continue;
+          if (honorVisibility && partIndex < parts.Count && !parts[partIndex].Visible)
+            continue;
+          if (partIndex < parts.Count && i < parts[partIndex].IndexStart)
+            continue;
 
+          var a = indices[i];
+          var b = indices[i + 1];
+          var c = indices[i + 2];
+          if ((uint)a >= (uint)posed.Count || (uint)b >= (uint)posed.Count || (uint)c >= (uint)posed.Count)
+            continue;
+          if (!Project(posed[a], viewProjection, width, height, out var ax, out var ay, out var az))
+            continue;
+          if (!Project(posed[b], viewProjection, width, height, out var bx, out var by, out var bz))
+            continue;
+          if (!Project(posed[c], viewProjection, width, height, out var cx, out var cy, out var cz))
+            continue;
+
+          var normal = normals.Count == posed.Count
+            ? normals[a] + normals[b] + normals[c]
+            : Vector3.Cross(posed[b] - posed[a], posed[c] - posed[a]);
+          if (normal.LengthSquared() < 1e-8f)
+            normal = Vector3.UnitY;
+          else
+            normal = Vector3.Normalize(normal);
+          var shade = Math.Clamp(
+            0.24f + 0.68f * Math.Clamp(Vector3.Dot(normal, key), 0f, 1f) + 0.22f * Math.Clamp(Vector3.Dot(normal, fill), 0f, 1f),
+            0f, 1f);
+          var shift = partIndex * 17 % 36 - 12;
+          byte br = (byte)Math.Clamp(96 + shift / 3, 48, 200);
+          byte bg = (byte)Math.Clamp(118 + shift / 2, 48, 210);
+          byte bb = (byte)Math.Clamp(156 + shift, 48, 230);
+          PreviewImage? albedo = null;
+          if (partIndex < parts.Count
+            && settings?.Albedo is { } textures
+            && parts[partIndex].Texture is { } textureName
+            && textures.TryGetValue(textureName, out var image))
+            albedo = image;
+
+          if (albedo is null)
+          {
+            Fill(pixels, depth, width, height, ax, ay, az, bx, by, bz, cx, cy, cz,
+              (byte)(bb * shade), (byte)(bg * shade), (byte)(br * shade));
+          }
+          else
+          {
+            var au = (uint)a < (uint)uvs.Count ? uvs[a].X : 0;
+            var av = (uint)a < (uint)uvs.Count ? uvs[a].Y : 0;
+            var bu = (uint)b < (uint)uvs.Count ? uvs[b].X : 0;
+            var bv = (uint)b < (uint)uvs.Count ? uvs[b].Y : 0;
+            var cu = (uint)c < (uint)uvs.Count ? uvs[c].X : 0;
+            var cv = (uint)c < (uint)uvs.Count ? uvs[c].Y : 0;
+            FillTextured(pixels, depth, width, height, ax, ay, az, bx, by, bz, cx, cy, cz,
+              au, av, bu, bv, cu, cv, albedo, shade);
+          }
+        }
       }
-    }
 
-    if (settings?.Wireframe == true && indices.Count >= 3)
-    {
-      var partIndex = 0;
-      for (var i = 0; i + 2 < indices.Count; i += 3)
+      if (settings?.Wireframe == true && indices.Count >= 3)
       {
-        while (partIndex < parts.Count && i >= parts[partIndex].IndexStart + parts[partIndex].IndexCount)
-          partIndex++;
-        if (partFilter >= 0 && partIndex != partFilter)
-          continue;
-        var a = indices[i];
-        var b = indices[i + 1];
-        var c = indices[i + 2];
-        if ((uint)a >= (uint)posed.Count || (uint)b >= (uint)posed.Count || (uint)c >= (uint)posed.Count)
-          continue;
-        if (!Project(posed[a], viewProjection, width, height, out var ax, out var ay, out _))
-          continue;
-        if (!Project(posed[b], viewProjection, width, height, out var bx, out var by, out _))
-          continue;
-        if (!Project(posed[c], viewProjection, width, height, out var cx, out var cy, out _))
-          continue;
-        Line(pixels, width, height, (int)ax, (int)ay, (int)bx, (int)by, 210, 220, 230);
-        Line(pixels, width, height, (int)bx, (int)by, (int)cx, (int)cy, 210, 220, 230);
-        Line(pixels, width, height, (int)cx, (int)cy, (int)ax, (int)ay, 210, 220, 230);
+        var partIndex = 0;
+        for (var i = 0; i + 2 < indices.Count; i += 3)
+        {
+          while (partIndex < parts.Count && i >= parts[partIndex].IndexStart + parts[partIndex].IndexCount)
+            partIndex++;
+          if (partFilter >= 0 && partIndex != partFilter)
+            continue;
+          if (honorVisibility && partIndex < parts.Count && !parts[partIndex].Visible)
+            continue;
+          var a = indices[i];
+          var b = indices[i + 1];
+          var c = indices[i + 2];
+          if ((uint)a >= (uint)posed.Count || (uint)b >= (uint)posed.Count || (uint)c >= (uint)posed.Count)
+            continue;
+          if (!Project(posed[a], viewProjection, width, height, out var ax, out var ay, out _))
+            continue;
+          if (!Project(posed[b], viewProjection, width, height, out var bx, out var by, out _))
+            continue;
+          if (!Project(posed[c], viewProjection, width, height, out var cx, out var cy, out _))
+            continue;
+          Line(pixels, width, height, (int)ax, (int)ay, (int)bx, (int)by, 210, 220, 230);
+          Line(pixels, width, height, (int)bx, (int)by, (int)cx, (int)cy, 210, 220, 230);
+          Line(pixels, width, height, (int)cx, (int)cy, (int)ax, (int)ay, 210, 220, 230);
+        }
       }
     }
 
@@ -242,6 +254,115 @@ public static class MeshPreview
     var distY = (height * 0.5f) / tan;
     var distX = (width * 0.5f) / (tan * Math.Max(aspect, 0.05f));
     return Math.Max(distY, distX) * 1.22f;
+  }
+
+  private sealed class DrawSlice
+  {
+    public required IReadOnlyList<Vector3> Positions { get; init; }
+    public required IReadOnlyList<Vector3> Normals { get; init; }
+    public required IReadOnlyList<Vector2> Uvs { get; init; }
+    public required IReadOnlyList<int> Indices { get; init; }
+    public required IReadOnlyList<MeshPart> Parts { get; init; }
+    public required IReadOnlyList<SkinWeights> Skin { get; init; }
+  }
+
+  /// <summary>
+  ///   LOD 0 with every part selected draws each checked shell on every vertex pool:
+  ///   Index's scene (LOD0 plus a checked sim shell, without _LOD or cdt). A lower LOD
+  ///   draws that buffer so the dropdown can still inspect it. One part draws that shell
+  ///   even when its checkbox is clear.
+  /// </summary>
+  private static List<DrawSlice> CollectSlices(ExportedMesh mesh, int lod, int partFilter, bool honorVisibility)
+  {
+    var slices = new List<DrawSlice>();
+    void Add(int level)
+    {
+      if (!TrySelect(mesh, level, out var positions, out var normals, out var uvs, out var indices, out var parts, out var skin))
+        return;
+      if (honorVisibility && parts.Count > 0 && !parts.Any(part => part.Visible && part.IndexCount >= 3))
+        return;
+      slices.Add(new DrawSlice
+      {
+        Positions = positions,
+        Normals = normals,
+        Uvs = uvs,
+        Indices = indices,
+        Parts = parts,
+        Skin = skin,
+      });
+    }
+
+    if (!honorVisibility)
+      Add(lod);
+    else
+    {
+      Add(0);
+      for (var level = 0; level < mesh.Levels.Count; level++)
+        Add(level + 1);
+    }
+
+    return slices;
+  }
+
+  private static bool TrySliceBounds(IReadOnlyList<DrawSlice> slices, int partFilter, bool honorVisibility, out Vector3 center, out Vector3 extent)
+  {
+    var any = false;
+    var min = new Vector3(float.MaxValue);
+    var max = new Vector3(float.MinValue);
+    void Include(Vector3 point)
+    {
+      any = true;
+      min = Vector3.Min(min, point);
+      max = Vector3.Max(max, point);
+    }
+
+    foreach (var slice in slices)
+    {
+      if (partFilter >= 0 && (uint)partFilter < (uint)slice.Parts.Count)
+      {
+        var part = slice.Parts[partFilter];
+        var end = Math.Min(slice.Indices.Count, part.IndexStart + part.IndexCount);
+        for (var i = Math.Max(0, part.IndexStart); i < end; i++)
+        {
+          var index = slice.Indices[i];
+          if ((uint)index < (uint)slice.Positions.Count)
+            Include(slice.Positions[index]);
+        }
+
+        continue;
+      }
+
+      if (!honorVisibility || slice.Parts.Count == 0)
+      {
+        foreach (var position in slice.Positions)
+          Include(position);
+        continue;
+      }
+
+      foreach (var part in slice.Parts)
+      {
+        if (!part.Visible || part.IndexCount <= 0)
+          continue;
+        var end = Math.Min(slice.Indices.Count, part.IndexStart + part.IndexCount);
+        for (var i = Math.Max(0, part.IndexStart); i < end; i++)
+        {
+          var index = slice.Indices[i];
+          if ((uint)index < (uint)slice.Positions.Count)
+            Include(slice.Positions[index]);
+        }
+      }
+    }
+
+    if (!any)
+    {
+      center = Vector3.Zero;
+      extent = Vector3.One;
+      return false;
+    }
+
+    center = (min + max) * 0.5f;
+    extent = Vector3.Max(max - min, new Vector3(0.05f));
+    return true;
   }
 
   private static bool TrySelect(
