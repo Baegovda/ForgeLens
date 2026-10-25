@@ -23,6 +23,10 @@ namespace LibSaber.SM2.Assets.Animation;
 ///   and unit scale are not identified (on the unarmed run one channel is a 4096-step saw,
 ///   and the idle track is entirely zero), so it is not sampled. A clip whose curves live
 ///   only inside the 0xF2 block, with no <c>.sani_data</c> of that grid size, is left unsampled.
+///   The idle range table starts 20 bytes past a multiple of the 28-byte record, which a
+///   search that stepped origins by 28 from 0 never tried. Retesting the unarmed run on
+///   that alignment, and on every other 4-byte residue, still does not swing both thighs,
+///   both knees, and both arms, so that take is not exported.
 /// </summary>
 internal static class EtnaCurves
 {
