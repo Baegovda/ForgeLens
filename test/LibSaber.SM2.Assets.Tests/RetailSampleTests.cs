@@ -1,4 +1,6 @@
+using System.Diagnostics;
 using System.Numerics;
+using System.Text.Json;
 using LibSaber.SM2.Assets.Animation;
 using LibSaber.SM2.Assets.Catalog;
 using LibSaber.SM2.Assets.Export;
@@ -107,19 +109,19 @@ public class RetailSampleTests
     Assert.Contains("TAIL6", clip.Bones);
     Assert.Contains("Footsteps", clip.Sequences);
     Assert.Contains("snd_bodyfall", clip.Sequences);
-    AssertCurves(clip, rotations: 22, translations: 0, frames: 107);
+    AssertCurves(clip, rotations: 73, translations: 73, frames: 107);
 
     var jump = LoadClip(catalog, store, "animation/archive/npc/zombie/jumping/jump_down_new/npc_zombie_jump_down_new_death_landing_v1_swarm_hormagaunt.sani.resource");
     Assert.InRange(jump.Duration, 1.9f, 2.1f);
     Assert.Equal(30f, jump.SampleRate);
     Assert.Equal(73, jump.Bones.Count);
-    AssertCurves(jump, rotations: 21, translations: 0, frames: 60);
+    AssertCurves(jump, rotations: 73, translations: 73, frames: 60);
     var centre = jump.Tracks.Single(track => track.BoneName == "CENTRE");
     var first = centre.Rotation[0].Value;
-    Assert.InRange(first.X, -0.83f, -0.79f);
-    Assert.InRange(first.Y, -0.02f, 0.01f);
-    Assert.InRange(first.Z, -0.09f, -0.05f);
-    Assert.InRange(first.W, 0.56f, 0.60f);
+    Assert.InRange(first.X, 0.47f, 0.50f);
+    Assert.InRange(first.Y, 0.40f, 0.44f);
+    Assert.InRange(first.Z, 0.56f, 0.60f);
+    Assert.InRange(first.W, 0.49f, 0.52f);
 
     var output = Path.Combine(dir.Path, "out");
     var index = catalog.FindByPath("tpl/marine_shield.tpl/marine_shield.tpl").First();
@@ -302,27 +304,41 @@ public class RetailSampleTests
     Assert.InRange(idle.Duration, 40.4f, 40.5f);
     Assert.Equal(30f, idle.SampleRate);
     Assert.Contains("Footsteps", idle.Sequences);
-    AssertCurves(idle, rotations: 52, translations: 0, frames: 1214);
+    AssertCurves(idle, rotations: 282, translations: 282, frames: 1214);
     var idleCentre = idle.Tracks.Single(track => track.BoneName == "CENTRE").Rotation[0].Value;
-    Assert.InRange(idleCentre.X, 0.03f, 0.06f);
-    Assert.InRange(idleCentre.W, 0.99f, 1f);
-    var idleBack = Arc(idle.Tracks.Single(track => track.BoneName == "BACKup"));
-    Assert.InRange(idleBack, 80f, 100f);
+    Assert.InRange(idleCentre.X, 0.45f, 0.48f);
+    Assert.InRange(idleCentre.Y, 0.45f, 0.48f);
+    Assert.InRange(idleCentre.Z, 0.53f, 0.56f);
+    Assert.InRange(idleCentre.W, 0.51f, 0.54f);
+    Assert.InRange(Arc(idle.Tracks.Single(track => track.BoneName == "BACKup")), 1f, 6f);
+    AssertMatchesReference(root, idle, "marine_idle_v01_intercessor.sani");
 
     var attack = LoadClip(catalog, store, "animation/primaris/assault/melee/npc_assault_attack_melee_thunder_hammer_light_1_intercessor.sani");
     Assert.InRange(attack.Duration, 5.1f, 5.3f);
     Assert.Equal(30f, attack.SampleRate);
     Assert.Contains("vfx_hammer", attack.Sequences);
-    AssertCurves(attack, rotations: 88, translations: 0, frames: 157);
-    Assert.InRange(Arc(attack.Tracks.Single(track => track.BoneName == "CENTRE")), 15f, 45f);
-    Assert.InRange(Arc(attack.Tracks.Single(track => track.BoneName == "ARM1R")), 80f, 110f);
-    Assert.InRange(Arc(attack.Tracks.Single(track => track.BoneName == "shoulder_R")), 85f, 110f);
+    AssertCurves(attack, rotations: 282, translations: 282, frames: 157);
+    Assert.InRange(Arc(attack.Tracks.Single(track => track.BoneName == "CENTRE")), 110f, 135f);
+    Assert.InRange(Arc(attack.Tracks.Single(track => track.BoneName == "ARM1R")), 140f, 160f);
+    Assert.InRange(Arc(attack.Tracks.Single(track => track.BoneName == "shoulder_R")), 70f, 90f);
+    Assert.InRange(Arc(attack.Tracks.Single(track => track.BoneName == "LEG1L")), 70f, 90f);
+    AssertMatchesReference(root, attack, "npc_assault_attack_melee_thunder_hammer_light_1_intercessor.sani");
 
     var run = LoadClip(catalog, store, "animation/primaris/tacticus/loco/run/tacticus_unarmed_run_fwd_intercessor.sani");
-    Assert.False(run.HasCurves);
+    Assert.True(run.HasCurves);
     Assert.Equal(286, run.Bones.Count);
     Assert.InRange(run.Duration, 1.0f, 1.1f);
-    Assert.Contains(run.Notes, note => note.Contains("do not partition", StringComparison.Ordinal) && note.Contains("15510", StringComparison.Ordinal));
+    AssertCurves(run, rotations: 282, translations: 282, frames: 33);
+    Assert.InRange(Arc(run.Tracks.Single(track => track.BoneName == "LEG1L")), 45f, 60f);
+    Assert.InRange(Arc(run.Tracks.Single(track => track.BoneName == "LEG1R")), 60f, 75f);
+    Assert.InRange(Arc(run.Tracks.Single(track => track.BoneName == "LEG2L")), 70f, 85f);
+    Assert.Equal(33, run.RootTranslation.Count);
+    Assert.InRange(run.RootTranslation[0].Value.Length(), 0f, 0.001f);
+    Assert.InRange(run.RootTranslation[^1].Value.X, -0.02f, 0.02f);
+    Assert.InRange(run.RootTranslation[^1].Value.Y, -0.02f, 0.02f);
+    Assert.InRange(run.RootTranslation[^1].Value.Z, 4.8f, 4.9f);
+    Assert.InRange(run.RootRotation[0].Value.W, 0.99f, 1.01f);
+    AssertMatchesReference(root, run, "tacticus_unarmed_run_fwd_intercessor.sani");
 
     var titus = Environment.GetEnvironmentVariable("LIBSABER_SM2_TITUS");
     if (string.IsNullOrWhiteSpace(titus) || !Directory.Exists(titus))
@@ -340,6 +356,138 @@ public class RetailSampleTests
     Assert.Equal(281, idle.Bones.Count(name => names.Contains(name)));
     Assert.Equal(533, bones.Count);
     Assert.Contains(bones, bone => bone.Name == "Object00C9" && bone.Parent < 0);
+  }
+
+  private static void AssertMatchesReference(string root, AnimationClip clip, string fileName)
+  {
+    var sani = Directory.EnumerateFiles(root, fileName, SearchOption.AllDirectories).Single();
+    var data = File.Exists(sani + "_data") ? sani + "_data" : null;
+    var script = Path.Combine(AppContext.BaseDirectory, "decode_sani.py");
+    Assert.True(File.Exists(script), script);
+    var jsonPath = Path.Combine(Path.GetTempPath(), "sani-" + Guid.NewGuid().ToString("N") + ".json");
+    try
+    {
+      var start = new ProcessStartInfo
+      {
+        FileName = "python3",
+        RedirectStandardOutput = true,
+        RedirectStandardError = true,
+        UseShellExecute = false,
+      };
+      start.ArgumentList.Add(script);
+      start.ArgumentList.Add(sani);
+      if (data is not null)
+        start.ArgumentList.Add(data);
+      start.ArgumentList.Add("--json");
+      start.ArgumentList.Add(jsonPath);
+      using var process = Process.Start(start);
+      Assert.NotNull(process);
+      var stdout = process.StandardOutput.ReadToEnd();
+      var stderr = process.StandardError.ReadToEnd();
+      process.WaitForExit();
+      Assert.True(process.ExitCode == 0, stdout + stderr);
+      using var document = JsonDocument.Parse(File.OpenRead(jsonPath));
+      var body = document.RootElement;
+      Assert.Equal(body.GetProperty("frames").GetInt32(), clip.Tracks.Max(track => Math.Max(track.Rotation.Count, track.Translation.Count)));
+      foreach (var bone in body.GetProperty("bones").EnumerateObject())
+      {
+        var track = clip.Tracks.SingleOrDefault(item => item.BoneName == bone.Name);
+        CompareChannel(bone.Name, bone.Value.GetProperty("rot"), track?.Rotation, true);
+        CompareChannel(bone.Name, bone.Value.GetProperty("trans"), track?.Translation, false);
+      }
+
+      var rootMotion = body.GetProperty("root");
+      if (rootMotion.ValueKind == JsonValueKind.Null)
+      {
+        Assert.Empty(clip.RootTranslation);
+        return;
+      }
+
+      var frame = 0;
+      foreach (var sample in rootMotion.EnumerateArray())
+      {
+        var translation = sample[0];
+        var rotation = sample[1];
+        Near(clip.RootTranslation[frame].Value.X, translation[0].GetDouble(), "root t " + frame);
+        Near(clip.RootTranslation[frame].Value.Y, translation[1].GetDouble(), "root t " + frame);
+        Near(clip.RootTranslation[frame].Value.Z, translation[2].GetDouble(), "root t " + frame);
+        Near(clip.RootRotation[frame].Value.W, rotation[0].GetDouble(), "root q " + frame);
+        Near(clip.RootRotation[frame].Value.X, rotation[1].GetDouble(), "root q " + frame);
+        Near(clip.RootRotation[frame].Value.Y, rotation[2].GetDouble(), "root q " + frame);
+        Near(clip.RootRotation[frame].Value.Z, rotation[3].GetDouble(), "root q " + frame);
+        frame++;
+      }
+
+      Assert.Equal(frame, clip.RootTranslation.Count);
+      Assert.Equal(frame, clip.RootRotation.Count);
+    }
+    finally
+    {
+      if (File.Exists(jsonPath))
+        File.Delete(jsonPath);
+    }
+  }
+
+  private static void CompareChannel(string bone, JsonElement frames, object? keys, bool rotation)
+  {
+    var index = 0;
+    var present = 0;
+    foreach (var frame in frames.EnumerateArray())
+    {
+      if (frame.ValueKind != JsonValueKind.Null)
+        present++;
+      index++;
+    }
+
+    if (rotation)
+    {
+      var rotationKeys = keys as List<QuatKey>;
+      if (present == 0)
+      {
+        Assert.True(rotationKeys is null || rotationKeys.Count == 0, bone + " rotation");
+        return;
+      }
+
+      Assert.NotNull(rotationKeys);
+      Assert.Equal(index, rotationKeys.Count);
+      index = 0;
+      foreach (var frame in frames.EnumerateArray())
+      {
+        var value = rotationKeys[index].Value;
+        Near(value.W, frame[0].GetDouble(), bone + " rot " + index);
+        Near(value.X, frame[1].GetDouble(), bone + " rot " + index);
+        Near(value.Y, frame[2].GetDouble(), bone + " rot " + index);
+        Near(value.Z, frame[3].GetDouble(), bone + " rot " + index);
+        index++;
+      }
+
+      return;
+    }
+
+    var translationKeys = keys as List<VectorKey>;
+    if (present == 0)
+    {
+      Assert.True(translationKeys is null || translationKeys.Count == 0, bone + " translation");
+      return;
+    }
+
+    Assert.NotNull(translationKeys);
+    Assert.Equal(index, translationKeys.Count);
+    index = 0;
+    foreach (var frame in frames.EnumerateArray())
+    {
+      var value = translationKeys[index].Value;
+      Near(value.X, frame[0].GetDouble(), bone + " tr " + index);
+      Near(value.Y, frame[1].GetDouble(), bone + " tr " + index);
+      Near(value.Z, frame[2].GetDouble(), bone + " tr " + index);
+      index++;
+    }
+  }
+
+  private static void Near(double actual, double expected, string label)
+  {
+    var delta = Math.Abs(actual - expected);
+    Assert.True(delta <= 2e-5, label + " delta " + delta.ToString("G6") + " actual " + actual + " expected " + expected);
   }
 
   private static float Arc(BoneTrack track)
@@ -378,7 +526,7 @@ public class RetailSampleTests
       }
 
       for (var i = 1; i < track.Translation.Count; i++)
-        Assert.True(Vector3.Distance(track.Translation[i - 1].Value, track.Translation[i].Value) < 0.5f);
+        Assert.True(Vector3.Distance(track.Translation[i - 1].Value, track.Translation[i].Value) < 1.5f);
     }
 
     steps.Sort();

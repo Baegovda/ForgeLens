@@ -27,6 +27,8 @@ public sealed class ExportSettings
   public Dictionary<int, MeshVisibility>? PartVisibility { get; set; }
   /// <summary>Clips written beside the bind mesh as <c>{model}__{clip}.fbx</c> and <c>.glb</c>. The bind file itself stays unanimated.</summary>
   public IReadOnlyList<AnimationClip> Clips { get; init; } = Array.Empty<AnimationClip>();
+  /// <summary>Adds the clip's 0xF4 track to the skeleton root translation. The extractor's <c>--no-root-motion</c> turns this off.</summary>
+  public bool RootMotion { get; init; } = true;
 }
 
 public sealed class ExportReport
@@ -215,6 +217,7 @@ public static class AssetExporter
     var usedClips = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
     foreach (var clip in settings.Clips)
     {
+      clip.RootMotion = settings.RootMotion;
       if (!clip.HasCurves || exportMesh.Bones.Count == 0)
         continue;
       var token = ClipToken(clip.Name);
@@ -769,7 +772,7 @@ public static class AssetExporter
       + "DDS keeps the original block compression. PNG and TGA are decoded previews." + Environment.NewLine
       + "Most textures are .pct.resource plus .pct_mip. A bare .pct is uncommon." + Environment.NewLine
       + "Models are .tpl plus .tpl_data. Lod 0 keeps the meshes Index leaves checked (the largest pool, plus a shell such as _SIM) and drops _LOD and collision. A higher lod writes that smaller vertex pool. FBX is binary 7.4, Z-up, with a skinned limb hierarchy. Each exported part gets a material whose diffuse (and _nm normal, when that texture is in the catalog) is a path relative to the FBX, pointing at the PNG or TGA written beside it. .lods_base, .geom_dbg, and .cdt are not mesh payloads." + Environment.NewLine
-      + "Animations: retail .sani plus .sani_data is an ETNA clip. Rotation keys are three int16 components lerped through a per-bone min/max, with w reconstructed, then composed with the bone's bind rotation. Translation keys are three 10-bit components, unwrapped across frames. Bones the clip does not name stay on the model bind pose. A clip with no .sani_data key grid is not sampled. export --anim writes {model}__{clip}.fbx and .glb beside the bind mesh." + Environment.NewLine
+      + "Animations: a retail .sani is an ETNA version-2 clip. 0xF2 stores the codec and every frame. 0xF6 stores the codec plus a few preview frames, and the sibling .sani_data holds the rest. Codes are unsigned (value = code * scale + min). Translation is an 11/11/10-bit word. Rotation is three codes through a modified Rodrigues quaternion, and that quaternion replaces the bone's bind rotation. Constant tracks are written for every bone the clip lists. Bones the clip does not name stay on the model bind pose. Scalar channels are not bone scale. The 0xF4 track is added to the skeleton root translation unless export is run with --no-root-motion. export --anim writes {model}__{clip}.fbx and .glb beside the bind mesh." + Environment.NewLine
       + "Particle systems (.ps, .sfx) are not converted. Their raw bytes and any named meshes or textures are copied." + Environment.NewLine;
   }
 

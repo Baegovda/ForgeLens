@@ -1121,6 +1121,12 @@ public static class FbxWriter
         times.Add(key.Time);
     }
 
+    if (clip.RootMotion)
+    {
+      foreach (var key in clip.RootTranslation)
+        times.Add(key.Time);
+    }
+
     if (times.Count == 0)
       return null;
 

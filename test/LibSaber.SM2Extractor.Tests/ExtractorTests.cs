@@ -315,6 +315,19 @@ public class ExtractorTests
       out _,
       out error));
     Assert.Contains("--anim", error);
+
+    Assert.True(ExtractorOptions.TryParse(
+      new[] { "export", "game", "--asset", "tpl/hero.tpl", "--format", "fbx-unreal", "--anim", "run", "--no-root-motion", "-o", "out" },
+      out options,
+      out error));
+    Assert.Equal("", error);
+    Assert.False(options.RootMotion);
+
+    Assert.False(ExtractorOptions.TryParse(
+      new[] { "list", "game", "--no-root-motion" },
+      out _,
+      out error));
+    Assert.Contains("--no-root-motion", error);
   }
 
   [Fact]

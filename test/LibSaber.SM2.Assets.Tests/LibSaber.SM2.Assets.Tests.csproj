@@ -21,4 +21,8 @@
     <ProjectReference Include="..\..\src\LibSaber.SM2.Assets\LibSaber.SM2.Assets.csproj" />
   </ItemGroup>
 
+  <ItemGroup>
+    <None Include="decode_sani.py" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+
 </Project>

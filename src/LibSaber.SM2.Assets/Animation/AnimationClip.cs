@@ -33,6 +33,15 @@ public sealed class AnimationClip
   public List<string> Bones { get; } = new();
   public float SampleRate { get; set; }
 
+  /// <summary>0xF4 root translation in source meters, Y-up. Empty when the clip has no root track.</summary>
+  public List<VectorKey> RootTranslation { get; } = new();
+
+  /// <summary>0xF4 root rotation. Stored so it can be checked against the codec. Export applies translation only.</summary>
+  public List<QuatKey> RootRotation { get; } = new();
+
+  /// <summary>When true, <see cref="RootTranslation"/> is added to every skeleton bone whose parent is the scene.</summary>
+  public bool RootMotion { get; set; } = true;
+
   public bool HasCurves => Tracks.Exists(track => track.Translation.Count + track.Rotation.Count + track.Scale.Count > 0);
 
   public static Vector3 Sample(IReadOnlyList<VectorKey> keys, Vector3 fallback, float time)

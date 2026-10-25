@@ -1,463 +1,465 @@
+using System.Buffers.Binary;
 using System.Numerics;
 
 namespace LibSaber.SM2.Assets.Animation;
 
 /// <summary>
-///   Expands a retail ETNA <c>.sani</c> plus its <c>.sani_data</c> into local TRS keys.
-///   The channel block (0xF6, or 0xF2 when the clip has no external payload) lists which
-///   bones animate and stores a per-bone range. Its index table is
-///   <c>30 + declaredBones * 4</c> bytes, so a 73-bone clip ends that table at byte 322
-///   and a 282-bone intercessor clip ends it at byte 1158. <c>.sani_data</c> is one 0xF2
-///   block whose payload is <c>frames * (animatedRotations * 6 + animatedTranslations * 4)</c>
-///   bytes: all translation keys, then all rotation keys, frame-major.
-///   A rotation key is three int16 values lerped from the bone's min xyz to max xyz;
-///   w is <c>sqrt(1 - x² - y² - z²)</c> with a positive sign. Those ranges are the first
-///   28-byte-per-bone block in the channel tail that stays on the unit sphere. A block
-///   that also swings <c>CENTRE</c> more than 100° is skipped when a later block stays
-///   under that; the thunder-hammer clip's first block folds the legs, and the next one
-///   is the arm swing. A translation
-///   key is three signed 10-bit values in the low 30 bits, lerped through the range record
-///   packed immediately before that block (when there is room) and unwrapped so a code
-///   that passes 511 does not pop to -512. Bones the clip does not list keep the skeleton
-///   bind pose. The 0xF4 block is a 50-byte header plus 6 int16 samples per frame. Its bone
-///   and unit scale are not identified (on the unarmed run one channel is a 4096-step saw,
-///   and the idle track is entirely zero), so it is not sampled. A clip whose curves live
-///   only inside the 0xF2 block, with no <c>.sani_data</c> of that grid size, is left unsampled.
-///   The idle range table starts 20 bytes past a multiple of the 28-byte record, which a
-///   search that stepped origins by 28 from 0 never tried. Retesting the unarmed run on
-///   that alignment, and on every other 4-byte residue, still does not swing both thighs,
-///   both knees, and both arms, so that take is not exported.
+///   Expands a retail ETNA <c>.sani</c> (class A, file version 2, codec subversion 2).
+///   <c>0xF2</c> is the codec header plus every frame. <c>0xF6</c> is the same header plus a
+///   few preview frames; the sibling <c>.sani_data</c> is one <c>0xF2</c> block whose payload
+///   is the full frame section. Counts are six int32 values (animated T/R/S, then constant
+///   T/R/S), followed by six uint16 index lists. Range records are 24 bytes (min xyz, scale xyz),
+///   one shared record per constant channel and one per animated bone. Codes are unsigned and
+///   decode as <c>code * scale + min</c>. A translation word is 11/11/10 bits. A rotation is
+///   three uint16 values through the modified Rodrigues map. Constant tracks are written for
+///   every listed bone, then animated samples overwrite the same bone. Scalar channels are not
+///   bones and are not applied as scale. <c>0xF4</c> is root motion; its translation is stored
+///   on the clip and applied to the skeleton root unless root motion is turned off.
 /// </summary>
 internal static class EtnaCurves
 {
 
   public static bool TryExpand(byte[] sani, byte[]? data, AnimationClip clip, int frames)
   {
-    if (frames <= 1 || clip.Bones.Count == 0 || clip.SampleRate <= 0)
+    if (frames < 1 || clip.Bones.Count == 0 || clip.SampleRate <= 0 || sani.Length < 36)
     {
       clip.Notes.Add("The ETNA header has no frame rate or bone names, so curve keys were not sampled.");
       return false;
     }
 
-    if (!TryChannels(sani, clip.Bones.Count, out var tail, out var translations, out var rotations, out var channel))
+    var version = BinaryPrimitives.ReadUInt16LittleEndian(sani.AsSpan(4, 2));
+    if (version != 2)
     {
-      if (rotations.Count == 0)
-        clip.Notes.Add(channel);
-      else
-      {
-        var grid = frames * (rotations.Count * 6 + translations.Count * 4);
-        clip.Notes.Add(
-          $"The {channel} block lists {rotations.Count} rotation and {translations.Count} translation bones, but the index lists do not partition the declared bones. "
-          + (data is null
-            ? $"No .sani_data key grid was loaded. The {tail.Length} bytes after the bone table are not a frame-major grid of {frames} frames ({grid} bytes), so curves were not sampled."
-            : "Curve keys were not sampled."));
-      }
-
+      clip.Notes.Add($"ETNA version {version} is not the class-A codec (version 2, subversion 2), so curve keys were not sampled.");
       return false;
     }
 
-    var expected = frames * (rotations.Count * 6 + translations.Count * 4);
-    if (data is null || !TryPayload(data, out var payload))
-    {
-      clip.Notes.Add(
-        $"No .sani_data key grid was loaded. The {channel} block lists {rotations.Count} rotation and {translations.Count} translation bones and then {tail.Length} bytes. "
-        + $"A frame-major grid of {frames} frames would be {expected} bytes (translation keys, then rotation keys) and these bytes are not that grid, so curves were not sampled.");
-      return false;
-    }
-
-    if (payload.Length != expected || rotations.Count == 0)
-    {
-      clip.Notes.Add($".sani_data is {payload.Length} bytes; {frames} frames of {rotations.Count} rotations and {translations.Count} translations would be {expected}. Keys were not sampled.");
-      return false;
-    }
-
-    var transBytes = frames * translations.Count * 4;
-    var rotBytes = payload.AsSpan(transBytes, frames * rotations.Count * 6);
-    if (!TryRotationRanges(tail, rotBytes, frames, rotations, clip.Bones, out var rangeOffset, out var medianDegrees))
-    {
-      clip.Notes.Add("Rotation ranges in the 0xF6 block did not produce unit quaternions, so keys were not sampled.");
-      return false;
-    }
-
-    var rate = clip.SampleRate;
-    for (var bone = 0; bone < rotations.Count; bone++)
-    {
-      var track = new BoneTrack { Bone = -1, BoneName = clip.Bones[rotations[bone]] };
-      var min = Read3(tail, rangeOffset + bone * 28);
-      var max = Read3(tail, rangeOffset + bone * 28 + 12);
-      var previous = Quaternion.Identity;
-      var started = false;
-      for (var frame = 0; frame < frames; frame++)
-      {
-        var sample = frame * rotations.Count + bone;
-        var x = Dequant(ReadI16(rotBytes, sample * 6), min.X, max.X);
-        var y = Dequant(ReadI16(rotBytes, sample * 6 + 2), min.Y, max.Y);
-        var z = Dequant(ReadI16(rotBytes, sample * 6 + 4), min.Z, max.Z);
-        var rotation = QuantizedQuat(x, y, z);
-        if (started && Quaternion.Dot(previous, rotation) < 0)
-          rotation = new Quaternion(-rotation.X, -rotation.Y, -rotation.Z, -rotation.W);
-        previous = rotation;
-        started = true;
-        track.Rotation.Add(new QuatKey { Time = frame / rate, Value = rotation });
-      }
-
-      clip.Tracks.Add(track);
-    }
-
-    var translated = 0;
-    var transStart = rangeOffset - translations.Count * 28;
-    if (translations.Count > 0 && transStart >= 0)
-    {
-      var transKeys = payload.AsSpan(0, transBytes);
-      for (var bone = 0; bone < translations.Count; bone++)
-      {
-        if (!TryTranslation(tail, transStart + bone * 28, transKeys, frames, translations.Count, bone, out var samples))
-          continue;
-        var track = new BoneTrack { Bone = -1, BoneName = clip.Bones[translations[bone]] };
-        var existing = clip.Tracks.Find(item => item.BoneName == track.BoneName);
-        var target = existing ?? track;
-        for (var frame = 0; frame < frames; frame++)
-          target.Translation.Add(new VectorKey { Time = frame / rate, Value = samples[frame] });
-        if (existing is null)
-          clip.Tracks.Add(target);
-        translated++;
-      }
-    }
-
-    clip.Notes.Add(
-      $"Sampled {rotations.Count} rotation tracks (median step {medianDegrees:0.###}°) and {translated} of {translations.Count} translation tracks. "
-      + "A rotation key is three int16 components lerped through the bone's channel-block min/max, with w reconstructed. "
-      + "A translation key is three 10-bit components in the same ranges, unwrapped across frames. "
-      + "Other bones stay on the skeleton bind pose. The 0xF4 int16 track is not a confirmed bone, so it was left out.");
-    return true;
-  }
-
-  private static bool TryPayload(byte[] data, out byte[] payload)
-  {
-    payload = Array.Empty<byte>();
-    if (data.Length < 6 || BitConverter.ToUInt16(data, 0) != 0xF2)
-      return false;
-    var end = BitConverter.ToInt32(data, 2);
-    if (end != data.Length || data.Length < 6)
-      return false;
-    payload = data.AsSpan(6).ToArray();
-    return true;
-  }
-
-  private static bool TryChannels(byte[] sani, int nameCount, out byte[] tail, out List<int> translations, out List<int> rotations, out string channel)
-  {
-    tail = Array.Empty<byte>();
-    translations = new List<int>();
-    rotations = new List<int>();
-    channel = "0xF6";
-    if (sani.Length < 36 || sani[0] != (byte)'E')
-    {
-      channel = "The ETNA channel block is missing, so curve keys were not sampled.";
-      return false;
-    }
-
-    var cursor = BitConverter.ToInt32(sani, 8);
-    byte[]? block = null;
-    ushort blockId = 0;
+    byte[]? codec = null;
+    var external = false;
+    byte[]? root = null;
+    var cursor = BinaryPrimitives.ReadInt32LittleEndian(sani.AsSpan(8, 4));
     while (cursor + 6 <= sani.Length)
     {
-      var id = BitConverter.ToUInt16(sani, cursor);
-      var end = BitConverter.ToInt32(sani, cursor + 2);
+      var tag = BinaryPrimitives.ReadUInt16LittleEndian(sani.AsSpan(cursor, 2));
+      var end = BinaryPrimitives.ReadInt32LittleEndian(sani.AsSpan(cursor + 2, 4));
       if (end <= cursor || end > sani.Length)
         break;
-      // 0xF6 is the channel table when the key grid lives in .sani_data.
-      // A clip with no sibling stores that same table at the start of 0xF2.
-      if (id == 0xF6 || (id == 0xF2 && blockId != 0xF6))
+      var payload = sani.AsSpan(cursor + 6, end - (cursor + 6)).ToArray();
+      if (tag == 0xF2)
       {
-        block = sani.AsSpan(cursor + 6, end - (cursor + 6)).ToArray();
-        blockId = id;
+        codec = payload;
+        external = false;
       }
+      else if (tag == 0xF6)
+      {
+        codec = payload;
+        external = true;
+      }
+      else if (tag == 0xF4)
+        root = payload;
 
       cursor = end;
     }
 
-    if (block is null || block.Length < 30 || BitConverter.ToUInt16(block, 0) != 2)
+    if (codec is null)
     {
-      channel = "The ETNA channel block does not start with a version-2 bone table, so curve keys were not sampled.";
+      clip.Notes.Add("The ETNA file has no 0xF2 or 0xF6 codec block, so curve keys were not sampled.");
       return false;
     }
 
-    var count0 = BitConverter.ToUInt16(block, 2);
-    var count1 = BitConverter.ToUInt16(block, 6);
-    var count2 = BitConverter.ToUInt16(block, 14);
-    var count3 = BitConverter.ToUInt16(block, 18);
-    var boneCount = count0 + count2;
-    var table = 30 + boneCount * 4;
-    channel = "0x" + blockId.ToString("X2");
-    if (boneCount == 0 || count1 + count3 != boneCount || boneCount > nameCount || block.Length < table)
-    {
-      channel = $"The {channel} bone table does not partition the skeleton, so curve keys were not sampled.";
+    if (!TryCodec(codec, external, data, frames, clip, out var sampledFrames, out var scalars))
       return false;
-    }
 
-    var index = 30;
-    var trans = ReadList(block, ref index, count0);
-    var rot = ReadList(block, ref index, count1);
-    var transRest = ReadList(block, ref index, count2);
-    var rotRest = ReadList(block, ref index, count3);
-    if (index != table)
+    var rootKeys = 0;
+    if (root is not null)
     {
-      channel = $"The {channel} bone table does not partition the skeleton, so curve keys were not sampled.";
-      return false;
+      if (TryRoot(root, frames, clip))
+        rootKeys = clip.RootTranslation.Count;
+      else
+        clip.Notes.Add("The 0xF4 root track did not match the frame count, so root translation was left out.");
     }
 
-    if (rot.Count == 0 || block.Length - table < rot.Count * 28)
-    {
-      channel = $"The {channel} bone table has no rotation ranges, so curve keys were not sampled.";
-      return false;
-    }
-
-    translations = trans;
-    rotations = rot;
-    tail = block.AsSpan(table).ToArray();
-    return Partitions(trans, transRest, boneCount) && Partitions(rot, rotRest, boneCount);
-  }
-
-  private static List<int> ReadList(byte[] block, ref int index, int count)
-  {
-    var list = new List<int>(count);
-    for (var i = 0; i < count; i++)
-    {
-      list.Add(BitConverter.ToUInt16(block, index));
-      index += 2;
-    }
-
-    return list;
-  }
-
-  private static bool Partitions(List<int> animated, List<int> constant, int boneCount)
-  {
-    var seen = new bool[boneCount];
-    foreach (var list in new[] { animated, constant })
-    {
-      foreach (var bone in list)
-      {
-        if ((uint)bone >= (uint)boneCount || seen[bone])
-          return false;
-        seen[bone] = true;
-      }
-    }
-
+    var rotations = clip.Tracks.Count(track => track.Rotation.Count > 0);
+    var translations = clip.Tracks.Count(track => track.Translation.Count > 0);
+    var scalarNote = scalars == 0
+      ? ""
+      : $" {scalars} scalar channels are not bones and were not applied as scale.";
+    var rootNote = rootKeys == 0
+      ? " No root translation was stored."
+      : $" Root translation has {rootKeys} keys (applied to the skeleton root unless --no-root-motion).";
+    clip.Notes.Add(
+      $"Sampled {rotations} rotation and {translations} translation tracks across {sampledFrames} frames. "
+      + "Codes are unsigned (value = code * scale + min). Translation is 11/11/10. "
+      + "Rotation is a modified Rodrigues quaternion and replaces the bind rotation. "
+      + "Constant tracks cover every listed bone."
+      + scalarNote
+      + rootNote);
     return true;
   }
 
-  private static bool TryRotationRanges(
-    byte[] tail,
-    ReadOnlySpan<byte> rotations,
+  private static bool TryCodec(
+    byte[] payload,
+    bool external,
+    byte[]? data,
     int frames,
-    List<int> boneIds,
-    List<string> names,
-    out int offset,
-    out float medianDegrees)
+    AnimationClip clip,
+    out int sampledFrames,
+    out int scalars)
   {
-    offset = 0;
-    medianDegrees = 180;
-    var bones = boneIds.Count;
-    var record = bones * 28;
-    var centre = boneIds.FindIndex(bone => (uint)bone < (uint)names.Count && names[bone] == "CENTRE");
-    // The range table is packed at the front of the tail. A later 4-byte shift can
-    // look smoother because it pairs keys with a tiny interval and squashes the pose
-    // toward identity, so the first block that stays on the unit sphere wins.
-    // One marine clip has an earlier block that is numerically valid and swings
-    // CENTRE by about 135°, which plants the feet above the head. The following
-    // block keeps CENTRE small and is the one applied. Hormagaunt and the idle
-    // clip are already under 100° on the first block.
-    int? folded = null;
-    float foldedMedian = 180;
-    for (var start = 0; start + record <= tail.Length; start += 4)
+    sampledFrames = 0;
+    scalars = 0;
+    var reader = new Reader(payload);
+    var sub = reader.U16();
+    if (!reader.Ok || sub != 2)
     {
-      if (!RangesLookReal(tail, start, bones))
-        continue;
-      var (maxSquared, median) = ScoreRotations(tail, start, rotations, frames, bones);
-      if (maxSquared > 1.25f || median > 8f)
-        continue;
-      if (centre >= 0 && CentreArc(tail, start, rotations, frames, bones, centre) > 100f)
-      {
-        if (folded is null)
-        {
-          folded = start;
-          foldedMedian = median;
-        }
+      clip.Notes.Add("The codec block does not start with subversion 2, so curve keys were not sampled.");
+      return false;
+    }
 
+    var counts = new int[6];
+    for (var i = 0; i < 6; i++)
+      counts[i] = reader.I32();
+    var preview = external ? reader.I32() : 0;
+    if (!reader.Ok || counts.Any(count => count < 0) || preview < 0)
+    {
+      clip.Notes.Add("The codec counts are not usable, so curve keys were not sampled.");
+      return false;
+    }
+
+    var n0 = counts[0];
+    var n1 = counts[1];
+    var n2 = counts[2];
+    var n3 = counts[3];
+    var n4 = counts[4];
+    var n5 = counts[5];
+    var idxT = reader.U16List(n0);
+    var idxR = reader.U16List(n1);
+    reader.U16List(n2);
+    var idxCt = reader.U16List(n3);
+    var idxCr = reader.U16List(n4);
+    reader.U16List(n5);
+    var constT = reader.Range3();
+    var constR = reader.Range3();
+    reader.F32();
+    reader.F32();
+    var animT = new Range3[n0];
+    var animR = new Range3[n1];
+    for (var i = 0; i < n0; i++)
+      animT[i] = reader.Range3();
+    for (var i = 0; i < n1; i++)
+      animR[i] = reader.Range3();
+    for (var i = 0; i < n2; i++)
+    {
+      reader.F32();
+      reader.F32();
+    }
+
+    var constTCodes = new ushort[n3 * 3];
+    var constRCodes = new ushort[n4 * 3];
+    for (var i = 0; i < constTCodes.Length; i++)
+      constTCodes[i] = reader.U16();
+    for (var i = 0; i < constRCodes.Length; i++)
+      constRCodes[i] = reader.U16();
+    for (var i = 0; i < n5; i++)
+      reader.U16();
+    if (!reader.Ok)
+    {
+      clip.Notes.Add("The codec header ended before the constant values, so curve keys were not sampled.");
+      return false;
+    }
+
+    ReadOnlySpan<byte> frameData;
+    if (!external)
+    {
+      sampledFrames = frames;
+      frameData = payload.AsSpan(reader.Offset);
+    }
+    else if (data is not null)
+    {
+      if (data.Length < 6
+        || BinaryPrimitives.ReadUInt16LittleEndian(data.AsSpan(0, 2)) != 0xF2
+        || BinaryPrimitives.ReadInt32LittleEndian(data.AsSpan(2, 4)) != data.Length)
+      {
+        clip.Notes.Add(".sani_data is not one 0xF2 block, so curve keys were not sampled.");
+        return false;
+      }
+
+      sampledFrames = frames;
+      frameData = data.AsSpan(6);
+    }
+    else
+    {
+      sampledFrames = preview;
+      frameData = payload.AsSpan(reader.Offset);
+      clip.Notes.Add($"Only {preview} preview frames are in the 0xF6 block. The full clip is {frames} frames and needs the sibling .sani_data.");
+    }
+
+    if (sampledFrames < 1)
+    {
+      clip.Notes.Add("The codec block has no frames, so curve keys were not sampled.");
+      return false;
+    }
+
+    var frameSize = n0 * 4 + n1 * 6 + n2 * 2;
+    if (frameData.Length < sampledFrames * frameSize)
+    {
+      clip.Notes.Add(
+        $"Frame data is {frameData.Length} bytes; {sampledFrames} frames of {n0} translations, {n1} rotations, and {n2} scalars would be {sampledFrames * frameSize}. Keys were not sampled.");
+      return false;
+    }
+
+    var bones = clip.Bones.Count;
+    var animTSlot = new int[bones];
+    var animRSlot = new int[bones];
+    Array.Fill(animTSlot, -1);
+    Array.Fill(animRSlot, -1);
+    var constVec = new Vector3?[bones];
+    var constQuat = new Quaternion?[bones];
+    var skipped = 0;
+    for (var i = 0; i < n3; i++)
+    {
+      var bone = idxCt[i];
+      if ((uint)bone >= (uint)bones)
+      {
+        skipped++;
         continue;
       }
 
-      offset = start;
-      medianDegrees = median;
-      return true;
+      constVec[bone] = constT.Decode(constTCodes[i * 3], constTCodes[i * 3 + 1], constTCodes[i * 3 + 2]);
     }
 
-    if (folded is int fallback)
+    for (var i = 0; i < n4; i++)
     {
-      offset = fallback;
-      medianDegrees = foldedMedian;
-      return true;
-    }
-
-    return false;
-  }
-
-  private static float CentreArc(byte[] tail, int start, ReadOnlySpan<byte> rotations, int frames, int bones, int bone)
-  {
-    var min = Read3(tail, start + bone * 28);
-    var max = Read3(tail, start + bone * 28 + 12);
-    Quaternion? origin = null;
-    var arc = 0f;
-    for (var frame = 0; frame < frames; frame++)
-    {
-      var sample = frame * bones + bone;
-      var x = Dequant(ReadI16(rotations, sample * 6), min.X, max.X);
-      var y = Dequant(ReadI16(rotations, sample * 6 + 2), min.Y, max.Y);
-      var z = Dequant(ReadI16(rotations, sample * 6 + 4), min.Z, max.Z);
-      var rotation = QuantizedQuat(x, y, z);
-      if (origin is not Quaternion first)
+      var bone = idxCr[i];
+      if ((uint)bone >= (uint)bones)
       {
-        origin = rotation;
+        skipped++;
         continue;
       }
 
-      var dot = MathF.Abs(Quaternion.Dot(first, rotation));
-      arc = MathF.Max(arc, MathF.Acos(Math.Clamp(dot, -1f, 1f)) * 2f * (180f / MathF.PI));
+      constQuat[bone] = constR.DecodeQuat(constRCodes[i * 3], constRCodes[i * 3 + 1], constRCodes[i * 3 + 2]);
     }
 
-    return arc;
-  }
+    for (var i = 0; i < n0; i++)
+    {
+      var bone = idxT[i];
+      if ((uint)bone >= (uint)bones)
+      {
+        skipped++;
+        continue;
+      }
 
-  private static bool RangesLookReal(byte[] tail, int start, int bones)
-  {
+      animTSlot[bone] = i;
+    }
+
+    for (var i = 0; i < n1; i++)
+    {
+      var bone = idxR[i];
+      if ((uint)bone >= (uint)bones)
+      {
+        skipped++;
+        continue;
+      }
+
+      animRSlot[bone] = i;
+    }
+
+    var tracks = new BoneTrack?[bones];
     for (var bone = 0; bone < bones; bone++)
     {
-      for (var component = 0; component < 6; component++)
+      if (animTSlot[bone] < 0 && constVec[bone] is null && animRSlot[bone] < 0 && constQuat[bone] is null)
+        continue;
+      tracks[bone] = new BoneTrack { Bone = -1, BoneName = clip.Bones[bone] };
+    }
+
+    var translationBytes = sampledFrames * n0 * 4;
+    var rotationBytes = sampledFrames * n1 * 6;
+    var translations = frameData.Slice(0, translationBytes);
+    var rotations = frameData.Slice(translationBytes, rotationBytes);
+    var rate = clip.SampleRate;
+    for (var frame = 0; frame < sampledFrames; frame++)
+    {
+      var time = frame / rate;
+      for (var bone = 0; bone < bones; bone++)
       {
-        var value = BitConverter.ToSingle(tail, start + bone * 28 + component * 4);
-        if (!float.IsFinite(value) || MathF.Abs(value) > 20f)
-          return false;
+        var track = tracks[bone];
+        if (track is null)
+          continue;
+        if (animTSlot[bone] is int slot and >= 0)
+        {
+          var word = BinaryPrimitives.ReadUInt32LittleEndian(translations.Slice((frame * n0 + slot) * 4, 4));
+          track.Translation.Add(new VectorKey { Time = time, Value = animT[slot].Decode(word >> 21, (word >> 10) & 0x7FF, word & 0x3FF) });
+        }
+        else if (constVec[bone] is Vector3 constantTranslation)
+          track.Translation.Add(new VectorKey { Time = time, Value = constantTranslation });
+
+        if (animRSlot[bone] is int rotSlot and >= 0)
+        {
+          var offset = (frame * n1 + rotSlot) * 6;
+          var x = BinaryPrimitives.ReadUInt16LittleEndian(rotations.Slice(offset, 2));
+          var y = BinaryPrimitives.ReadUInt16LittleEndian(rotations.Slice(offset + 2, 2));
+          var z = BinaryPrimitives.ReadUInt16LittleEndian(rotations.Slice(offset + 4, 2));
+          track.Rotation.Add(new QuatKey { Time = time, Value = animR[rotSlot].DecodeQuat(x, y, z) });
+        }
+        else if (constQuat[bone] is Quaternion constantRotation)
+          track.Rotation.Add(new QuatKey { Time = time, Value = constantRotation });
       }
+    }
+
+    foreach (var track in tracks)
+    {
+      if (track is not null)
+        clip.Tracks.Add(track);
+    }
+
+    if (clip.Tracks.Count == 0)
+    {
+      clip.Notes.Add("The codec lists no bone tracks inside the name table, so curve keys were not sampled.");
+      return false;
+    }
+
+    if (skipped > 0)
+      clip.Notes.Add($"{skipped} codec indices fell outside the name table and were skipped.");
+    scalars = n2 + n5;
+    return true;
+  }
+
+  private static bool TryRoot(byte[] payload, int frames, AnimationClip clip)
+  {
+    var reader = new Reader(payload);
+    var sub = reader.U16();
+    var translation = reader.Range3();
+    var rotation = reader.Range3();
+    if (!reader.Ok || sub != 2)
+      return false;
+    var needed = frames * 12;
+    if (payload.Length < reader.Offset + needed)
+      return false;
+
+    var rate = clip.SampleRate;
+    var codes = payload.AsSpan(reader.Offset);
+    for (var frame = 0; frame < frames; frame++)
+    {
+      var offset = frame * 6;
+      var x = BinaryPrimitives.ReadUInt16LittleEndian(codes.Slice(offset, 2));
+      var y = BinaryPrimitives.ReadUInt16LittleEndian(codes.Slice(offset + 2, 2));
+      var z = BinaryPrimitives.ReadUInt16LittleEndian(codes.Slice(offset + 4, 2));
+      clip.RootTranslation.Add(new VectorKey { Time = frame / rate, Value = translation.Decode(x, y, z) });
+    }
+
+    var rotationOffset = frames * 6;
+    for (var frame = 0; frame < frames; frame++)
+    {
+      var offset = rotationOffset + frame * 6;
+      var x = BinaryPrimitives.ReadUInt16LittleEndian(codes.Slice(offset, 2));
+      var y = BinaryPrimitives.ReadUInt16LittleEndian(codes.Slice(offset + 2, 2));
+      var z = BinaryPrimitives.ReadUInt16LittleEndian(codes.Slice(offset + 4, 2));
+      clip.RootRotation.Add(new QuatKey { Time = frame / rate, Value = rotation.DecodeQuat(x, y, z) });
     }
 
     return true;
   }
 
-  private static (float MaxSquared, float Median) ScoreRotations(byte[] tail, int start, ReadOnlySpan<byte> rotations, int frames, int bones)
-  {
-    var angles = new List<float>();
-    var maxSquared = 0f;
-    for (var bone = 0; bone < bones; bone++)
-    {
-      var min = Read3(tail, start + bone * 28);
-      var max = Read3(tail, start + bone * 28 + 12);
-      Quaternion? previous = null;
-      for (var frame = 0; frame < frames; frame++)
-      {
-        var sample = frame * bones + bone;
-        var x = Dequant(ReadI16(rotations, sample * 6), min.X, max.X);
-        var y = Dequant(ReadI16(rotations, sample * 6 + 2), min.Y, max.Y);
-        var z = Dequant(ReadI16(rotations, sample * 6 + 4), min.Z, max.Z);
-        var squared = x * x + y * y + z * z;
-        if (squared > maxSquared)
-          maxSquared = squared;
-        if (squared > 1.25f)
-          return (squared, 180f);
-
-        var rotation = QuantizedQuat(x, y, z);
-        if (previous is Quaternion prior)
-        {
-          var dot = MathF.Abs(Quaternion.Dot(prior, rotation));
-          dot = Math.Clamp(dot, -1f, 1f);
-          angles.Add(MathF.Acos(dot) * 2f * (180f / MathF.PI));
-        }
-
-        previous = rotation;
-      }
-    }
-
-    angles.Sort();
-    var median = angles.Count == 0 ? 180f : angles[angles.Count / 2];
-    return (maxSquared, median);
-  }
-
-  private static bool TryTranslation(byte[] tail, int range, ReadOnlySpan<byte> keys, int frames, int stride, int bone, out Vector3[] samples)
-  {
-    samples = new Vector3[frames];
-    var min = Read3(tail, range);
-    var max = Read3(tail, range + 12);
-    if (!Finite(min) || !Finite(max))
-      return false;
-
-    var previous = new int[3];
-    var started = false;
-    var worst = 0f;
-    for (var frame = 0; frame < frames; frame++)
-    {
-      var word = BitConverter.ToUInt32(keys.Slice((frame * stride + bone) * 4, 4));
-      var codes = new int[3];
-      for (var component = 0; component < 3; component++)
-      {
-        var code = (int)((word >> (component * 10)) & 1023);
-        if (code >= 512)
-          code -= 1024;
-        if (started)
-        {
-          while (code - previous[component] > 512)
-            code -= 1024;
-          while (previous[component] - code > 512)
-            code += 1024;
-        }
-
-        previous[component] = code;
-        codes[component] = code;
-      }
-
-      started = true;
-      var value = new Vector3(
-        Dequant10(codes[0], min.X, max.X),
-        Dequant10(codes[1], min.Y, max.Y),
-        Dequant10(codes[2], min.Z, max.Z));
-      if (frame > 0)
-        worst = MathF.Max(worst, Vector3.Distance(samples[frame - 1], value));
-      samples[frame] = value;
-    }
-
-    return worst < 0.5f && samples.All(sample => float.IsFinite(sample.X) && sample.Length() < 8f);
-  }
-
-  private static bool Finite(Vector3 value)
-    => float.IsFinite(value.X) && float.IsFinite(value.Y) && float.IsFinite(value.Z)
-      && MathF.Abs(value.X) <= 20f && MathF.Abs(value.Y) <= 20f && MathF.Abs(value.Z) <= 20f;
-
-  private static Vector3 Read3(byte[] bytes, int offset)
-    => new(BitConverter.ToSingle(bytes, offset), BitConverter.ToSingle(bytes, offset + 4), BitConverter.ToSingle(bytes, offset + 8));
-
-  private static short ReadI16(ReadOnlySpan<byte> bytes, int offset)
-    => BitConverter.ToInt16(bytes.Slice(offset, 2));
-
-  private static float Dequant(short sample, float min, float max)
-  {
-    var t = sample / 32767f * 0.5f + 0.5f;
-    return min + t * (max - min);
-  }
-
-  private static float Dequant10(int code, float min, float max)
-  {
-    var t = code / 511f * 0.5f + 0.5f;
-    return min + t * (max - min);
-  }
-
-  private static Quaternion QuantizedQuat(float x, float y, float z)
+  private static Quaternion Mrp(double x, double y, double z)
   {
     var squared = x * x + y * y + z * z;
-    if (squared > 1f)
+    var scale = 1.0 / (squared + 1.0);
+    return new Quaternion(
+      (float)(2 * scale * x),
+      (float)(2 * scale * y),
+      (float)(2 * scale * z),
+      (float)((1.0 - squared) * scale));
+  }
+
+  private readonly struct Range3
+  {
+    public float MinX { get; init; }
+    public float MinY { get; init; }
+    public float MinZ { get; init; }
+    public float ScaleX { get; init; }
+    public float ScaleY { get; init; }
+    public float ScaleZ { get; init; }
+
+    public Vector3 Decode(uint x, uint y, uint z)
+      => new(
+        (float)(x * (double)ScaleX + MinX),
+        (float)(y * (double)ScaleY + MinY),
+        (float)(z * (double)ScaleZ + MinZ));
+
+    public Quaternion DecodeQuat(uint x, uint y, uint z)
+      => Mrp(x * (double)ScaleX + MinX, y * (double)ScaleY + MinY, z * (double)ScaleZ + MinZ);
+  }
+
+  private ref struct Reader
+  {
+    private readonly ReadOnlySpan<byte> _span;
+    public int Offset;
+    public bool Ok;
+
+    public Reader(ReadOnlySpan<byte> span)
     {
-      var scale = 1f / MathF.Sqrt(squared);
-      return new Quaternion(x * scale, y * scale, z * scale, 0);
+      _span = span;
+      Offset = 0;
+      Ok = true;
     }
 
-    return new Quaternion(x, y, z, MathF.Sqrt(MathF.Max(0, 1f - squared)));
+    public ushort U16()
+    {
+      if (!Ok || Offset + 2 > _span.Length)
+      {
+        Ok = false;
+        return 0;
+      }
+
+      var value = BinaryPrimitives.ReadUInt16LittleEndian(_span.Slice(Offset, 2));
+      Offset += 2;
+      return value;
+    }
+
+    public int I32()
+    {
+      if (!Ok || Offset + 4 > _span.Length)
+      {
+        Ok = false;
+        return 0;
+      }
+
+      var value = BinaryPrimitives.ReadInt32LittleEndian(_span.Slice(Offset, 4));
+      Offset += 4;
+      return value;
+    }
+
+    public float F32()
+    {
+      if (!Ok || Offset + 4 > _span.Length)
+      {
+        Ok = false;
+        return 0;
+      }
+
+      var value = BinaryPrimitives.ReadSingleLittleEndian(_span.Slice(Offset, 4));
+      Offset += 4;
+      return value;
+    }
+
+    public ushort[] U16List(int count)
+    {
+      var list = new ushort[count];
+      for (var i = 0; i < count; i++)
+        list[i] = U16();
+      return list;
+    }
+
+    public Range3 Range3()
+      => new()
+      {
+        MinX = F32(),
+        MinY = F32(),
+        MinZ = F32(),
+        ScaleX = F32(),
+        ScaleY = F32(),
+        ScaleZ = F32(),
+      };
   }
 
 }

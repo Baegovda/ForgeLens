@@ -4,9 +4,10 @@ using LibSaber.SM2.Assets.Animation;
 namespace LibSaber.SM2.Assets.Meshes;
 
 /// <summary>
-///   Writes one clip sample over skeleton bind locals. A rotation key is an offset from
-///   identity, so it is applied on top of the bind rotation (<c>bind * clip</c>). An
-///   identity bind leaves the key unchanged. Missing channels keep the bind value.
+///   Writes one clip sample over skeleton bind locals. A rotation key is the bone's local
+///   rotation, so it replaces the bind rotation. A translation key is the local translation.
+///   Missing channels keep the bind value. When <see cref="AnimationClip.RootMotion"/> is set,
+///   the 0xF4 root translation is added to every bone with no parent.
 /// </summary>
 internal static class ClipPose
 {
@@ -41,16 +42,32 @@ internal static class ClipPose
       if (track.Rotation.Count == 0)
         rotation = Quaternion.CreateFromRotationMatrix(bind);
       else
-      {
-        var bindRotation = Matrix4x4.Decompose(bind, out _, out var decomposed, out _)
-          ? decomposed
-          : Quaternion.CreateFromRotationMatrix(bind);
-        rotation = Quaternion.Normalize(bindRotation * AnimationClip.Sample(track.Rotation, Quaternion.Identity, time));
-      }
+        rotation = Quaternion.Normalize(AnimationClip.Sample(track.Rotation, Quaternion.Identity, time));
 
       if (track.Scale.Count == 0)
         scale = Matrix4x4.Decompose(bind, out var bindScale, out _, out _) ? bindScale : Vector3.One;
       local[index] = Matrix4x4.CreateScale(scale) * Matrix4x4.CreateFromQuaternion(rotation) * Matrix4x4.CreateTranslation(translation);
+    }
+
+    if (!clip.RootMotion || clip.RootTranslation.Count == 0)
+      return;
+
+    var root = AnimationClip.Sample(clip.RootTranslation, Vector3.Zero, time);
+    for (var i = 0; i < bones.Count; i++)
+    {
+      if (bones[i].Parent >= 0)
+        continue;
+      if (!Matrix4x4.Decompose(local[i], out var scale, out var rotation, out var translation))
+      {
+        local[i].M41 += root.X;
+        local[i].M42 += root.Y;
+        local[i].M43 += root.Z;
+        continue;
+      }
+
+      local[i] = Matrix4x4.CreateScale(scale)
+        * Matrix4x4.CreateFromQuaternion(rotation)
+        * Matrix4x4.CreateTranslation(translation + root);
     }
   }
 

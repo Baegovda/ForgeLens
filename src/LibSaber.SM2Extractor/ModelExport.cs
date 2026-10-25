@@ -213,6 +213,7 @@ public static class ModelExport
       Space = ExportSpace.Unreal,
       Lod = options.Lod,
       Clips = clips,
+      RootMotion = options.RootMotion,
     };
   }
 

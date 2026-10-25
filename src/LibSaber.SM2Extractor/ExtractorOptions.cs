@@ -10,7 +10,7 @@ LibSaber.SM2Extractor — list and extract Warhammer 40,000: Space Marine 2 arch
 Usage:
   LibSaber.SM2Extractor list <archive-or-folder> [options]
   LibSaber.SM2Extractor extract <archive-or-folder> --output <folder> [options]
-  LibSaber.SM2Extractor export <game-folder> --asset <path> --format <fbx-unreal|gltf|both> --output <folder> [--lod <n>] [--anim <name|all>]
+  LibSaber.SM2Extractor export <game-folder> --asset <path> --format <fbx-unreal|gltf|both> --output <folder> [--lod <n>] [--anim <name|all>] [--no-root-motion]
 
 The game ships .pak archives with a sibling cache of the same name plus ".cache"
 (client_pc\something.pak and client_pc\something.pak.cache). .pck files with a
@@ -35,6 +35,9 @@ Options:
                           or several clips when it is a substring). all writes every .sani
                           that shares at least 8 bone names with the model. export only.
                           Bones the clip does not name stay on the bind pose.
+                          The clip's 0xF4 track is added to the skeleton root translation.
+  --no-root-motion        Leave that root translation off. The bone curves are unchanged.
+                          export only.
   --no-recursive          When the input is a folder, do not search subfolders.
   --prefix-archive        Write each archive under <output>\<archive name>\. extract only.
   --no-overwrite          Leave files that are already in the output folder. extract only.
@@ -65,6 +68,7 @@ Examples:
   public string? Format { get; private init; }
   public int Lod { get; private init; }
   public string? Animation { get; private init; }
+  public bool RootMotion { get; private init; } = true;
 
   public static ExtractorOptions Help()
     => new() { Verb = ExtractorVerb.Help };
@@ -105,6 +109,8 @@ Examples:
     var prefixArchive = false;
     var overwrite = true;
     var quiet = false;
+    var rootMotion = true;
+    var rootMotionSet = false;
     var positionals = new List<string>();
 
     for (var i = 0; i < args.Length; i++)
@@ -137,6 +143,19 @@ Examples:
       if (arg == "--no-overwrite")
       {
         overwrite = false;
+        continue;
+      }
+
+      if (arg == "--no-root-motion")
+      {
+        if (rootMotionSet)
+        {
+          error = "Root motion specified more than once.";
+          return false;
+        }
+
+        rootMotion = false;
+        rootMotionSet = true;
         continue;
       }
 
@@ -295,9 +314,9 @@ Examples:
       return false;
     }
 
-    if (verb != ExtractorVerb.Export && (asset is not null || format is not null || lodSet || animation is not null))
+    if (verb != ExtractorVerb.Export && (asset is not null || format is not null || lodSet || animation is not null || rootMotionSet))
     {
-      error = "--asset, --format, --lod, and --anim are only valid with export.";
+      error = "--asset, --format, --lod, --anim, and --no-root-motion are only valid with export.";
       return false;
     }
 
@@ -348,6 +367,7 @@ Examples:
       Format = format?.ToLowerInvariant(),
       Lod = lod,
       Animation = animation,
+      RootMotion = rootMotion,
     };
     return true;
   }

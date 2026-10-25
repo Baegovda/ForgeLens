@@ -131,7 +131,8 @@ public static class SaniReader
 
   /// <summary>
   ///   Retail .sani files start with ETNA. The header carries duration, rate, frame count,
-  ///   and the bone name table. <see cref="EtnaCurves"/> samples the paired .sani_data.
+  ///   and the bone name table. <see cref="EtnaCurves"/> samples the class-A codec
+  ///   (inline 0xF2, or 0xF6 plus the paired .sani_data) and the 0xF4 root translation.
   /// </summary>
   private static bool TryReadEtna(byte[] bytes, AnimationClip clip, byte[]? siblingBytes)
   {

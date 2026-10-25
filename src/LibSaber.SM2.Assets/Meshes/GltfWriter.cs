@@ -245,6 +245,7 @@ public static class GltfWriter
   {
     var channels = new List<string>();
     var samplers = new List<string>();
+    var translated = new HashSet<int>();
     foreach (var track in clip.Tracks)
     {
       var node = track.Bone;
@@ -264,14 +265,19 @@ public static class GltfWriter
       {
         var times = track.Translation.Select(key => key.Time).ToArray();
         var values = new float[track.Translation.Count * 3];
+        var addRoot = clip.RootMotion && clip.RootTranslation.Count > 0 && mesh.Bones[node].Parent < 0;
         for (var i = 0; i < track.Translation.Count; i++)
         {
-          var point = AxisConvert.Point(track.Translation[i].Value, space, gltf: true);
+          var value = track.Translation[i].Value;
+          if (addRoot)
+            value += AnimationClip.Sample(clip.RootTranslation, Vector3.Zero, times[i]);
+          var point = AxisConvert.Point(value, space, gltf: true);
           values[i * 3] = point.X;
           values[i * 3 + 1] = point.Y;
           values[i * 3 + 2] = point.Z;
         }
 
+        translated.Add(node);
         Channel("translation", TimeAccessor(times, bin, views, accessors), VectorAccessor(values, bin, views, accessors));
       }
 
@@ -279,12 +285,9 @@ public static class GltfWriter
       {
         var times = track.Rotation.Select(key => key.Time).ToArray();
         var values = new float[track.Rotation.Count * 4];
-        var bindRotation = Matrix4x4.Decompose(mesh.Bones[node].Local, out _, out var decomposed, out _)
-          ? decomposed
-          : Quaternion.CreateFromRotationMatrix(mesh.Bones[node].Local);
         for (var i = 0; i < track.Rotation.Count; i++)
         {
-          var rotation = TurnQuaternion(Quaternion.Normalize(bindRotation * track.Rotation[i].Value));
+          var rotation = TurnQuaternion(Quaternion.Normalize(track.Rotation[i].Value));
 
           values[i * 4] = rotation.X;
           values[i * 4 + 1] = rotation.Y;
@@ -307,6 +310,30 @@ public static class GltfWriter
         }
 
         Channel("scale", TimeAccessor(times, bin, views, accessors), VectorAccessor(values, bin, views, accessors));
+      }
+    }
+
+    if (clip.RootMotion && clip.RootTranslation.Count > 0)
+    {
+      for (var node = 0; node < mesh.Bones.Count; node++)
+      {
+        if (mesh.Bones[node].Parent >= 0 || translated.Contains(node))
+          continue;
+        var bind = mesh.Bones[node].Local;
+        var origin = new Vector3(bind.M41, bind.M42, bind.M43);
+        var times = clip.RootTranslation.Select(key => key.Time).ToArray();
+        var values = new float[times.Length * 3];
+        for (var i = 0; i < clip.RootTranslation.Count; i++)
+        {
+          var point = AxisConvert.Point(origin + clip.RootTranslation[i].Value, space, gltf: true);
+          values[i * 3] = point.X;
+          values[i * 3 + 1] = point.Y;
+          values[i * 3 + 2] = point.Z;
+        }
+
+        var sampler = samplers.Count;
+        samplers.Add($"{{\"input\":{TimeAccessor(times, bin, views, accessors)},\"output\":{VectorAccessor(values, bin, views, accessors)},\"interpolation\":\"LINEAR\"}}");
+        channels.Add($"{{\"sampler\":{sampler},\"target\":{{\"node\":{node},\"path\":\"translation\"}}}}");
       }
     }
 
