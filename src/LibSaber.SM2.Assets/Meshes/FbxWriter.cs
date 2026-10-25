@@ -22,6 +22,11 @@ public static class FbxWriter
 
   public static void Write(string path, ExportedMesh mesh, ExportSpace space, IReadOnlyDictionary<string, string>? textureFiles = null)
   {
+    // Unreal import uses Index's checked set. A caller that still holds the full
+    // template (LOD shells and collision) must not ship those as extra meshes.
+    if (space == ExportSpace.Unreal)
+      mesh = mesh.VisibleGeometry();
+
     var root = new Node("");
     var ids = new IdSource();
     var bones = BuildBones(mesh, space);
@@ -137,7 +142,9 @@ public static class FbxWriter
     PropInt(props, "UpAxisSign", 1);
     PropInt(props, "FrontAxis", 1);
     PropInt(props, "FrontAxisSign", 1);
-    // Z-up, -Y forward (FBX right-handed). CoordAxisSign -1 is that system; +1 mirrors it.
+    // Z-up, front along -Y in Blender's names, which is FrontAxis +Y. CoordAxisSign -1
+    // keeps the basis right-handed. +1 on the coord axis mirrors the mesh. Vertex data
+    // faces +Y so a default Unreal import matches the mannequin.
     PropInt(props, "CoordAxis", 0);
     PropInt(props, "CoordAxisSign", -1);
     PropInt(props, "OriginalUpAxis", 2);
@@ -172,7 +179,7 @@ public static class FbxWriter
     var materials = CollectMaterials(mesh);
     var textures = CollectTextures(mesh);
     var geometry = mesh.HasTriangles ? 1 : 0;
-    var models = 1 + mesh.Bones.Count;
+    var models = 1 + mesh.Bones.Count + (mesh.Bones.Count > 0 ? 1 : 0);
     var attributes = mesh.Bones.Count;
     var deformers = mesh.HasSkin && mesh.HasTriangles ? 1 + bones.Clusters.Count : 0;
     var poses = 1;
@@ -207,6 +214,8 @@ public static class FbxWriter
     var textures = CollectTextures(mesh);
     if (mesh.HasTriangles)
       WriteGeometry(objects, mesh, space, ids, materials);
+    if (mesh.Bones.Count > 0)
+      WriteArmature(objects, mesh, ids);
     WriteMeshModel(objects, mesh, ids);
     for (var i = 0; i < mesh.Bones.Count; i++)
     {
@@ -292,8 +301,9 @@ public static class FbxWriter
       var uvs = new double[mesh.Uvs.Count * 2];
       for (var i = 0; i < mesh.Uvs.Count; i++)
       {
-        uvs[i * 2] = mesh.Uvs[i].X;
-        uvs[i * 2 + 1] = mesh.Uvs[i].Y;
+        var uv = AxisConvert.FbxUv(mesh.Uvs[i], space);
+        uvs[i * 2] = uv.X;
+        uvs[i * 2 + 1] = uv.Y;
       }
 
       layer.Add("UV").DoubleArray(uvs);
@@ -352,6 +362,27 @@ public static class FbxWriter
     var entry = layer.Add("LayerElement");
     entry.Add("Type").String(type);
     entry.Add("TypedIndex").Int32(0);
+  }
+
+  private static void WriteArmature(Node objects, ExportedMesh mesh, IdSource ids)
+  {
+    var model = objects.Add("Model");
+    model.Int64(ids.Armature);
+    model.String(NameClass(mesh.Name + "_Skeleton", "Model"));
+    model.String("Null");
+    model.Add("Version").Int32(232);
+    var props = model.Add("Properties70");
+    PropLcl(props, "Lcl Translation", 0, 0, 0);
+    PropLcl(props, "Lcl Rotation", 0, 0, 0);
+    PropLcl(props, "Lcl Scaling", 1, 1, 1);
+    PropDouble(props, "Visibility", 1, "Visibility", "");
+    PropInt(props, "DefaultAttributeIndex", 0);
+    PropEnum(props, "RotationOrder", 0);
+    PropEnum(props, "InheritType", 1);
+    model.Add("MultiLayer").Int32(0);
+    model.Add("MultiTake").Int32(0);
+    model.Add("Shading").Char(1);
+    model.Add("Culling").String("CullingOff");
   }
 
   private static void WriteMeshModel(Node objects, ExportedMesh mesh, IdSource ids)
@@ -453,6 +484,9 @@ public static class FbxWriter
     PropString(props, "UVSet", "UVMap");
     PropEnum(props, "WrapModeU", 0);
     PropEnum(props, "WrapModeV", 0);
+    PropVector(props, "Translation", 0, 0, 0);
+    PropVector(props, "Rotation", 0, 0, 0);
+    PropVector(props, "Scaling", 1, 1, 1);
     PropBool(props, "UseMaterial", true);
     PropBool(props, "UseMipMap", false);
 
@@ -528,7 +562,15 @@ public static class FbxWriter
     pose.String("BindPose");
     pose.Add("Type").String("BindPose");
     pose.Add("Version").Int32(100);
-    pose.Add("NbPoseNodes").Int32(1 + mesh.Bones.Count);
+    var poseNodes = 1 + mesh.Bones.Count + (mesh.Bones.Count > 0 ? 1 : 0);
+    pose.Add("NbPoseNodes").Int32(poseNodes);
+    if (mesh.Bones.Count > 0)
+    {
+      var armNode = pose.Add("PoseNode");
+      armNode.Add("Node").Int64(ids.Armature);
+      armNode.Add("Matrix").DoubleArray(MatrixArray(Matrix4x4.Identity));
+    }
+
     var meshNode = pose.Add("PoseNode");
     meshNode.Add("Node").Int64(ids.MeshModel);
     meshNode.Add("Matrix").DoubleArray(MatrixArray(Matrix4x4.Identity));
@@ -543,13 +585,16 @@ public static class FbxWriter
   private static void WriteConnections(Node root, ExportedMesh mesh, IdSource ids, BoneTables bones)
   {
     var connections = root.Add("Connections");
-    Connect(connections, "OO", ids.MeshModel, 0);
+    var sceneParent = mesh.Bones.Count > 0 ? ids.Armature : 0;
+    if (mesh.Bones.Count > 0)
+      Connect(connections, "OO", ids.Armature, 0);
+    Connect(connections, "OO", ids.MeshModel, sceneParent);
     if (mesh.HasTriangles)
       Connect(connections, "OO", ids.Geometry, ids.MeshModel);
     for (var i = 0; i < mesh.Bones.Count; i++)
     {
       var parent = mesh.Bones[i].Parent;
-      var parentId = parent >= 0 && parent < ids.BoneModels.Length ? ids.BoneModels[parent] : 0;
+      var parentId = parent >= 0 && parent < ids.BoneModels.Length ? ids.BoneModels[parent] : sceneParent;
       Connect(connections, "OO", ids.BoneModels[i], parentId);
       Connect(connections, "OO", ids.BoneAttributes[i], ids.BoneModels[i]);
     }
@@ -862,6 +907,18 @@ public static class FbxWriter
     node.Int32(value);
   }
 
+  private static void PropVector(Node props, string name, double x, double y, double z)
+  {
+    var node = props.Add("P");
+    node.String(name);
+    node.String("Vector3D");
+    node.String("Vector");
+    node.String("");
+    node.Double(x);
+    node.Double(y);
+    node.Double(z);
+  }
+
   private static void PropLcl(Node props, string name, double x, double y, double z)
   {
     var node = props.Add("P");
@@ -946,6 +1003,7 @@ public static class FbxWriter
     public long MeshModel { get; } = 2;
     public long Skin { get; } = 3;
     public long Pose { get; } = 4;
+    public long Armature { get; } = 5;
     public long[] BoneModels { get; private set; } = Array.Empty<long>();
     public long[] BoneAttributes { get; private set; } = Array.Empty<long>();
     public long[] Clusters { get; private set; } = Array.Empty<long>();

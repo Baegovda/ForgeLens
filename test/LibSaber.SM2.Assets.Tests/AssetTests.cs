@@ -307,6 +307,15 @@ public class AssetTests
     Assert.True(MathF.Abs(unreal.Z - 200f) < 0.0001f);
     var blender = AxisConvert.Point(new Vector3(0, 2, 0), ExportSpace.Blender, gltf: false);
     Assert.True(MathF.Abs(blender.Z - 2f) < 0.0001f);
+    var front = AxisConvert.Point(new Vector3(0.2f, 1.6f, 0.5f), ExportSpace.Unreal, gltf: false);
+    Assert.True(MathF.Abs(front.X - (-20f)) < 0.001f);
+    Assert.True(MathF.Abs(front.Y - 50f) < 0.001f);
+    Assert.True(MathF.Abs(front.Z - 160f) < 0.001f);
+    var uv = AxisConvert.FbxUv(new Vector2(1.5f, -1.25f), ExportSpace.Unreal);
+    Assert.True(MathF.Abs(uv.X - 1.5f) < 0.0001f);
+    Assert.True(MathF.Abs(uv.Y - 2.25f) < 0.0001f);
+    var kept = AxisConvert.FbxUv(new Vector2(1.5f, -1.25f), ExportSpace.Blender);
+    Assert.True(MathF.Abs(kept.Y - (-1.25f)) < 0.0001f);
   }
 
   [Fact]
@@ -624,6 +633,57 @@ public class AssetTests
     Assert.Contains("NormalMap", Encoding.ASCII.GetString(bytes));
     Assert.Contains("head_01_2", Encoding.ASCII.GetString(bytes));
     Assert.DoesNotContain("ch_titus_body_spec", Encoding.ASCII.GetString(bytes));
+  }
+
+  [Fact]
+  public void UnrealFbx_OmitsHiddenShellsFromTheSingleMesh()
+  {
+    var mesh = new ExportedMesh { Name = "hero" };
+    mesh.Positions.Add(new Vector3(0, 1, 0.4f));
+    mesh.Positions.Add(new Vector3(0.1f, 1, 0.4f));
+    mesh.Positions.Add(new Vector3(0, 1.1f, 0.4f));
+    mesh.Normals.Add(Vector3.UnitZ);
+    mesh.Normals.Add(Vector3.UnitZ);
+    mesh.Normals.Add(Vector3.UnitZ);
+    mesh.Uvs.Add(new Vector2(0.25f, -1.5f));
+    mesh.Uvs.Add(new Vector2(0.75f, -1.5f));
+    mesh.Uvs.Add(new Vector2(0.25f, -1.1f));
+    mesh.Indices.AddRange(new[] { 0, 1, 2 });
+    mesh.Parts.Add(new MeshPart { Name = "body", IndexStart = 0, IndexCount = 3, Visible = true, Texture = "body" });
+    var level = new MeshLod { Name = "LOD1" };
+    level.Positions.Add(Vector3.Zero);
+    level.Positions.Add(Vector3.UnitX);
+    level.Positions.Add(Vector3.UnitY);
+    level.Normals.Add(Vector3.UnitZ);
+    level.Normals.Add(Vector3.UnitZ);
+    level.Normals.Add(Vector3.UnitZ);
+    level.Uvs.Add(Vector2.Zero);
+    level.Uvs.Add(Vector2.UnitX);
+    level.Uvs.Add(Vector2.UnitY);
+    level.Indices.AddRange(new[] { 0, 1, 2 });
+    level.Parts.Add(new MeshPart { Name = "shell_cdt", IndexStart = 0, IndexCount = 3, Visible = false, HideReason = "volume" });
+    mesh.Levels.Add(level);
+
+    using var dir = new TempDirectory();
+    var fbx = Path.Combine(dir.Path, "hero.fbx");
+    FbxWriter.Write(fbx, mesh, ExportSpace.Unreal);
+    var text = Encoding.ASCII.GetString(File.ReadAllBytes(fbx));
+    Assert.Contains("body", text);
+    Assert.DoesNotContain("shell_cdt", text);
+    Assert.Equal(1, Count(text, "\0\u0001Geometry"));
+    Assert.Equal(1, Count(text, "\0\u0001Model"));
+  }
+
+  private static int Count(string text, string token)
+  {
+    var count = 0;
+    var index = 0;
+    while ((index = text.IndexOf(token, index, StringComparison.Ordinal)) >= 0)
+    {
+      count++;
+      index += token.Length;
+    }
+    return count;
   }
 
   [Fact]

@@ -5,9 +5,9 @@ namespace LibSaber.SM2.Assets.Meshes;
 
 public enum ExportSpace
 {
-  /// <summary>FBX is Z-up centimeters (source meters times 100). glTF is Y-up meters.</summary>
+  /// <summary>FBX is Z-up, +Y forward, centimeters (source meters times 100). glTF is Y-up meters.</summary>
   Unreal = 0,
-  /// <summary>FBX is Z-up meters. glTF is Y-up meters.</summary>
+  /// <summary>FBX is Z-up, +Y forward, meters. glTF is Y-up meters. UVs stay as sampled, because Blender does not flip V.</summary>
   Blender = 1,
 }
 
@@ -236,7 +236,7 @@ public static class AxisConvert
 {
 
   public const string Assumption =
-    "Source units are meters, Y-up. A retail character is about 2.6 units on Y, which is a standing height, and a helmet is about 0.3 units. glTF stays Y-up meters. Unreal FBX is Z-up centimeters (times 100). Blender FBX is Z-up meters.";
+    "Source units are meters, Y-up, +Z in front. A retail character is about 2.6 units on Y. glTF stays Y-up meters. Unreal FBX is Z-up, +Y forward, centimeters (times 100), which is the facing Unreal's mannequin uses after a default import. Blender FBX is the same facing in meters.";
 
   public static float Scale(ExportSpace space, bool gltf)
     => !gltf && space == ExportSpace.Unreal ? 100f : 1f;
@@ -248,7 +248,16 @@ public static class AxisConvert
   }
 
   public static Vector3 Direction(Vector3 value, bool gltf)
-    => gltf ? value : new Vector3(value.X, -value.Z, value.Y);
+    => gltf ? value : new Vector3(-value.X, value.Z, value.Y);
+
+  /// <summary>
+  ///   UV stored on the mesh is the coordinate MeshPreview samples, with V = 0 at the top of the image.
+  ///   Unreal's FBX importer then sets <c>v = 1 - v</c>. Writing <c>1 - v</c> here lands on that same texel.
+  ///   The value is not wrapped: a seam that crosses an integer would split if each vertex were reduced mod 1.
+  ///   Blender's importer does not do that flip, so a Blender-space FBX keeps the stored coordinate.
+  /// </summary>
+  public static Vector2 FbxUv(Vector2 sampled, ExportSpace space)
+    => space == ExportSpace.Unreal ? new Vector2(sampled.X, 1f - sampled.Y) : sampled;
 
   public static Matrix4x4 Matrix(Matrix4x4 source, ExportSpace space, bool gltf)
   {
@@ -265,13 +274,15 @@ public static class AxisConvert
 
   /// <summary>
   ///   Source is Y-up, X right, +Z toward the character's front. Destination FBX is
-  ///   Z-up and -Y forward: (x, y, z) maps to (x, -z, y). This is that change of basis.
+  ///   Z-up and +Y forward (Unreal's mannequin, and this file's FrontAxis): (x, y, z)
+  ///   maps to (-x, z, y). A 180° yaw from the previous -Y facing, so it is a rotation
+  ///   and does not mirror. The same matrix converts bone worlds.
   /// </summary>
   private static Matrix4x4 Basis()
     => new(
-      1, 0, 0, 0,
+      -1, 0, 0, 0,
       0, 0, 1, 0,
-      0, -1, 0, 0,
+      0, 1, 0, 0,
       0, 0, 0, 1);
 
   /// <summary>
