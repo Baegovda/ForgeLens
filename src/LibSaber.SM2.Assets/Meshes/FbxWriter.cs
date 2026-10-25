@@ -21,7 +21,7 @@ public static class FbxWriter
   private static readonly byte[] FootMagic = { 0xF8, 0x5A, 0x8C, 0x6A, 0xDE, 0xF5, 0xD9, 0x7E, 0xEC, 0xE9, 0x0C, 0xE3, 0x75, 0x8F, 0x29, 0x0B };
   private const string CreationStamp = "1970-01-01 10:00:00:000";
 
-  public static void Write(string path, ExportedMesh mesh, ExportSpace space, IReadOnlyDictionary<string, string>? textureFiles = null)
+  public static void Write(string path, ExportedMesh mesh, ExportSpace space, IReadOnlyDictionary<string, string>? textureFiles = null, bool animationOnly = false)
   {
     // Unreal import uses Index's checked set. A caller that still holds the full
     // template (LOD shells and collision) must not ship those as extra meshes.
@@ -36,18 +36,20 @@ public static class FbxWriter
     take?.Allocate(ids);
 
     WriteHeader(root);
-    WriteGlobalSettings(root, space);
+    WriteGlobalSettings(root, space, take);
     WriteDocuments(root, ids.Next(), take?.Name ?? "");
     root.Add("References");
-    WriteDefinitions(root, mesh, bones, take);
-    WriteObjects(root, mesh, space, ids, bones, textureFiles);
+    WriteDefinitions(root, mesh, bones, take, animationOnly);
+    WriteObjects(root, mesh, space, ids, bones, textureFiles, take, animationOnly);
     if (take is not null)
-      WriteAnimationObjects(root, take);
-    WriteConnections(root, mesh, ids, bones);
+      WriteAnimationObjects(root, take, mesh);
+    WriteConnections(root, mesh, ids, bones, animationOnly);
     if (take is not null)
       WriteAnimationConnections(root, take, ids);
     var takes = root.Add("Takes");
     takes.Add("Current").String(take?.Name ?? "");
+    if (take is not null)
+      WriteTake(takes, take);
 
     using var stream = File.Create(path);
     stream.Write(HeadMagic);
@@ -140,7 +142,7 @@ public static class FbxWriter
     root.Add("Creator").String("LibSaber.SM2Browser");
   }
 
-  private static void WriteGlobalSettings(Node root, ExportSpace space)
+  private static void WriteGlobalSettings(Node root, ExportSpace space, AnimTake? take)
   {
     var settings = root.Add("GlobalSettings");
     settings.Add("Version").Int32(1000);
@@ -161,10 +163,37 @@ public static class FbxWriter
     PropDouble(props, "OriginalUnitScaleFactor", unit);
     PropColorRgb(props, "AmbientColor", 0, 0, 0);
     PropString(props, "DefaultCamera", "Producer Perspective");
-    PropEnum(props, "TimeMode", 6);
-    PropTime(props, "TimeSpanStart", 0);
-    PropTime(props, "TimeSpanStop", 46186158000);
-    PropDouble(props, "CustomFrameRate", 30);
+    var rate = take is { SampleRate: > 1f } ? take.SampleRate : 30d;
+    PropEnum(props, "TimeMode", TimeMode(rate));
+    PropTime(props, "TimeSpanStart", take?.StartTick ?? 0);
+    // A static mesh keeps the one-second span Blender writes. A clip must cover its
+    // last key: the SDK evaluator clamps to this span, and a 40s idle was cut at 1s.
+    PropTime(props, "TimeSpanStop", take?.StopTick ?? 46186158000);
+    PropDouble(props, "CustomFrameRate", rate);
+  }
+
+  private static int TimeMode(double rate)
+  {
+    if (Math.Abs(rate - 24d) < 0.05)
+      return 11;
+    if (Math.Abs(rate - 30d) < 0.05)
+      return 6;
+    if (Math.Abs(rate - 60d) < 0.05)
+      return 3;
+    return 14;
+  }
+
+  private static void WriteTake(Node takes, AnimTake take)
+  {
+    var node = takes.Add("Take");
+    node.String(take.Name);
+    node.Add("FileName").String(take.Name + ".tak");
+    var local = node.Add("LocalTime");
+    local.Int64(take.StartTick);
+    local.Int64(take.StopTick);
+    var reference = node.Add("ReferenceTime");
+    reference.Int64(take.StartTick);
+    reference.Int64(take.StopTick);
   }
 
   private static void WriteDocuments(Node root, long documentId, string stackName)
@@ -181,14 +210,14 @@ public static class FbxWriter
     doc.Add("RootNode").Int64(0);
   }
 
-  private static void WriteDefinitions(Node root, ExportedMesh mesh, BoneTables bones, AnimTake? take)
+  private static void WriteDefinitions(Node root, ExportedMesh mesh, BoneTables bones, AnimTake? take, bool animationOnly)
   {
-    var materials = CollectMaterials(mesh);
-    var textures = CollectTextures(mesh);
-    var geometry = mesh.HasTriangles ? 1 : 0;
-    var models = 1 + mesh.Bones.Count + (mesh.Bones.Count > 0 ? 1 : 0);
+    var materials = animationOnly ? new List<MaterialRef>() : CollectMaterials(mesh);
+    var textures = animationOnly ? new List<TextureRef>() : CollectTextures(mesh);
+    var geometry = !animationOnly && mesh.HasTriangles ? 1 : 0;
+    var models = (animationOnly ? 0 : 1) + mesh.Bones.Count + (mesh.Bones.Count > 0 ? 1 : 0);
     var attributes = mesh.Bones.Count;
-    var deformers = mesh.HasSkin && mesh.HasTriangles ? 1 + bones.Clusters.Count : 0;
+    var deformers = !animationOnly && mesh.HasSkin && mesh.HasTriangles ? 1 + bones.Clusters.Count : 0;
     var poses = 1;
     var curves = take?.CurveCount ?? 0;
     var curveNodes = take?.NodeCount ?? 0;
@@ -217,26 +246,39 @@ public static class FbxWriter
     ObjectType(definitions, "Pose", poses, null, null);
     if (take is not null)
     {
-      ObjectType(definitions, "AnimationStack", 1, null, null);
-      ObjectType(definitions, "AnimationLayer", 1, null, null);
-      ObjectType(definitions, "AnimationCurveNode", curveNodes, null, null);
+      ObjectType(definitions, "AnimationStack", 1, "FbxAnimStack", AnimationStackTemplate);
+      ObjectType(definitions, "AnimationLayer", 1, "FbxAnimLayer", AnimationLayerTemplate);
+      ObjectType(definitions, "AnimationCurveNode", curveNodes, "FbxAnimCurveNode", AnimationCurveNodeTemplate);
       ObjectType(definitions, "AnimationCurve", curves, null, null);
     }
   }
 
-  private static void WriteObjects(Node root, ExportedMesh mesh, ExportSpace space, IdSource ids, BoneTables bones, IReadOnlyDictionary<string, string>? textureFiles)
+  private static void WriteObjects(Node root, ExportedMesh mesh, ExportSpace space, IdSource ids, BoneTables bones, IReadOnlyDictionary<string, string>? textureFiles, AnimTake? take, bool animationOnly)
   {
     var objects = root.Add("Objects");
-    var materials = CollectMaterials(mesh);
-    var textures = CollectTextures(mesh);
-    if (mesh.HasTriangles)
+    var materials = animationOnly ? new List<MaterialRef>() : CollectMaterials(mesh);
+    var textures = animationOnly ? new List<TextureRef>() : CollectTextures(mesh);
+    if (!animationOnly && mesh.HasTriangles)
       WriteGeometry(objects, mesh, space, ids, materials);
     if (mesh.Bones.Count > 0)
       WriteArmature(objects, mesh, ids);
-    WriteMeshModel(objects, mesh, ids);
+    if (!animationOnly)
+      WriteMeshModel(objects, mesh, ids);
     for (var i = 0; i < mesh.Bones.Count; i++)
     {
-      WriteBone(objects, mesh.Bones[i], bones.Local[i], ids.BoneModels[i], ids.BoneAttributes[i]);
+      AnimBone? animated = null;
+      if (take is not null)
+      {
+        foreach (var bone in take.Bones)
+        {
+          if (bone.Index != i)
+            continue;
+          animated = bone;
+          break;
+        }
+      }
+
+      WriteBone(objects, mesh.Bones[i], bones.Local[i], ids.BoneModels[i], ids.BoneAttributes[i], animated);
     }
 
     foreach (var material in materials)
@@ -244,10 +286,10 @@ public static class FbxWriter
     foreach (var texture in textures)
       WriteTexture(objects, texture, ids, textureFiles);
 
-    if (mesh.HasSkin && mesh.HasTriangles)
+    if (!animationOnly && mesh.HasSkin && mesh.HasTriangles)
       WriteSkin(objects, mesh, bones, ids);
 
-    WriteBindPose(objects, mesh, bones, ids);
+    WriteBindPose(objects, mesh, bones, ids, animationOnly);
   }
 
   private static void WriteGeometry(Node objects, ExportedMesh mesh, ExportSpace space, IdSource ids, List<MaterialRef> materials)
@@ -423,7 +465,7 @@ public static class FbxWriter
     model.Add("Culling").String("CullingOff");
   }
 
-  private static void WriteBone(Node objects, Bone bone, Matrix4x4 local, long modelId, long attributeId)
+  private static void WriteBone(Node objects, Bone bone, Matrix4x4 local, long modelId, long attributeId, AnimBone? animated)
   {
     var attribute = objects.Add("NodeAttribute");
     attribute.Int64(attributeId);
@@ -445,8 +487,8 @@ public static class FbxWriter
     model.String("LimbNode");
     model.Add("Version").Int32(232);
     var props = model.Add("Properties70");
-    PropLcl(props, "Lcl Translation", translation.X, translation.Y, translation.Z);
-    PropLcl(props, "Lcl Rotation", euler.X, euler.Y, euler.Z);
+    PropLcl(props, "Lcl Translation", translation.X, translation.Y, translation.Z, animated?.Translation is not null);
+    PropLcl(props, "Lcl Rotation", euler.X, euler.Y, euler.Z, animated?.Rotation is not null);
     PropLcl(props, "Lcl Scaling", scale.X, scale.Y, scale.Z);
     PropDouble(props, "Visibility", 1, "Visibility", "");
     PropInt(props, "DefaultAttributeIndex", 0);
@@ -571,7 +613,7 @@ public static class FbxWriter
     }
   }
 
-  private static void WriteBindPose(Node objects, ExportedMesh mesh, BoneTables bones, IdSource ids)
+  private static void WriteBindPose(Node objects, ExportedMesh mesh, BoneTables bones, IdSource ids, bool animationOnly)
   {
     var pose = objects.Add("Pose");
     pose.Int64(ids.Pose);
@@ -579,7 +621,7 @@ public static class FbxWriter
     pose.String("BindPose");
     pose.Add("Type").String("BindPose");
     pose.Add("Version").Int32(100);
-    var poseNodes = 1 + mesh.Bones.Count + (mesh.Bones.Count > 0 ? 1 : 0);
+    var poseNodes = (animationOnly ? 0 : 1) + mesh.Bones.Count + (mesh.Bones.Count > 0 ? 1 : 0);
     pose.Add("NbPoseNodes").Int32(poseNodes);
     if (mesh.Bones.Count > 0)
     {
@@ -588,9 +630,12 @@ public static class FbxWriter
       armNode.Add("Matrix").DoubleArray(MatrixArray(Matrix4x4.Identity));
     }
 
-    var meshNode = pose.Add("PoseNode");
-    meshNode.Add("Node").Int64(ids.MeshModel);
-    meshNode.Add("Matrix").DoubleArray(MatrixArray(Matrix4x4.Identity));
+    if (!animationOnly)
+    {
+      var meshNode = pose.Add("PoseNode");
+      meshNode.Add("Node").Int64(ids.MeshModel);
+      meshNode.Add("Matrix").DoubleArray(MatrixArray(Matrix4x4.Identity));
+    }
     for (var i = 0; i < mesh.Bones.Count; i++)
     {
       var node = pose.Add("PoseNode");
@@ -599,14 +644,15 @@ public static class FbxWriter
     }
   }
 
-  private static void WriteConnections(Node root, ExportedMesh mesh, IdSource ids, BoneTables bones)
+  private static void WriteConnections(Node root, ExportedMesh mesh, IdSource ids, BoneTables bones, bool animationOnly)
   {
     var connections = root.Add("Connections");
     var sceneParent = mesh.Bones.Count > 0 ? ids.Armature : 0;
     if (mesh.Bones.Count > 0)
       Connect(connections, "OO", ids.Armature, 0);
-    Connect(connections, "OO", ids.MeshModel, sceneParent);
-    if (mesh.HasTriangles)
+    if (!animationOnly)
+      Connect(connections, "OO", ids.MeshModel, sceneParent);
+    if (!animationOnly && mesh.HasTriangles)
       Connect(connections, "OO", ids.Geometry, ids.MeshModel);
     for (var i = 0; i < mesh.Bones.Count; i++)
     {
@@ -617,6 +663,9 @@ public static class FbxWriter
     }
 
     var materials = CollectMaterials(mesh);
+    if (animationOnly)
+      return;
+
     foreach (var material in materials)
     {
       var materialId = ids.Materials[material.Key];
@@ -830,6 +879,31 @@ public static class FbxWriter
   private static void VideoTemplate(Node props)
     => PropStringUrl(props, "Path", "");
 
+  private static void AnimationStackTemplate(Node props)
+  {
+    PropString(props, "Description", "");
+    PropTime(props, "LocalStart", 0);
+    PropTime(props, "LocalStop", 0);
+    PropTime(props, "ReferenceStart", 0);
+    PropTime(props, "ReferenceStop", 0);
+  }
+
+  private static void AnimationLayerTemplate(Node props)
+  {
+    PropNumber(props, "Weight", 100);
+    PropBool(props, "Mute", false);
+    PropBool(props, "Solo", false);
+    PropBool(props, "Lock", false);
+    PropColorRgb(props, "Color", 0.8, 0.8, 0.8);
+    PropEnum(props, "BlendMode", 0);
+    PropEnum(props, "RotationAccumulationMode", 0);
+    PropEnum(props, "ScaleAccumulationMode", 0);
+    PropULong(props, "BlendModeBypass", 0);
+  }
+
+  private static void AnimationCurveNodeTemplate(Node props)
+    => PropCompound(props, "d");
+
   private static void PropInt(Node props, string name, int value)
     => Prop(props, name, "int", "Integer", "", value);
 
@@ -939,16 +1013,26 @@ public static class FbxWriter
     node.Double(z);
   }
 
-  private static void PropLcl(Node props, string name, double x, double y, double z)
+  private static void PropLcl(Node props, string name, double x, double y, double z, bool animated = false)
   {
     var node = props.Add("P");
     node.String(name);
     node.String(name);
     node.String("");
-    node.String("A");
+    node.String(animated ? "A+" : "A");
     node.Double(x);
     node.Double(y);
     node.Double(z);
+  }
+
+  private static void PropULong(Node props, string name, long value)
+  {
+    var node = props.Add("P");
+    node.String(name);
+    node.String("ULongLong");
+    node.String("");
+    node.String("");
+    node.Int64(value);
   }
 
   private static void PropColor(Node props, string name, double r, double g, double b)
@@ -995,6 +1079,8 @@ public static class FbxWriter
   }
 
   private const double FbxTicksPerSecond = 46186158000d;
+  private const int LinearKeyFlags = (1 << 2) | (1 << 8) | (1 << 13) | (1 << 14);
+  private static readonly float[] LinearKeyData = { 0f, 0f, BitConverter.Int32BitsToSingle(unchecked((int)0x0F3F0F3F)), 0f };
 
   private static AnimTake? BuildTake(ExportedMesh mesh, ExportSpace space, BoneTables bind)
   {
@@ -1043,7 +1129,7 @@ public static class FbxWriter
       }
     }
 
-    var take = new AnimTake(Safe(clip.Name), samples);
+    var take = new AnimTake(Safe(clip.Name), samples, clip.SampleRate);
     for (var bone = 0; bone < count; bone++)
     {
       var restT = new Vector3(bind.Local[bone].M41, bind.Local[bone].M42, bind.Local[bone].M43);
@@ -1060,7 +1146,7 @@ public static class FbxWriter
 
       if (!moveT && !moveR)
         continue;
-      take.Bones.Add(new AnimBone(bone, moveT ? Flatten(translation[bone]) : null, moveR ? Flatten(rotation[bone]) : null));
+      take.Bones.Add(new AnimBone(bone, moveT ? Flatten(translation[bone]) : null, moveR ? Flatten(rotation[bone]) : null, restT, restR));
     }
 
     return take.Bones.Count == 0 ? null : take;
@@ -1094,55 +1180,61 @@ public static class FbxWriter
   private static float EulerDistance(Vector3 a, Vector3 b)
     => MathF.Abs(NearestAngle(a.X, b.X) - a.X) + MathF.Abs(NearestAngle(a.Y, b.Y) - a.Y) + MathF.Abs(NearestAngle(a.Z, b.Z) - a.Z);
 
-  private static void WriteAnimationObjects(Node root, AnimTake take)
+  private static void WriteAnimationObjects(Node root, AnimTake take, ExportedMesh mesh)
   {
     var objects = root.Children.Last(node => Encoding.UTF8.GetString(node.Name) == "Objects");
-    var stop = take.Samples.Length == 0 ? 0 : (long)Math.Round(take.Samples[^1] * FbxTicksPerSecond);
     var stack = objects.Add("AnimationStack");
     stack.Int64(take.StackId);
     stack.String(NameClass(take.Name, "AnimStack"));
     stack.String("");
     var stackProps = stack.Add("Properties70");
-    PropTime(stackProps, "LocalStart", 0);
-    PropTime(stackProps, "LocalStop", stop);
-    PropTime(stackProps, "ReferenceStart", 0);
-    PropTime(stackProps, "ReferenceStop", stop);
+    PropTime(stackProps, "LocalStart", take.StartTick);
+    PropTime(stackProps, "LocalStop", take.StopTick);
+    PropTime(stackProps, "ReferenceStart", take.StartTick);
+    PropTime(stackProps, "ReferenceStop", take.StopTick);
 
     var layer = objects.Add("AnimationLayer");
     layer.Int64(take.LayerId);
     layer.String(NameClass(take.Name, "AnimLayer"));
     layer.String("");
+    var layerProps = layer.Add("Properties70");
+    PropNumber(layerProps, "Weight", 100);
+    PropBool(layerProps, "Mute", false);
 
     foreach (var bone in take.Bones)
     {
+      var boneName = mesh.Bones[bone.Index].Name;
       if (bone.Translation is not null)
-        WriteCurveNode(objects, take, bone.TranslationId, bone.TranslationCurves, "T", bone.Translation);
+        WriteCurveNode(objects, take, bone.TranslationId, bone.TranslationCurves, boneName, "T", bone.Translation, bone.RestTranslation);
       if (bone.Rotation is not null)
-        WriteCurveNode(objects, take, bone.RotationId, bone.RotationCurves, "R", bone.Rotation);
+        WriteCurveNode(objects, take, bone.RotationId, bone.RotationCurves, boneName, "R", bone.Rotation, bone.RestRotation);
     }
   }
 
-  private static void WriteCurveNode(Node objects, AnimTake take, long id, long[] curves, string channel, float[] values)
+  private static void WriteCurveNode(Node objects, AnimTake take, long id, long[] curves, string boneName, string channel, float[] values, Vector3 rest)
   {
     var node = objects.Add("AnimationCurveNode");
     node.Int64(id);
-    node.String(NameClass(channel, "AnimCurveNode"));
+    node.String(NameClass(boneName + " " + channel, "AnimCurveNode"));
     node.String("");
     var props = node.Add("Properties70");
-    PropNumber(props, "d|X", 0);
-    PropNumber(props, "d|Y", 0);
-    PropNumber(props, "d|Z", 0);
+    // The compound has to exist before d|X/Y/Z. Without it the SDK stores those as
+    // user properties and GetCurve(layer, "X") does not see the keys.
+    PropCompound(props, "d");
+    PropNumber(props, "d|X", rest.X);
+    PropNumber(props, "d|Y", rest.Y);
+    PropNumber(props, "d|Z", rest.Z);
     for (var axis = 0; axis < 3; axis++)
-      WriteCurve(objects, curves[axis], channel + "XYZ"[axis], take.Samples, values, axis);
+      WriteCurve(objects, curves[axis], boneName + channel + "XYZ"[axis], take.Samples, values, axis, axis switch { 0 => rest.X, 1 => rest.Y, _ => rest.Z });
   }
 
-  private static void WriteCurve(Node objects, long id, string name, float[] samples, float[] values, int axis)
+  private static void WriteCurve(Node objects, long id, string name, float[] samples, float[] values, int axis, double rest)
   {
     var curve = objects.Add("AnimationCurve");
     curve.Int64(id);
     curve.String(NameClass(name, "AnimCurve"));
     curve.String("");
-    curve.Add("Default").Double(0);
+    curve.Add("Default").Double(rest);
     curve.Add("KeyVer").Int32(4008);
     var times = new long[samples.Length];
     var axisValues = new float[samples.Length];
@@ -1154,8 +1246,10 @@ public static class FbxWriter
 
     curve.Add("KeyTime").Int64Array(times);
     curve.Add("KeyValueFloat").FloatArray(axisValues);
-    curve.Add("KeyAttrFlags").Int32Array(new[] { 4 });
-    curve.Add("KeyAttrDataFloat").FloatArray(new float[] { 0, 0, 0, 0 });
+    // Same linear-plus-tangent flags Blender writes. Unreal's FBX SDK accepts that
+    // combination; a bare linear flag is not what those files contain.
+    curve.Add("KeyAttrFlags").Int32Array(new[] { LinearKeyFlags });
+    curve.Add("KeyAttrDataFloat").FloatArray(LinearKeyData);
     curve.Add("KeyAttrRefCount").Int32Array(new[] { samples.Length });
   }
 
@@ -1186,14 +1280,22 @@ public static class FbxWriter
 
   private sealed class AnimTake
   {
-    public AnimTake(string name, float[] samples)
+    public AnimTake(string name, float[] samples, float sampleRate)
     {
       Name = name.Length == 0 ? "clip" : name;
       Samples = samples;
+      SampleRate = sampleRate;
+      StartTick = samples.Length == 0 ? 0 : (long)Math.Round(samples[0] * FbxTicksPerSecond);
+      StopTick = samples.Length == 0 ? 0 : (long)Math.Round(samples[^1] * FbxTicksPerSecond);
+      if (StopTick <= StartTick)
+        StopTick = StartTick + (long)Math.Round(FbxTicksPerSecond / 30d);
     }
 
     public string Name { get; }
     public float[] Samples { get; }
+    public float SampleRate { get; }
+    public long StartTick { get; }
+    public long StopTick { get; }
     public long StackId { get; private set; }
     public long LayerId { get; private set; }
     public List<AnimBone> Bones { get; } = new();
@@ -1223,16 +1325,20 @@ public static class FbxWriter
 
   private sealed class AnimBone
   {
-    public AnimBone(int index, float[]? translation, float[]? rotation)
+    public AnimBone(int index, float[]? translation, float[]? rotation, Vector3 restTranslation, Vector3 restRotation)
     {
       Index = index;
       Translation = translation;
       Rotation = rotation;
+      RestTranslation = restTranslation;
+      RestRotation = restRotation;
     }
 
     public int Index { get; }
     public float[]? Translation { get; }
     public float[]? Rotation { get; }
+    public Vector3 RestTranslation { get; }
+    public Vector3 RestRotation { get; }
     public long TranslationId { get; set; }
     public long RotationId { get; set; }
     public long[] TranslationCurves { get; set; } = Array.Empty<long>();
@@ -1302,7 +1408,14 @@ public static class FbxWriter
   private sealed class Node
   {
     private const int Sentinel = 13;
-    private static readonly HashSet<string> AlwaysSentinel = new(StringComparer.Ordinal);
+    // The FBX SDK reader expects a null child-list terminator on these two nodes even
+    // when they have no children. Without it the layer is dropped, the stack grows a
+    // default "Base Layer" with no curves, and Unreal samples the bind pose.
+    private static readonly HashSet<string> AlwaysSentinel = new(StringComparer.Ordinal)
+    {
+      "AnimationStack",
+      "AnimationLayer",
+    };
 
     public Node(string name) => Name = Encoding.UTF8.GetBytes(name);
     public byte[] Name { get; }

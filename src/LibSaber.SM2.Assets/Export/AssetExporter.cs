@@ -230,10 +230,12 @@ public static class AssetExporter
         report.Written++;
       }
 
-      if (settings.WriteFbx && exportMesh.HasTriangles)
+      if (settings.WriteFbx && exportMesh.Bones.Count > 0)
       {
         var fbxPath = Destination(outputDirectory, relative, ".fbx", batch);
-        FbxWriter.Write(fbxPath, exportMesh, settings.Space, textureFiles);
+        // Skeleton and curves only. A mesh in this file makes Interchange import nothing
+        // when mesh import is off, and the legacy importer builds a second SkeletalMesh.
+        FbxWriter.Write(fbxPath, exportMesh, settings.Space, textureFiles, animationOnly: true);
         report.Written++;
       }
 

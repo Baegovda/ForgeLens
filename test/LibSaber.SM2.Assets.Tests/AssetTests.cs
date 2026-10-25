@@ -1,4 +1,5 @@
 using System.Diagnostics;
+using System.IO.Compression;
 using System.Numerics;
 using System.Text;
 using LibSaber.SM2.Assets.Animation;
@@ -937,6 +938,193 @@ public class AssetTests
     Assert.Contains("SpecularColor", text);
     Assert.Contains("../../pct/ch_titus_body_spec.png", text);
     Assert.Contains("NormalMap", text);
+  }
+
+  [Fact]
+  public void AnimFbx_IsSkeletonOnlyAndTheCurvesMove()
+  {
+    var mesh = new ExportedMesh { Name = "arm" };
+    mesh.Bones.Add(new Bone { Name = "root", Parent = -1 });
+    mesh.Bones.Add(new Bone { Name = "ARM1R", Parent = 0 });
+    mesh.Positions.Add(Vector3.Zero);
+    mesh.Positions.Add(Vector3.UnitX);
+    mesh.Positions.Add(Vector3.UnitY);
+    mesh.Indices.AddRange(new[] { 0, 1, 2 });
+    mesh.Parts.Add(new MeshPart { Name = "tri", IndexStart = 0, IndexCount = 3 });
+    var clip = new AnimationClip { Name = "swing", Duration = 2f, SampleRate = 30f };
+    var track = new BoneTrack { BoneName = "ARM1R" };
+    track.Rotation.Add(new QuatKey { Time = 0f, Value = Quaternion.Identity });
+    track.Rotation.Add(new QuatKey { Time = 2f, Value = Quaternion.CreateFromAxisAngle(Vector3.UnitY, MathF.PI / 2f) });
+    clip.Tracks.Add(track);
+    mesh.Clip = clip;
+
+    using var dir = new TempDirectory();
+    var path = Path.Combine(dir.Path, "swing.fbx");
+    FbxWriter.Write(path, mesh, ExportSpace.Unreal, animationOnly: true);
+    var file = File.ReadAllBytes(path);
+    var roots = FbxNodes(file);
+    var objects = roots.Single(node => node.Name == "Objects");
+    Assert.DoesNotContain(objects.Children, node => node.Name is "Geometry" or "Deformer" or "Material");
+    Assert.DoesNotContain(objects.Children, node => node.Name == "Model" && node.Props.Count > 2 && node.Props[2] as string == "Mesh");
+
+    var layer = objects.Children.Single(node => node.Name == "AnimationLayer");
+    Assert.True(layer.Sentinel, "AnimationLayer needs the null terminator the FBX SDK reader requires");
+    Assert.Contains(layer.Children, node => node.Name == "Properties70");
+
+    var curveNode = objects.Children.First(node => node.Name == "AnimationCurveNode");
+    var props = curveNode.Children.Single(node => node.Name == "Properties70");
+    Assert.Contains(props.Children, node => node.Name == "P" && node.Props.Count > 0 && node.Props[0] as string == "d");
+
+    var moved = false;
+    foreach (var curve in objects.Children.Where(node => node.Name == "AnimationCurve"))
+    {
+      var values = (float[])curve.Children.Single(node => node.Name == "KeyValueFloat").Props[0];
+      if (values.Max() - values.Min() > 20f)
+        moved = true;
+      var flags = (int[])curve.Children.Single(node => node.Name == "KeyAttrFlags").Props[0];
+      Assert.Equal((1 << 2) | (1 << 8) | (1 << 13) | (1 << 14), flags[0]);
+    }
+
+    Assert.True(moved, "a rotation curve should change by more than 20 degrees");
+
+    var settings = roots.Single(node => node.Name == "GlobalSettings");
+    var timeStop = settings.Children.Single(node => node.Name == "Properties70").Children
+      .Single(node => node.Name == "P" && node.Props[0] as string == "TimeSpanStop");
+    Assert.Equal(2L * 46186158000L, (long)timeStop.Props[^1]);
+
+    var takes = roots.Single(node => node.Name == "Takes");
+    var take = takes.Children.Single(node => node.Name == "Take");
+    var local = take.Children.Single(node => node.Name == "LocalTime");
+    Assert.Equal(0L, (long)local.Props[0]);
+    Assert.Equal(2L * 46186158000L, (long)local.Props[1]);
+  }
+
+  private sealed class FbxNode
+  {
+    public string Name { get; init; } = "";
+    public List<object?> Props { get; } = new();
+    public List<FbxNode> Children { get; } = new();
+    public bool Sentinel { get; set; }
+  }
+
+  private static List<FbxNode> FbxNodes(byte[] file)
+  {
+    var offset = 27;
+    var roots = new List<FbxNode>();
+    while (offset + 13 < file.Length)
+    {
+      var node = ReadFbx(file, ref offset);
+      if (node is null)
+        break;
+      roots.Add(node);
+    }
+
+    return roots;
+  }
+
+  private static FbxNode? ReadFbx(byte[] file, ref int offset)
+  {
+    var end = BitConverter.ToInt32(file, offset);
+    if (end == 0)
+    {
+      offset += 13;
+      return null;
+    }
+
+    var count = BitConverter.ToInt32(file, offset + 4);
+    var nameLength = file[offset + 12];
+    var name = Encoding.UTF8.GetString(file, offset + 13, nameLength);
+    var cursor = offset + 13 + nameLength;
+    var node = new FbxNode { Name = name };
+    for (var i = 0; i < count; i++)
+      node.Props.Add(ReadFbxProp(file, ref cursor));
+    if (cursor < end)
+    {
+      while (cursor < end - 13)
+      {
+        var child = ReadFbx(file, ref cursor);
+        if (child is null)
+          break;
+        node.Children.Add(child);
+      }
+
+      node.Sentinel = end - cursor == 13 && file.AsSpan(cursor, 13).SequenceEqual(new byte[13]);
+    }
+
+    offset = end;
+    return node;
+  }
+
+  private static object? ReadFbxProp(byte[] file, ref int cursor)
+  {
+    var type = (char)file[cursor++];
+    switch (type)
+    {
+      case 'Y':
+        var y = BitConverter.ToInt16(file, cursor);
+        cursor += 2;
+        return y;
+      case 'C':
+        return file[cursor++];
+      case 'I':
+        var i = BitConverter.ToInt32(file, cursor);
+        cursor += 4;
+        return i;
+      case 'F':
+        var f = BitConverter.ToSingle(file, cursor);
+        cursor += 4;
+        return f;
+      case 'D':
+        var d = BitConverter.ToDouble(file, cursor);
+        cursor += 8;
+        return d;
+      case 'L':
+        var l = BitConverter.ToInt64(file, cursor);
+        cursor += 8;
+        return l;
+      case 'S' or 'R':
+        var n = BitConverter.ToInt32(file, cursor);
+        cursor += 4;
+        var bytes = file.AsSpan(cursor, n);
+        cursor += n;
+        if (type == 'R')
+          return bytes.ToArray();
+        var zero = bytes.IndexOf((byte)0);
+        return Encoding.UTF8.GetString(zero >= 0 ? bytes[..zero] : bytes);
+      case 'i' or 'f' or 'd' or 'l':
+        var elements = BitConverter.ToInt32(file, cursor);
+        var encoding = BitConverter.ToInt32(file, cursor + 4);
+        var compressed = BitConverter.ToInt32(file, cursor + 8);
+        cursor += 12;
+        var raw = file.AsSpan(cursor, compressed).ToArray();
+        cursor += compressed;
+        if (encoding == 1)
+        {
+          using var input = new MemoryStream(raw);
+          using var zlib = new ZLibStream(input, CompressionMode.Decompress);
+          using var output = new MemoryStream();
+          zlib.CopyTo(output);
+          raw = output.ToArray();
+        }
+
+        if (type == 'f')
+        {
+          var values = new float[elements];
+          Buffer.BlockCopy(raw, 0, values, 0, elements * 4);
+          return values;
+        }
+
+        if (type == 'i')
+        {
+          var values = new int[elements];
+          Buffer.BlockCopy(raw, 0, values, 0, elements * 4);
+          return values;
+        }
+
+        return raw;
+      default:
+        throw new InvalidDataException($"FBX property {type}");
+    }
   }
 
 }

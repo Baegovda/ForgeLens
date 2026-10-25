@@ -29,9 +29,11 @@ Options:
   --lod <n>               0 (default) exports the meshes Index leaves checked.
                           1 and up export that smaller vertex pool. export only.
   --anim <name|all>       Also write {model}__{clip}.fbx / .glb with that clip on this
-                          skeleton. <name> matches the .sani path (one token, or several
-                          clips when it is a substring). all writes every .sani that
-                          shares at least 8 bone names with the model. export only.
+                          skeleton. The FBX is the skeleton and the curves only (no mesh),
+                          so Unreal imports an AnimSequence onto the existing skeleton.
+                          The glb keeps the mesh. <name> matches the .sani path (one token,
+                          or several clips when it is a substring). all writes every .sani
+                          that shares at least 8 bone names with the model. export only.
                           Bones the clip does not name stay on the bind pose.
   --no-recursive          When the input is a folder, do not search subfolders.
   --prefix-archive        Write each archive under <output>\<archive name>\. extract only.
