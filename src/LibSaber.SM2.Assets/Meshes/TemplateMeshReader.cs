@@ -546,76 +546,25 @@ public static class TemplateMeshReader
 
     var layer = DiffuseLayer(sub.Material);
     var set = layer is { UvSetIndex: >= 0 } ? layer.UvSetIndex : 0;
-    var scale = UvScale(slice.Uv.Flags, sub, set);
     var tileU = layer is { TilingU: > 0 and < 64 } ? layer.TilingU : 1f;
     var tileV = layer is { TilingV: > 0 and < 64 } ? layer.TilingV : 1f;
-    var sources = new Vector2[count];
     var index = 0;
     foreach (var data in new InterleavedDataSerializer(slice.Uv).DeserializeRange(reader, start, end))
     {
-      if (index >= sources.Length)
+      if (index >= uvs.Length)
         break;
       var source = UvChannel(data, set);
-      sources[index++] = new Vector2(source.X, source.Y);
-    }
-
-    // UvScaling is the factor that was divided out before snorm packing, but only on axes that
-    // were actually packed into 1/scale. Armor often keeps a second island in the other half of U
-    // (sharedHiLo == 0). Multiplying that axis tiles it over the first island.
-    var (scaleU, scaleV) = PackedChannelScales(sources, index, scale);
-    for (var i = 0; i < index; i++)
-    {
-      var snormU = sources[i].X;
-      var snormV = 1f - sources[i].Y;
-      // A packed island shares the submesh with a second island that already sits past 1/scale.
-      // The part scale still expands the packed island. Vertices that would leave 0..1 keep
-      // their stored coordinate so that second island is not wrapped back over the first.
-      var uScale = Fits(snormU, scaleU) ? scaleU : 1f;
-      var vScale = Fits(snormV, scaleV) ? scaleV : 1f;
-      uvs[i] = new Vector2(snormU * uScale * tileU, 1f - snormV * vScale * tileV);
+      // InterleavedDataSerializer already flips V (1 - snorm). Those snorms are the texture
+      // coordinates. The submesh UvScaling short is not a multiplier: the greaves and plates
+      // are packed into the lower half of the atlas on purpose. Stretching that island by the
+      // short lands it on the parchment and trim in the other half, which is the scrambled
+      // patches on the armor. Material tiling still applies, around the flipped V.
+      var u = source.X * tileU;
+      var v = tileV == 1f ? source.Y : 1f - (1f - source.Y) * tileV;
+      uvs[index++] = new Vector2(u, v);
     }
 
     return uvs;
-  }
-
-  private static (float U, float V) PackedChannelScales(Vector2[] sources, int count, float scale)
-  {
-    if (count == 0 || scale <= 1f)
-      return (1f, 1f);
-
-    var u = new float[count];
-    var v = new float[count];
-    for (var i = 0; i < count; i++)
-    {
-      u[i] = sources[i].X;
-      v[i] = 1f - sources[i].Y;
-    }
-
-    Array.Sort(u);
-    Array.Sort(v);
-    var u99 = u[(int)(0.99f * (count - 1))];
-    var v99 = v[(int)(0.99f * (count - 1))];
-    // A channel packed by `scale` has its 99th percentile at about 1/scale. One that already
-    // reaches the far side of the texture must stay put, or the preview wraps it into patches.
-    const float limit = 1.05f;
-    return (u99 * scale <= limit ? scale : 1f, v99 * scale <= limit ? scale : 1f);
-  }
-
-  private static bool Fits(float snorm, float scale)
-    => snorm * scale <= 1.02f && snorm * scale >= -0.02f;
-
-  private static float UvScale(FVFFlags flags, GeometrySubMesh sub, int set)
-  {
-    var compressed = set switch
-    {
-      1 => (flags & FVFFlags.TEX1_COMPR) != 0,
-      2 => (flags & FVFFlags.TEX2_COMPR) != 0,
-      3 => (flags & FVFFlags.TEX3_COMPR) != 0,
-      _ => (flags & FVFFlags.TEX0_COMPR) != 0,
-    };
-    if (!compressed || !sub.UvScaling.TryGetValue((byte)set, out var raw) || raw == 0)
-      return 1f;
-    return raw;
   }
 
   private static Vector4 UvChannel(InterleavedData data, int set)

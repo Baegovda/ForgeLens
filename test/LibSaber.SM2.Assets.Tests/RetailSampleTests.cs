@@ -153,10 +153,11 @@ public class RetailSampleTests
       armMaxU = MathF.Max(armMaxU, uv.X);
     }
 
-    // Scale 2 is applied only to channels packed into about 1/scale. This arms part's V was packed
-    // into the top half; its U already spans the texture, and multiplying U tiles a second island.
-    Assert.True(armMinV < 0.25f, $"arm V min {armMinV}");
-    Assert.InRange(armMaxU, 0.85f, 1.05f);
+    // Compressed UVs are already texture coordinates. This arms island sits in the lower half
+    // of the atlas, which is the blue plate. Multiplying by the submesh UvScaling short would
+    // stretch it onto the parchment half and drop V's minimum near 0.
+    Assert.InRange(armMinV, 0.45f, 0.65f);
+    Assert.InRange(armMaxU, 0.95f, 1.05f);
     Assert.Equal(mesh.Positions.Count, mesh.Uvs.Count);
     Assert.Equal(mesh.Positions.Count, mesh.Normals.Count);
     Assert.Equal(mesh.Positions.Count, mesh.Skin.Count);
