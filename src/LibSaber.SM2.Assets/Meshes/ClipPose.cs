@@ -3,7 +3,11 @@ using LibSaber.SM2.Assets.Animation;
 
 namespace LibSaber.SM2.Assets.Meshes;
 
-/// <summary>Writes one clip sample over skeleton bind locals. Missing channels keep the bind value.</summary>
+/// <summary>
+///   Writes one clip sample over skeleton bind locals. A rotation key is an offset from
+///   identity, so it is applied on top of the bind rotation (<c>bind * clip</c>). An
+///   identity bind leaves the key unchanged. Missing channels keep the bind value.
+/// </summary>
 internal static class ClipPose
 {
 
@@ -32,10 +36,18 @@ internal static class ClipPose
 
       var bind = local[index];
       var translation = AnimationClip.Sample(track.Translation, new Vector3(bind.M41, bind.M42, bind.M43), time);
-      var rotation = AnimationClip.Sample(track.Rotation, Quaternion.Identity, time);
       var scale = AnimationClip.Sample(track.Scale, Vector3.One, time);
+      Quaternion rotation;
       if (track.Rotation.Count == 0)
         rotation = Quaternion.CreateFromRotationMatrix(bind);
+      else
+      {
+        var bindRotation = Matrix4x4.Decompose(bind, out _, out var decomposed, out _)
+          ? decomposed
+          : Quaternion.CreateFromRotationMatrix(bind);
+        rotation = Quaternion.Normalize(bindRotation * AnimationClip.Sample(track.Rotation, Quaternion.Identity, time));
+      }
+
       if (track.Scale.Count == 0)
         scale = Matrix4x4.Decompose(bind, out var bindScale, out _, out _) ? bindScale : Vector3.One;
       local[index] = Matrix4x4.CreateScale(scale) * Matrix4x4.CreateFromQuaternion(rotation) * Matrix4x4.CreateTranslation(translation);

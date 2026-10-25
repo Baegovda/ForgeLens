@@ -279,9 +279,12 @@ public static class GltfWriter
       {
         var times = track.Rotation.Select(key => key.Time).ToArray();
         var values = new float[track.Rotation.Count * 4];
+        var bindRotation = Matrix4x4.Decompose(mesh.Bones[node].Local, out _, out var decomposed, out _)
+          ? decomposed
+          : Quaternion.CreateFromRotationMatrix(mesh.Bones[node].Local);
         for (var i = 0; i < track.Rotation.Count; i++)
         {
-          var rotation = TurnQuaternion(track.Rotation[i].Value);
+          var rotation = TurnQuaternion(Quaternion.Normalize(bindRotation * track.Rotation[i].Value));
 
           values[i * 4] = rotation.X;
           values[i * 4 + 1] = rotation.Y;

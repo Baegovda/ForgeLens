@@ -282,6 +282,79 @@ public class RetailSampleTests
     Assert.Contains("rotation", glb);
   }
 
+  [Fact]
+  public void RetailMarine_DecodesIdleAndAttackOntoTitusNames()
+  {
+    var root = Environment.GetEnvironmentVariable("LIBSABER_SM2_PICK");
+    if (string.IsNullOrWhiteSpace(root) || !Directory.Exists(root))
+      return;
+
+    using var dir = new TempDirectory();
+    var entries = Directory.EnumerateFiles(root, "*", SearchOption.AllDirectories)
+      .Select(path => new CacheFile.Entry(Path.GetRelativePath(root, path).Replace('\\', '/'), File.ReadAllBytes(path)))
+      .ToArray();
+    CacheFile.Create(dir.Path, "pick.pak", entries);
+    var catalog = GameCatalog.Load(dir.Path);
+    using var store = new ArchiveStore(catalog);
+
+    var idle = LoadClip(catalog, store, "animation/interplay/battle_barge/idle/marine_idle_v01_intercessor.sani.resource");
+    Assert.Equal(286, idle.Bones.Count);
+    Assert.InRange(idle.Duration, 40.4f, 40.5f);
+    Assert.Equal(30f, idle.SampleRate);
+    Assert.Contains("Footsteps", idle.Sequences);
+    AssertCurves(idle, rotations: 52, translations: 0, frames: 1214);
+    var idleCentre = idle.Tracks.Single(track => track.BoneName == "CENTRE").Rotation[0].Value;
+    Assert.InRange(idleCentre.X, 0.03f, 0.06f);
+    Assert.InRange(idleCentre.W, 0.99f, 1f);
+    var idleBack = Arc(idle.Tracks.Single(track => track.BoneName == "BACKup"));
+    Assert.InRange(idleBack, 80f, 100f);
+
+    var attack = LoadClip(catalog, store, "animation/primaris/assault/melee/npc_assault_attack_melee_thunder_hammer_light_1_intercessor.sani");
+    Assert.InRange(attack.Duration, 5.1f, 5.3f);
+    Assert.Equal(30f, attack.SampleRate);
+    Assert.Contains("vfx_hammer", attack.Sequences);
+    AssertCurves(attack, rotations: 88, translations: 0, frames: 157);
+    Assert.InRange(Arc(attack.Tracks.Single(track => track.BoneName == "CENTRE")), 15f, 45f);
+    Assert.InRange(Arc(attack.Tracks.Single(track => track.BoneName == "ARM1R")), 80f, 110f);
+    Assert.InRange(Arc(attack.Tracks.Single(track => track.BoneName == "shoulder_R")), 85f, 110f);
+
+    var run = LoadClip(catalog, store, "animation/primaris/tacticus/loco/run/tacticus_unarmed_run_fwd_intercessor.sani");
+    Assert.False(run.HasCurves);
+    Assert.Equal(286, run.Bones.Count);
+    Assert.InRange(run.Duration, 1.0f, 1.1f);
+    Assert.Contains(run.Notes, note => note.Contains("do not partition", StringComparison.Ordinal) && note.Contains("15510", StringComparison.Ordinal));
+
+    var titus = Environment.GetEnvironmentVariable("LIBSABER_SM2_TITUS");
+    if (string.IsNullOrWhiteSpace(titus) || !Directory.Exists(titus))
+      return;
+
+    using var titusDir = new TempDirectory();
+    var titusEntries = Directory.EnumerateFiles(titus, "*", SearchOption.AllDirectories)
+      .Select(path => new CacheFile.Entry(Path.GetRelativePath(titus, path).Replace('\\', '/'), File.ReadAllBytes(path)))
+      .ToArray();
+    CacheFile.Create(titusDir.Path, "titus.pak", titusEntries);
+    var titusCatalog = GameCatalog.Load(titusDir.Path);
+    using var titusStore = new ArchiveStore(titusCatalog);
+    var bones = LoadMesh(titusCatalog, titusStore, "tpl/cc_titus_assault.tpl/cc_titus_assault.tpl").Bones;
+    var names = bones.Select(bone => bone.Name).ToHashSet(StringComparer.Ordinal);
+    Assert.Equal(281, idle.Bones.Count(name => names.Contains(name)));
+    Assert.Equal(533, bones.Count);
+    Assert.Contains(bones, bone => bone.Name == "Object00C9" && bone.Parent < 0);
+  }
+
+  private static float Arc(BoneTrack track)
+  {
+    var origin = track.Rotation[0].Value;
+    var arc = 0f;
+    foreach (var key in track.Rotation)
+    {
+      var dot = MathF.Abs(Quaternion.Dot(origin, key.Value));
+      arc = MathF.Max(arc, MathF.Acos(Math.Clamp(dot, -1f, 1f)) * 2f * (180f / MathF.PI));
+    }
+
+    return arc;
+  }
+
   private static void AssertCurves(AnimationClip clip, int rotations, int translations, int frames)
   {
     Assert.True(clip.HasCurves);

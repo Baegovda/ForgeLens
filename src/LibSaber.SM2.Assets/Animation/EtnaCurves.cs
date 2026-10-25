@@ -4,45 +4,62 @@ namespace LibSaber.SM2.Assets.Animation;
 
 /// <summary>
 ///   Expands a retail ETNA <c>.sani</c> plus its <c>.sani_data</c> into local TRS keys.
-///   The <c>.sani</c> 0xF6 block lists which bones animate and stores a per-bone range.
-///   <c>.sani_data</c> is one 0xF2 block whose payload is
-///   <c>frames * (animatedRotations * 6 + animatedTranslations * 4)</c> bytes:
-///   all translation keys, then all rotation keys, frame-major.
+///   The channel block (0xF6, or 0xF2 when the clip has no external payload) lists which
+///   bones animate and stores a per-bone range. Its index table is
+///   <c>30 + declaredBones * 4</c> bytes, so a 73-bone clip ends that table at byte 322
+///   and a 282-bone intercessor clip ends it at byte 1158. <c>.sani_data</c> is one 0xF2
+///   block whose payload is <c>frames * (animatedRotations * 6 + animatedTranslations * 4)</c>
+///   bytes: all translation keys, then all rotation keys, frame-major.
 ///   A rotation key is three int16 values lerped from the bone's min xyz to max xyz;
 ///   w is <c>sqrt(1 - x² - y² - z²)</c> with a positive sign. Those ranges are the first
-///   28-byte-per-bone block in the 0xF6 tail that stays on the unit sphere. A translation
+///   28-byte-per-bone block in the channel tail that stays on the unit sphere. A block
+///   that also swings <c>CENTRE</c> more than 100° is skipped when a later block stays
+///   under that; the thunder-hammer clip's first block folds the legs, and the next one
+///   is the arm swing. A translation
 ///   key is three signed 10-bit values in the low 30 bits, lerped through the range record
 ///   packed immediately before that block (when there is room) and unwrapped so a code
 ///   that passes 511 does not pop to -512. Bones the clip does not list keep the skeleton
-///   bind pose. The 0xF4 block (6 int16 per frame, middle component always 0) is a separate
-///   track whose bone and unit scale are not identified, so it is not sampled.
+///   bind pose. The 0xF4 block (6 int16 per frame) is a separate track whose bone and unit
+///   scale are not identified, so it is not sampled. A clip whose curves live only inside
+///   the 0xF2 block, with no <c>.sani_data</c> of that grid size, is left unsampled.
 /// </summary>
 internal static class EtnaCurves
 {
 
   public static bool TryExpand(byte[] sani, byte[]? data, AnimationClip clip, int frames)
   {
-    if (data is null || frames <= 1 || clip.Bones.Count == 0 || clip.SampleRate <= 0)
+    if (frames <= 1 || clip.Bones.Count == 0 || clip.SampleRate <= 0)
     {
-      clip.Notes.Add(data is null
-        ? "Paired .sani_data was not loaded, so curve keys were not sampled."
-        : "The ETNA header has no frame rate or bone names, so curve keys were not sampled.");
+      clip.Notes.Add("The ETNA header has no frame rate or bone names, so curve keys were not sampled.");
       return false;
     }
 
-    if (!TryPayload(data, out var payload))
+    if (!TryChannels(sani, clip.Bones.Count, out var tail, out var translations, out var rotations, out var channel))
     {
-      clip.Notes.Add(".sani_data does not start with the 0xF2 block, so curve keys were not sampled.");
-      return false;
-    }
+      if (rotations.Count == 0)
+        clip.Notes.Add(channel);
+      else
+      {
+        var grid = frames * (rotations.Count * 6 + translations.Count * 4);
+        clip.Notes.Add(
+          $"The {channel} block lists {rotations.Count} rotation and {translations.Count} translation bones, but the index lists do not partition the declared bones. "
+          + (data is null
+            ? $"No .sani_data key grid was loaded. The {tail.Length} bytes after the bone table are not a frame-major grid of {frames} frames ({grid} bytes), so curves were not sampled."
+            : "Curve keys were not sampled."));
+      }
 
-    if (!TryChannels(sani, clip.Bones.Count, out var tail, out var translations, out var rotations))
-    {
-      clip.Notes.Add("The ETNA 0xF6 bone table does not partition the skeleton, so curve keys were not sampled.");
       return false;
     }
 
     var expected = frames * (rotations.Count * 6 + translations.Count * 4);
+    if (data is null || !TryPayload(data, out var payload))
+    {
+      clip.Notes.Add(
+        $"No .sani_data key grid was loaded. The {channel} block lists {rotations.Count} rotation and {translations.Count} translation bones and then {tail.Length} bytes. "
+        + $"A frame-major grid of {frames} frames would be {expected} bytes (translation keys, then rotation keys) and these bytes are not that grid, so curves were not sampled.");
+      return false;
+    }
+
     if (payload.Length != expected || rotations.Count == 0)
     {
       clip.Notes.Add($".sani_data is {payload.Length} bytes; {frames} frames of {rotations.Count} rotations and {translations.Count} translations would be {expected}. Keys were not sampled.");
@@ -51,7 +68,7 @@ internal static class EtnaCurves
 
     var transBytes = frames * translations.Count * 4;
     var rotBytes = payload.AsSpan(transBytes, frames * rotations.Count * 6);
-    if (!TryRotationRanges(tail, rotBytes, frames, rotations.Count, out var rangeOffset, out var medianDegrees))
+    if (!TryRotationRanges(tail, rotBytes, frames, rotations, clip.Bones, out var rangeOffset, out var medianDegrees))
     {
       clip.Notes.Add("Rotation ranges in the 0xF6 block did not produce unit quaternions, so keys were not sampled.");
       return false;
@@ -104,7 +121,7 @@ internal static class EtnaCurves
 
     clip.Notes.Add(
       $"Sampled {rotations.Count} rotation tracks (median step {medianDegrees:0.###}°) and {translated} of {translations.Count} translation tracks. "
-      + "A rotation key is three int16 components lerped through the bone's 0xF6 min/max, with w reconstructed. "
+      + "A rotation key is three int16 components lerped through the bone's channel-block min/max, with w reconstructed. "
       + "A translation key is three 10-bit components in the same ranges, unwrapped across frames. "
       + "Other bones stay on the skeleton bind pose. The 0xF4 int16 track is not a confirmed bone, so it was left out.");
     return true;
@@ -122,52 +139,78 @@ internal static class EtnaCurves
     return true;
   }
 
-  private static bool TryChannels(byte[] sani, int boneCount, out byte[] tail, out List<int> translations, out List<int> rotations)
+  private static bool TryChannels(byte[] sani, int nameCount, out byte[] tail, out List<int> translations, out List<int> rotations, out string channel)
   {
     tail = Array.Empty<byte>();
     translations = new List<int>();
     rotations = new List<int>();
+    channel = "0xF6";
     if (sani.Length < 36 || sani[0] != (byte)'E')
+    {
+      channel = "The ETNA channel block is missing, so curve keys were not sampled.";
       return false;
+    }
+
     var cursor = BitConverter.ToInt32(sani, 8);
     byte[]? block = null;
+    ushort blockId = 0;
     while (cursor + 6 <= sani.Length)
     {
       var id = BitConverter.ToUInt16(sani, cursor);
       var end = BitConverter.ToInt32(sani, cursor + 2);
       if (end <= cursor || end > sani.Length)
         break;
-      if (id == 0xF6)
+      // 0xF6 is the channel table when the key grid lives in .sani_data.
+      // A clip with no sibling stores that same table at the start of 0xF2.
+      if (id == 0xF6 || (id == 0xF2 && blockId != 0xF6))
+      {
         block = sani.AsSpan(cursor + 6, end - (cursor + 6)).ToArray();
+        blockId = id;
+      }
+
       cursor = end;
     }
 
-    if (block is null || block.Length < 322)
+    if (block is null || block.Length < 30 || BitConverter.ToUInt16(block, 0) != 2)
+    {
+      channel = "The ETNA channel block does not start with a version-2 bone table, so curve keys were not sampled.";
       return false;
+    }
 
     var count0 = BitConverter.ToUInt16(block, 2);
     var count1 = BitConverter.ToUInt16(block, 6);
     var count2 = BitConverter.ToUInt16(block, 14);
     var count3 = BitConverter.ToUInt16(block, 18);
-    if (2 + 2 + (count0 + count1 + count2 + count3) * 2 > 322)
+    var boneCount = count0 + count2;
+    var table = 30 + boneCount * 4;
+    channel = "0x" + blockId.ToString("X2");
+    if (boneCount == 0 || count1 + count3 != boneCount || boneCount > nameCount || block.Length < table)
+    {
+      channel = $"The {channel} bone table does not partition the skeleton, so curve keys were not sampled.";
       return false;
-    if (count0 + count2 != boneCount || count1 + count3 != boneCount)
-      return false;
+    }
 
     var index = 30;
     var trans = ReadList(block, ref index, count0);
     var rot = ReadList(block, ref index, count1);
     var transRest = ReadList(block, ref index, count2);
     var rotRest = ReadList(block, ref index, count3);
-    if (index != 322)
+    if (index != table)
+    {
+      channel = $"The {channel} bone table does not partition the skeleton, so curve keys were not sampled.";
       return false;
-    if (!Partitions(trans, transRest, boneCount) || !Partitions(rot, rotRest, boneCount))
+    }
+
+    if (rot.Count == 0 || block.Length - table < rot.Count * 28)
+    {
+      channel = $"The {channel} bone table has no rotation ranges, so curve keys were not sampled.";
       return false;
+    }
 
     translations = trans;
     rotations = rot;
-    tail = block.AsSpan(322).ToArray();
-    return tail.Length >= rot.Count * 28;
+    tail = block.AsSpan(table).ToArray();
+    return Partitions(trans, transRest, boneCount) && Partitions(rot, rotRest, boneCount);
   }
 
   private static List<int> ReadList(byte[] block, ref int index, int count)
@@ -198,14 +241,29 @@ internal static class EtnaCurves
     return true;
   }
 
-  private static bool TryRotationRanges(byte[] tail, ReadOnlySpan<byte> rotations, int frames, int bones, out int offset, out float medianDegrees)
+  private static bool TryRotationRanges(
+    byte[] tail,
+    ReadOnlySpan<byte> rotations,
+    int frames,
+    List<int> boneIds,
+    List<string> names,
+    out int offset,
+    out float medianDegrees)
   {
     offset = 0;
     medianDegrees = 180;
+    var bones = boneIds.Count;
     var record = bones * 28;
+    var centre = boneIds.FindIndex(bone => (uint)bone < (uint)names.Count && names[bone] == "CENTRE");
     // The range table is packed at the front of the tail. A later 4-byte shift can
     // look smoother because it pairs keys with a tiny interval and squashes the pose
     // toward identity, so the first block that stays on the unit sphere wins.
+    // One marine clip has an earlier block that is numerically valid and swings
+    // CENTRE by about 135°, which plants the feet above the head. The following
+    // block keeps CENTRE small and is the one applied. Hormagaunt and the idle
+    // clip are already under 100° on the first block.
+    int? folded = null;
+    float foldedMedian = 180;
     for (var start = 0; start + record <= tail.Length; start += 4)
     {
       if (!RangesLookReal(tail, start, bones))
@@ -213,12 +271,56 @@ internal static class EtnaCurves
       var (maxSquared, median) = ScoreRotations(tail, start, rotations, frames, bones);
       if (maxSquared > 1.25f || median > 8f)
         continue;
+      if (centre >= 0 && CentreArc(tail, start, rotations, frames, bones, centre) > 100f)
+      {
+        if (folded is null)
+        {
+          folded = start;
+          foldedMedian = median;
+        }
+
+        continue;
+      }
+
       offset = start;
       medianDegrees = median;
       return true;
     }
 
+    if (folded is int fallback)
+    {
+      offset = fallback;
+      medianDegrees = foldedMedian;
+      return true;
+    }
+
     return false;
+  }
+
+  private static float CentreArc(byte[] tail, int start, ReadOnlySpan<byte> rotations, int frames, int bones, int bone)
+  {
+    var min = Read3(tail, start + bone * 28);
+    var max = Read3(tail, start + bone * 28 + 12);
+    Quaternion? origin = null;
+    var arc = 0f;
+    for (var frame = 0; frame < frames; frame++)
+    {
+      var sample = frame * bones + bone;
+      var x = Dequant(ReadI16(rotations, sample * 6), min.X, max.X);
+      var y = Dequant(ReadI16(rotations, sample * 6 + 2), min.Y, max.Y);
+      var z = Dequant(ReadI16(rotations, sample * 6 + 4), min.Z, max.Z);
+      var rotation = QuantizedQuat(x, y, z);
+      if (origin is not Quaternion first)
+      {
+        origin = rotation;
+        continue;
+      }
+
+      var dot = MathF.Abs(Quaternion.Dot(first, rotation));
+      arc = MathF.Max(arc, MathF.Acos(Math.Clamp(dot, -1f, 1f)) * 2f * (180f / MathF.PI));
+    }
+
+    return arc;
   }
 
   private static bool RangesLookReal(byte[] tail, int start, int bones)
