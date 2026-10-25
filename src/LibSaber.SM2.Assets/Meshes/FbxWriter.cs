@@ -216,7 +216,9 @@ public static class FbxWriter
     var textures = animationOnly ? new List<TextureRef>() : CollectTextures(mesh);
     var geometry = !animationOnly && mesh.HasTriangles ? 1 : 0;
     var models = (animationOnly ? 0 : 1) + mesh.Bones.Count + (mesh.Bones.Count > 0 ? 1 : 0);
-    var attributes = mesh.Bones.Count;
+    // Blender's armature FBX connects a Null NodeAttribute to the Null model. LimbNode
+    // attributes alone leave that root without the attribute its DefaultAttributeIndex names.
+    var attributes = mesh.Bones.Count + (mesh.Bones.Count > 0 ? 1 : 0);
     var deformers = !animationOnly && mesh.HasSkin && mesh.HasTriangles ? 1 + bones.Clusters.Count : 0;
     var poses = 1;
     var curves = take?.CurveCount ?? 0;
@@ -232,7 +234,11 @@ public static class FbxWriter
     if (geometry != 0)
       ObjectType(definitions, "Geometry", geometry, "FbxMesh", GeometryTemplate);
     if (attributes != 0)
-      ObjectType(definitions, "NodeAttribute", attributes, "LimbNode", AttributeTemplate);
+    {
+      var attributeType = ObjectType(definitions, "NodeAttribute", attributes, null, null);
+      PropertyTemplate(attributeType, "FbxNull", NullAttributeTemplate);
+      PropertyTemplate(attributeType, "LimbNode", AttributeTemplate);
+    }
     if (materials.Count != 0)
       ObjectType(definitions, "Material", materials.Count, "FbxSurfacePhong", MaterialTemplate);
     if (textures.Count != 0)
@@ -425,6 +431,14 @@ public static class FbxWriter
 
   private static void WriteArmature(Node objects, ExportedMesh mesh, IdSource ids)
   {
+    var attribute = objects.Add("NodeAttribute");
+    attribute.Int64(ids.ArmatureAttribute);
+    attribute.String(NameClass(mesh.Name + "_Skeleton", "NodeAttribute"));
+    attribute.String("Null");
+    attribute.Add("TypeFlags").String("Null");
+    var attributeProps = attribute.Add("Properties70");
+    PropDouble(attributeProps, "Size", 100);
+
     var model = objects.Add("Model");
     model.Int64(ids.Armature);
     model.String(NameClass(mesh.Name + "_Skeleton", "Model"));
@@ -649,7 +663,10 @@ public static class FbxWriter
     var connections = root.Add("Connections");
     var sceneParent = mesh.Bones.Count > 0 ? ids.Armature : 0;
     if (mesh.Bones.Count > 0)
+    {
       Connect(connections, "OO", ids.Armature, 0);
+      Connect(connections, "OO", ids.ArmatureAttribute, ids.Armature);
+    }
     if (!animationOnly)
       Connect(connections, "OO", ids.MeshModel, sceneParent);
     if (!animationOnly && mesh.HasTriangles)
@@ -829,13 +846,18 @@ public static class FbxWriter
       matrix.M41, matrix.M42, matrix.M43, matrix.M44,
     };
 
-  private static void ObjectType(Node definitions, string name, int count, string? template, Action<Node>? fill)
+  private static Node ObjectType(Node definitions, string name, int count, string? template, Action<Node>? fill)
   {
     var type = definitions.Add("ObjectType");
     type.String(name);
     type.Add("Count").Int32(count);
-    if (template is null || fill is null)
-      return;
+    if (template is not null && fill is not null)
+      PropertyTemplate(type, template, fill);
+    return type;
+  }
+
+  private static void PropertyTemplate(Node type, string template, Action<Node> fill)
+  {
     var props = type.Add("PropertyTemplate");
     props.String(template);
     fill(props.Add("Properties70"));
@@ -859,6 +881,9 @@ public static class FbxWriter
     PropBool(props, "Casts Shadows", true);
     PropBool(props, "Receive Shadows", true);
   }
+
+  private static void NullAttributeTemplate(Node props)
+    => PropDouble(props, "Size", 100);
 
   private static void AttributeTemplate(Node props)
     => PropDouble(props, "Size", 1);
@@ -1372,6 +1397,7 @@ public static class FbxWriter
     public long Skin { get; } = 3;
     public long Pose { get; } = 4;
     public long Armature { get; } = 5;
+    public long ArmatureAttribute { get; } = 6;
     public long[] BoneModels { get; private set; } = Array.Empty<long>();
     public long[] BoneAttributes { get; private set; } = Array.Empty<long>();
     public long[] Clusters { get; private set; } = Array.Empty<long>();

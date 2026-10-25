@@ -19,9 +19,10 @@ namespace LibSaber.SM2.Assets.Animation;
 ///   key is three signed 10-bit values in the low 30 bits, lerped through the range record
 ///   packed immediately before that block (when there is room) and unwrapped so a code
 ///   that passes 511 does not pop to -512. Bones the clip does not list keep the skeleton
-///   bind pose. The 0xF4 block (6 int16 per frame) is a separate track whose bone and unit
-///   scale are not identified, so it is not sampled. A clip whose curves live only inside
-///   the 0xF2 block, with no <c>.sani_data</c> of that grid size, is left unsampled.
+///   bind pose. The 0xF4 block is a 50-byte header plus 6 int16 samples per frame. Its bone
+///   and unit scale are not identified (on the unarmed run one channel is a 4096-step saw,
+///   and the idle track is entirely zero), so it is not sampled. A clip whose curves live
+///   only inside the 0xF2 block, with no <c>.sani_data</c> of that grid size, is left unsampled.
 /// </summary>
 internal static class EtnaCurves
 {

@@ -967,6 +967,11 @@ public class AssetTests
     Assert.DoesNotContain(objects.Children, node => node.Name is "Geometry" or "Deformer" or "Material");
     Assert.DoesNotContain(objects.Children, node => node.Name == "Model" && node.Props.Count > 2 && node.Props[2] as string == "Mesh");
 
+    var nullAttribute = objects.Children.Single(node => node.Name == "NodeAttribute" && node.Props.Count > 2 && node.Props[2] as string == "Null");
+    Assert.Equal("Null", nullAttribute.Children.Single(node => node.Name == "TypeFlags").Props[0]);
+    var limb = objects.Children.First(node => node.Name == "NodeAttribute" && node.Props.Count > 2 && node.Props[2] as string == "LimbNode");
+    Assert.Equal("Skeleton", limb.Children.Single(node => node.Name == "TypeFlags").Props[0]);
+
     var layer = objects.Children.Single(node => node.Name == "AnimationLayer");
     Assert.True(layer.Sentinel, "AnimationLayer needs the null terminator the FBX SDK reader requires");
     Assert.Contains(layer.Children, node => node.Name == "Properties70");
