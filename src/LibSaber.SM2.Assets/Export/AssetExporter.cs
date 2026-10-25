@@ -27,7 +27,7 @@ public sealed class ExportSettings
   /// <summary>Checked meshes for a previewed catalog index. Other files keep Index's defaults.</summary>
   public Dictionary<int, MeshVisibility>? PartVisibility { get; set; }
   /// <summary>Clips written beside the bind mesh as <c>{model}__{clip}.fbx</c> and <c>.glb</c>. The bind file itself stays unanimated.</summary>
-  public IReadOnlyList<AnimationClip> Clips { get; init; } = Array.Empty<AnimationClip>();
+  public IReadOnlyList<AnimationClip> Clips { get; set; } = Array.Empty<AnimationClip>();
   /// <summary>Adds the clip's 0xF4 track to the skeleton root translation. The extractor's <c>--no-root-motion</c> turns this off.</summary>
   public bool RootMotion { get; init; } = true;
   /// <summary>
@@ -254,6 +254,9 @@ public static class AssetExporter
         // when mesh import is off, and the legacy importer builds a second SkeletalMesh.
         FbxWriter.Write(fbxPath, exportMesh, settings.Space, textureFiles, animationOnly: true);
         report.Written++;
+        var animScript = Path.Combine(Path.GetDirectoryName(fbxPath)!, "ue_import_anim.py");
+        if (!File.Exists(animScript) || usedClips.Count == 1)
+          WriteUnrealScript(animScript, report);
       }
 
       var bound = clip.Tracks.Count(track => exportMesh.Bones.Exists(bone => bone.Name == track.BoneName));
@@ -788,7 +791,8 @@ public static class AssetExporter
   private static void WriteUnrealScript(string path, ExportReport report)
   {
     var assembly = typeof(AssetExporter).Assembly;
-    var name = assembly.GetManifestResourceNames().FirstOrDefault(item => item.EndsWith("import_sm2_materials.py", StringComparison.Ordinal));
+    var file = Path.GetFileName(path);
+    var name = assembly.GetManifestResourceNames().FirstOrDefault(item => item.EndsWith(file, StringComparison.Ordinal));
     if (name is null)
       return;
     using var stream = assembly.GetManifestResourceStream(name);

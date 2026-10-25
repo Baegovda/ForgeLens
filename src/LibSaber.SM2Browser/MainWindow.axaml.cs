@@ -30,6 +30,7 @@ public partial class MainWindow : Window
   private TextureDocument? _texture;
   private ExportedMesh? _mesh;
   private AnimationClip? _clip;
+  private int _clipIndex = -1;
   private float _yaw = 0.7f;
   private float _pitch = 0.18f;
   private float _distance;
@@ -357,6 +358,7 @@ public partial class MainWindow : Window
         if (generation != _previewGeneration)
           return;
         _clip = clip;
+        _clipIndex = row.Index;
         ApplyClipToMesh(clip);
         SkeletonToggle.IsVisible = _mesh is { Bones.Count: > 0 };
         PreviewText.Text = Describe(clip);
@@ -818,6 +820,7 @@ public partial class MainWindow : Window
     if (generation != _animGeneration || _mesh is null)
       return;
     _clip = clip;
+    _clipIndex = index;
     ApplyClipToMesh(clip);
     PreviewNote.Text = clip.HasCurves
       ? $"{clip.Name}: {clip.Tracks.Count} tracks, {clip.Duration:0.###}s. Bones this clip does not name stay on the bind pose."
@@ -1078,7 +1081,16 @@ public partial class MainWindow : Window
     try
     {
       var progress = new Progress<string>(path => StatusText.Text = "Exporting " + path);
-      var report = await Task.Run(() => AssetExporter.Export(_catalog, _store, indices, choice.Folder, choice.Settings, progress));
+      var catalog = _catalog;
+      var store = _store;
+      var previewClip = _clip is { HasCurves: true } ? _clipIndex : -1;
+      var notes = new List<string>();
+      var report = await Task.Run(() =>
+      {
+        var files = ExportPlan.Apply(catalog, store, indices, choice.Settings, choice.Clips, previewClip, notes);
+        return AssetExporter.Export(catalog, store, files, choice.Folder, choice.Settings, progress);
+      });
+      report.Messages.InsertRange(0, notes);
       StatusText.Text = $"Exported {report.Written} files, skipped {report.Skipped}. {string.Join(" ", report.Messages.Take(3))}";
     }
     catch (Exception ex)

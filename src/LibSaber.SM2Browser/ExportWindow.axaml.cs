@@ -10,6 +10,7 @@ public sealed class ExportChoice
 {
   public required string Folder { get; init; }
   public required ExportSettings Settings { get; init; }
+  public ClipChoice Clips { get; init; }
 }
 
 public partial class ExportWindow : Window
@@ -90,8 +91,10 @@ public partial class ExportWindow : Window
       WriteModelTextures = ModelTexturesBox.IsChecked == true,
       CopyOriginalBytes = RawBox.IsChecked == true,
       Space = SpaceBox.SelectedIndex == 1 ? ExportSpace.Blender : ExportSpace.Unreal,
+      IncludeClothSim = ClothBox.IsChecked == true,
+      RootMotion = RootMotionBox.IsChecked == true,
     };
-    _result?.TrySetResult(new ExportChoice { Folder = folder, Settings = settings });
+    _result?.TrySetResult(new ExportChoice { Folder = folder, Settings = settings, Clips = (ClipChoice)Math.Max(0, ClipBox.SelectedIndex) });
     Close();
   }
 

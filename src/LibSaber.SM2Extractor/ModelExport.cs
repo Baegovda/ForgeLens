@@ -149,27 +149,11 @@ public static class ModelExport
     TextWriter stderr,
     bool quiet)
   {
-    var headers = SaniIndex.ReadHeaders(catalog, store);
-    List<SaniIndex.Header> chosen;
-    if (animation.Equals("all", StringComparison.OrdinalIgnoreCase))
+    var chosen = ClipResolver.Choose(catalog, store, modelIndex, animation, out var error);
+    if (chosen.Count == 0)
     {
-      var mesh = TemplateMeshReader.Load(catalog, store, modelIndex);
-      var names = mesh.Bones.Select(bone => bone.Name).ToList();
-      chosen = SaniIndex.Compatible(headers, names);
-      if (chosen.Count == 0)
-      {
-        stderr.WriteLine($"No .sani shares at least {SaniIndex.MinimumSharedBones} bone names with this model. Pass --anim and a clip path to force one.");
-        return false;
-      }
-    }
-    else
-    {
-      chosen = SaniIndex.Match(headers, animation);
-      if (chosen.Count == 0)
-      {
-        stderr.WriteLine($"No .sani matches '{animation}'.");
-        return false;
-      }
+      stderr.WriteLine(error);
+      return false;
     }
 
     foreach (var header in chosen)

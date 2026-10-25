@@ -13,6 +13,7 @@
 
   <ItemGroup>
     <EmbeddedResource Include="Export/import_sm2_materials.py" />
+    <EmbeddedResource Include="../../tools/ue/ue_import_anim.py" LogicalName="ue_import_anim.py" />
   </ItemGroup>
 
   <ItemGroup>

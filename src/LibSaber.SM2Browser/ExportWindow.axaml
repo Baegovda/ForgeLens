@@ -36,6 +36,15 @@
         <CheckBox x:Name="ModelTexturesBox" Content="Textures used by the model" IsChecked="True" />
         <CheckBox x:Name="MaterialBox" Content="Material slots as JSON" IsChecked="True" />
         <CheckBox x:Name="RawBox" Content="Also copy original bytes" />
+        <CheckBox x:Name="ClothBox" Content="Include *_SIM cloth simulation meshes (the game never draws them)" />
+        <TextBlock Text="Animations (anim-only FBX against the model's skeleton, plus ue_import_anim.py)" Margin="0,8,0,0" />
+        <ComboBox x:Name="ClipBox" SelectedIndex="1">
+          <ComboBoxItem Content="None (selected .sani export as .anim.json)" />
+          <ComboBoxItem Content="Selected .sani rows, against the selected model" />
+          <ComboBoxItem Content="The clip playing in the preview" />
+          <ComboBoxItem Content="Every clip sharing the model's bone names" />
+        </ComboBox>
+        <CheckBox x:Name="RootMotionBox" Content="Root motion (0xF4 track on the root)" IsChecked="True" />
         <TextBlock TextWrapping="Wrap" Opacity="0.75" Text="Effects (.ps, .sfx) are copied raw, with any texture or model names found inside them. Particle systems are not converted." />
       </StackPanel>
     </ScrollViewer>
