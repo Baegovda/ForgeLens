@@ -227,7 +227,14 @@ def make_master(folder, asset_name="M_SM2", translucent=False):
     link(opaque, "", opacity, "False")
     link(diffuse, "A", opacity, "True")
 
-    mel.connect_material_property(diffuse, "RGB", unreal.MaterialProperty.MP_BASE_COLOR)
+    # glt.albedo_tint from the .td variant (sidecar albedoTint). White when unset.
+    tint = expr(material, unreal.MaterialExpressionVectorParameter, -500, -320)
+    tint.set_editor_property("parameter_name", "AlbedoTint")
+    tint.set_editor_property("default_value", unreal.LinearColor(1.0, 1.0, 1.0, 1.0))
+    tinted = expr(material, unreal.MaterialExpressionMultiply, -200, -260)
+    link(diffuse, "RGB", tinted, "A")
+    link(tint, "", tinted, "B")
+    mel.connect_material_property(tinted, "", unreal.MaterialProperty.MP_BASE_COLOR)
     mel.connect_material_property(opacity, "", unreal.MaterialProperty.MP_OPACITY if translucent else unreal.MaterialProperty.MP_OPACITY_MASK)
     mel.connect_material_property(detail_switch, "", unreal.MaterialProperty.MP_NORMAL)
     mel.connect_material_property(metal, "", unreal.MaterialProperty.MP_METALLIC)
@@ -391,6 +398,11 @@ def build(sidecar_path, folder):
         unreal.MaterialEditingLibrary.set_material_instance_static_switch_parameter_value(instance, "UseOpacityMask", slot.get("blend") in ("masked", "translucent"))
         if emissive is not None:
             unreal.MaterialEditingLibrary.set_material_instance_scalar_parameter_value(instance, "EmissiveStrength", 1.0)
+        albedo_tint = slot.get("albedoTint")
+        if albedo_tint:
+            # The tint bytes are sRGB like the albedo they multiply; Unreal multiplies in linear.
+            lin = [pow(float(c), 2.2) for c in albedo_tint[:3]]
+            unreal.MaterialEditingLibrary.set_material_instance_vector_parameter_value(instance, "AlbedoTint", unreal.LinearColor(lin[0], lin[1], lin[2], 1.0))
         unreal.EditorAssetLibrary.save_loaded_asset(instance)
         instances[name] = instance
         unreal.log("SM2 instance " + name)

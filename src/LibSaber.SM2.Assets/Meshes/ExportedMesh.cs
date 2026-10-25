@@ -44,6 +44,11 @@ public sealed class MeshPart
   public string Variant { get; set; } = "default";
   /// <summary><c>opaque</c>, <c>masked</c> (alpha kill), or <c>translucent</c>.</summary>
   public string Blend { get; set; } = "opaque";
+  /// <summary>
+  ///   <c>glt.albedo_tint</c> of the texture definition variant, as R, G, B, A in 0..1 (the .td stores A, R, G, B bytes).
+  ///   Null when the variant does not set one (white).
+  /// </summary>
+  public float[]? AlbedoTint { get; set; }
   /// <summary>Index leaves LOD and collision shells unchecked. Defaults on so hand-built meshes still export whole.</summary>
   public bool Visible { get; set; } = true;
   /// <summary>"LOD" or "volume" when <see cref="Visible"/> was cleared by Index's default filter.</summary>
@@ -64,6 +69,7 @@ public sealed class MeshPart
       SpecularChannels = SpecularChannels,
       Variant = Variant,
       Blend = Blend,
+      AlbedoTint = AlbedoTint,
       Visible = Visible,
       HideReason = HideReason,
     };

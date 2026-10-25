@@ -64,6 +64,7 @@ public static class MaterialMaps
   {
     var cache = new Dictionary<string, List<MaterialMap>>(StringComparer.OrdinalIgnoreCase);
     var texts = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+    var tints = new Dictionary<string, float[]?>(StringComparer.OrdinalIgnoreCase);
     Attach(mesh.Parts);
     foreach (var level in mesh.Levels)
       Attach(level.Parts);
@@ -91,6 +92,15 @@ public static class MaterialMaps
         part.Emissive = FirstPresent(maps, "emissive");
         part.SpecularChannels = maps.FirstOrDefault(map => map.Role == "specular")?.Channels ?? "";
         part.Blend = BlendOf(maps.FirstOrDefault(map => map.Role == "diffuse"));
+        if (!tints.TryGetValue(key, out var tint))
+        {
+          var text = DefinitionText(catalog, store, hint, key[..key.IndexOf('\n')], texts);
+          var block = text is null ? null : VariantBlock(text, part.Variant);
+          tint = block is null ? null : AlbedoTint(block);
+          tints[key] = tint;
+        }
+
+        part.AlbedoTint = tint;
       }
     }
 
@@ -205,6 +215,23 @@ public static class MaterialMaps
 
   internal static bool IsSrgb(IReadOnlyList<ChannelPack> packing)
     => packing.Count == 0 || packing.Any(channel => channel.Meaning is "albedo" or "emissive");
+
+  private static readonly Regex AlbedoTintSpec = new(
+    @"albedo_tint\s*=\s*\[\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)\s*\]",
+    RegexOptions.Compiled);
+
+  /// <summary>
+  ///   <c>shaders.glt.albedo_tint = [A, R, G, B]</c> (the same byte order as <c>second_spec.metallicTint</c>,
+  ///   whose [255, 252, 204, 133] is gold). Returned as R, G, B, A in 0..1, or null when absent.
+  /// </summary>
+  internal static float[]? AlbedoTint(string variantBlock)
+  {
+    var match = AlbedoTintSpec.Match(variantBlock);
+    if (!match.Success)
+      return null;
+    float Byte(int group) => Math.Clamp(int.Parse(match.Groups[group].Value, CultureInfo.InvariantCulture), 0, 255) / 255f;
+    return new[] { Byte(2), Byte(3), Byte(4), Byte(1) };
+  }
 
   internal static string? VariantBlock(string text, string variant)
   {

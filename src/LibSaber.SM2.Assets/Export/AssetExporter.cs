@@ -684,6 +684,7 @@ public static class AssetExporter
       slot = slot.Name,
       variant = slot.Part.Variant,
       blend = slot.Part.Blend,
+      albedoTint = slot.Part.AlbedoTint,
       maps = slot.Part.Maps.Select(map => new
       {
         role = map.Role,
