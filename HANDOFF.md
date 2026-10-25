@@ -31,7 +31,7 @@ For any agent continuing this work: read this whole file before you do anything.
   - The game exe is at `/workspace/rea/sm2_retail.exe` (81 MB).
     - The REA MCP times out on it; run Ghidra headless or rizin directly instead.
   - The .sani spec and a reference decoder are in `/workspace/rea/out/` (`SANI_FORMAT.md`, `decode_sani.py`).
-  - The box has no GitHub login, so commits made there are not pushed. Push them through a cloud agent or ask india.
+  - Push: on the box `git bundle create /workspace/sm2.bundle <lastpushed>..HEAD`, CopyFromBox to C:\Users\Revaptor_FX\sm2.bundle, then in C:\Users\Revaptor_FX\ls_push: `git fetch ..\sm2.bundle HEAD; git merge --ff-only FETCH_HEAD; git push origin HEAD`.
 - **Repo:** https://github.com/Baegovda/LibSaber. PR #1 is on branch `cursor/sm2-pck-extractor-4420`.
 
 ## Build and install
@@ -108,5 +108,11 @@ For any agent continuing this work: read this whole file before you do anything.
 - Verified: 150 random .sfx parse with no failure; Exports/sfx_fx_iron_halo_25hp (10 emitters, 10 textures, 1 mesh), Exports/sfx_fx_helbrute_head_glow (5 emitters, 6 textures).
 - Next for item 3: UE script that builds a Niagara system from niagara.json (sprite/mesh emitters with spawn rate, lifetime, size/color curves), and export the referenced geom tpls.
 
+### Item 5 (part) RESOLVED - root-motion direction
+- Data is consistent: run F4 root ends at source (0,0,+4.859) = +Z, the character front (Assumption: source +Z front). In the tpl the root node Object00C9 (#201) and ROOT (#202) have identity MatrixLT.
+- UE evidence (AnimPose, WORLD): Interchange-imported skeleton ref has Object00C9/ROOT yaw 180; the legacy-importer anim had yaw 0, so the whole animated body faced -Y (eyes y=-54) and the root moved to y=-485.9. Import mismatch, not a decoder bug.
+- Fix: tools/ue/ue_import_anim.py (also SM2_Work/Scripts) imports anim-only FBX with legacy FBX + import_rotation yaw 180. Result /Game/SM2_Work/Original/cc_titus_assault/Anim_yaw180/*: root yaw 180 = ref, eyes y=+54.5 (face +Y like the mesh), run root 0 -> y=+485.9. All 3 clips reimported. Old /Anim kept.
+- Still open in item 5: F3/F7 second slot, version >= 3, F6 clips without .sani_data.
+
 ### Open
-3 VFX (Niagara builder), 5 .sani gaps, 6 push (no credentials on box) / tests (dotnet test hangs at restore).
+3 VFX (UE Niagara builder from niagara.json), 5 .sani F3/F7 / v3 / F6-without-data, 6 tests (dotnet test hangs at restore; push now works via bundle).
