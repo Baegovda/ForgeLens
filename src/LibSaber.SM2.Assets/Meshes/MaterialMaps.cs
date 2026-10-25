@@ -64,7 +64,7 @@ public static class MaterialMaps
   {
     var cache = new Dictionary<string, List<MaterialMap>>(StringComparer.OrdinalIgnoreCase);
     var texts = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
-    var tints = new Dictionary<string, float[]?>(StringComparer.OrdinalIgnoreCase);
+    var variants = new Dictionary<string, (float[]? Tint, string? Mode)>(StringComparer.OrdinalIgnoreCase);
     Attach(mesh.Parts);
     foreach (var level in mesh.Levels)
       Attach(level.Parts);
@@ -91,15 +91,17 @@ public static class MaterialMaps
         part.Specular = FirstPresent(maps, "specular");
         part.Emissive = FirstPresent(maps, "emissive");
         part.SpecularChannels = maps.FirstOrDefault(map => map.Role == "specular")?.Channels ?? "";
-        part.Blend = BlendOf(maps.FirstOrDefault(map => map.Role == "diffuse"));
-        if (!tints.TryGetValue(key, out var tint))
+        if (!variants.TryGetValue(key, out var shading))
         {
           var text = DefinitionText(catalog, store, hint, key[..key.IndexOf('\n')], texts);
           var block = text is null ? null : VariantBlock(text, part.Variant);
-          tint = block is null ? null : AlbedoTint(block);
-          tints[key] = tint;
+          shading = (block is null ? null : AlbedoTint(block), block is null ? null : BlendMode(block));
+          variants[key] = shading;
         }
 
+        var tint = shading.Tint;
+        part.BlendMode = shading.Mode ?? "opaque";
+        part.Blend = BlendOf(maps.FirstOrDefault(map => map.Role == "diffuse"), shading.Mode);
         part.AlbedoTint = tint;
       }
     }
@@ -372,16 +374,31 @@ public static class MaterialMaps
     return map?.Name;
   }
 
-  private static string BlendOf(MaterialMap? diffuse)
+  private static readonly Regex BlendModeSpec = new(@"\bblendMode\s*=\s*""([A-Za-z_]+)""", RegexOptions.Compiled);
+
+  /// <summary><c>shaders.glt.blendMode</c> of a variant block, or null (the engine default, <c>opaque</c>).</summary>
+  internal static string? BlendMode(string variantBlock)
   {
-    if (diffuse is null)
-      return "opaque";
-    if (diffuse.Channels.Contains("AKill", StringComparison.OrdinalIgnoreCase))
-      return "masked";
-    if (diffuse.Channels.Contains("Transp", StringComparison.OrdinalIgnoreCase))
+    var match = BlendModeSpec.Match(variantBlock);
+    return match.Success ? match.Groups[1].Value : null;
+  }
+
+  /// <summary>
+  ///   The exe's glt blend-mode enum is opaque, blend, add, add_no_alpha, add_smooth_no_alpha,
+  ///   premul_a, mul, mul_inv (string table at 0x144cc9190, default opaque). A variant is only
+  ///   translucent when its glt.blendMode says so: ch_titus_head is Diff(rgb)+Transp(a) but its
+  ///   default (skin) variant has no blendMode and draws opaque; only its hair variant is "blend".
+  ///   AKill in format_descr is alpha test (akill, 0x14364a800) and is independent of blendMode.
+  /// </summary>
+  private static string BlendOf(MaterialMap? diffuse, string? blendMode)
+  {
+    if (blendMode is not null && !blendMode.Equals("opaque", StringComparison.OrdinalIgnoreCase))
       return "translucent";
+    if (diffuse is not null && diffuse.Channels.Contains("AKill", StringComparison.OrdinalIgnoreCase))
+      return "masked";
     return "opaque";
   }
+
 
   private static List<(string Role, string Name)> NamedMaps(string block)
   {

@@ -80,3 +80,19 @@ For any agent continuing this work: read this whole file before you do anything.
 - Keep this file updated at the end of each stage: state, open items, commit hashes.
 - Never touch the owner's original assets in /Game/SM2. Test imports go under /Game/SM2_Test or /Game/SM2_vN.
 - Before editing any of the owner's scripts or files, back them up as `.bakN`.
+
+## 2026-10-26 update (Cursor Agent)
+### Layout (all work lives here now; supersedes "never touch /Game/SM2")
+- PC: `C:\Users\Revaptor_FX\Desktop\SM2_Work\{Exports\<asset>, Anim\Titus_Anim, Captures\{TypeTest,TypeTest_overview,Item2_head}, Raw\{TypeTest_raw,titus_td}, Scripts\}` (uemcp_call.py stays in home).
+- UE: `/Game/SM2_Work/{Original/cc_titus_assault (old /Game/SM2), v4/cc_titus_assault, cc_titus_assault, cc_swarm_hormagaunt, refrt_imp_rhino_01, refrt_tyr_arch_column_01, wpn_bolter_heavy_01}`; 595 assets moved via rename_assets, 0 redirectors.
+- Capture: Scripts/ue_cap.py, two calls (capture, then export) - same-call export returns a stale RT.
+
+### Item 2 RESOLVED - head_01* alpha
+- Translucency is driven by the variant `glt.blendMode`, not `Transp(a)` in format_descr. Enum string table @0x144cc9190: opaque, blend, add, add_no_alpha, add_smooth_no_alpha, premul_a, mul, mul_inv (default opaque); "blendMode" @0x14355b708. akill @0x14364a800 (table 0x144ccc7e0), compared at 0x14173bb19/0x14173bb54.
+- ch_titus_head.td default (skin) variant has no blendMode -> opaque; only `hair` variant is blend; ch_eye_shadow_01 = blend/glass.
+- Exporter: MaterialMaps.BlendOf: non-opaque blendMode -> translucent, else AKill -> masked, else opaque; sidecar `blendMode`.
+- Verified: head_01/head_01_7 -> M_SM2 (opaque), head_01_9/_2/_5/_10 -> M_SM2_Translucent, head_01_8 masked; Rhino glass still translucent; Hormagaunt head opaque; 41/41 slots imported.
+- Visual capture (Captures/Item2_head/compare*.jpg) inconclusive: Titus head mesh is fully inside the helmet; face not visible even with helmet slots hidden.
+
+### Open
+3 VFX .sfx, 4 Rhino stacked parts, 5 .sani gaps, 6 push (no credentials on box) / tests (dotnet test hangs at restore).

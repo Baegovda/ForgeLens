@@ -49,6 +49,8 @@ public sealed class MeshPart
   ///   Null when the variant does not set one (white).
   /// </summary>
   public float[]? AlbedoTint { get; set; }
+  /// <summary>Raw <c>glt.blendMode</c> of the variant (<c>opaque</c> when unset).</summary>
+  public string BlendMode { get; set; } = "opaque";
   /// <summary>Index leaves LOD and collision shells unchecked. Defaults on so hand-built meshes still export whole.</summary>
   public bool Visible { get; set; } = true;
   /// <summary>"LOD" or "volume" when <see cref="Visible"/> was cleared by Index's default filter.</summary>
@@ -70,6 +72,7 @@ public sealed class MeshPart
       Variant = Variant,
       Blend = Blend,
       AlbedoTint = AlbedoTint,
+      BlendMode = BlendMode,
       Visible = Visible,
       HideReason = HideReason,
     };
