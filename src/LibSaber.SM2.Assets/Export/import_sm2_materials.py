@@ -92,14 +92,16 @@ def param_tex(material, name, x, y, sampler):
     return node
 
 
-def make_master(folder):
+def make_master(folder, asset_name="M_SM2", translucent=False):
+    # translucent=True is the Transp(a) parent (glass, gibs caps): diffuse alpha drives Opacity.
     tools = unreal.AssetToolsHelpers.get_asset_tools()
-    asset_name = "M_SM2"
     existing = folder + "/" + asset_name
     if unreal.EditorAssetLibrary.does_asset_exist(existing):
         unreal.EditorAssetLibrary.delete_asset(existing)
     material = tools.create_asset(asset_name, folder, unreal.Material, unreal.MaterialFactoryNew())
-    material.set_editor_property("blend_mode", unreal.BlendMode.BLEND_MASKED)
+    material.set_editor_property("blend_mode", unreal.BlendMode.BLEND_TRANSLUCENT if translucent else unreal.BlendMode.BLEND_MASKED)
+    if translucent:
+        material.set_editor_property("translucency_lighting_mode", unreal.TranslucencyLightingMode.TLM_SURFACE)
     material.set_editor_property("two_sided", True)
     mel = unreal.MaterialEditingLibrary
 
@@ -226,7 +228,7 @@ def make_master(folder):
     link(diffuse, "A", opacity, "True")
 
     mel.connect_material_property(diffuse, "RGB", unreal.MaterialProperty.MP_BASE_COLOR)
-    mel.connect_material_property(opacity, "", unreal.MaterialProperty.MP_OPACITY_MASK)
+    mel.connect_material_property(opacity, "", unreal.MaterialProperty.MP_OPACITY if translucent else unreal.MaterialProperty.MP_OPACITY_MASK)
     mel.connect_material_property(detail_switch, "", unreal.MaterialProperty.MP_NORMAL)
     mel.connect_material_property(metal, "", unreal.MaterialProperty.MP_METALLIC)
     mel.connect_material_property(rough_switch, "", unreal.MaterialProperty.MP_ROUGHNESS)
@@ -320,6 +322,7 @@ def build(sidecar_path, folder):
     tools = unreal.AssetToolsHelpers.get_asset_tools()
     unreal.EditorAssetLibrary.make_directory(folder)
     master = make_master(folder)
+    translucent_master = make_master(folder, "M_SM2_Translucent", translucent=True)
     hidden = make_hidden(folder)
     cache = {}
     instances = {}
@@ -348,7 +351,7 @@ def build(sidecar_path, folder):
         if unreal.EditorAssetLibrary.does_asset_exist(full):
             unreal.EditorAssetLibrary.delete_asset(full)
         instance = tools.create_asset(asset_name, folder, unreal.MaterialInstanceConstant, unreal.MaterialInstanceConstantFactoryNew())
-        instance.set_editor_property("parent", master)
+        instance.set_editor_property("parent", translucent_master if slot.get("blend") == "translucent" else master)
         diffuse = first_map(slot, "diffuse")
         normal = first_map(slot, "normal")
         packed = first_map(slot, "specular")
@@ -385,7 +388,7 @@ def build(sidecar_path, folder):
             ao_in_alpha = False  # BC4: AO(a) is physically in R
         unreal.MaterialEditingLibrary.set_material_instance_static_switch_parameter_value(instance, "AoInAlpha", ao_in_alpha)
         unreal.MaterialEditingLibrary.set_material_instance_static_switch_parameter_value(instance, "HasDetail", detail is not None and detail_mask is not None)
-        unreal.MaterialEditingLibrary.set_material_instance_static_switch_parameter_value(instance, "UseOpacityMask", slot.get("blend") == "masked")
+        unreal.MaterialEditingLibrary.set_material_instance_static_switch_parameter_value(instance, "UseOpacityMask", slot.get("blend") in ("masked", "translucent"))
         if emissive is not None:
             unreal.MaterialEditingLibrary.set_material_instance_scalar_parameter_value(instance, "EmissiveStrength", 1.0)
         unreal.EditorAssetLibrary.save_loaded_asset(instance)
@@ -397,28 +400,38 @@ def build(sidecar_path, folder):
         folder + "/" + mesh_name,
         folder + "/" + mesh_name + "_Skeleton",
     ]
+    # FBX imports as a SkeletalMesh for characters and a StaticMesh for props,
+    # weapons, and vehicles (no skin weights). Prefer the asset named after the mesh.
     found = None
     registry = unreal.AssetRegistryHelpers.get_asset_registry()
     for asset_data in registry.get_assets_by_path(folder, recursive=True):
-        if str(asset_data.asset_class_path.asset_name) == "SkeletalMesh":
+        if str(asset_data.asset_class_path.asset_name) in ("SkeletalMesh", "StaticMesh"):
             loaded = asset_data.get_asset()
             if loaded is not None and (found is None or loaded.get_name() == mesh_name):
                 found = loaded
                 if loaded.get_name() == mesh_name:
                     break
     if found is None:
-        unreal.log_warning("SM2 imported the instances. No skeletal mesh was found under " + folder + ". Assign them on the mesh after the FBX import.")
+        unreal.log_warning("SM2 imported the instances. No skeletal or static mesh was found under " + folder + ". Assign them on the mesh after the FBX import.")
         return
-    slots = list(found.get_editor_property("materials"))
-    for index, material_slot in enumerate(slots):
-        slot_name = str(material_slot.get_editor_property("material_slot_name"))
-        if slot_name in instances:
-            material_slot.set_editor_property("material_interface", instances[slot_name])
-            slots[index] = material_slot
-    found.set_editor_property("materials", slots)
+    assigned = 0
+    if isinstance(found, unreal.StaticMesh):
+        for index, material_slot in enumerate(list(found.get_editor_property("static_materials"))):
+            slot_name = str(material_slot.get_editor_property("material_slot_name"))
+            if slot_name in instances:
+                found.set_material(index, instances[slot_name])
+                assigned += 1
+    else:
+        slots = list(found.get_editor_property("materials"))
+        for index, material_slot in enumerate(slots):
+            slot_name = str(material_slot.get_editor_property("material_slot_name"))
+            if slot_name in instances:
+                material_slot.set_editor_property("material_interface", instances[slot_name])
+                slots[index] = material_slot
+                assigned += 1
+        found.set_editor_property("materials", slots)
     unreal.EditorAssetLibrary.save_loaded_asset(found)
-    unreal.log("SM2 assigned " + str(len(instances)) + " instances to " + found.get_name())
-
+    unreal.log("SM2 assigned " + str(assigned) + " of " + str(len(instances)) + " instances to " + found.get_name())
 
 def main():
     args = [arg for arg in sys.argv[1:] if not arg.startswith("-")]
