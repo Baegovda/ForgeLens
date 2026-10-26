@@ -60,6 +60,29 @@ internal static class GpuBench
         var textures = MainWindow.ResolvePreview(catalog, store, mesh, index);
         Line($"{catalog.GetFile(index).Path}: LOD0 {mesh.Positions.Count:N0} verts, {mesh.Parts.Sum(p => p.IndexCount / 3):N0} tris, bones {mesh.Bones.Count}, albedo {textures.Albedo.Count}, normal {textures.Normals.Count}, spec {textures.Specular.Count}; load {watch.Elapsed.TotalSeconds:0.0}s");
         settings = new PreviewSettings { Albedo = textures.Albedo, Normals = textures.Normals, Specular = textures.Specular, InPlace = true };
+        foreach (var part in mesh.Parts.Where(p => p.Visible))
+        {
+          var diffuse = part.Maps.FirstOrDefault(m => m.Role == "diffuse");
+          var alpha = "";
+          if (part.Texture is { } tex && textures.Albedo.TryGetValue(tex, out var image))
+          {
+            long sum = 0, low = 0;
+            var n = image.Bgra.Length / 4;
+            for (var i = 3; i < image.Bgra.Length; i += 4)
+            {
+              sum += image.Bgra[i];
+              if (image.Bgra[i] < 128)
+                low++;
+            }
+
+            alpha = $" alpha mean {sum / Math.Max(1, n)} <128 {100.0 * low / Math.Max(1, n):0}%";
+          }
+
+          Line($"part {part.Name} tris {part.IndexCount / 3} blend={part.Blend} blendMode={part.BlendMode} variant={part.Variant} tex={part.Texture} diffuse.ch={diffuse?.Channels} spec={part.SpecularChannels} aniso={(part.AnisoSpec is null ? "-" : part.AnisoSpec.DirMap + "/" + part.AnisoSpec.Anisotropy)} second={(part.SecondSpec is null ? "-" : "on")} maps={string.Join(",", part.Maps.Select(m => m.Role + ":" + System.IO.Path.GetFileName(m.Name)))}{alpha}");
+        }
+
+        if (Environment.GetEnvironmentVariable("SM2_PARTS_ONLY") == "1")
+          return 0;
         if (PreviewBench.PartCenter(mesh, out var c, out _))
           pauldron = c;
         if (mesh.Bones.Count > 0)
@@ -139,6 +162,25 @@ internal static class GpuBench
         Line($"first frame incl. upload {watch.Elapsed.TotalMilliseconds:0} ms");
         if (pauldron is { } target)
           Shot(gpu, fb, "gpu_pauldron_1100x1000.png", 1100, 1000, new OrbitCamera { Yaw = 1.45f, Pitch = 0.12f, Distance = fit * 0.30f, Target = target }, 0, false, false);
+        if (HeadCenter(mesh) is { } head)
+        {
+          // Face close-ups: hide the helmet as the browser part list would.
+          var helmet = mesh.Parts.Where(p => p.Visible && p.Name.Contains("helmet", StringComparison.OrdinalIgnoreCase)).ToList();
+          foreach (var part in helmet)
+            part.Visible = false;
+          foreach (var (name, yaw) in new[] { ("front", 0f), ("left", 0.7f), ("right", -0.7f), ("back", 3.14159f) })
+          {
+            var headCam = new OrbitCamera { Yaw = yaw, Pitch = 0.05f, Distance = fit * 0.12f, Target = head };
+            gpu.LegacyOpaque = true;
+            Shot(gpu, fb, $"head_{name}_before.png", 1000, 1000, headCam, 0, false, false);
+            gpu.LegacyOpaque = false;
+            Shot(gpu, fb, $"head_{name}_after.png", 1000, 1000, headCam, 0, false, false);
+          }
+
+          foreach (var part in helmet)
+            part.Visible = true;
+        }
+
         Shot(gpu, fb, "gpu_wire_skeleton_1100x1000.png", 1100, 1000, new OrbitCamera { Yaw = 0.7f, Pitch = 0.18f }, 0, true, true);
         if (game == "synthetic")
         {
@@ -234,6 +276,30 @@ internal static class GpuBench
     };
     Program.BuildAvaloniaApp().StartWithClassicDesktopLifetime(args);
     return exit;
+  }
+
+  /// <summary>Centre of the eye parts (else the head part), to frame the face.</summary>
+  private static Vector3? HeadCenter(ExportedMesh mesh)
+  {
+    var parts = mesh.Parts.Where(p => p.Visible && (p.Texture ?? "").Contains("_eye", StringComparison.OrdinalIgnoreCase) && !(p.Texture ?? "").Contains("shadow", StringComparison.OrdinalIgnoreCase)).ToList();
+    if (parts.Count == 0)
+      parts = mesh.Parts.Where(p => p.Visible && p.Name.Contains("head", StringComparison.OrdinalIgnoreCase)).ToList();
+    var sum = Vector3.Zero;
+    var n = 0;
+    foreach (var part in parts)
+    {
+      for (var i = part.IndexStart; i < part.IndexStart + part.IndexCount && i < mesh.Indices.Count; i++)
+      {
+        var index = mesh.Indices[i];
+        if ((uint)index < (uint)mesh.Positions.Count)
+        {
+          sum += mesh.Positions[index];
+          n++;
+        }
+      }
+    }
+
+    return n == 0 ? null : sum / n;
   }
 
   private static ExportedMesh Synthetic(out PreviewImage albedo, out PreviewImage normal)

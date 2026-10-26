@@ -33,6 +33,9 @@ internal sealed unsafe class GlPreview : IDisposable
   private object? _owner;
   private readonly Dictionary<string, int> _uniforms = new();
 
+  /// <summary>Bench "before" frames: every part in the opaque pass, as v3 drew them.</summary>
+  public bool LegacyOpaque { get; set; }
+
   public int Samples { get; private set; }
   public float Anisotropy { get; private set; } = 1;
   public string Info { get; private set; } = "";
@@ -388,30 +391,20 @@ internal sealed unsafe class GlPreview : IDisposable
     }
 
     _gl.Uniform1(U("uMode"), 0);
-    foreach (var batch in scene.Batches)
-    {
-      var gpu = Upload(batch);
-      _gl.Uniform1(U("uSkin"), skin is { Length: > 0 } && gpu.Skinned ? 1 : 0);
-      _gl.BindVertexArray(gpu.Vao);
-      foreach (var part in batch.Parts)
-      {
-        if (!part.Draw || part.IndexCount < 3)
-          continue;
-        var albedo = Texture(part.Albedo, true, budget);
-        var normal = Texture(part.Normal, false, budget);
-        var spec = Texture(part.Specular, false, budget);
-        Bind(TextureUnit.Texture0, albedo);
-        Bind(TextureUnit.Texture1, normal);
-        Bind(TextureUnit.Texture2, spec);
-        _gl.Uniform1(U("uHasAlbedo"), albedo != 0 ? 1 : 0);
-        _gl.Uniform1(U("uHasNormal"), normal != 0 ? 1 : 0);
-        _gl.Uniform1(U("uHasSpec"), spec != 0 ? 1 : 0);
-        _gl.Uniform1(U("uRoughA"), part.RoughInAlpha ? 1 : 0);
-        _gl.Uniform1(U("uAoB"), part.AoInBlue ? 1 : 0);
-        SetVec3("uSolid", part.Solid);
-        _gl.DrawElements(PrimitiveType.Triangles, (uint)part.IndexCount, DrawElementsType.UnsignedInt, (void*)(part.IndexStart * 4L));
-      }
-    }
+    // Pass 1 opaque, pass 2 alpha-tested (alpha-to-coverage under MSAA), pass 3 blended back to front without
+    // depth writes. Hair ships as a hard (masked) and a soft (blend) copy of the same cards: the soft pass uses
+    // depth LESS, so it only adds the fringes the hard pass cut away.
+    DrawPass(scene, skin, budget, PreviewBlend.Opaque);
+    if (Samples > 1)
+      _gl.Enable(EnableCap.SampleAlphaToCoverage);
+    DrawPass(scene, skin, budget, PreviewBlend.Masked);
+    _gl.Disable(EnableCap.SampleAlphaToCoverage);
+    _gl.Enable(EnableCap.Blend);
+    _gl.BlendFuncSeparate(BlendingFactor.One, BlendingFactor.OneMinusSrcAlpha, BlendingFactor.One, BlendingFactor.OneMinusSrcAlpha);
+    _gl.DepthMask(false);
+    DrawPass(scene, skin, budget, PreviewBlend.Translucent);
+    _gl.DepthMask(true);
+    _gl.Disable(EnableCap.Blend);
 
     // Overlays: flat colour, no depth test (as the CPU preview draws them on top).
     _gl.Disable(EnableCap.DepthTest);
@@ -465,6 +458,71 @@ internal sealed unsafe class GlPreview : IDisposable
     _gl.BlitFramebuffer(0, 0, width, height, 0, 0, width, height, ClearBufferMask.ColorBufferBit, BlitFramebufferFilter.Nearest);
     _gl.BindFramebuffer(FramebufferTarget.Framebuffer, (uint)targetFb);
     _gl.ActiveTexture(TextureUnit.Texture0);
+  }
+
+  private void DrawPass(PreviewScene scene, Matrix4x4[]? skin, Stopwatch budget, PreviewBlend pass)
+  {
+    var items = new List<(PreviewBatch Batch, PreviewPartDraw Part, float Depth)>();
+    foreach (var batch in scene.Batches)
+    {
+      foreach (var part in batch.Parts)
+      {
+        var blend = LegacyOpaque ? PreviewBlend.Opaque : part.Blend;
+        if (!part.Draw || part.IndexCount < 3 || blend != pass)
+          continue;
+        items.Add((batch, part, pass == PreviewBlend.Translucent ? Vector3.DistanceSquared(part.Center, scene.Eye) : 0));
+      }
+    }
+
+    if (items.Count == 0)
+      return;
+    if (pass == PreviewBlend.Translucent)
+      items.Sort((a, b) => b.Depth.CompareTo(a.Depth));
+    _gl.Uniform1(U("uBlend"), (int)pass);
+    object? bound = null;
+    foreach (var (batch, part, _) in items)
+    {
+      var gpu = Upload(batch);
+      if (!ReferenceEquals(bound, batch))
+      {
+        _gl.Uniform1(U("uSkin"), skin is { Length: > 0 } && gpu.Skinned ? 1 : 0);
+        _gl.BindVertexArray(gpu.Vao);
+        bound = batch;
+      }
+
+      var albedo = Texture(part.Albedo, true, budget);
+      var normal = Texture(part.Normal, false, budget);
+      var spec = Texture(part.Specular, false, budget);
+      // Without its coverage texture a cut-out or blended part would draw as a solid sheet: skip it this frame.
+      if (pass != PreviewBlend.Opaque && part.AlphaFromAlbedo && albedo == 0)
+        continue;
+      Bind(TextureUnit.Texture0, albedo);
+      Bind(TextureUnit.Texture1, normal);
+      Bind(TextureUnit.Texture2, spec);
+      _gl.Uniform1(U("uHasAlbedo"), albedo != 0 ? 1 : 0);
+      _gl.Uniform1(U("uHasNormal"), normal != 0 ? 1 : 0);
+      _gl.Uniform1(U("uHasSpec"), spec != 0 ? 1 : 0);
+      _gl.Uniform1(U("uRoughA"), part.RoughInAlpha ? 1 : 0);
+      _gl.Uniform1(U("uAoB"), part.AoInBlue ? 1 : 0);
+      _gl.Uniform1(U("uUseAlpha"), pass != PreviewBlend.Opaque && part.AlphaFromAlbedo ? 1 : 0);
+      SetVec3("uSolid", part.Solid);
+      SetVec3("uTint", part.Tint);
+      var aniso = part.Aniso;
+      if (LegacyOpaque)
+        aniso = null;
+      _gl.Uniform1(U("uAniso"), aniso is null ? 0 : 1);
+      if (aniso is not null)
+      {
+        var angle = Math.Clamp(aniso.Angle, 0f, 180f) * MathF.PI / 180f;
+        _gl.Uniform2(U("uAnisoDir"), MathF.Cos(angle), MathF.Sin(angle));
+        _gl.Uniform4(U("uAnisoParams"), aniso.Intensity, aniso.Anisotropy, part.SecondSpec ? aniso.ExtraIntensity : 0f, aniso.ExtraShift);
+      }
+
+      _gl.DepthFunc(pass == PreviewBlend.Translucent ? DepthFunction.Less : DepthFunction.Lequal);
+      _gl.DrawElements(PrimitiveType.Triangles, (uint)part.IndexCount, DrawElementsType.UnsignedInt, (void*)(part.IndexStart * 4L));
+    }
+
+    _gl.DepthFunc(DepthFunction.Less);
   }
 
   /// <summary>Last resolved frame as top-down BGRA.</summary>
@@ -598,7 +656,19 @@ internal sealed unsafe class GlPreview : IDisposable
     uniform vec3 uKey;
     uniform vec3 uFill;
     uniform vec3 uEye;
+    uniform vec3 uTint;
+    uniform int uBlend;
+    uniform int uUseAlpha;
+    uniform int uAniso;
+    uniform vec2 uAnisoDir;
+    uniform vec4 uAnisoParams;
     out vec4 oColor;
+    // Kajiya-Kay strand lobe: highlight where the half vector is perpendicular to the strand.
+    float strand(vec3 T, vec3 H, float e)
+    {
+      float th = dot(T, H);
+      return pow(sqrt(max(0.0, 1.0 - th * th)), e);
+    }
     vec3 toLinear(vec3 c) { return mix(c / 12.92, pow((c + 0.055) / 1.055, vec3(2.4)), step(0.04045, c)); }
     vec3 toSrgb(vec3 c)
     {
@@ -613,10 +683,27 @@ internal sealed unsafe class GlPreview : IDisposable
         return;
       }
       vec3 N = dot(vNrm, vNrm) > 1e-12 ? normalize(vNrm) : vec3(0.0, 1.0, 0.0);
+      vec3 V = normalize(uEye - vPos);
+      // Cards and shells are two-sided: light the side that faces the camera.
+      if (uBlend != 0 && dot(N, V) < 0.0)
+        N = -N;
       // Albedo is an sRGB texture: the sampler returns linear, filtered and mipped in linear space.
-      vec3 base = uHasAlbedo == 1 ? texture(uAlbedo, vUv).rgb : toLinear(uSolid);
+      vec4 albedo = uHasAlbedo == 1 ? texture(uAlbedo, vUv) : vec4(toLinear(uSolid), 1.0);
+      vec3 base = albedo.rgb * uTint;
+      float alpha = uUseAlpha == 1 ? albedo.a : 1.0;
+      if (uBlend == 1)
+      {
+        // Alpha test at 0.5, sharpened to about one pixel so alpha-to-coverage gives clean anti-aliased edges.
+        alpha = (alpha - 0.5) / max(fwidth(alpha), 1e-4) + 0.5;
+        if (alpha <= 0.0)
+          discard;
+        alpha = clamp(alpha, 0.0, 1.0);
+      }
+      else if (uBlend == 2 && alpha < 0.004)
+        discard;
       vec3 L = N;
       float gloss = 1.0;
+      vec3 frameT = vec3(0.0);
       if (uHasNormal == 1)
       {
         vec3 raw = texture(uNormal, vUv).rgb * 2.0 - 1.0;
@@ -631,6 +718,8 @@ internal sealed unsafe class GlPreview : IDisposable
         vec3 T = dp2perp * duv1.x + dp1perp * duv2.x;
         vec3 B = dp2perp * duv1.y + dp1perp * duv2.y;
         float m = max(dot(T, T), dot(B, B));
+        if (m > 1e-30)
+          frameT = (T * uAnisoDir.x + B * uAnisoDir.y) * inversesqrt(m);
         if (len > 1e-4 && m > 1e-30)
         {
           float inv = inversesqrt(m);
@@ -650,7 +739,18 @@ internal sealed unsafe class GlPreview : IDisposable
         rough = uRoughA == 1 ? s.a : s.g;
         ao = uAoB == 1 ? s.b : 1.0;
       }
-      vec3 V = normalize(uEye - vPos);
+      if (uAniso == 1 && uHasNormal == 0)
+      {
+        vec3 dp1 = dFdx(vPos);
+        vec3 dp2 = dFdy(vPos);
+        vec2 duv1 = dFdx(vUv);
+        vec2 duv2 = dFdy(vUv);
+        vec3 T = cross(dp2, N) * duv1.x + cross(N, dp1) * duv2.x;
+        vec3 B = cross(dp2, N) * duv1.y + cross(N, dp1) * duv2.y;
+        float m = max(dot(T, T), dot(B, B));
+        if (m > 1e-30)
+          frameT = (T * uAnisoDir.x + B * uAnisoDir.y) * inversesqrt(m);
+      }
       vec3 H = normalize(uKey + V);
       float ndotl = clamp(dot(L, uKey), 0.0, 1.0);
       float ndotf = clamp(dot(L, uFill), 0.0, 1.0);
@@ -661,8 +761,23 @@ internal sealed unsafe class GlPreview : IDisposable
       // Same light rig and terms as the CPU preview, evaluated in linear light.
       float diffuse = (0.16 + 0.72 * ndotl + 0.18 * ndotf) * (0.25 + 0.75 * ao);
       float spec = pow(ndoth, e) * (0.04 + metal * 0.85) * ndotl * ((e + 8.0) / 64.0);
-      vec3 lit = base * pow(diffuse, 2.2) + vec3(spec) * mix(vec3(1.0), base / max(max(base.r, max(base.g, base.b)), 1e-3), metal * 0.6);
-      oColor = vec4(toSrgb(lit), 1.0);
+      vec3 tintSpec = mix(vec3(1.0), base / max(max(base.r, max(base.g, base.b)), 1e-3), metal * 0.6);
+      vec3 lit = base * pow(diffuse, 2.2) + vec3(spec) * tintSpec;
+      if (uAniso == 1 && dot(frameT, frameT) > 1e-12)
+      {
+        // glt.anisotropic_spec (hair): base lobe along the strand, second (extra) lobe on the tangent shifted toward
+        // N by extra.shift and tinted by the albedo, as in the UE master (T2 = normalize(T + shift * N)).
+        vec3 T1 = normalize(frameT - L * dot(L, frameT));
+        vec3 T2 = normalize(T1 + L * uAnisoParams.w);
+        float wrap = clamp(dot(L, uKey) * 0.5 + 0.5, 0.0, 1.0);
+        float e1 = mix(24.0, 160.0, 1.0 - clamp(rough, 0.0, 1.0)) * (0.5 + uAnisoParams.y);
+        float s1 = strand(T1, H, e1) * 0.10 * uAnisoParams.x;
+        float s2 = strand(T2, H, e1 * 0.3) * 0.16 * uAnisoParams.z;
+        lit = base * pow(diffuse, 2.2) + (vec3(s1) + s2 * base * 2.0) * wrap * ao;
+      }
+      // Premultiplied output for the blended pass; alpha drives coverage in the masked pass.
+      vec3 encoded = toSrgb(lit);
+      oColor = uBlend == 2 ? vec4(encoded * alpha, alpha) : vec4(encoded, uBlend == 1 ? alpha : 1.0);
     }
     """;
 }

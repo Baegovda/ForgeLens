@@ -94,7 +94,7 @@
                         ToolTip.Tip="2x2 supersampling on still frames (drag and playback render 1x)" />
           <ToggleButton x:Name="GpuToggle" Content="GPU" IsChecked="True" IsVisible="False" Click="GpuToggled"
                         ToolTip.Tip="GPU preview (OpenGL ES via ANGLE/Direct3D 11, 8x MSAA, GPU skinning). Off = CPU renderer, which also takes over by itself if the GPU path fails." />
-          <Button x:Name="PlayButton" Content="Play" IsVisible="False" Click="PlayClicked" />
+          <Button x:Name="PlayButton" Content="Play" IsVisible="False" Click="PlayClicked" ToolTip.Tip="Space: play / pause" />
           <TextBlock x:Name="RenderStats" VerticalAlignment="Center" Opacity="0.7" FontSize="11" />
         </WrapPanel>
         <WrapPanel x:Name="AnimBar" DockPanel.Dock="Top" Orientation="Horizontal" Margin="0,2,0,0" IsVisible="False">

@@ -98,6 +98,8 @@ public partial class MainWindow : Window
       SyncScrub();
       DrawMesh();
     };
+    // Space = Play/Pause anywhere in the window, except while typing (search, anim filter) or in an open dropdown.
+    AddHandler(KeyDownEvent, SpaceKeyDown, RoutingStrategies.Tunnel);
     Opened += async (_, _) =>
     {
       if (!string.IsNullOrWhiteSpace(_settings.LastFolder) && Directory.Exists(_settings.LastFolder))
@@ -914,6 +916,21 @@ public partial class MainWindow : Window
     DrawMesh(false);
   }
 
+  private void SpaceKeyDown(object? sender, KeyEventArgs e)
+  {
+    if (e.Key != Key.Space || e.KeyModifiers != KeyModifiers.None)
+      return;
+    var focused = FocusManager?.GetFocusedElement();
+    if (focused is TextBox || e.Source is TextBox)
+      return;
+    if (focused is ComboBox { IsDropDownOpen: true } || focused is ComboBoxItem)
+      return;
+    if (_mesh is null || _clip is null || !_clip.HasCurves || !PlayButton.IsVisible)
+      return;
+    e.Handled = true; // and the focused button does not also get clicked
+    PlayClicked(PlayButton, new RoutedEventArgs());
+  }
+
   private void PlayClicked(object? sender, RoutedEventArgs e)
   {
     if (_playTimer.IsEnabled)
@@ -950,29 +967,50 @@ public partial class MainWindow : Window
     AnimBox.ItemsSource = new[] { new AnimChoice { Label = "Finding animations…", Index = -1 } };
     AnimBox.SelectedIndex = 0;
     _suppressAnim = false;
-    var choices = await Task.Run(() =>
+    var modelPath = _previewFileIndex >= 0 ? catalog.GetFile(_previewFileIndex).Path : key;
+    var (choices, owner) = await Task.Run(() =>
     {
       _clipHeaders ??= SaniIndex.ReadHeaders(catalog, store);
+      CharacterAnimations.Result owner;
+      try
+      {
+        owner = CharacterAnimations.Resolve(catalog, store, modelPath);
+      }
+      catch (Exception exception)
+      {
+        owner = new CharacterAnimations.Result(new HashSet<string>(), new[] { CharacterAnimations.ModelToken(modelPath) }, Array.Empty<string>(), Array.Empty<string>(), "class scan failed: " + exception.Message);
+      }
+
       var rows = new List<AnimChoice>();
       foreach (var header in SaniIndex.Compatible(_clipHeaders, names))
       {
         var file = Path.GetFileName(header.Path);
-        var same = key.Length > 0 && header.Path.Contains(key, StringComparison.OrdinalIgnoreCase);
-        rows.Add(new AnimChoice { Label = $"{(same ? "★ " : "")}{file}  ({header.Duration:0.00}s)", Index = header.Index, Path = header.Path, SameModel = same });
+        var rank = owner.Rank(header.Path);
+        var mark = rank switch { ClipRank.Main => "★ ", ClipRank.Cinematic => "☆ ", _ => "" };
+        rows.Add(new AnimChoice
+        {
+          Label = $"{mark}{file}  ({header.Duration:0.00}s)", Index = header.Index, Path = header.Path,
+          Rank = rank, SameModel = owner.Named(header.Path),
+        });
       }
 
-      // Clips named after this model first, then by path.
-      rows.Sort((a, b) => a.SameModel != b.SameModel ? (a.SameModel ? -1 : 1) : string.Compare(a.Path, b.Path, StringComparison.OrdinalIgnoreCase));
-      return rows;
+      // ★ this character's gameplay set, ☆ its cinematic clips, then the rest (clips named after it first), each by path.
+      rows.Sort((a, b) =>
+        a.Rank != b.Rank ? a.Rank.CompareTo(b.Rank)
+        : a.SameModel != b.SameModel ? (a.SameModel ? -1 : 1)
+        : string.Compare(a.Path, b.Path, StringComparison.OrdinalIgnoreCase));
+      return (rows, owner);
     });
     if (generation != _animGeneration || _mesh is null)
       return;
     _animAll = choices;
     ApplyAnimFilter(keepSelection: false);
-    var same = choices.Count(c => c.SameModel);
+    var main = choices.Count(c => c.Rank == ClipRank.Main);
+    var cinematic = choices.Count(c => c.Rank == ClipRank.Cinematic);
     StatusText.Text = choices.Count == 0
       ? "No animation shares 8 or more bone names with this model."
-      : $"{choices.Count:N0} animations share bone names with this model ({same:N0} named after '{key}', listed first).";
+      : $"{choices.Count:N0} animations share bone names with this model · ★ {main:N0} main · ☆ {cinematic:N0} cinematic ('{string.Join("/", owner.Tokens)}') · {owner.Source}";
+    ToolTip.SetTip(StatusText, owner.Classes.Count == 0 ? owner.Source : string.Join("\n", owner.Classes.Take(20)));
   }
 
   private async void AnimChanged(object? sender, SelectionChangedEventArgs e)
@@ -1347,5 +1385,6 @@ public sealed class AnimChoice
   public int Index { get; init; } = -1;
   public string Path { get; init; } = "";
   public bool SameModel { get; init; }
+  public ClipRank Rank { get; init; } = ClipRank.Other;
   public override string ToString() => Label;
 }

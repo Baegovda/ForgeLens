@@ -1,10 +1,32 @@
+using System.Runtime.CompilerServices;
 using System.Numerics;
 
 namespace LibSaber.SM2.Assets.Meshes;
 
 /// <summary>One drawable part range of a <see cref="PreviewBatch"/> with its resolved preview material.</summary>
+/// <summary>How a part composites, from the material: <c>MeshPart.Blend</c> (td <c>glt.blendMode</c> and the diffuse AKill channel).</summary>
+public enum PreviewBlend
+{
+  Opaque = 0,
+  /// <summary>Alpha test (AKill): cut at 0.5, alpha-to-coverage under MSAA, two-sided.</summary>
+  Masked = 1,
+  /// <summary><c>glt.blendMode</c> other than opaque: alpha blended after the opaque pass, no depth write, sorted.</summary>
+  Translucent = 2,
+}
+
 public sealed class PreviewPartDraw
 {
+  public string Name { get; init; } = "";
+  public PreviewBlend Blend { get; init; }
+  /// <summary>The albedo's alpha is coverage (<c>AKill(a)</c> or <c>Transp(a)</c> in the diffuse format).</summary>
+  public bool AlphaFromAlbedo { get; init; }
+  /// <summary><c>glt.albedo_tint</c> RGB (white when unset).</summary>
+  public Vector3 Tint { get; init; } = Vector3.One;
+  /// <summary><c>glt.anisotropic_spec</c> (hair): strand highlight along the tangent-space angle.</summary>
+  public AnisoSpec? Aniso { get; init; }
+  public bool SecondSpec { get; init; }
+  /// <summary>Bind-pose centre of the part's triangles, for back-to-front sorting of translucent parts.</summary>
+  public Vector3 Center { get; init; }
   public int IndexStart { get; init; }
   public int IndexCount { get; init; }
   public bool Draw { get; init; }
@@ -103,6 +125,13 @@ public static partial class MeshPreview
           RoughInAlpha = channels.Contains("Roughness(a)", StringComparison.OrdinalIgnoreCase),
           AoInBlue = channels.Contains("AO(b)", StringComparison.OrdinalIgnoreCase) || channels.Length == 0,
           Solid = new Vector3(Math.Clamp(156 + shift, 48, 230), Math.Clamp(118 + shift / 2, 48, 210), Math.Clamp(96 + shift / 3, 48, 200)) / 255f,
+          Name = part.Name,
+          Blend = BlendOf(part),
+          AlphaFromAlbedo = AlphaChannel(part),
+          Tint = part.AlbedoTint is { Length: >= 3 } t ? new Vector3(t[0], t[1], t[2]) : Vector3.One,
+          Aniso = part.AnisoSpec,
+          SecondSpec = part.SecondSpec is not null,
+          Center = PartCenter(prepared, start, end),
         });
       }
 
@@ -203,5 +232,47 @@ public static partial class MeshPreview
       BoneLines = lines,
       Note = slices.Count == 0 && mesh.Bones.Count == 0 ? (string.IsNullOrEmpty(mesh.Message) ? "Nothing to draw." : mesh.Message) : mesh.Message,
     };
+  }
+
+  private static PreviewBlend BlendOf(MeshPart part)
+    => part.Blend.ToLowerInvariant() switch
+    {
+      "translucent" => PreviewBlend.Translucent,
+      "masked" => PreviewBlend.Masked,
+      _ => PreviewBlend.Opaque,
+    };
+
+  private static bool AlphaChannel(MeshPart part)
+  {
+    var diffuse = part.Maps.FirstOrDefault(map => map.Role == "diffuse");
+    var channels = diffuse?.Channels ?? "";
+    return channels.Contains("AKill", StringComparison.OrdinalIgnoreCase) || channels.Contains("Transp", StringComparison.OrdinalIgnoreCase);
+  }
+
+  private static readonly ConditionalWeakTable<object, Dictionary<int, Vector3>> Centers = new();
+
+  private static Vector3 PartCenter(Prepared prepared, int start, int end)
+  {
+    var cache = Centers.GetOrCreateValue(prepared);
+    lock (cache)
+    {
+      if (cache.TryGetValue(start, out var known))
+        return known;
+      var sum = Vector3.Zero;
+      var n = 0;
+      var positions = prepared.Positions;
+      for (var i = start; i < end; i += 7)
+      {
+        var index = prepared.Indices[i];
+        if ((uint)index >= (uint)positions.Length)
+          continue;
+        sum += positions[index];
+        n++;
+      }
+
+      var center = n == 0 ? Vector3.Zero : sum / n;
+      cache[start] = center;
+      return center;
+    }
   }
 }
