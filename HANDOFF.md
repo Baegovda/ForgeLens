@@ -984,3 +984,27 @@ Based on 00d32bd. Patches in `/workspace/patches/vfx2/`. Captures in `/workspace
   `MeshPreview.RemoveRootMotion` strips ROOT XZ travel per frame.
 - Todo: REA grenade smoke colour, trail_bolter_smoke faintness, ratio, blend_add, exposure/light scale, genOnFly;
   untyped flesh emitter (part_mag_ee_bolter_flesh); VAT blood splashes; SELF_DISTORTION render; degNear on trails/meshes.
+
+## vfx3 part 3 (Grok Bot, 2026-10-27)
+- 1f9ffce coverings: `em_covering_*` entries (no typeParams/visuals/emission, only `physics.cdt.coveringInteraction.radiusScale`)
+  are surface painters (coveringMask layer of nearby surfaces), not particles. Parsed to `EffectDefinition.Coverings`
+  (`CoveringDef`: kind, radiusScale, isVisible) and shown as a note in the VFX panel; no longer `Unsupported`.
+  Corpus: 27 (blood r1 x15, water r1 x6, mud r1 x3, blood r0.4 x2, blood r0.6 x1). part_mag_ee_bolter_flesh = blood r0.4 on HEAD.
+- 28d731d grenade smoke colour: `seq_fin_expl_g` is channel-packed (R dark shading, G mid, B hot/fire mask), so drawn as RGB it
+  is blue. `visuals.textureTintControl` (@0x143645278, field +0x140, 0..1) is set to 0 on most of its users ->
+  texture used as luminance (`EmitterDef.TextureTint`, sprite shader mix(lum, rgb, tint)); absent = 1 (unchanged).
+  Capture: browser_run_shots/vfx3/tint/grenade_tint_cmp.png, grenade_tint_zoom.png.
+- Not implemented (data noted): `additionalContrast` (0..400, 2969 non-zero) + `contrastColorKey` [A,R,G,B] (e.g. grenade
+  37.53 / orange 246,102,14): looks like a hot-colour ramp on bright texels (fire core). Shader is GPU-side, not REA'd.
+  `applyColorGradients` (default on, 61 x False) feeds PART_CPU_EMITTERS_COLOR_GRADIENTS; also GPU-side.
+- trail_bolter_smoke: spawned by `EcsComponentPjlShotSfx.sfxTrailsGlow*Uids` on bolter_bullet (firearm_describer.sso), i.e.
+  it follows the projectile. Faint by data: blend add, colour ARGB alpha<=113 (x alphaMult 2), rgb 38..177, intensity 1x2,
+  texture trail_smoke_hard is a thin wisp (mean alpha 17), and degNear radStart 2 -> radEnd 20 scaleAlpha 0 fades it near
+  the camera. Not a bug; tcIn scale [0.025,1] (Clamp) is not applied to trails (corpus: 0.2/0.1/0.01 x 1 common).
+- VAT blood splashes (not implemented, findings): splashes_vtxa_lwi parts splasheNN map to solid_blood.td materials splash_NN
+  (shaderType shader_blood_splash; floatParam0-2 bounds min (-0.5,-0.5,-0.0624), 3-5 scale (1/255,1/255,0.001397), 6 = 120,
+  7 = 60/119, tex1 albedo = splash_5_v2_anim_data (pos), addInfo _n (normals), tex2 addInfo _d (precision low byte?)).
+  Tri-soup meshes (splashe05 19086 verts); UV1 u = (col+0.5)/2400, v takes 8 values (119k+0.5)/951 = 8 row bands.
+  The pct is downsampled (2400x471, `downsampled: true`), bands are 58.875 rows. Decoded positions at the band rows do not
+  reproduce the rest mesh (best 0.10 m mean error over all perms/frames) and triangles are only coherent at some rows,
+  so the layout/encoding is still unknown. splashe06/08/10/... are 1-tri placeholders.
