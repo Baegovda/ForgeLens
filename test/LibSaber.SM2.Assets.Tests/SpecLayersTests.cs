@@ -52,9 +52,9 @@ public class SpecLayersTests
     Assert.NotNull(second);
     Assert.Equal(new[] { 252 / 255f, 204 / 255f, 133 / 255f, 1f }, second!.MetallicTint);
     Assert.Equal(0f, second.MetalnessScale);
-    Assert.Equal(0.2f, second.MetalnessBias, 4);
+    Assert.Equal((double)0.2f, (double)second.MetalnessBias, 4);
     Assert.Equal(0f, second.RoughnessScale);
-    Assert.Equal(0.49f, second.RoughnessBias, 4);
+    Assert.Equal((double)0.49f, (double)second.RoughnessBias, 4);
   }
 
   [Fact]
@@ -63,11 +63,11 @@ public class SpecLayersTests
     var aniso = SpecLayers.Aniso(Hormagaunt);
     Assert.NotNull(aniso);
     Assert.Equal(90f, aniso!.Angle);
-    Assert.Equal(0.4f, aniso.Anisotropy, 4);
+    Assert.Equal((double)0.4f, (double)aniso.Anisotropy, 4);
     Assert.Equal(3f, aniso.Intensity);
     Assert.Equal(4f, aniso.ExtraIntensity);
     Assert.Equal(0.5f, aniso.ExtraAnisotropy);
-    Assert.Equal(0.2f, aniso.ExtraShift, 4);
+    Assert.Equal((double)0.2f, (double)aniso.ExtraShift, 4);
     Assert.Equal("", aniso.DirMap);
   }
 
