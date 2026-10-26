@@ -383,25 +383,53 @@ public static class MaterialMaps
     return map?.Name;
   }
 
-  private static readonly Regex BlendModeSpec = new(@"\bblendMode\s*=\s*""([A-Za-z_]+)""", RegexOptions.Compiled);
+  private static readonly Regex BlendModeSpec = new(@"\bblendMode\s*=\s*""([A-Za-z_0-9]+)""", RegexOptions.Compiled);
 
-  /// <summary><c>shaders.glt.blendMode</c> of a variant block, or null (the engine default, <c>opaque</c>).</summary>
+  /// <summary>
+  ///   <c>shaders.glt.blendMode</c> of a variant block, or null (the engine default, <c>opaque</c>).
+  ///   Only a direct child of the <c>glt</c> block counts: layer sub-blocks carry their own
+  ///   <c>blendMode = "tint_only"</c> / <c>"tex_blend"</c> (colorization/tint layer enum) and an
+  ///   undersuit's nested <c>blendMode = "blend"</c>, none of which make the surface translucent.
+  /// </summary>
   internal static string? BlendMode(string variantBlock)
   {
-    var match = BlendModeSpec.Match(variantBlock);
-    return match.Success ? match.Groups[1].Value : null;
+    var glt = Block(variantBlock, "glt");
+    var scope = glt ?? variantBlock;
+    var target = glt is null ? 0 : 1;
+    var depth = 0;
+    var position = 0;
+    foreach (Match match in BlendModeSpec.Matches(scope))
+    {
+      for (; position < match.Index; position++)
+      {
+        if (scope[position] == '{')
+          depth++;
+        else if (scope[position] == '}')
+          depth--;
+      }
+
+      if (depth == target)
+        return match.Groups[1].Value;
+    }
+
+    return null;
   }
 
   /// <summary>
-  ///   The exe's glt blend-mode enum is opaque, blend, add, add_no_alpha, add_smooth_no_alpha,
-  ///   premul_a, mul, mul_inv (string table at 0x144cc9190, default opaque). A variant is only
-  ///   translucent when its glt.blendMode says so: ch_titus_head is Diff(rgb)+Transp(a) but its
-  ///   default (skin) variant has no blendMode and draws opaque; only its hair variant is "blend".
+  ///   The exe parses glt blend modes against a 20-entry table at 0x144cc9180 (string to enum
+  ///   0x14230f690, enum to string 0x14230f710 over the copy at 0x144cc9220): none, black, opaque,
+  ///   blend, add, add_no_alpha, add_smooth_no_alpha, premul_a, mul, mul_inv, lighten, darken,
+  ///   subtract, invert, blend_mul_src1, blend_alpha_src1, blend_only_dest, min, max, blend_factor.
+  ///   "none" (no blending; e.g. vhl_imp_chimera_01 hull, ch_undersuit_v1/v2) and "opaque" both draw
+  ///   opaque; everything else is translucent. ch_titus_head is Diff(rgb)+Transp(a) but its default
+  ///   (skin) variant has no blendMode and draws opaque; only its hair variant is "blend".
   ///   AKill in format_descr is alpha test (akill, 0x14364a800) and is independent of blendMode.
   /// </summary>
-  private static string BlendOf(MaterialMap? diffuse, string? blendMode)
+  internal static string BlendOf(MaterialMap? diffuse, string? blendMode)
   {
-    if (blendMode is not null && !blendMode.Equals("opaque", StringComparison.OrdinalIgnoreCase))
+    if (blendMode is not null
+        && !blendMode.Equals("opaque", StringComparison.OrdinalIgnoreCase)
+        && !blendMode.Equals("none", StringComparison.OrdinalIgnoreCase))
       return "translucent";
     if (diffuse is not null && diffuse.Channels.Contains("AKill", StringComparison.OrdinalIgnoreCase))
       return "masked";
