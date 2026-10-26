@@ -33,6 +33,16 @@ public sealed class AnimationClip
   public List<string> Bones { get; } = new();
   public float SampleRate { get; set; }
 
+  /// <summary>Scalar (float) channel names from the F1 header, after the bone names. Not bones.</summary>
+  public List<string> Scalars { get; } = new();
+
+  /// <summary>
+  ///   True when the clip carries a second codec slot (0xF3 inline / 0xF7 external, clip+0x68).
+  ///   The stats dumper FUN_141060280 prints clip+0x68 != 0 as the "HasAdditive" column
+  ///   (string 0x1435ef808). The slot holds the additive delta of slot 0 against its first frame.
+  /// </summary>
+  public bool HasAdditive { get; set; }
+
   /// <summary>0xF4 root translation in source meters, Y-up. Empty when the clip has no root track.</summary>
   public List<VectorKey> RootTranslation { get; } = new();
 

@@ -159,18 +159,20 @@ public static class SaniReader
       return true;
     }
 
-    var offset = 32;
-    while (offset + 4 <= stringEnd && clip.Bones.Count < declaredBones + 8)
+    // F1 header FUN_1422336c0: bones (+24) names, then scalars (+28) names, each hashed by
+    // FUN_141c3fa90. A name may be empty (version-3 tpl clips leave unnamed objects blank).
+    var declaredScalars = BitConverter.ToInt32(bytes, 28);
+    if (declaredScalars < 0 || declaredScalars > 4096)
+      declaredScalars = 0;
+    var names = ReadNames(bytes, 32, stringEnd, declaredBones + declaredScalars);
+    for (var i = 0; i < names.Count; i++)
     {
-      var length = BitConverter.ToInt32(bytes, offset);
-      offset += 4;
-      if (length <= 0 || length > 200 || offset + length > stringEnd)
-        break;
-      var name = Encoding.ASCII.GetString(bytes, offset, length);
-      if (name.Any(ch => ch < 32 || ch > 126))
-        break;
-      clip.Bones.Add(name);
-      offset += length;
+      // Empty names cannot bind by name; give each a unique placeholder so the skeleton
+      // written for the clip has distinct bones (see HANDOFF: binding v3 tpl tracks).
+      if (i < declaredBones)
+        clip.Bones.Add(names[i].Length > 0 ? names[i] : $"unnamed_{i:D3}");
+      else
+        clip.Scalars.Add(names[i]);
     }
 
     clip.Duration = duration > 0 && !float.IsNaN(duration) ? duration : 0;
@@ -199,8 +201,8 @@ public static class SaniReader
     if (!expanded && siblingBytes is not null && clip.Notes.Count == 0)
       clip.Notes.Add("Paired .sani_data did not yield keys.");
     clip.Notes.Insert(0, $"ETNA clip, {clip.Bones.Count} bones, {frames} frames, {clip.SampleRate:0.###} fps, {clip.Duration:0.###}s. Packed blocks total {packed:N0} bytes.{dataNote}");
-    if (clip.Bones.Count != declaredBones)
-      clip.Notes.Add($"The header declared {declaredBones} bones and the name table has {clip.Bones.Count}.");
+    if (clip.Bones.Count != declaredBones || clip.Scalars.Count != declaredScalars)
+      clip.Notes.Add($"The header declared {declaredBones} bones and {declaredScalars} scalars; the name table has {clip.Bones.Count} and {clip.Scalars.Count}.");
     return true;
   }
 
@@ -229,21 +231,35 @@ public static class SaniReader
     rate = BitConverter.ToSingle(bytes.Slice(16, 4));
     if (stringEnd < 36 || stringEnd > bytes.Length)
       return false;
-    var offset = 32;
-    while (offset + 4 <= stringEnd && bones.Count < 4096)
+    var declared = BitConverter.ToInt32(bytes.Slice(24, 4));
+    if (declared < 0 || declared > 4096)
+      return false;
+    bones = ReadNames(bytes, 32, stringEnd, declared);
+
+    return bones.Count > 0;
+  }
+
+  /// <summary>Length-prefixed ASCII names (u32 length, may be 0). Stops at a bad length or the F1 end.</summary>
+  private static List<string> ReadNames(ReadOnlySpan<byte> bytes, int offset, int end, int count)
+  {
+    var names = new List<string>();
+    while (names.Count < count && offset + 4 <= end)
     {
       var length = BitConverter.ToInt32(bytes.Slice(offset, 4));
       offset += 4;
-      if (length <= 0 || length > 200 || offset + length > stringEnd)
+      if (length < 0 || length > 256 || offset + length > end)
         break;
-      var name = Encoding.ASCII.GetString(bytes.Slice(offset, length));
-      if (name.Any(ch => ch < 32 || ch > 126))
+      var raw = bytes.Slice(offset, length);
+      var ok = true;
+      foreach (var ch in raw)
+        ok &= ch is >= 32 and <= 126;
+      if (!ok)
         break;
-      bones.Add(name);
+      names.Add(Encoding.ASCII.GetString(raw));
       offset += length;
     }
 
-    return bones.Count > 0;
+    return names;
   }
 
   private static void CollectNames(ReadOnlySpan<byte> payload, List<string> names)
