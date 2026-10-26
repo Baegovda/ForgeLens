@@ -1,3 +1,56 @@
+# >>> NEW AGENT: START HERE (bootstrap) <<<
+
+You were given only this repo link. Follow these steps in order before you do anything else. When you finish, you should be able to continue exactly where the previous agent stopped.
+
+## 0. Read this whole file
+- Then read the newest dated "update" sections at the bottom; they are the latest state.
+- `git log --oneline -15` on branch `cursor/sm2-pck-extractor-4420` is the source of truth for what is done.
+- The PR is https://github.com/Baegovda/LibSaber/pull/1.
+
+## 1. Required connectors / MCP: check each one and install it if it's missing
+Check with GetMcpServerStatus / GetDynamicTools. Install missing ones with SearchPlugins and InstallPlugin, then authenticate with AuthenticateMcpServer.
+
+| What | Name | Used for | If missing |
+|---|---|---|---|
+| REA (reverse engineering) | namespace `user-rea` (plugin "REA"; Ghidra, JADX and similar) | the REA-first rule, mandatory | SearchPlugins "REA", then install. Its MCP times out on the 81 MB exe, so run Ghidra headless or rizin on the box directly |
+| GitHub | `cursor-github` (read-only) | PR and commit reads | RequestScmConnect / InstallPlugin |
+| Owner's PC shell | ListMachines, then the machine named **Revaptor-FX** (id `d3fb99ad-25ca-45c1-81af-41e5ca09104a` at the time of writing) | PowerShell, Unreal control, push | the owner has to register the PC |
+| Unreal Editor | **UEMCP** on the PC (`pip install uemcp`, https://github.com/ATDev-Inc/uemcp), driven by `tools/ue/uemcp_call.py` | import, materials, captures | see step 2 |
+
+## 2. Tools: check they exist, install them if missing
+- **Box (shared Linux machine):**
+  - Ghidra at `/home/box/ghidra`, plus `/home/box/tools/ghidra-nativeaot`.
+  - `rizin` at `~/.local/bin/rizin`.
+  - dotnet at `/home/box/tools/dotnet`.
+  - Game exe at `/workspace/rea/sm2_retail.exe`.
+  - Earlier RE outputs at `/workspace/rea/out`.
+  - Repo at `/workspace/LibSaber`.
+  - If any of these are missing, reinstall them, or copy the exe from the PC (D:\Steam\steamapps\common\Space Marine 2). Copy it to C:\Users\Revaptor_FX first, because the D: path can be refused.
+- **PC:**
+  - Python 3.10 with `pip install uemcp mcp`.
+  - Copy `tools/ue/uemcp_call.py` to `C:\Users\Revaptor_FX\`.
+  - Unreal 5.7.4 project at `K:\Unreal Projects\UE_VFX_57`. The editor must be open, and it listens on 127.0.0.1 only.
+- **Smoke test:** `python uemcp_call.py` should list the tools, including `ue_python`.
+
+## 3. How to push: the box has no GitHub login, the PC does (gh as Baegovda)
+1. Box: `git bundle create /workspace/sm2.bundle <last-pushed>..HEAD`
+2. CopyFromBox to `C:\Users\Revaptor_FX\sm2.bundle`. Check the size; one copy silently delivered a stale file.
+3. PC: `cd C:\Users\Revaptor_FX\ls_push; git fetch ..\sm2.bundle HEAD; git merge --ff-only FETCH_HEAD; git push origin HEAD`
+   - If `ls_push` is missing, clone the branch into it first.
+- Commit identity: `-c user.name="Cursor Agent" -c user.email=cursoragent@cursor.com`.
+
+## 4. Working contract with the owner (india님, Korean)
+- Reply in Korean, short and plain.
+- Report at each stage.
+- Do items one at a time, in order, and confirm before starting the next big step.
+- The owner granted full permission to build, install, push and manage folders. Never delete the owner's assets; move them instead.
+- **REA first, always.** Base every format or shader conclusion on exe addresses or strings, and cite them.
+- Work only inside the PC's `Desktop\SM2_Work` and Unreal's `/Game/SM2_Work`.
+- **Next step at handoff:** step 3, second specular (gold metallicTint) plus anisotropic material layers. Then step 4, the `dotnet test` restore hang. Niagara (.sfx to Niagara) is deferred.
+- At the end of every stage, update this file, commit and push.
+
+---
+
 # HANDOFF — SM2 → Unreal asset pipeline (read this first)
 
 For any agent continuing this work: read this whole file before you do anything.
