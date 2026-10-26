@@ -25,6 +25,19 @@ if (args[0] == "--dump")
   return 0;
 }
 
+if (args[0] == "--names")
+{
+  // sanival --names <file.sani> : print track index, bone name, key counts, and the scalar names.
+  var b = File.ReadAllBytes(args[1]);
+  var d = File.Exists(args[1] + "_data") ? File.ReadAllBytes(args[1] + "_data") : null;
+  var c = SaniReader.FromBytes(b, d);
+  for (var i = 0; i < c.Tracks.Count; i++)
+    Console.WriteLine($"T {i} {c.Tracks[i].BoneName} r{c.Tracks[i].Rotation.Count} t{c.Tracks[i].Translation.Count} s{c.Tracks[i].Scale.Count}");
+  for (var i = 0; i < c.Scalars.Count; i++)
+    Console.WriteLine($"S {i} {c.Scalars[i]}");
+  return 0;
+}
+
 if (args[0] == "--root")
 {
   // sanival --root <file.sani> [step] : print root-motion keys (translation, rotation).
