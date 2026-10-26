@@ -367,3 +367,38 @@ Before/after sheets and UE check output: box `/workspace/anim_survey/fix12/`. UE
      Before: bone 0 `_Skeleton` 0 cm, root motion off.
 - Build: `C:\Users\Revaptor_FX\SM2Extractor5\LibSaber.SM2Extractor.exe`. Tests: SM2.Assets 52/52, SM2Extractor 35/35.
 - Open: cinematic rebase (level-space c06/c10), `--anim-only` / multi-clip export, additive clip type, Mannequin RTG (see REPORT.md).
+
+## SM2Browser v2 preview (2026-10-26, browser_v2)
+Installed: `C:\Users\Revaptor_FX\SM2Browser_v2\LibSaber.SM2Browser.exe` (single-file win-x64; older builds kept as `.bakN`).
+Bench: `LibSaber.SM2Browser.exe --bench <game> tpl/cc_titus.tpl <outdir> [frames]` renders old (Bench/MeshPreviewLegacy.cs) vs new
+renderer from the same cameras and writes bench.txt + PNGs; `SM2_BENCH_TESS=1` adds the tessellation string scan.
+
+Root causes in the old MeshPreview (all CPU, Titus LOD0 = 422,499 verts / 299,607 tris / 38 parts / 525 bones):
+- Stutter: single-threaded raster of all 300k tris every frame via IReadOnlyList, new WriteableBitmap each frame, 33 ms timer
+  advanced by a fixed step. Old: 221 ms/frame at 1100x1000 (4.5 fps), 263 ms at 1600x1200 (32-core PC).
+- Grain/sand: nearest-neighbour texel fetch, no mips, affine UVs, no AA, rendered at DIPs capped 1100x1400 then stretched.
+- Faceting: Fill/FillTextured shaded one colour per triangle; FillLit used normals[a] for the whole triangle; skinned normals
+  were never transformed.
+- Not tessellation: sm2_retail.exe parses `tessellation_parameters` in fcn.1421df540 (string 0x1436ea3f8, xref 0x1421df5c9;
+  smooth = `pn_triangles` 0x1436ea3e0 xref 0x1421df6b3 | `phong` 0x1436ea3f0; displace `heightmap` 0x14364a858; `maxLevel`
+  0x1436ea428; also `TESSELLATION: ` 0x1437eb300, `isAdaptiveSubdivision` 0x1437f5588, `USE_ADAPTIVE_SUBDIVISION` 0x1437f5318,
+  `displacementMapping` 0x143634590). Scan of all 37,403 .td in the catalog: 0 contain tessellation/pn_triangles/phong/
+  isAdaptiveSubdivision/displacementMapping (700 contain "heightmap" = hdetm detail maps). Titus tpl files: none (only
+  "heightmap" in cc_titus.tpl). So Titus pauldrons are plain meshes (pre_order_shoulder_01 24,222 + 12,207 tris).
+- FBX/glTF already write per-vertex normals (GltfWriter NORMAL accessor; FbxWriter LayerElementNormal ByPolygonVertex, from
+  VertexSerializer.DecompressNormalFromInt16) — export was never faceted.
+
+New renderer (src/LibSaber.SM2.Assets/Meshes/MeshPreview.cs): parallel skin (positions+normals), projection, chunked binning
+into bands with sub-pixel cull, parallel band raster; perspective-correct barycentrics; interpolated vertex normals + per-pixel
+TBN; per-part pre-resolved box-filtered MipChain with bilinear sampling and per-triangle LOD; Toksvig spec AA; 2x2 SSAA when
+idle (AA toggle); renders at physical pixels. Prepared slice arrays cached per slice.
+Numbers (PC, median): 1100x1000 new 1x 21 ms (47 fps; clear 2.6 / project 1.0 / bin 0.9 / raster 14.9), 1600x1200 26.5 ms
+(38 fps); 2x2 SSAA still frame 54 / 69 ms. Playback of a Titus cinematic clip with In place: ~26 ms (39 fps), skin 1.7 ms.
+
+UI: toolbar and anim bar are WrapPanels (no clipping at the default 1440x800); "AA" toggle + render stats; Anim "Filter clips"
+TextBox (live, case-insensitive substring over the path, Bind pose always first, clips containing the model key - e.g. "titus"
+- marked with a star and sorted first); "In place" (default on) rebases cinematic clips that start far from the origin (reference
+bone = topmost bone displaced >= 50% of the max at t=0; cached per clip); Bind pose / model change resets clip, time label and
+slider; playback is real-time; mouse wheel no longer changes AnimBox/LodBox/PartBox selection when closed; Meshes list is a
+TreeView with _LODn variants nested (collapsed) under their base row (lowest LOD promoted if no base).
+Next: a GPU path would be the real fix for >60 fps with SSAA.
