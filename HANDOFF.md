@@ -1008,3 +1008,45 @@ Based on 00d32bd. Patches in `/workspace/patches/vfx2/`. Captures in `/workspace
   The pct is downsampled (2400x471, `downsampled: true`), bands are 58.875 rows. Decoded positions at the band rows do not
   reproduce the rest mesh (best 0.10 m mean error over all perms/frames) and triangles are only coherent at some rows,
   so the layout/encoding is still unknown. splashe06/08/10/... are 1-tri placeholders.
+
+## UE verification: constructors + physics (2026-10-27, ue_verify)
+Base e4ceb7d (extractor built from it: PC `Desktop\SM2_Work\Bin\SM2Extractor_e4ceb7d`). Patches: `/workspace/patches/ue_verify/`.
+Captures: PC `Desktop\SM2_Work\Captures\ue_verify\`, box `/workspace/browser_run_shots/ue_verify/`. UE 5.7.4, editor not restarted.
+- **Constructors → `/Game/SM2_Work/Tests/bulk_fix/<a>`** (existing `Exports\bulk_fix` exports from 01:34, exe10 = same constructor code;
+  default variant PREDEFINED_PRESET_1, png only), `ue_bulk.py import <a> bulk_fix`, one at a time:
+
+  | tpl | mesh / mat / anim s | slots = MIs | textures | bones | errors | clip root speed |
+  |---|---|---|---|---|---|---|
+  | tank | 89.6 / 51.3 / 87.0 | 54 = 54 | 69 | 6104 | 0 | 520.6 cm/s |
+  | sniper | 69.1 / 57.9 / 60.1 | 64 = 64 | 81 | 5315 | 0 | 520.6 cm/s |
+  | soldier | 9.8 / 41.3 / 7.1 | 41 = 41 | 53 | 2328 | 0 | 520.6 cm/s |
+
+  - No D3D11 RHI abort, no new crash report (last is the unrelated 00:43 62B0), no `LogRHI: Error` in the log. Editor peaked ~14 GB.
+  - 0 material mismatches, 0 bad texture params, 0 missing files. Looks: one armor set each, no stacked pieces; tank and sniper
+    bare-headed (`helmet_*_no_helmet`), sniper cloak, chaos soldier helmeted (variant.json regions match).
+  - The bone count still includes the bones of hidden parts (harmless; only parts are hidden).
+- **Physics → `/Game/SM2_Work/Tests/physics/<a>`**: fresh PC exports `Exports\physics\{cc_titus,cc_calgar}` (`--tex-formats png`,
+  physics on; Titus `tacticus_run_v01_intercessor` 46 s, Calgar `calgar_last_stand_convoy_start_run_calgar` 40 s), then
+  `ue_bulk.py import <a> physics`, then `ue_sm2_physics.py <json> <mesh> <folder> physasset`:
+  - Titus: 1447 bones, 38/38 MIs; 34 jiggle (0 missing) + 922 helper bones (0 missing). Calgar: 1596 bones, 44/44 MIs; 3 + 1294 (0 missing).
+  - `PA_cc_titus_sm2`, `PA_cc_calgar_sm2` created (not assigned).
+  - Motion check `tools/ue/ue_phys_probe.py <json> <anim> [samples]` (local swing vs frame 0, per jiggle group / sim mesh):
+    Titus 32/34 jiggles move (max 95°), every helper moves (tabards 25-42 cm, seals 26-38 cm); Calgar 3/3 jiggles, cloak
+    1024 helpers up to 161 cm, belts/ribbons 41-52 cm. Frame captures (ue_cap_lit pose → capture → export) show the tabards,
+    purity seals and the cloak following the run with no exploded vertices.
+  - AnimDynamics / Chaos Cloth live setup: still not scriptable. 5.7 exposes `AnimGraphNode_AnimDynamics`, `ChaosClothAsset` etc. as
+    classes, but no AnimGraph node or cloth-asset creation API (`SkeletalMeshEditorSubsystem` has only create/assign physics asset).
+    The bake is what plays; the json `ue` blocks remain the manual recipe.
+- **Fixes (this stage):**
+  - `ue_sm2_physics.py` crashed with `KeyError: 'name'`: the sidecar writes the jiggle name as `Name` (C# member name). Reads both.
+  - Clip import resampled the 60 Hz bake to the FBX's 30 fps (Titus 28 frames instead of 57 keys). The shared `sm2_anim_import`
+    block (ue_import_anim.py, ue_anim_survey.py, ue_sani_fix.py) now sets `custom_sample_rate` from the `{model}.physics.json`
+    `baked[].rate` for baked clips: Titus re-import → 56 frames / 57 keys (`Tests/physics/cc_titus/Anims60`).
+    The `Anims` imports in `Tests/physics/*` are the 30 fps ones from before the fix.
+  - `ue_cap_lit.py fit`: frames the whole skeletal mesh from its imported bounds. The actor bounds cropped the constructors to shin..shoulder.
+- **Open:**
+  - Calgar cape shows a diagonal red/white stripe pattern in UE. It is already in the no-physics bulk capture
+    (`Captures\bulk\cc_calgar`), so it is a material/texture issue, not physics. Not investigated (REA the cloak material next).
+  - A few spiky triangles on the Calgar cloak hem late in the clip (t≈0.9). Cloak has 1133 free particles but helpers are capped at 1024,
+    and thin-strip clusters swing up to ~180° locally (polar fit on near-collinear particles). Matches the ≈74 % figure; not fixed.
+  - Baked clips are still not loop-seamless; no in-game or browser side-by-side yet.
