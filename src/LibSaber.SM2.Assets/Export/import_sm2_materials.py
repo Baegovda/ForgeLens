@@ -17,6 +17,8 @@
 # Import the FBX as a skeletal mesh first (default settings, materials and
 # textures on). The script then replaces those slot materials. The third
 # argument is the content folder. It defaults to /Game/SM2/<mesh name>.
+# (The LibSaber dev tools in tools/ue pass the folder explicitly: /Game/SM2_Work/Characters/<mesh>
+# for skeletal characters, /Game/SM2_Work/Props/<mesh> for props; see HANDOFF.md "UE layout".)
 
 import json
 import os

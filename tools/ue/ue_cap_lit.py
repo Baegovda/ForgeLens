@@ -48,10 +48,10 @@ if mode in ("capture", "pose"):
             names = [str(b) for b in comp.get_all_socket_names()]
             hb = next((b for b in names if b.lower() == "head"), None) or next((b for b in names if "head" in b.lower()), None)
             o = comp.get_socket_location(hb); r = 70.0
-            hidden = unreal.load_asset("/Game/SM2_Work/_Tools/M_Hide")
+            hidden = unreal.load_asset("/Game/SM2_Work/Materials/M_Hide")
             if hidden is None:
                 # Masked, opacity mask 0: the section draws nothing (the ClothSimHidden one still ghosts).
-                hidden = unreal.AssetToolsHelpers.get_asset_tools().create_asset("M_Hide", "/Game/SM2_Work/_Tools", unreal.Material, unreal.MaterialFactoryNew())
+                hidden = unreal.AssetToolsHelpers.get_asset_tools().create_asset("M_Hide", "/Game/SM2_Work/Materials", unreal.Material, unreal.MaterialFactoryNew())
                 hidden.set_editor_property("blend_mode", unreal.BlendMode.BLEND_MASKED)
                 hidden.set_editor_property("two_sided", True)
                 mel = unreal.MaterialEditingLibrary

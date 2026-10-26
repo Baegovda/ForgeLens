@@ -127,13 +127,13 @@ For any agent continuing this work: read this whole file before you do anything.
 
 ## Rules
 - Keep this file updated at the end of each stage: state, open items, commit hashes.
-- Never touch the owner's original assets in /Game/SM2. Test imports go under /Game/SM2_Test or /Game/SM2_vN.
+- Never touch the owner's original assets. All SM2 work lives under /Game/SM2_Work in the layout below ("UE layout (unified)").
 - Before editing any of the owner's scripts or files, back them up as `.bakN`.
 
 ## 2026-10-26 update (Cursor Agent)
 ### Layout (all work lives here now; supersedes "never touch /Game/SM2")
 - PC: `C:\Users\Revaptor_FX\Desktop\SM2_Work\{Exports\<asset>, Anim\Titus_Anim, Captures\{TypeTest,TypeTest_overview,Item2_head}, Raw\{TypeTest_raw,titus_td}, Scripts\}` (uemcp_call.py stays in home).
-- UE: `/Game/SM2_Work/{Original/cc_titus_assault (old /Game/SM2), v4/cc_titus_assault, cc_titus_assault, cc_swarm_hormagaunt, refrt_imp_rhino_01, refrt_tyr_arch_column_01, wpn_bolter_heavy_01}`; 595 assets moved via rename_assets, 0 redirectors.
+- UE: `/Game/SM2_Work/{Original/cc_titus_assault (old /Game/SM2), v4/cc_titus_assault, cc_titus_assault, cc_swarm_hormagaunt, refrt_imp_rhino_01, refrt_tyr_arch_column_01, wpn_bolter_heavy_01}`; 595 assets moved via rename_assets, 0 redirectors. (Superseded by "UE layout (unified)" below.)
 - Capture: Scripts/ue_cap.py, two calls (capture, then export) - same-call export returns a stale RT.
 
 ### Item 2 RESOLVED - head_01* alpha
@@ -239,3 +239,27 @@ All five gaps from item 5, done REA-first (Ghidra project /workspace/rea/ghidra_
 - Tests: test/LibSaber.SM2.Assets.Tests/SaniGapTests.cs (4 synthetic tests; pass in a shim runner on the box, real `dotnet test` still hangs at restore there).
 - Tools: tools/sanival (`sanival <folder> <out.tsv>`, `--dump <file> <bone|index>`, `--root <file> [step]`), tools/ue/ue_sani_fix.py (import mesh + before/after anim; `check` prints AnimPose WORLD bone poses at 0/25/50/75/100%).
 - UE (/Game/SM2_Work/sani_fix): door_mushroom (mesh + after/door_mushroom__close, 3.267 s; before = no clip at all) - flower_base_bind_01 moves (-500,-310,-265) -> (-387,-274,207), flower_base_bind_04 pitch -74 -> -18, no NaN. cc_vortex_beast before/after boss_intro (19 s) identical poses (see gap 4). Captures Captures\sani_fix\door_mushroom_{before_bind,after_f000,f050,f100} (box /workspace/sani/captures): camera ends up inside the door's hull, so they are not useful visually; the AnimPose numbers are the evidence.
+
+## UE layout (unified, 2026-10-26)
+Everything our work created lives in `/Game/SM2_Work`. An inventory of /Game (255,440 assets) found no SM2 work outside it: no /Game/SM2, /Game/SM2_Test, /Game/SM2_vN or scratch/_calib folders remain. The `M_SM2` / `M_SM2_Translucent` / `M_SM2_ClothSimHidden` masters are written per asset by import_sm2_materials.py, so they stay next to that asset's instances. Different generations differ, so they are not merged.
+```
+/Game/SM2_Work/
+  Materials/              M_Hide (capture helper, was _Tools)
+  Original/cc_titus_assault/   owner's original import, untouched; /Game/Work/02/Lightning_01 references its mesh and Anim/run_fwd
+  Characters/<asset>/     current import (mesh, Skeleton, masters, MIs, Textures/): cc_titus_assault, cc_swarm_hormagaunt, cc_calgar (was step3/*), cc_sorcerer_exalted, cc_vortex_beast
+  Props/<asset>/          refrt_imp_rhino_01 (was refrt_imp_rhino_01_v2, fixed LOD), refrt_tyr_arch_column_01, wpn_bolter_heavy_01, door_mushroom
+  Animations/<asset>/     clips: cc_titus_assault/{Bulk,GUI,yaw180} (skeleton = Original/cc_titus_assault), cc_sorcerer_exalted/Bulk,
+                          cc_swarm_hormagaunt/Bulk (skeleton = Tests/pre_step3/cc_swarm_hormagaunt), cc_vortex_beast, door_mushroom (sani "after")
+  Tests/<stage>/<asset>/  step3_ab_off (was step3/_ab_off), sani_before, pre_step3 (old root cc_titus_assault, cc_swarm_hormagaunt),
+                          v4 (cc_titus_assault), rhino_stacked (old refrt_imp_rhino_01), typetest (future ue_typetest.py output)
+```
+- How it was moved: `tools/ue/ue_reorg_layout.py plan|apply`. It moved 827 assets with AssetTools.rename_assets, left 0 redirectors and saved everything. Afterwards the 41 old folders that were empty on disk were removed, and nothing was deleted. A disk backup from before the move is at `Desktop\SM2_Work\Backup\Content_SM2_Work.bak1` (2.7 GB).
+- How it was verified: `tools/ue/ue_verify_layout.py`. It reports 963 assets, 0 redirectors and 0 missing /Game dependencies. Every mesh's MIs and parents resolve inside its own folder (Titus 41 slots, Hormagaunt 26, Calgar 44, Rhino 16, Column 11, Bolter 26), and every anim resolves its skeleton. All the masters have shader stats, i.e. they compile: M_SM2 161 ps instructions, Translucent 1214, ClothSimHidden 141.
+- Scripts now targeting this layout (repo `tools/ue` and `Desktop\SM2_Work\Scripts`):
+  - ue_step3.py → Characters|Props/<asset>.
+  - ue_step3_ab.py → Tests/step3_ab_off/<asset>.
+  - ue_sani_fix.py: mesh → Characters|Props/<asset>, "after" → Animations/<asset>, "before" → Tests/sani_before/<asset>. Optional export tags are args 4 and 5.
+  - ue_typetest.py → Tests/typetest/<dir>.
+  - ue_cap*.py → Materials/M_Hide.
+  - ue_import_anim.py / ue_bulk_anim.py take the destination as an argument: pass Animations/<asset>/<set>.
+  - The product default in import_sm2_materials.py stays /Game/SM2/<mesh> for end users, and our tools pass the folder explicitly.

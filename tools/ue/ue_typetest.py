@@ -2,7 +2,7 @@ import sys, runpy, os, json, unreal
 name, skeletal = sys.argv[1], sys.argv[2] == "1"
 export_dir = sys.argv[3] if len(sys.argv) > 3 else name
 root = r"C:/Users/Revaptor_FX/Desktop/SM2_Work/Exports/" + export_dir + "/tpl/" + name + ".tpl/"
-folder = "/Game/SM2_Work/" + export_dir
+folder = "/Game/SM2_Work/Tests/typetest/" + export_dir
 t = unreal.AssetImportTask(); t.filename = root + name + ".fbx"; t.destination_path = folder
 t.automated = True; t.replace_existing = True; t.save = True
 o = unreal.FbxImportUI(); o.import_mesh = True; o.import_materials = False; o.import_textures = False; o.import_animations = False
