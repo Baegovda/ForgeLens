@@ -16,6 +16,16 @@ import sys, os, math, builtins, unreal
 def sm2_anim_import(fbx, skeleton, dest, yaw="auto", root_motion=True):
     import unreal
     files = fbx if isinstance(fbx, (list, tuple)) else [fbx]
+    import os as _os, json as _json, glob as _glob
+    def baked_rate(path):
+        # {model}.physics.json beside the clip lists the clips whose physics was baked (and at what rate).
+        d, n = _os.path.split(path); clip = _os.path.splitext(n)[0].split("__", 1)[-1]
+        for pj in _glob.glob(_os.path.join(d, "*.physics.json")):
+            try: baked = _json.load(open(pj, encoding="utf-8-sig")).get("baked") or []
+            except Exception: continue
+            for b in baked:
+                if str(b.get("clip", "")).lower() == clip.lower(): return int(b.get("rate") or 60)
+        return 0
     def one(y, batch=None):
         unreal.SystemLibrary.execute_console_command(None, "Interchange.FeatureFlags.Import.FBX 0")
         tasks = []
@@ -27,6 +37,11 @@ def sm2_anim_import(fbx, skeleton, dest, yaw="auto", root_motion=True):
                 o.import_materials = False; o.import_textures = False; o.skeleton = skeleton
                 o.mesh_type_to_import = unreal.FBXImportType.FBXIT_ANIMATION
                 o.anim_sequence_import_data.set_editor_property("import_rotation", unreal.Rotator(roll=0, pitch=0, yaw=y))
+                pr = baked_rate(f)
+                if pr:
+                    # Physics-baked clip: keep the 60 Hz jiggle/cloth keys instead of resampling to the FBX's 30 fps.
+                    o.anim_sequence_import_data.set_editor_property("use_default_sample_rate", False)
+                    o.anim_sequence_import_data.set_editor_property("custom_sample_rate", pr)
                 t.options = o; tasks.append(t)
             unreal.AssetToolsHelpers.get_asset_tools().import_asset_tasks(tasks)
         finally:
