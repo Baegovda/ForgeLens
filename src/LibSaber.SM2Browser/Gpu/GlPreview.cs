@@ -38,6 +38,7 @@ internal sealed unsafe class GlPreview : IDisposable
   /// <summary>Particle effect drawn over the scene after the translucent pass (null = none).</summary>
   public EffectLayer? Effect { get; set; }
   public double LastEffectMs => _fx?.LastMs ?? 0;
+  public IReadOnlyCollection<string> MissingEffectTextures => _fx?.MissingTextures ?? (IReadOnlyCollection<string>)Array.Empty<string>();
 
   private EffectRenderer Fx => _fx ??= new EffectRenderer(_gl, _header);
 

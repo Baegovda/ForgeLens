@@ -79,6 +79,8 @@ internal sealed unsafe class EffectRenderer : IDisposable
   }
 
   public bool Pending { get; private set; }
+  /// <summary>Texture names the source could not provide (not drawn on sprites).</summary>
+  public HashSet<string> MissingTextures { get; } = new(StringComparer.OrdinalIgnoreCase);
 
   private uint Link(string vs, string fs)
   {
@@ -133,10 +135,15 @@ internal sealed unsafe class EffectRenderer : IDisposable
     return id;
   }
 
-  private uint Texture(EffectLayer layer, string? name)
+  /// <summary>
+  ///   GL texture for a name: 0 while decoding (<see cref="Pending"/>). A texture the source does not have is
+  ///   skipped for sprites (a white quad stands out far more than a missing flare; fx_jetpack_attack's part_candle
+  ///   drew as huge blue boxes) and drawn white for meshes, whose placeholder materials are tinted by overrides.
+  /// </summary>
+  private uint Texture(EffectLayer layer, string? name, bool missingWhite = false)
   {
     if (string.IsNullOrEmpty(name)) return _white;
-    if (_textures.TryGetValue(name, out var id)) return id;
+    if (_textures.TryGetValue(name, out var id)) return id == uint.MaxValue ? (missingWhite ? _white : 0) : id;
     var image = layer.Texture(name);
     if (image is null)
     {
@@ -144,8 +151,9 @@ internal sealed unsafe class EffectRenderer : IDisposable
       return 0;
     }
 
-    id = image.Width > 0 ? Upload(image) : _white;
+    id = image.Width > 0 ? Upload(image) : uint.MaxValue;
     _textures[name] = id;
+    if (id == uint.MaxValue) { MissingTextures.Add(name); return missingWhite ? _white : 0; }
     return id;
   }
 
@@ -221,7 +229,7 @@ internal sealed unsafe class EffectRenderer : IDisposable
       var tex = Texture(layer, batch.Emitter.Texture);
       if (tex == 0) continue;
       var mask = batch.Emitter.AlphaMask is { } mn ? Texture(layer, mn) : 0u;
-      if (batch.Emitter.AlphaMask is not null && mask == 0) continue;
+      if (batch.Emitter.AlphaMask is { } m0 && mask == 0 && !MissingTextures.Contains(m0)) continue; // decoding; a missing mask draws unmasked
       _gl.ActiveTexture(TextureUnit.Texture1);
       _gl.BindTexture(TextureTarget.Texture2D, mask);
       _gl.ActiveTexture(TextureUnit.Texture0);
@@ -324,7 +332,7 @@ internal sealed unsafe class EffectRenderer : IDisposable
         foreach (var (start, count, material) in parts)
         {
           if (material.Translucent != translucent) continue;
-          var tex = Texture(layer, material.Texture);
+          var tex = Texture(layer, material.Texture, missingWhite: true);
           if (tex == 0) continue;
           _gl.BindTexture(TextureTarget.Texture2D, tex);
           var c = inst.Color * material.Tint;
@@ -346,7 +354,7 @@ internal sealed unsafe class EffectRenderer : IDisposable
       if (b is { } x) { _gl.DeleteVertexArray(x.Vao); _gl.DeleteBuffer(x.Vbo); _gl.DeleteBuffer(x.Ibo); }
     _gl.DeleteProgram(_mesh);
     foreach (var id in _textures.Values.Distinct())
-      if (id != _white) _gl.DeleteTexture(id);
+      if (id != _white && id != uint.MaxValue) _gl.DeleteTexture(id);
     _gl.DeleteTexture(_white);
     _gl.DeleteProgram(_sprite);
     _gl.DeleteProgram(_ground);

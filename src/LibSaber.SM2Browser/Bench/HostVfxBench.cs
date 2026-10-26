@@ -117,6 +117,7 @@ internal static class HostVfxBench
         }
       }
 
+      Line($"missing textures (not drawn): [{string.Join(", ", gpu.MissingEffectTextures.OrderBy(x => x))}]");
       done = true;
       Dispatcher.UIThread.Post(() => window.Close());
       return false;
