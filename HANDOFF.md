@@ -517,3 +517,47 @@ Install: `C:\Users\Revaptor_FX\SM2Browser_v4\LibSaber.SM2Browser.exe` (MD5 C7B88
 - Bench (RTX 4090, ANGLE D3D11, MSAA 8x): static 0.37–0.46 ms, playing 0.68–1.23 ms, vsync 116–120 fps.
 
 Caveats / pending: CPU renderer still ignores blend (draws all opaque). In-app GUI captures of the sorted Titus list and the GPU toggle check in the real window were not driven (user active on the PC at Unreal Editor); verify by opening cc_titus.tpl → Animations. Space-key behaviour verified by code path only.
+
+## Mannequin → SM2 retarget prototype (2026-10-26, retarget)
+Tool: `tools/ue/ue_sm2_retarget.py` (UE 5.7 Python, run through uerun.ps1). Builds NEW assets only; the owner's
+`IK_titus_deathwatch`, `IK_cadian_*` and the Mannequin assets are never edited (the batch step first copies the
+Manny clips to `<dest>/../MannySrc`, so nothing is written into `/Game/Characters`; `redirectors /Game/Characters` = none).
+- `mesh <fbx> <dest>`: import a fresh ROOT-rooted SM2Extractor6 export (`Exports\retarget\{cadian,titus}\tpl\...`).
+- `rig <mesh> <dest> <name>` → `IK_SM2_<name>`: retarget root CENTRE, FBIK (start CENTRE), 28 chains named exactly like
+  IK_Mannequin (Spine BACKdown→BACKup, Neck, Head, Clavicle, Arm ARM1→HAND, Leg LEG1→FOOT2, Thumb `x1_fing1→x1FINGeff`,
+  metacarpals `xN_fing1`, fingers `xN_fing2→xNFINGeff`), goals Left/RightHandIK, Left/RightFootIK. Armor/cloth unmapped.
+- `rtg <dest> <name>` → `RTG_Manny_to_<name>`: auto_map_chains EXACT, retarget pose `SM2_AutoAlign` (auto_align_all_bones,
+  then finger bones reset to the SM2 bind pose, see below), then `configure_ops`.
+- `batch <dest> <name> <anims...>` → `<dest>/Anims/<anim>_<name>`; an existing output is kept as `_bakN`.
+- `eval <manny> <sm2>`: world-space hands/feet/head error vs Manny×pelvis ratio, spine twist, index curl, planted-foot speed, root disp.
+- `fbx <anim folder> <out>`: FBX export of the retargeted clips (`Desktop\SM2_Work\Exports\retarget\anims\{cadian,titus}`).
+- `config`, `unalign`, `fingers`, `info`, `redirectors`: repair / tuning / inspection.
+
+UE 5.7 API gotchas found:
+- `IKRetargetFactory` already creates the 6 default ops; `add_default_ops` on top duplicates them (guarded: only when 0 ops).
+- Ops created before the IK rigs are assigned resolve no bones → retargeted clips had **0 root motion**. Fix: `run_op_initial_setup(i)` for every op (in `configure_ops`). After it: walk 450→471 cm, jog 1060→1110 cm (Cadian, ratio 1.047), Titus 694/1635 (ratio 1.542) = exactly Manny × pelvis-height ratio.
+- `RootMotionOpSettings.source_root_bone/target_root_bone/target_pelvis_bone` are deprecated; even reading them raises.
+- `chains_to_retarget` elements are returned by value: modify `ch[i]`, write `ch[i] = x`, then `set_settings`. (Before this fix every per-chain change — IK offsets, finger rotation mode — silently did nothing.)
+
+Results (contact sheets Manny / Cadian / Titus rows: `/workspace/retarget/sheet_*.jpg`; Idle, Walk, Jog, Jump):
+| check | Cadian | Titus |
+|---|---|---|
+| hands vs Manny×ratio | 5–8 % of pelvis height | 7–13 % |
+| feet | 2–5 % | 2–5 % |
+| spine twist |diff| mean | 0.1–1.6° | 0.1–2.3° |
+| index curl vs Manny | −14…−20° (bind pose is 12° straighter) | ±4° |
+| root motion | = Manny×ratio | = Manny×ratio |
+| foot min z (bone) | +1–2 cm | +6–7 cm (boot sole thickness, bone above ground) |
+| planted-foot slide, walk | ≈ expected (+3 %/+20 %) | ≈ expected |
+| planted-foot slide, jog | 43 vs 25 cm/s expected | 97–105 vs 34–37 cm/s expected |
+Finger curl fix: auto-align straightened SM2 fingers onto Manny's directions (retarget-pose curl ~18° vs Manny ref 42°), and
+deltas are copied from that pose → every clip ~24° less curled. Resetting finger bones in the retarget pose to the SM2 bind
+pose (`unalign`) fixed Titus (±4°) and halved Cadian's gap.
+
+Open:
+1. Jog foot sliding (Titus ~2.7× expected). IK is live (a +30 cm goal offset lifts the feet 30 cm) and pelvis
+   `scale_horizontal` 1.0 is the minimum (0.65 → 220, 1.25 → 320 cm/s); `GENERATE_FROM_TARGET_PELVIS` and
+   `affect_ik_horizontal` 0 change nothing. Next: put the leg goal on the ankle (FOOT1) instead of FOOT2, check the FBIK
+   bone settings/iterations, or add a foot-planting/stride-warping step.
+2. Cadian finger bind curl is 12° straighter than Manny: add a small retarget-pose curl on `x*_fing2/3` if it shows.
+3. Feet hover 1–7 cm: that's bone height; check against the boot sole mesh before adding a static offset.
