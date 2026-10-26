@@ -1052,3 +1052,59 @@ Captures: PC `Desktop\SM2_Work\Captures\ue_verify\`, box `/workspace/browser_run
   - A few spiky triangles on the Calgar cloak hem late in the clip (t≈0.9). Cloak has 1133 free particles but helpers are capped at 1024,
     and thin-strip clusters swing up to ~180° locally (polar fit on near-collinear particles). Matches the ≈74 % figure; not fixed.
   - Baked clips are still not loop-seamless; no in-game or browser side-by-side yet.
+
+## vfx3 part 4: particle shader bytecode (Grok Bot, 2026-10-27 05:15 KST)
+
+Notes only. No code changed this round.
+
+**Where the shaders are**
+- `default.pak` → `shader_cache/prebuild/pc/*.sdc`. Relevant files:
+  - `common_pc_dx12_particles.sdc` (CPU sprites)
+  - `common_pc_dx12_particles_gpu*.sdc`
+  - `common_pc_dx12_trail.sdc`, `common_pc_dx12_lightning_trail.sdc`
+  - `pc_dx12_sfx.sdc` (mesh particles: SFX_* tints/gradients)
+  - `pc_dx12_combine_material.sdc`, `pc_dx12_distort.sdc`
+- PC copy: `Desktop\SM2_Work\Raw\shaders_vfx\` (extracted with `SM2Extractor_e4ceb7d -f *particles*.sdc ...` from `D:\Steam\steamapps\common\Space Marine 2\client_pc\root\paks\client\default\default.pak`).
+- Box copy: `/workspace/vfxsh/*.sdc`.
+
+**How to unpack and read them**
+- Unpack: `python3 /workspace/mat/sdcx.py X.sdc outdir` gives `NNNNN_k.dxbc` (DXIL containers, zlib records).
+  - Box output: `/workspace/vfxsh/dx_*`.
+  - `particles_gpu.sdc` (30 MB) has a different header and sdcx.py fails on it; not unpacked.
+- Disassemble with names (cbuffer layouts, resource names): `LD_LIBRARY_PATH=/home/box/tools/dxc/lib /home/box/tools/dxc/bin/dxc -dumpbin f.dxbc`.
+  - Output: `/workspace/vfxsh/ll_*`.
+- Readable GLSL: `/home/box/tools/dxil-spirv/build/dxil-spirv f.dxbc --glsl --output f.glsl`.
+  - Output: `/workspace/vfxsh/gl_*`.
+
+**Sprite pixel shader**
+- Reference shader: `particles 00114_2` (lit color PS). Per-emitter data is `PART_EMITTERS_SHARED_DATA`, a float4 buffer with 6 float4 per emitter, indexed by `TEXCOORD_2.x & 0xffff`.
+- CPU-side mirror: a global array at `0x14400c7ec` with stride 0x60 and 6144 entries (init at `FUN_140175824`, upload near `0x141854211`). The packer has not been found yet.
+- Shared-data slots, read from the shader:
+  - `[1].rgb` = contrastColorKey in raw 0..255; `[1].w` = additionalContrast. Inferred from value ranges, but very likely.
+  - `[0].z` = factor t, unconfirmed (see the formula below).
+  - `[0].x` = alpha-mask softness.
+  - `[2].x` = alpha-mask distortion amount.
+  - `[3].x` = flags: 8 = distortion texture, 16 = alpha mask, 32 = no base, 64 = lit, 1024 = soft alpha.
+  - `[4].x` = final intensity multiplier.
+  - `[4].y` = flowmap strength.
+  - `[4].w` = colour-gradient row (int; <0 = none).
+- Formula, exact from the shader (tex = flipbook lerp of 2 frames by `fract(TEXCOORD_11.z)`, V = vertex colour TEXCOORD):
+  ```
+  if (row>=0) { l = dot(tex.rgb, (0.2127,0.7152,0.0722))*tex.a; tex = gradTex(l, (row+0.5)/1024) * l; }   // PART_CPU_EMITTERS_COLOR_GRADIENTS, 1024 rows
+  boost = 1 + additionalContrast * saturate(1 - length(key.rgb/255 - tex.rgb));                         // contrast fire core
+  c = tex.rgb * V.rgb * boost;  a = tex.a * V.a;
+  rgb = c + t*(t*V.rgb*tex.a - c);   // t = shared[0].z
+  rgb += litTerm*a; rgb *= maskAlpha * shared[4].x * ...;  alpha out = a*mask (premultiplied-style)
+  ```
+- What t means is still open. If t = textureTintControl, then tint=1 means vertex colour × alpha only, and tint=0 means the full texture colour. Under that reading, `seq_fin_expl_g` with tint 0 would render blue (its B channel is the hot fire channel; checked visually, BC7 so no channel swap).
+- Most likely `_g` textures are meant for the colour-gradient path (`applyColorGradients` defaults to True; corpus has False ×61 only). But no gradient data was found anywhere: there is no `colorGradient` key in any .sfx/.td, and `part_data_color_gradients` / `partEMITTER_CPU_COLOR_GRADIENT_REF` is a runtime registry.
+- So the current tint=0 → luminance heuristic (0010) stays. The next step is to find the gradient source: `colorGradient` field at sfx_part +0x138 (serializer `FUN_1417c6988`, type `FUN_142746030`) and `colorGradientRef` (0x143645f38, xrefs `0x1417aebbb`...).
+
+**Next steps**
+1. Implement the contrast boost above in `EffectRenderer` SpriteFs: uniforms `uKey` (contrastColorKey/255) and `uContrast`.
+   - It is safe now, but should start behind `SM2_VFX_CONTRAST=1` until it is checked against the grenade.
+2. Decide what t is by finding the CPU packer: search for writes of stride 0x60 into `0x14400c7ec`, or into the per-frame copy around `0x141854211`.
+3. Trails: `trail.sdc` has `CB_PASS_TRAIL`, `CB_ANIM_TRAILS`, `TRAIL_DIFF`/`TRAIL_DISTORT`/`TRAIL_NORMAL`/`TRAIL_ALPHA_MASK_TEX`/`TRAIL_DYNAMIC_MASK`, `TRAIL_DEGR` (degNear?), `TRAIL_FLATLIGHTING`.
+   - Read the tc-scale and degradation code there (`/workspace/vfxsh/gl_common_pc_dx12_trail`).
+4. VAT (`shader_blood_splash`): probably in `pc_dx12_sfx.sdc` (mesh particle VS with `CB_OBJ_MATERIAL_DATA`).
+   - Find a VS that reads two textures with `floatParam6`/`floatParam7`-like frame counts (120 / 60). Still unsolved.
