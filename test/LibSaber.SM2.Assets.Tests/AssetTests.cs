@@ -946,6 +946,7 @@ public class AssetTests
     var mesh = new ExportedMesh { Name = "arm" };
     mesh.Bones.Add(new Bone { Name = "root", Parent = -1 });
     mesh.Bones.Add(new Bone { Name = "ARM1R", Parent = 0 });
+    mesh.Bones.Add(new Bone { Name = "marker", Parent = -1 }); // two roots: the writer keeps the armature Null
     mesh.Positions.Add(Vector3.Zero);
     mesh.Positions.Add(Vector3.UnitX);
     mesh.Positions.Add(Vector3.UnitY);

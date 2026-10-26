@@ -36,6 +36,10 @@ public static class FbxWriter
       mesh = UnrealRoot.Promote(mesh);
       armature = false;
     }
+    else if (space == ExportSpace.Unreal && unrealRoot && UnrealRoot.HasSingleRoot(mesh.Bones))
+    {
+      armature = false; // single tpl root without a ROOT child: it is bone 0 and carries the root motion
+    }
     _armature = armature;
 
     var root = new Node("");

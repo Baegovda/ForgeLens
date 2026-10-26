@@ -16,6 +16,24 @@ public static class UnrealRoot
 {
   public const string RootName = "ROOT";
 
+  /// <summary>
+  ///   True when the hierarchy has exactly one parentless bone. Tyranid monsters and walkers (carnifex, lictor,
+  ///   hive tyrant, warrior, zoanthrope, dreadnought, helbrute) have no <c>ROOT</c> bone: their tpl root is named after the
+  ///   model (<c>cc_carnifex</c> → <c>Object0080</c> → <c>Object0081</c> → <c>CENTRE</c>). That root already gets the 0xF4
+  ///   motion from <see cref="ClipPose"/>, so it must be Unreal bone 0 too, without the armature Null above it.
+  /// </summary>
+  public static bool HasSingleRoot(IReadOnlyList<Bone> bones)
+  {
+    var roots = 0;
+    foreach (var bone in bones)
+    {
+      if (bone.Parent < 0 && ++roots > 1)
+        return false;
+    }
+
+    return roots == 1;
+  }
+
   /// <summary>Index of the bone that becomes the hierarchy root, or -1 when the hierarchy does not have the SM2 shape.</summary>
   public static int FindPromotable(IReadOnlyList<Bone> bones, out int oldRoot)
   {

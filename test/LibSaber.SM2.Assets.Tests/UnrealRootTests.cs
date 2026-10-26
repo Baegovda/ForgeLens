@@ -48,4 +48,44 @@ public class UnrealRootTests
     single.Bones.Add(new Bone { Name = "ROOT", Parent = -1 });
     Assert.Same(single, UnrealRoot.Promote(single));
   }
+
+  [Fact]
+  public void HasSingleRoot_CountsParentlessBones()
+  {
+    var tyranid = new List<Bone>
+    {
+      new() { Name = "cc_carnifex", Parent = -1 },
+      new() { Name = "Object0080", Parent = 0 },
+      new() { Name = "CENTRE", Parent = 1 },
+    };
+    Assert.True(UnrealRoot.HasSingleRoot(tyranid));
+    Assert.Equal(-1, UnrealRoot.FindPromotable(tyranid, out _));
+    Assert.False(UnrealRoot.HasSingleRoot(new List<Bone> { new() { Name = "a", Parent = -1 }, new() { Name = "b", Parent = -1 } }));
+    Assert.False(UnrealRoot.HasSingleRoot(new List<Bone>()));
+  }
+
+  [Theory]
+  [InlineData(1, false)] // single tpl root without ROOT (carnifex shape): no armature Null, the root is bone 0
+  [InlineData(2, true)] // several roots: keep the Null so Unreal gets one skeleton
+  public void FbxUnreal_ArmatureNullOnlyForSeveralRoots(int roots, bool expectNull)
+  {
+    var mesh = new ExportedMesh { Name = "beast" };
+    mesh.Positions.Add(Vector3.Zero); mesh.Positions.Add(Vector3.UnitX); mesh.Positions.Add(Vector3.UnitY);
+    mesh.Indices.Add(0); mesh.Indices.Add(1); mesh.Indices.Add(2);
+    mesh.Bones.Add(new Bone { Name = "beast_root", Parent = -1, Local = Matrix4x4.Identity, InverseBind = Matrix4x4.Identity });
+    mesh.Bones.Add(new Bone { Name = "CENTRE", Parent = roots == 1 ? 0 : -1, Local = Matrix4x4.CreateTranslation(0, 1, 0), InverseBind = Matrix4x4.Identity });
+    var dir = Path.Combine(Path.GetTempPath(), "ur_" + Guid.NewGuid().ToString("N"));
+    Directory.CreateDirectory(dir);
+    try
+    {
+      var fbx = Path.Combine(dir, "beast.fbx");
+      FbxWriter.Write(fbx, mesh, ExportSpace.Unreal);
+      var hasNull = File.ReadAllBytes(fbx).AsSpan().IndexOf("beast_Skeleton"u8) >= 0;
+      Assert.Equal(expectNull, hasNull);
+    }
+    finally
+    {
+      Directory.Delete(dir, true);
+    }
+  }
 }
