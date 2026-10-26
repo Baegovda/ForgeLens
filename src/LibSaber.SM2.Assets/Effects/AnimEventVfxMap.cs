@@ -3,7 +3,22 @@ using System.Text.Json.Nodes;
 namespace LibSaber.SM2.Assets.Effects;
 
 /// <summary>One effect a morpheme event starts, with where the link was found.</summary>
-public sealed record EventVfx(string Effect, string Source, string Locator = "");
+/// <param name="AtEnd">Reached from a duration event's <c>OnDeactivate</c>/<c>OnExit</c>: fires at the event's end.</param>
+public sealed record EventVfx(string Effect, string Source, string Locator = "", bool AtEnd = false);
+
+/// <summary>
+///   An event that stops effects: <c>BlueprintNodeVfxStop</c> / <c>BlueprintSfxLibraryStopsfx</c> (one name),
+///   <c>BlueprintNodeStopPackOfVfx</c> (<c>vfxList</c>), <c>BlueprintNodeStopAllSfx</c> (<see cref="All"/> but
+///   <c>ignoreSfxList</c>). Stopping ends emission; live particles finish their life.
+/// </summary>
+public sealed record EventStop(string Source, IReadOnlyList<string> Names, bool All = false, bool AtEnd = false)
+{
+  public bool Matches(string effect, Func<string, string> resolve) =>
+    All ? !Names.Any(n => Same(n, effect, resolve)) : Names.Any(n => Same(n, effect, resolve));
+
+  private static bool Same(string name, string effect, Func<string, string> resolve) =>
+    name.Equals(effect, StringComparison.OrdinalIgnoreCase) || resolve(name).Equals(effect, StringComparison.OrdinalIgnoreCase);
+}
 
 /// <summary>
 ///   Morpheme event name -> effects, read from blueprint graphs (<c>.sso</c>). The game has no hardcoded table
@@ -29,11 +44,19 @@ public sealed class AnimEventVfxMap
 
   private readonly Dictionary<string, List<EventVfx>> _map = new(StringComparer.OrdinalIgnoreCase);
   private readonly Dictionary<string, string> _sfxKeys = new(StringComparer.OrdinalIgnoreCase);
+  private readonly Dictionary<string, List<EventStop>> _stops = new(StringComparer.OrdinalIgnoreCase);
+  private static readonly HashSet<string> Stoppers = new(StringComparer.Ordinal)
+  {
+    "BlueprintNodeVfxStop", "BlueprintSfxLibraryStopsfx", "BlueprintNodeStopPackOfVfx", "BlueprintNodeStopAllSfx",
+  };
+  private static readonly HashSet<string> EndPins = new(StringComparer.Ordinal) { "OnDeactivate", "OnExit" };
 
   public IReadOnlyDictionary<string, List<EventVfx>> Events => _map;
   public int Files { get; private set; }
 
   public IReadOnlyList<EventVfx> For(string eventName) => _map.TryGetValue(eventName, out var list) ? list : [];
+  public IReadOnlyDictionary<string, List<EventStop>> StopEvents => _stops;
+  public IReadOnlyList<EventStop> StopsFor(string eventName) => _stops.TryGetValue(eventName, out var list) ? list : [];
 
   /// <summary>Effect file name for a blueprint name: a class <c>sfx.list</c> key's <c>__type</c>, else the name itself.</summary>
   public string Resolve(string name) => _sfxKeys.TryGetValue(name, out var type) ? type : name;
@@ -100,35 +123,75 @@ public sealed class AnimEventVfxMap
 
       var evName = n.Obj("mrEvent")?.Str("name") ?? n.Obj("mrDurationEvent")?.Str("name");
       if (evName is not { Length: > 0 }) continue;
-      // Exec BFS (OnEnter / OnActivate / OnExit ...), a few hops deep, collecting effect starters.
-      var queue = new Queue<(string, int)>(Links(n).Where(l => l.EndsWith("/Input", StringComparison.Ordinal)).Select(l => (l[..l.IndexOf('/')], 0)));
+      // Exec BFS (OnEnter / OnActivate / OnExit ...), a few hops deep, collecting effect starters and stoppers.
+      // Whatever hangs off a duration event's OnDeactivate / OnExit happens at the event's end.
+      var queue = new Queue<(string, int, bool)>(Pins(n).Where(l => l.Target.EndsWith("/Input", StringComparison.Ordinal))
+        .Select(l => (l.Target[..l.Target.IndexOf('/')], 0, n.ContainsKey("mrDurationEvent") && EndPins.Contains(l.Pin))));
       var seen = new HashSet<string>(StringComparer.Ordinal);
       while (queue.Count > 0)
       {
-        var (name, depth) = queue.Dequeue();
-        if (!seen.Add(name) || nodes[name] is not JsonObject target) continue;
-        if (Starters.Contains(target.Str("__type") ?? ""))
+        var (name, depth, atEnd) = queue.Dequeue();
+        if (!seen.Add(name + (atEnd ? "#end" : "")) || nodes[name] is not JsonObject target) continue;
+        var targetType = target.Str("__type") ?? "";
+        if (Starters.Contains(targetType))
         {
           var locator = target.Obj("locator1Ref")?.Str("def") ?? target.Obj("locatorRef")?.Str("def") ?? "";
-          foreach (var (key, value) in target)
-            if (value is JsonObject param && (key.Contains("sfx", StringComparison.OrdinalIgnoreCase) || key.Contains("vfx", StringComparison.OrdinalIgnoreCase))
-                && param.Str("def") is { Length: > 0 } def)
-              Add(evName, new EventVfx(def, source, locator));
-          if (pipes.TryGetValue(name, out var piped))
-            foreach (var p in piped) Add(evName, new EventVfx(p, source, locator));
+          foreach (var effect in Names(target, name, pipes))
+            Add(evName, new EventVfx(effect, source, locator, atEnd));
+        }
+        else if (Stoppers.Contains(targetType))
+        {
+          var all = targetType == "BlueprintNodeStopAllSfx";
+          var names = all ? Strings(target["ignoreSfxList"]).ToList()
+            : targetType == "BlueprintNodeStopPackOfVfx" ? Strings(target["vfxList"]).ToList()
+            : Names(target, name, pipes).ToList();
+          if (all || names.Count > 0) AddStop(evName, new EventStop(source, names, all, atEnd));
         }
 
         if (depth < 6)
           foreach (var l in Links(target).Where(l => l.EndsWith("/Input", StringComparison.Ordinal)))
-            queue.Enqueue((l[..l.IndexOf('/')], depth + 1));
+            queue.Enqueue((l[..l.IndexOf('/')], depth + 1, atEnd));
       }
     }
+  }
+
+  /// <summary>Effect names a starter/stopper node names: <c>*sfx*</c>/<c>*vfx*</c> param defaults plus string pipes into it.</summary>
+  private static IEnumerable<string> Names(JsonObject node, string nodeName, Dictionary<string, List<string>> pipes)
+  {
+    foreach (var (key, value) in node)
+      if (value is JsonObject param && (key.Contains("sfx", StringComparison.OrdinalIgnoreCase) || key.Contains("vfx", StringComparison.OrdinalIgnoreCase))
+          && param.Str("def") is { Length: > 0 } def)
+        yield return def;
+    if (pipes.TryGetValue(nodeName, out var piped))
+      foreach (var p in piped) yield return p;
+  }
+
+  private static IEnumerable<string> Strings(JsonNode? node)
+  {
+    if (node is JsonArray a)
+      foreach (var v in a)
+        if (v is JsonValue jv && jv.TryGetValue<string>(out var s) && s.Length > 0) yield return s;
+  }
+
+  private void AddStop(string ev, EventStop stop)
+  {
+    if (!_stops.TryGetValue(ev, out var list)) _stops[ev] = list = [];
+    if (!list.Any(x => x.All == stop.All && x.AtEnd == stop.AtEnd && x.Names.SequenceEqual(stop.Names, StringComparer.OrdinalIgnoreCase))) list.Add(stop);
   }
 
   private void Add(string ev, EventVfx vfx)
   {
     if (!_map.TryGetValue(ev, out var list)) _map[ev] = list = [];
-    if (!list.Any(x => x.Effect.Equals(vfx.Effect, StringComparison.OrdinalIgnoreCase))) list.Add(vfx);
+    if (!list.Any(x => x.Effect.Equals(vfx.Effect, StringComparison.OrdinalIgnoreCase) && x.AtEnd == vfx.AtEnd)) list.Add(vfx);
+  }
+
+  private static IEnumerable<(string Pin, string Target)> Pins(JsonObject node)
+  {
+    foreach (var (key, value) in node)
+      if (value is JsonArray a)
+        foreach (var item in a)
+          if (item is JsonValue v && v.TryGetValue<string>(out var s) && s.Contains('/'))
+            yield return (key, s);
   }
 
   private static IEnumerable<string> Links(JsonObject node)

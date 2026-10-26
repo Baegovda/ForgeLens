@@ -171,4 +171,75 @@ public class HostEffectTests
     Assert.Contains(fire, v => v.Effect == "fx_piped");
     Assert.Empty(map.For("nothing"));
   }
+
+  private const string StopBlueprint = """
+    nodes   =   {
+       glow   =   {
+          __type   =   "BlueprintNodeEquipmentUserMorphemeDurationEvent"
+          mrDurationEvent   =   {
+             name   =   "vfx_glow"
+          }
+          OnActivate   =   [
+             "start/Input"
+          ]
+          OnDeactivate   =   [
+             "stop/Input"
+          ]
+       }
+       start   =   {
+          __type   =   "BlueprintNodeVfxRestart"
+          vfxUidRef   =   {
+             def   =   "fx_muzzle"
+          }
+       }
+       stop   =   {
+          __type   =   "BlueprintNodeVfxStop"
+          vfxUidRef   =   {
+             def   =   "fx_muzzle"
+          }
+       }
+       trailStop   =   {
+          __type   =   "BlueprintNodeEquipmentUserMorphemeEvent"
+          mrEvent   =   {
+             name   =   "hit_trail_stop_effect"
+          }
+          OnEmitEvent   =   [
+             "pack/Input"
+          ]
+       }
+       pack   =   {
+          __type   =   "BlueprintNodeStopPackOfVfx"
+          vfxList   =   [
+             "trail_a",
+             "trail_b"
+          ]
+       }
+    }
+    """;
+
+  [Fact]
+  public void StopEventsEndEmission()
+  {
+    var map = new AnimEventVfxMap();
+    map.AddBlueprint("bp_stop", StopBlueprint);
+    Assert.False(Assert.Single(map.For("vfx_glow")).AtEnd);
+    var end = Assert.Single(map.StopsFor("vfx_glow"));
+    Assert.True(end.AtEnd);
+    Assert.Equal(["trail_a", "trail_b"], Assert.Single(map.StopsFor("hit_trail_stop_effect")).Names);
+
+    // Duration event 0.1..0.3 of a 1 s clip: the muzzle (8-particle burst at 0) starts at 0.1 and is stopped at 0.3.
+    var clip = new AnimationClip { Duration = 1f };
+    clip.EventTracks.Add(new AnimEventTrack("vfx", [new AnimEvent(0.1f, 0.2f, 0, ["vfx_glow"])]));
+    var lib = new EffectLibrary(new MemoryEffectSource(new Dictionary<string, string> { ["fx_flash_part"] = Part, ["fx_muzzle"] = Group }));
+    var host = new EffectHost(["root", "tip"]);
+    host.SetPose([Matrix4x4.Identity, Matrix4x4.Identity]);
+    var events = new AnimEventEffects(clip, map, n => lib.Resolve(n) is { } t ? EffectDefinition.Build(n, t) : null, host);
+    var cue = Assert.Single(events.Cues);
+    Assert.Equal(0.1f, cue.Time, 0.001f);
+    Assert.Equal(0.3f, cue.Stop, 0.001f);
+    Assert.Equal(1, events.StopCount);
+    var inst = Assert.Single(events.At(0.5f));
+    Assert.True(inst.Stopped);
+    Assert.Empty(events.At(0.3f + 3f));
+  }
 }

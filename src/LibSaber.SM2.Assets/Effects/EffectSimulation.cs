@@ -91,6 +91,9 @@ public sealed class EffectInstance
   public EffectDefinition Definition { get; }
   public ulong Seed { get; set; }
   public float Time { get; private set; }
+  /// <summary>Instance time a stop event ends emission (bursts, flows, trail points, lights); live particles finish.</summary>
+  public float StopTime { get; set; } = float.PositiveInfinity;
+  public bool Stopped => Time >= StopTime;
   public int StepCount { get; private set; }
   /// <summary>Where the effect is placed in the world.</summary>
   public Matrix4x4 Root { get; set; } = Matrix4x4.Identity;
@@ -200,6 +203,7 @@ public sealed class EffectInstance
     t.Time += dt;
     for (var i = 0; i < t.Points.Count; i++) { var p = t.Points[i]; p.Age += dt; t.Points[i] = p; }
     t.Points.RemoveAll(p => p.Age > def.TimeLifeSeg);
+    if (Stopped) return;
     if (t.Started && Vector3.Distance(t.Head, pos) > 10f) t.Points.Clear();
     var last = t.Points.Count > 0 ? t.Points[^1].Position : t.Started ? t.Head : pos;
     var d = Vector3.Distance(last, pos);
@@ -238,12 +242,12 @@ public sealed class EffectInstance
 
     var t0 = e.Time;
     var t1 = t0 + dt;
-    var active = def.EmitDuration <= 0 || t0 < def.EmitDuration;
+    var active = (def.EmitDuration <= 0 || t0 < def.EmitDuration) && !Stopped;
     var count = 0;
     switch (def.Emission)
     {
       case EmissionKind.Explosion:
-        if (!e.Burst && t1 >= def.BurstDelay)
+        if (!e.Burst && t1 >= def.BurstDelay && !Stopped)
         {
           e.Burst = true;
           count = (int)MathF.Round(def.BurstCount.X + (def.BurstCount.Y - def.BurstCount.X) * e.Random.Float());
@@ -413,7 +417,7 @@ public sealed class EffectInstance
   {
     foreach (var light in Definition.Lights)
     {
-      if (Time > light.Duration) continue;
+      if (Time > light.Duration || Stopped) continue;
       var n = Math.Clamp(Time / light.Duration, 0f, 1f);
       var parent = light.NameParent.Length > 0 && Socket?.Invoke(light.NameParent, Time) is { } socket ? socket : CurrentRoot;
       var world = light.Transform * parent;

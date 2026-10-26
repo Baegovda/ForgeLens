@@ -72,7 +72,8 @@ public sealed class EffectHost
 /// </summary>
 public sealed class AnimEventEffects
 {
-  public sealed record Cue(float Time, string Event, string Track, string Effect, string Source);
+  /// <param name="Stop">Clip time a later stop event ends its emission (+inf = none).</param>
+  public sealed record Cue(float Time, string Event, string Track, string Effect, string Source, float Stop = float.PositiveInfinity);
 
   private readonly List<(Cue Cue, EffectInstance Instance)> _instances = [];
   public IReadOnlyList<Cue> Cues { get; }
@@ -84,6 +85,15 @@ public sealed class AnimEventEffects
   {
     var cues = new List<Cue>();
     var unmapped = new SortedSet<string>(StringComparer.Ordinal);
+    var length = clip.Duration > 0 ? clip.Duration : 1f;
+    var stops = new List<(float Time, EventStop Stop)>();
+    foreach (var track in clip.EventTracks)
+      foreach (var ev in track.Events)
+        foreach (var tag in ev.Tags)
+          foreach (var stop in map.StopsFor(tag))
+            if (include?.Invoke(new EventVfx("", stop.Source)) ?? true)
+              stops.Add(((ev.Start + (stop.AtEnd ? ev.Duration : 0f)) * length, stop));
+    StopCount = stops.Count;
     foreach (var track in clip.EventTracks)
       foreach (var ev in track.Events)
         foreach (var tag in ev.Tags)
@@ -96,9 +106,13 @@ public sealed class AnimEventEffects
             var name = map.Resolve(hit.Effect);
             if (!seen.Add(name + "@" + hit.Locator)) continue;
             if (build(name) is not { } def) { unmapped.Add($"{tag}->{name}?"); continue; }
-            var cue = new Cue(ev.Start * (clip.Duration > 0 ? clip.Duration : 1f), tag, track.Name, name, hit.Source);
+            var time = (ev.Start + (hit.AtEnd ? ev.Duration : 0f)) * length;
+            // A stop at the same instant is the "stop old, start new" restart idiom: only later stops count.
+            var stopAt = stops.Where(s => s.Time > time + 1e-4f && s.Stop.Matches(name, map.Resolve)).Select(s => s.Time).DefaultIfEmpty(float.PositiveInfinity).Min();
+            var cue = new Cue(time, tag, track.Name, name, hit.Source, stopAt);
             cues.Add(cue);
             var inst = host.Attach(def, hit.Locator, (ulong)(cues.Count * 7919));
+            inst.StopTime = stopAt - time;
             _instances.Add((cue, inst));
           }
         }
@@ -108,6 +122,8 @@ public sealed class AnimEventEffects
   }
 
   public int Count => _instances.Count;
+  /// <summary>Stop cues on this clip (after the blueprint filter).</summary>
+  public int StopCount { get; }
 
   /// <summary>Instances alive at clip time <paramref name="t"/>, each seeked to its local time.</summary>
   public IEnumerable<EffectInstance> At(float t)
@@ -115,7 +131,7 @@ public sealed class AnimEventEffects
     foreach (var (cue, inst) in _instances)
     {
       var local = t - cue.Time;
-      if (local < 0 || local > Math.Max(0.1f, inst.Definition.Duration) + 2f) continue;
+      if (local < 0 || local > Math.Max(0.1f, Math.Min(inst.Definition.Duration, inst.StopTime)) + 2f) continue;
       inst.Seek(local);
       yield return inst;
     }

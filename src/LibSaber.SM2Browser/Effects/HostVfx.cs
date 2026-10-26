@@ -117,7 +117,7 @@ internal sealed class HostVfx
     var tags = clip.EventTracks.Sum(t => t.Events.Count);
     return Status = tags == 0
       ? $"{clip.Name}: no morpheme events"
-      : $"{clip.Name}: {tags} events, {_events.Cues.Count} effect cues ({string.Join(", ", _events.Cues.Select(c => $"{c.Event}@{c.Time:0.00}s->{c.Effect}").Take(6))})"
+      : $"{clip.Name}: {tags} events, {_events.Cues.Count} effect cues, {_events.StopCount} stops ({string.Join(", ", _events.Cues.Select(c => $"{c.Event}@{c.Time:0.00}s->{c.Effect}").Take(6))})"
         + (_events.Unmapped.Count > 0 ? $"; no blueprint link: {string.Join(", ", _events.Unmapped.Take(8))}" : "")
         + $" [{Map.Files} blueprints]";
   }
