@@ -21,6 +21,8 @@ public sealed class Bone
   public bool Influences { get; set; }
   /// <summary>The template object's <c>animNmb</c> (-1 = not animated). See <see cref="ClipBinding"/>.</summary>
   public int AnimIndex { get; set; } = -1;
+  /// <summary>The template object's own name before the <c>_N</c> dedupe suffix (empty for hand-built meshes).</summary>
+  public string SourceName { get; set; } = "";
 }
 
 public struct SkinWeights
@@ -63,6 +65,8 @@ public sealed class MeshPart
   public bool Visible { get; set; } = true;
   /// <summary>"LOD" or "volume" when <see cref="Visible"/> was cleared by Index's default filter.</summary>
   public string? HideReason { get; set; }
+  /// <summary>Template object (geometry graph node) the submesh belongs to, or -1. Indexes <see cref="ExportedMesh.Bones"/>.</summary>
+  public int Node { get; set; } = -1;
   public List<MaterialMap> Maps { get; } = new();
 
   public MeshPart Copy(int indexStart, int indexCount)
@@ -86,6 +90,7 @@ public sealed class MeshPart
       BaseLayer = BaseLayer,
       Visible = Visible,
       HideReason = HideReason,
+      Node = Node,
     };
     copy.Maps.AddRange(Maps);
     return copy;

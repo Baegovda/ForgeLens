@@ -47,7 +47,17 @@ def texture_file(sidecar_path, entry):
     return os.path.normpath(os.path.join(os.path.dirname(sidecar_path), relative))
 
 
+_IMPORTED = [0]
+# The whole build runs inside one editor tick, so every imported texture's RHI resource and its
+# build buffers stay alive until the script returns. 900 2K maps in one tick (an unfiltered
+# constructor tpl) aborted the D3D11 RHI thread. Collect garbage every GC_EVERY imports.
+GC_EVERY = 32
+
+
 def import_texture(disk, dest, name, srgb, normal):
+    _IMPORTED[0] += 1
+    if _IMPORTED[0] % GC_EVERY == 0:
+        unreal.SystemLibrary.collect_garbage()
     if not disk or not os.path.isfile(disk):
         unreal.log_warning("SM2 missing texture " + str(disk))
         return None

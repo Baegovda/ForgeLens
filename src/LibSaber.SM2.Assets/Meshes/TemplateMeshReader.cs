@@ -136,6 +136,7 @@ public static class TemplateMeshReader
         Parent = parent >= 0 && parent < objects.Count && parent != i ? parent : -1,
         Local = obj.MatrixModel,
         AnimIndex = obj.animNmb,
+        SourceName = obj.GetName() ?? "",
       });
     }
 
@@ -557,7 +558,7 @@ public static class TemplateMeshReader
       var rigid = !skinned && graph.objects is { Count: > 0 } objects ? ((uint)sub.NodeId < (uint)objects.Count ? sub.NodeId : 0) : -1;
       if (rigid >= 0)
         rigidParts++;
-      AppendRange(mesh, target, vertices, uvs, faces, info.VertexOffset, skinned, sub.BoneIds, partName, sub.Material, !hidden, hideReason, ref rejected, rigid);
+      AppendRange(mesh, target, vertices, uvs, faces, info.VertexOffset, skinned, sub.BoneIds, partName, sub.Material, !hidden, hideReason, ref rejected, rigid, sub.NodeId);
     }
   }
 
@@ -707,7 +708,8 @@ public static class TemplateMeshReader
     bool visible,
     string? hideReason,
     ref int rejected,
-    int rigidJoint = -1)
+    int rigidJoint = -1,
+    int node = -1)
   {
     if (vertices.Length == 0 || faces.Length == 0)
       return;
@@ -749,6 +751,7 @@ public static class TemplateMeshReader
         Variant = string.IsNullOrWhiteSpace(material?.ShadingMaterialMaterial) ? "default" : material.ShadingMaterialMaterial,
         Visible = visible,
         HideReason = hideReason,
+        Node = node,
       });
     }
 

@@ -3,6 +3,7 @@ using System.Text;
 using System.Text.Json;
 using LibSaber.SM2.Assets.Animation;
 using LibSaber.SM2.Assets.Catalog;
+using LibSaber.SM2.Assets.Customization;
 using LibSaber.SM2.Assets.Meshes;
 using LibSaber.SM2.Assets.Textures;
 
@@ -48,6 +49,12 @@ public sealed class ExportSettings
   public bool RebaseFirstFrame { get; init; } = true;
   /// <summary>Write the clip files only (no bind mesh, materials, or textures). For importing onto a skeleton already in the project.</summary>
   public bool AnimationOnly { get; init; }
+  /// <summary>
+  ///   Armor variant for customizable constructor tpls (<see cref="CustomizationLibrary.IsConstructorTemplate"/>), as a
+  ///   <see cref="VariantRequest"/> spec. Null or <c>default</c> keeps PREDEFINED_PRESET_1 (what SetActivePresetToDefault
+  ///   equips); <c>all</c> exports every armor piece. Other tpls are never filtered.
+  /// </summary>
+  public string? Variant { get; init; }
 }
 
 public sealed class ExportReport
@@ -209,6 +216,7 @@ public static class AssetExporter
       visibility.Apply(mesh);
     if (!settings.IncludeClothSim)
       HideClothSim(mesh);
+    var variant = settings.AnimationOnly ? null : ApplyVariant(catalog, store, file, mesh, settings, report);
     var exportMesh = SelectExportGeometry(mesh, settings.Lod);
     if (!settings.AnimationOnly)
       AttachResolvedNormals(catalog, index, exportMesh);
@@ -301,8 +309,82 @@ public static class AssetExporter
     if (settings.AnimationOnly)
       return;
     WriteMaterial(outputDirectory, file.Path, exportMesh.Material, settings, report, batch);
+    if (variant is not null)
+      WriteVariantSidecar(Destination(outputDirectory, file.Path, ".variant.json", batch), variant, report);
     if (settings.WriteModelTextures)
-      ExportModelTextures(catalog, store, index, exportMesh, outputDirectory, settings, report, batch);
+      ExportModelTextures(catalog, store, index, exportMesh, outputDirectory, settings, report, batch, partsOnly: variant is { HiddenParts: > 0 });
+  }
+
+  private static readonly System.Runtime.CompilerServices.ConditionalWeakTable<GameCatalog, CustomizationLibrary?[]> Libraries = new();
+
+  /// <summary>
+  ///   Picks one armor variant on a constructor tpl. Team and appearance come from the dummy .cls that names the tpl
+  ///   (<c>geom.nameTpl</c> + <c>characterInfo</c>), else from the tpl name. Returns null when nothing was filtered.
+  /// </summary>
+  internal static VariantResult? ApplyVariant(GameCatalog catalog, ArchiveStore store, CatalogFileInfo file, ExportedMesh mesh, ExportSettings settings, ExportReport report)
+  {
+    var template = AssetClassification.BaseName(file.Name);
+    if (!CustomizationLibrary.IsConstructorTemplate(template))
+      return null;
+    var request = VariantRequest.Parse(settings.Variant);
+    if (request.All)
+    {
+      report.Messages.Add($"{template}: --variant all, every customization region exported.");
+      return null;
+    }
+
+    var holder = Libraries.GetValue(catalog, _ => new CustomizationLibrary?[1]);
+    CustomizationLibrary? library;
+    lock (holder)
+      library = holder[0] ??= CustomizationLibrary.Load(catalog, store);
+    if (library is null)
+    {
+      report.Messages.Add($"{template}: {CustomizationLibrary.LibraryPath} is not in the catalog; every armor piece exported.");
+      return null;
+    }
+
+    string? team = request.Team;
+    string? appearance = request.Appearance;
+    var source = "--variant";
+    if (appearance is null)
+    {
+      var character = CustomizationLibrary.CharacterFromDummyClass(catalog, store, template);
+      if (character is { } fromClass)
+      {
+        team ??= fromClass.Team;
+        appearance = library.AppearanceForMastery(team, fromClass.Mastery);
+        source = fromClass.Source + " characterInfo " + fromClass.Team + "/" + fromClass.Mastery;
+      }
+
+      if (appearance is null && CustomizationLibrary.CharacterFromName(template) is { } fromName)
+      {
+        team ??= fromName.Team;
+        appearance = library.AppearanceForMastery(team, fromName.Mastery) ?? "PVE_PVP_" + fromName.Mastery[4..];
+        source = "tpl name (" + fromName.Team + "/" + fromName.Mastery + ")";
+      }
+    }
+
+    team ??= "LOYALIST";
+    if (appearance is null)
+    {
+      report.Messages.Add($"{template}: no customization appearance found; every armor piece exported.");
+      return null;
+    }
+
+    var result = ArmorVariant.Apply(mesh, library, team, appearance, request);
+    result.Template = template;
+    result.AppearanceSource = source;
+    report.Messages.Add($"{template}: variant {team}/{appearance} {result.Preset}: hid {result.HiddenParts} armor parts of {result.CustomizableObjects} customizable objects, {result.VisibleParts} visible parts left. --variant all keeps every piece.");
+    foreach (var note in result.Notes.Take(8))
+      report.Messages.Add(template + ": " + note);
+    return result;
+  }
+
+  private static void WriteVariantSidecar(string path, VariantResult variant, ExportReport report)
+  {
+    Directory.CreateDirectory(Path.GetDirectoryName(path)!);
+    File.WriteAllText(path, JsonSerializer.Serialize(variant, new JsonSerializerOptions { WriteIndented = true }));
+    report.Written++;
   }
 
   /// <summary>True for a cloth simulation shell such as <c>tbrd_01_frnt_SIM_02</c> or <c>cloth_stamp_leg_SIM</c>.</summary>
@@ -508,10 +590,13 @@ public static class AssetExporter
     string outputDirectory,
     ExportSettings settings,
     ExportReport report,
-    IReadOnlyList<string> batch)
+    IReadOnlyList<string> batch,
+    bool partsOnly = false)
   {
     var names = TextureNames(mesh);
-    if (mesh.Material is not null)
+    // The tpl texture list (tex0..) and per-part material slots cover every armor piece. With a variant
+    // filter on, only textures the visible parts reference are written.
+    if (mesh.Material is not null && !partsOnly)
     {
       foreach (var slot in mesh.Material.Slots)
       {

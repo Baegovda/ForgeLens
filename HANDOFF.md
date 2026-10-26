@@ -619,8 +619,8 @@ Base b913484. Branch `bulk`. Tools in `tools/bulk/` (PC copies in `Desktop\SM2_W
     - 5,315 nodes and 274 textures;
     - 375-670 s per export, ~8-10 GB RAM, 9-20 GB on disk;
     - every texture is written 3x (dds+png+tga).
-    - The UE import of the sniper crashed the editor (RHI breadcrumbs during texture builds). They are not in the UE pass.
-    - Options: a `--variant` filter, or a png-only texture flag for fbx-unreal.
+    - The UE import of the sniper crashed the editor (RHI breadcrumbs during texture builds).
+    - **Done:** `--variant` and `--tex-formats`. See "Constructor tpls" below.
   - **Fixed: Tyranid monsters and walkers had no root motion in UE (`UnrealRoot.HasSingleRoot`).**
   - Affected: carnifex, lictor, hive tyrant, warrior, zoanthrope, dreadnought, helbrute.
   - Their tpl hierarchy is `ObjectNNNN → ObjectNNNN → CENTRE` with no `ROOT`. FindPromotable declined, so FbxWriter kept the `{mesh}_Skeleton` Null. That Null became bone 0, and the 0xF4 motion sat on bone 1.
@@ -639,4 +639,72 @@ Base b913484. Branch `bulk`. Tools in `tools/bulk/` (PC copies in `Desktop\SM2_W
 - **Disk:**
   - Cleanup was approved by the user. Deleted `Exports\bulk\*.bakN`: 36 folders, 61.1 GB. C: free went from 4.9 GB to 66.0 GB; it was ~50 GB after the bulk_fix imports and DDC.
   - Deleted 18 of the 24 `/Game/SM2_Work/Tests/bulk/*_bakN` folders through the editor API.
-  - 6 remain (calgar, chaplain, intercessor, primaris_captain, titus_assault, titus_deathwatch; ~2.2 GB on K:). The editor reports them in use: their new `_Skeleton` still references the renamed mesh. Delete them with `Scripts\bulk\ue_del_bak.py` after a UE restart.
+  - The other 6 (calgar, chaplain, intercessor, primaris_captain, titus_assault, titus_deathwatch) were reported in use because their new `_Skeleton` still referenced the renamed mesh. **Correction (2026-10-27):** all 6 were deleted with `Scripts\bulk\ue_del_bak.py` after a UE restart. They took ~0.26 GB on K:, not the ~2.2 GB estimated earlier. No `Tests/bulk/*_bakN` folders remain.
+
+## Constructor tpls: `--variant` + `--tex-formats` (2026-10-27, constructor)
+Base d0ad14f. Branch `constructor`. Patch: `/workspace/patches/constructor/`.
+- **Problem:** `cc_sm_constructor_tank`, `cc_sm_constructor_sniper` and `cc_ch_constructor_soldier` are customization libraries, not characters. They hold every armor piece of every region.
+  - Exports took 375-670 s and 12-23.5 GB, with every texture written 3x.
+  - The UE import of the sniper aborted the editor.
+- **REA (how the game hides armor):**
+  - Geom script bindings:
+    - HideObj `FUN_14133eae0`;
+    - ShowObj `0x14133fec0` (a thunk to `FUN_141349c70`);
+    - HideObjs `0x14133eaf0`;
+    - ShowObjsOnly `0x141347dd0`.
+  - HideObj and ShowObj loop over the names and call `FUN_14133e750(geom, name, show, isPattern, 0x140000)`.
+  - `FUN_14133e750`:
+    - It looks up the name through `FUN_141d912a0` and checks the flags at `node+0x18`.
+    - It then calls `FUN_142216790(tree, node, 0x140000, hide)`. That walks the subtree with `FUN_14225c680` and sets or clears bits at `node+0x1c`.
+    - So hiding is recursive: hiding a `_grp`/LOD group node hides everything under it.
+    - With `isPattern` it glob-matches through `FUN_142781420`/`FUN_142781890` and applies `FUN_141d99490` per match.
+  - Default look: `ssl/body/customization/progression/character_customization_outfit_state_release.sslbin` calls `SetActivePresetToDefault` next to the constant `"PREDEFINED_PRESET_1"`.
+  - Team and class come from the loading-scene dummy. `ssl/loading_scene_logic/customizable_character_dummy_tank.cls` has `nameTpl="cc_sm_constructor_tank"`, `team="LOYALIST"`, `masteryType="PVE_TANK"`.
+- **Code** (`Customization/SslText.cs`, `Customization/ArmorVariant.cs`, `AssetExporter.ApplyVariant`):
+  - The customization library is the text SSL. Customizable objects are every region's `meshes`, including subtrees.
+  - Hide set = (customizable − shown by the preset/overrides) ∪ `meshesToHide` of the shown regions ∪ `powerfist*` ∪ `-obj`, minus `+obj`.
+  - The filter only hides parts. It never unhides parts already hidden as LOD, volume or cloth-sim (HideReason `variant`).
+  - Appearance resolution: the dummy `.cls` (`CharacterFromDummyClass`), then the tpl name, then the `PVE_PVP_<X>` fallback.
+  - Writes `{model}.variant.json`: team, appearance and its source, preset, regions, hidden/visible counts, and notes.
+  - With a variant active, only textures referenced by visible parts are written. The tpl TexList and the per-part `Material.Slots` are skipped (`partsOnly`).
+  - `MeshPart.Node` (a tpl node id) and `Bone.SourceName` were added so parts can be matched to object names.
+- **CLI:**
+  - `--variant <spec>`, with tokens split on `,` or `;`:
+    - `default`;
+    - `all` / `none`;
+    - `preset=N` or `preset=PREDEFINED_PRESET_N`;
+    - `appearance=TEAM/UID`;
+    - `team=`;
+    - `SECTION=uid` (a region override);
+    - `+obj` / `-obj`.
+  - Without `--variant`, constructor tpls get `default` (PREDEFINED_PRESET_1). `--variant all` keeps every piece, as before. Other tpls are unchanged.
+  - `--tex-formats dds,png,tga|all`. The default stays dds+png+tga.
+  - png-only is safe for UE: `import_sm2_materials.py` reads the sidecar `packing[].stored` and falls back to dds only for old sidecars. The FBX links png, then tga, then dds.
+- **UE RHI crash:**
+  - Report: `Saved\Crashes\UECC-Windows-CF5F62BC...`, 2026-10-26 23:44 KST. "Abort signal received" in D3D11, with `LogRHI: Error: Breadcrumbs 'RHIThread'`.
+  - It happened during the sniper's material import, after 89 2K textures (each with a "Required Memory Estimate 351 MB"). The whole Python build ran inside one editor tick.
+  - Cause: resource exhaustion from texture count and size, not a data bug.
+  - Mitigation:
+    - The variant filter (sniper 895 → 81 png).
+    - `import_sm2_materials.py` calls `unreal.SystemLibrary.collect_garbage()` every `GC_EVERY = 32` texture imports.
+  - The separate 00:43 crash (62B0) was an ensure in ForceDeleteObjects on `cc_termagant_bak1`, which is unrelated.
+- **Re-export** (`tools/bulk/ctor_export.ps1 -InPlace`, exe10, default variant, `--tex-formats png`, 3 parallel) into `Exports\bulk_fix\<a>`:
+
+  | tpl | before s | after s | before GB | after GB | textures before → after | FBX MB | hidden / visible parts |
+  |---|---|---|---|---|---|---|---|
+  | tank | 670.8 | 104.7 | 23.5 | 0.394 | 1031×3 → 69 png | 365 → 24.1 | 978 / 54 |
+  | sniper | 513.8 | 102.7 | 19.8 | 0.413 | 895×3 → 81 png | 22.4 | 778 / 64 |
+  | soldier | 375.5 | 64.6 | 12.1 | 0.276 | 520×3 → 53 png | 17.1 | 370 / 41 |
+
+  - Times are wall-clock with 3 exports running in parallel. In earlier runs, the variant alone was 58-96 s.
+  - Material sidecar slots after filtering: tank 54 (was 1032), sniper 64, soldier 41.
+  - Validation on the real tpls (box console app): tank hid 565 of 620 customizable objects, sniper 442 of 498, soldier 237 of 286.
+  - The sniper has 4 benign notes: its preset lists torso_chest4/5 and torso_l/r_pauldron, which its library doesn't have.
+- **UE:** `ue_bulk.py import <a> bulk_fix` imports into `/Game/SM2_Work/Tests/bulk_fix/<a>`, then run the captures.
+- **Tests:**
+  - `ArmorVariantTests` (+9): SSL parse, default preset, preset 2 grp subtree and meshesToHide, overrides and forced objects, unknown region, no LOD unhide, request parse, appearance from cls/name, and `Part.Copy` keeping Node.
+  - `VariantOptionTests` (+7).
+  - Totals: SM2.Assets 81, SM2Extractor 42, LibSaber.Tests 5, all passing.
+- **Cleanup (approved by the user, 2026-10-27 01:14 KST):**
+  - `/Game/SM2_Work/_Legacy` (SM2_Test, SM2_v4, SM2) and `/Game/Test` held 0 files. Both were removed.
+  - The registry check printed `GONE True True` (`Scripts\legacy\ue_rmpaths.py`).

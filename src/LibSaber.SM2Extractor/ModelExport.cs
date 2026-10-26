@@ -186,9 +186,10 @@ public static class ModelExport
     var gltf = format is "gltf" or "both";
     return new ExportSettings
     {
-      WriteDds = true,
-      WritePng = true,
-      WriteTga = true,
+      WriteDds = options.WriteDds,
+      WritePng = options.WritePng,
+      WriteTga = options.WriteTga,
+      Variant = options.Variant,
       WriteGltf = gltf,
       WriteFbx = fbx,
       CopyOriginalBytes = false,

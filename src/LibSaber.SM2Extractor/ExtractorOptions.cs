@@ -10,7 +10,7 @@ LibSaber.SM2Extractor — list and extract Warhammer 40,000: Space Marine 2 arch
 Usage:
   LibSaber.SM2Extractor list <archive-or-folder> [options]
   LibSaber.SM2Extractor extract <archive-or-folder> --output <folder> [options]
-  LibSaber.SM2Extractor export <game-folder> --asset <path> --format <fbx-unreal|gltf|both> --output <folder> [--lod <n>] [--anim <name|all>]... [--anim-only] [--anim-rebase <first-frame|none>] [--no-root-motion] [--include-cloth-sim]
+  LibSaber.SM2Extractor export <game-folder> --asset <path> --format <fbx-unreal|gltf|both> --output <folder> [--lod <n>] [--anim <name|all>]... [--anim-only] [--anim-rebase <first-frame|none>] [--no-root-motion] [--include-cloth-sim] [--variant <spec>] [--tex-formats <list>]
 
 The game ships .pak archives with a sibling cache of the same name plus ".cache"
 (client_pc\something.pak and client_pc\something.pak.cache). .pck files with a
@@ -55,6 +55,16 @@ Options:
   --include-cloth-sim     Keep *_SIM cloth simulation meshes. The game only uses them to
                           drive the *_REND cloth (InitSimToRenderSkinning) and never draws
                           them, so they are skipped by default. export only.
+  --variant <spec>        Armor variant for customizable constructor tpls (cc_sm_constructor_*,
+                          cc_ch_constructor_*), which carry every armor piece of every region.
+                          default: PREDEFINED_PRESET_1 of the tpl's appearance (the preset
+                          SetActivePresetToDefault equips). all: no filter (old behavior).
+                          Tokens, separated by ',' or ';': preset=N, appearance=TEAM/UID,
+                          SECTION=regionUid (HELMET=helmet_tank_common_01), +object, -object.
+                          Other tpls are not filtered. Writes {model}.variant.json. export only.
+  --tex-formats <list>    Texture files to write: any of dds, png, tga (',' separated).
+                          Default dds,png,tga. The FBX links png, then tga, then dds.
+                          export only.
   --no-recursive          When the input is a folder, do not search subfolders.
   --prefix-archive        Write each archive under <output>\<archive name>\. extract only.
   --no-overwrite          Leave files that are already in the output folder. extract only.
@@ -90,6 +100,11 @@ Examples:
   public bool AnimationOnly { get; private init; }
   public bool RebaseFirstFrame { get; private init; } = true;
   public bool IncludeClothSim { get; private init; }
+  /// <summary><c>--variant</c> spec, or null for the default (PREDEFINED_PRESET_1 on constructor tpls).</summary>
+  public string? Variant { get; private init; }
+  public bool WriteDds { get; private init; } = true;
+  public bool WritePng { get; private init; } = true;
+  public bool WriteTga { get; private init; } = true;
 
   public static ExtractorOptions Help()
     => new() { Verb = ExtractorVerb.Help };
@@ -137,6 +152,8 @@ Examples:
     var rebaseSet = false;
     var rootMotionSet = false;
     var includeClothSim = false;
+    string? variant = null;
+    string? texFormats = null;
     var positionals = new List<string>();
 
     for (var i = 0; i < args.Length; i++)
@@ -175,6 +192,46 @@ Examples:
       if (arg == "--include-cloth-sim")
       {
         includeClothSim = true;
+        continue;
+      }
+
+      if (TryTakeValue(args, ref i, arg, "--variant", "--variant", out var variantValue))
+      {
+        if (variant is not null)
+        {
+          error = "Variant specified more than once.";
+          return false;
+        }
+
+        if (string.IsNullOrWhiteSpace(variantValue))
+        {
+          error = "Variant is empty.";
+          return false;
+        }
+
+        try
+        {
+          LibSaber.SM2.Assets.Customization.VariantRequest.Parse(variantValue);
+        }
+        catch (ArgumentException ex)
+        {
+          error = ex.Message;
+          return false;
+        }
+
+        variant = variantValue.Trim();
+        continue;
+      }
+
+      if (TryTakeValue(args, ref i, arg, "--tex-formats", "--tex-formats", out var texValue))
+      {
+        if (texFormats is not null)
+        {
+          error = "Texture formats specified more than once.";
+          return false;
+        }
+
+        texFormats = texValue ?? "";
         continue;
       }
 
@@ -371,9 +428,9 @@ Examples:
       return false;
     }
 
-    if (verb != ExtractorVerb.Export && (asset is not null || format is not null || lodSet || animation is not null || rootMotionSet || includeClothSim || !unrealRootBone || animationOnly || rebaseSet))
+    if (verb != ExtractorVerb.Export && (asset is not null || format is not null || lodSet || animation is not null || rootMotionSet || includeClothSim || !unrealRootBone || animationOnly || rebaseSet || variant is not null || texFormats is not null))
     {
-      error = "--asset, --format, --lod, --anim, --anim-only, --anim-rebase, --no-root-motion, --fbx-armature-null, and --include-cloth-sim are only valid with export.";
+      error = "--asset, --format, --lod, --anim, --anim-only, --anim-rebase, --no-root-motion, --fbx-armature-null, --include-cloth-sim, --variant, and --tex-formats are only valid with export.";
       return false;
     }
 
@@ -410,6 +467,10 @@ Examples:
       }
     }
 
+    bool dds = true, png = true, tga = true;
+    if (texFormats is not null && !TryParseTextureFormats(texFormats, out dds, out png, out tga, out error))
+      return false;
+
     options = new ExtractorOptions
     {
       Verb = verb.Value,
@@ -429,7 +490,47 @@ Examples:
       AnimationOnly = animationOnly,
       RebaseFirstFrame = rebase,
       IncludeClothSim = includeClothSim,
+      Variant = variant,
+      WriteDds = dds,
+      WritePng = png,
+      WriteTga = tga,
     };
+    return true;
+  }
+
+  /// <summary><c>--tex-formats</c>: a ',' / ';' / '+' list of dds, png, tga. At least one is required.</summary>
+  public static bool TryParseTextureFormats(string value, out bool dds, out bool png, out bool tga, out string error)
+  {
+    dds = png = tga = false;
+    error = "";
+    foreach (var token in value.Split(new[] { ',', ';', '+' }, StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
+    {
+      switch (token.TrimStart('.').ToLowerInvariant())
+      {
+        case "dds":
+          dds = true;
+          break;
+        case "png":
+          png = true;
+          break;
+        case "tga":
+          tga = true;
+          break;
+        case "all":
+          dds = png = tga = true;
+          break;
+        default:
+          error = $"Unknown texture format '{token}'. --tex-formats takes dds, png, tga (comma separated).";
+          return false;
+      }
+    }
+
+    if (!dds && !png && !tga)
+    {
+      error = "--tex-formats needs at least one of dds, png, tga.";
+      return false;
+    }
+
     return true;
   }
 
