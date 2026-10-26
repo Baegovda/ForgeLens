@@ -122,7 +122,7 @@ For any agent continuing this work: read this whole file before you do anything.
 2. **Transparent face slots.** Titus's head_01* slots are marked transparent. Confirm in the game what their alpha means before using the translucent parent on them.
 3. **VFX.** There is no `.sfx` to Niagara conversion; files are extracted raw only.
 4. **Rhino parts.** Check whether destroyed or variant parts are stacked on the hull.
-5. **.sani gaps.** Mostly done, see "sani gaps (2026-10-26)" below. Still open: binding of v3 empty-name tracks, and root *rotation* (decoded, not applied by the exporters).
+5. **.sani gaps.** Done for SM2, see "sani gaps (2026-10-26)" and "sani gaps, part 2" below. v3 empty-name tracks bind by template animNmb, root rotation is applied, and unskinned tpl parts are world-baked and rigidly bound.
 6. **Push and tests.** Push the local commits to PR #1 and get the tests running.
 
 ## Rules
@@ -164,7 +164,7 @@ For any agent continuing this work: read this whole file before you do anything.
 - Still open in item 5: F3/F7 second slot, version >= 3, F6 clips without .sani_data.
 
 ### Open
-3 VFX (UE Niagara builder from niagara.json), 5 .sani (only v3 empty-name binding and root rotation left), 6 tests (dotnet test hangs at restore; push now works via bundle).
+3 VFX (Niagara last; first browser playback as in-game), 5 .sani (done, see part 2), 6 tests (dotnet test hangs at restore; push now works via bundle).
 
 ## Bulk .sani validation (2026-10-26)
 - Census of 23,227 .sani: v2 F6 sub2 20,244; v2 F2 sub2 1,223; v1 F6 787; v2 F6+F7 542; v2 F6 sub1 218; v1 F2 73; v3 F2+F3 61; v3 F6+F7 40; v2 F2+F3 21; v2 F2 sub1 18. F8 appears in 661 files.
@@ -230,15 +230,45 @@ All five gaps from item 5, done REA-first (Ghidra project /workspace/rea/ghidra_
 - PC backup before install: C:\Users\Revaptor_FX\SM2Extractor.bak2 (old build). Raw file restored: Raw\sani_all\...\pve_relay_boss_intro_shot_01_char_vortex_beast1_vortex_beast.sani was overwritten by an old sanival call (TSV header, 92 bytes, kept as .sani.bak1) and restored from Raw\sani_all.zip (60,885 bytes). sanival now refuses an unknown flag / non-folder / non-.tsv output.
 - Loader FUN_14222fe40 accepts version 1..3; F2/F6 = slot 0 (clip+0x60), F3/F7 = slot 1 (clip+0x68), F4 = root (FUN_142234f10); codec factory FUN_142234c00 reads the sub u16 only when version > 1.
 1. **v3: FIXED.** vtbl 0x1437e74e0. Header FUN_14222d0d0 (8 counts nT nR nS nF cT cR cS cF), carve FUN_14222d550, planar T,R,S,F frames FUN_14222d6b0, frame size FUN_14222d7c0 = nT*4+nR*6+nS*6+nF*2 (sampler c810 is the reference). Name table FUN_1422336c0: bones (+24) then scalars (+28), interned by FUN_141c3fa90 (string-pool id; empty string -> id 0). Scalars go to AnimationClip.Scalars. v3/F7 .sani_data = F2 block + F3 block. Raw v3 sub-1 codec (vtbl 0x1437e72d0) not decoded (no retail file uses it).
-   - Open: v3 empty names (id 0) cannot bind by name; exporter names them unnamed_###. hologram_planet anim binds 0/47, door_mushroom close 128/130. Next RE: the consumer of the clip+0x40 id array.
+   - Empty names: FIXED in part 2 (bind by template animNmb rank).
 2. **F3/F7 second slot: FIXED (as additive flag).** Stats dumper FUN_141060280 prints HasAdditive (string 0x1435ef808) = clip+0x68 != 0. Numerically slot1 R(f) = R0(f)*inv(R0(0)) (max err 0.00x deg), T(f) = T0(f)-T0(0), scales 1 (cultist_stand_shoot, cadian_talk, door_mushroom close). Only slot 0 is exported; AnimationClip.HasAdditive is set.
 3. **F6 without .sani_data: NO-OP.** Census: 0 such files in retail; preview fallback kept.
-4. **v1 root motion: DECODED, partial in export.** F4 sub 1 vtbl 0x1437e77b8 ([1] FUN_14222ef50 exact, [2] FUN_14222ef80 lerp T + FUN_1427ae2c0 blend R, [3] FUN_14222f060 carve, [7] FUN_14222f0d0 load); size FUN_14222f140: float4 T[frames] then float4 R[frames] (w,x,y,z). Sub 2 root = vtbl 0x1437e7800. All 860 v1 files carry F4; 2 are non-identity (vortex_beast boss_intro / outro): T is all zero, R is non-identity (e.g. boss_intro frame 250 = (w .785, x -.366, y .354, z -.354)). ClipPose/FbxWriter/GltfWriter apply only root translation, so the FBX is byte-identical to the bak2 export (MD5 61234DEB...). Applying root rotation needs proof of how the engine composes it with the (already scene-placed) bones - open.
+4. **v1 root motion: DECODED, partial in export.** F4 sub 1 vtbl 0x1437e77b8 ([1] FUN_14222ef50 exact, [2] FUN_14222ef80 lerp T + FUN_1427ae2c0 blend R, [3] FUN_14222f060 carve, [7] FUN_14222f0d0 load); size FUN_14222f140: float4 T[frames] then float4 R[frames] (w,x,y,z). Sub 2 root = vtbl 0x1437e7800. All 860 v1 files carry F4; 2 are non-identity (vortex_beast boss_intro / outro): T is all zero, R is non-identity (e.g. boss_intro frame 250 = (w .785, x -.366, y .354, z -.354)). ClipPose/FbxWriter/GltfWriter apply only root translation, so the FBX is byte-identical to the bak2 export (MD5 61234DEB...). Root rotation: APPLIED in part 2.
 5. **Rotation steps > 90 deg: NOT A BUG.** FUN_1427ae2c0 is slerp-approx with hemisphere flip (dot<0 -> negate), same shortest path as UE; codes are unsigned code*scale+min (no wrap). Box sample: 1548 snaps vs 27 one-frame spikes, mostly attach/hand/prop/IK bones. PC: 1967 files have a step > 90 deg. No code change.
 - Validation: PC Raw\sani_validation3.tsv 23,227 OK / 0 FAIL (v1 860, v2 22,266, v3 101); additive 664, scale tracks 101. Box /workspace/sani/val3.tsv 449/449 OK; v3 hologram_planet matches py/sani.py.
 - Tests: test/LibSaber.SM2.Assets.Tests/SaniGapTests.cs (4 synthetic tests; pass in a shim runner on the box, real `dotnet test` still hangs at restore there).
 - Tools: tools/sanival (`sanival <folder> <out.tsv>`, `--dump <file> <bone|index>`, `--root <file> [step]`), tools/ue/ue_sani_fix.py (import mesh + before/after anim; `check` prints AnimPose WORLD bone poses at 0/25/50/75/100%).
 - UE (/Game/SM2_Work/sani_fix): door_mushroom (mesh + after/door_mushroom__close, 3.267 s; before = no clip at all) - flower_base_bind_01 moves (-500,-310,-265) -> (-387,-274,207), flower_base_bind_04 pitch -74 -> -18, no NaN. cc_vortex_beast before/after boss_intro (19 s) identical poses (see gap 4). Captures Captures\sani_fix\door_mushroom_{before_bind,after_f000,f050,f100} (box /workspace/sani/captures): camera ends up inside the door's hull, so they are not useful visually; the AnimPose numbers are the evidence.
+
+## sani gaps, part 2 (2026-10-26)
+CLI: box /workspace/pub3 -> PC C:\Users\Revaptor_FX\SM2Extractor3\LibSaber.SM2Extractor.exe. SM2Extractor2 = a04e0bc, and the older SM2Extractor is kept. Always pass the full `--anim tpl/<n>.tpl/animations/<clip>.sani`, because a short name matches by substring and exports many clips.
+1. **v3 empty-name tracks: FIXED (a04e0bc).**
+   - Exe: the `CONFIG.useSaniAnimationsInTpl` path FUN_141db55f0 -> FUN_142232230 takes the tpl objects with animNmb != -1, sorts them by animNmb (FUN_14127d230) and writes clip+0x50[i] = object id. No name is compared.
+   - Code: Export/ClipBinding.cs and Bone.AnimIndex. When the counts do not match, it falls back to names. An explicit bone index is kept.
+   - Logs: door_mushroom close 130/130 (was 128), hologram_planet anim 47/47 (was 0).
+2. **Unskinned tpl parts: FIXED (this series).**
+   - TemplateMeshReader baked unskinned parts with the node's LOCAL MatrixModel. ReadSkeleton proves MatrixModel is local (inverse binds pair only as world = local * parentWorld).
+   - hprobe: hologram_planet has 63 of 65 geometry nodes with world != local, up to 8.72 m. Rhino has 0 of 10, so the change is a no-op there.
+   - The parts are now baked with the composed world matrix, and each one gets a rigid skin weight (J0 = node, W0 = 1), so node tracks move it. Exporter note: "N unskinned parts are bound rigidly...".
+   - UE: the old mesh shows one stray outer sphere (bind bounds sphere 52 m). The new one shows the planet with its rings (17 m), and the rings move between t = 0, 0.25 and 0.5 (9.5 to 11 % of pixels change).
+3. **Root rotation (F4 R): APPLIED (a04e0bc).**
+   - Exe: FUN_14222fe40 case 3 samples the root (FUN_142234f10, vtbl+8) at frame 0 and frame N-1. It uses FUN_1427aa8a0 (q inverse), FUN_1427ace20 (R^-1 v) and FUN_1427ad8b0 (q mul): root+8 = R0^-1 (T_last - T0), and root+0x14 = R0^-1 R_last. The result goes to clip+0x70. So p' = R p + T, which is `local * R * T` (row vectors) for parentless bones.
+   - Code: ClipPose, FbxWriter (R key times) and GltfWriter (bakes T and R on parentless bones). The identity-R path is byte-identical.
+   - Census (PC Raw\sani_root_census.tsv): 23,227 clips, 418 with R. 416 of them are turn clips whose angle matches the name. The other 2 are cinematics, pve_relay boss_intro 89.6 deg and outro 50 deg, both with T = 0.
+   - Root motion is per controller: `MorphemeController.useAnimRootMotion` (+0x41, string 0x1435da538, registered at 0x140e4e9be in FUN_140e4b2f0). Cinematics presumably play without it: boss_intro ends tilted at z 805 with R, but in the idle stance without it. The exporter therefore warns for clips with R and suggests `--no-root-motion` for those 2 shots. There is no path heuristic, because the exe gives no proof of one.
+   - vortex_beast attack_melee_180 (v2): CENTRE yaw f0/fN was 89/89 and is now 89/-91 (a true 180). The largest one-frame step drops from 79.1 cm to 24.9 cm.
+   - No regression: the titus run clip FBX and every mesh FBX are byte-identical.
+- UE additions:
+  - Props/hologram_planet (rigid-bound mesh)
+  - Animations/hologram_planet/hologram_planet__anim
+  - Tests/sani_before/hologram_planet/localbake/* (old mesh + anim)
+  - Animations/door_mushroom/door_mushroom__close (130/130; the old 128/130 clip is in Tests/sani_before/door_mushroom)
+  - Animations/cc_vortex_beast/{boss_intro, attack_melee_180} (before copies in Tests/sani_before/cc_vortex_beast)
+- Captures: tools/ue/ue_cap2.py. Each capture takes three calls (pose, capture, export). The centre is the posed bones, and the radius is max(bone spread, mesh bounds sphere). The camera sits at R/sin(fov/2), so it is outside the mesh. cdt/_glr/rb_/_lod/nav_silhouette slots are hidden. Output: PC Desktop\SM2_Work\Captures2 and box /workspace/sani/captures2 (12 sets x front/side/three_quarter).
+- Known limits:
+  - Affix-hidden volumes cannot be told apart by UE slot name (pass hide=).
+  - There is no unit test for the world bake yet (needs a tpl fixture).
+  - A 90 deg turn clip was not imported. The census and the 180 clip cover the rotation sign.
 
 ## UE layout (unified, 2026-10-26)
 Everything our work created lives in `/Game/SM2_Work`. An inventory of /Game (255,440 assets) found no SM2 work outside it: no /Game/SM2, /Game/SM2_Test, /Game/SM2_vN or scratch/_calib folders remain. The `M_SM2` / `M_SM2_Translucent` / `M_SM2_ClothSimHidden` masters are written per asset by import_sm2_materials.py, so they stay next to that asset's instances. Different generations differ, so they are not merged.
@@ -247,9 +277,9 @@ Everything our work created lives in `/Game/SM2_Work`. An inventory of /Game (25
   Materials/              M_Hide (capture helper, was _Tools)
   Original/cc_titus_assault/   owner's original import, untouched; /Game/Work/02/Lightning_01 references its mesh and Anim/run_fwd
   Characters/<asset>/     current import (mesh, Skeleton, masters, MIs, Textures/): cc_titus_assault, cc_swarm_hormagaunt, cc_calgar (was step3/*), cc_sorcerer_exalted, cc_vortex_beast
-  Props/<asset>/          refrt_imp_rhino_01 (was refrt_imp_rhino_01_v2, fixed LOD), refrt_tyr_arch_column_01, wpn_bolter_heavy_01, door_mushroom
+  Props/<asset>/          refrt_imp_rhino_01 (was refrt_imp_rhino_01_v2, fixed LOD), refrt_tyr_arch_column_01, wpn_bolter_heavy_01, door_mushroom, hologram_planet
   Animations/<asset>/     clips: cc_titus_assault/{Bulk,GUI,yaw180} (skeleton = Original/cc_titus_assault), cc_sorcerer_exalted/Bulk,
-                          cc_swarm_hormagaunt/Bulk (skeleton = Tests/pre_step3/cc_swarm_hormagaunt), cc_vortex_beast, door_mushroom (sani "after")
+                          cc_swarm_hormagaunt/Bulk (skeleton = Tests/pre_step3/cc_swarm_hormagaunt), cc_vortex_beast, door_mushroom, hologram_planet (sani "after")
   Tests/<stage>/<asset>/  step3_ab_off (was step3/_ab_off), sani_before, pre_step3 (old root cc_titus_assault, cc_swarm_hormagaunt),
                           v4 (cc_titus_assault), rhino_stacked (old refrt_imp_rhino_01), typetest (future ue_typetest.py output)
 ```

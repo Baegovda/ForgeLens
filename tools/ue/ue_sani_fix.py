@@ -3,6 +3,8 @@
 # then report per-anim length, frames and bone poses (world space) at a few times.
 # usage: ue_sani_fix.py import <name> <clip> [after_tag] [before_tag]   |   ue_sani_fix.py check <name> <bone,bone,...>
 # Exports are read from Desktop/SM2_Work/Exports/sani_fix_<tag>/<name>/tpl/<name>.tpl/ (tags default to after / before).
+# A tag of "-" skips that side. The mesh is imported only when <folder>/<name> does not exist yet, so an existing
+# mesh keeps its material instances (pass "remesh" as arg 6 to force a reimport).
 import sys, os, unreal
 mode, name = sys.argv[1], sys.argv[2]
 base = r"C:/Users/Revaptor_FX/Desktop/SM2_Work/Exports/sani_fix_{}/" + name + "/tpl/" + name + ".tpl/"
@@ -13,15 +15,21 @@ tags = {"after": sys.argv[4] if len(sys.argv) > 4 else "after", "before": sys.ar
 tools = unreal.AssetToolsHelpers.get_asset_tools()
 if mode == "import":
     clip = sys.argv[3]
-    t = unreal.AssetImportTask(); t.filename = base.format(tags["after"]) + name + ".fbx"; t.destination_path = folder
-    t.automated = True; t.replace_existing = True; t.save = True
-    o = unreal.FbxImportUI(); o.import_mesh = True; o.import_materials = False; o.import_textures = False; o.import_animations = False
-    o.import_as_skeletal = True; o.mesh_type_to_import = unreal.FBXImportType.FBXIT_SKELETAL_MESH
-    t.options = o
-    tools.import_asset_tasks([t])
-    print("MESH", list(t.imported_object_paths))
+    remesh = len(sys.argv) > 6 and sys.argv[6] == "remesh"
+    if unreal.EditorAssetLibrary.does_asset_exist(folder + "/" + name) and not remesh:
+        print("MESHKEEP", folder + "/" + name)
+    else:
+      t = unreal.AssetImportTask(); t.filename = base.format(tags["after"]) + name + ".fbx"; t.destination_path = folder
+      t.automated = True; t.replace_existing = True; t.save = True
+      o = unreal.FbxImportUI(); o.import_mesh = True; o.import_materials = False; o.import_textures = False; o.import_animations = False
+      o.import_as_skeletal = True; o.mesh_type_to_import = unreal.FBXImportType.FBXIT_SKELETAL_MESH
+      t.options = o
+      tools.import_asset_tasks([t])
+      print("MESH", list(t.imported_object_paths))
     mesh = unreal.load_asset(folder + "/" + name)
     for v in ("before", "after"):
+        if tags[v] == "-":
+            continue
         fbx = base.format(tags[v]) + name + "__" + clip + ".fbx"
         if not os.path.exists(fbx):
             print("NOFBX", v, fbx); continue

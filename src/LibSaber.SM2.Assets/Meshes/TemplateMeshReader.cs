@@ -276,6 +276,7 @@ public static class TemplateMeshReader
     }
 
     var rejected = 0;
+    var rigidParts = 0;
     IndexMeshVisibility.Classify(graph, out var lodNames, out var volumeNames);
     try
     {
@@ -285,8 +286,8 @@ public static class TemplateMeshReader
         var target = new Surface(lod == 0 ? "LOD0" : "LOD" + lod);
         var skinned = (group.Vertex.Flags & (FVFFlags.WEIGHT4 | FVFFlags.WEIGHT8)) != 0;
         foreach (var slice in group.Slices)
-          DecodeSlice(mesh, graph, reader, slice, target, skinned, lodNames, volumeNames, ref rejected);
-        if (skinned && target.Skin.Count != target.Positions.Count)
+          DecodeSlice(mesh, graph, reader, slice, target, skinned, lodNames, volumeNames, ref rejected, ref rigidParts);
+        if (target.Skin.Count != target.Positions.Count)
           target.Skin.Clear();
         if (lod == 0)
           target.CopyTo(mesh);
@@ -304,6 +305,8 @@ public static class TemplateMeshReader
       notes.Add("This mesh has no per-vertex skin weights.");
     else
       MarkInfluences(mesh);
+    if (rigidParts > 0)
+      notes.Add($"{rigidParts} unskinned parts are bound rigidly (weight 1) to their node and placed by its composed world (local * parent world), so node tracks move them.");
     var shown = mesh.Parts.Count(part => part.Visible) + mesh.Levels.Sum(level => level.Parts.Count(part => part.Visible));
     var listed = mesh.Parts.Count + mesh.Levels.Sum(level => level.Parts.Count);
     notes.Add($"LOD0 is every part on the largest vertex pool: {mesh.Positions.Count:N0} vertices, {mesh.Indices.Count / 3:N0} triangles, {mesh.Parts.Count} parts.");
@@ -483,7 +486,8 @@ public static class TemplateMeshReader
     bool skinned,
     HashSet<string> lodNames,
     HashSet<string> volumeNames,
-    ref int rejected)
+    ref int rejected,
+    ref int rigidParts)
   {
     var subs = graph.SubMeshes?.Where(sub => sub.MeshId == slice.MeshIndex).ToList() ?? new List<GeometrySubMesh>();
     if (subs.Count == 0)
@@ -548,7 +552,12 @@ public static class TemplateMeshReader
       var nodeName = NodeName(graph, sub.NodeId);
       var partName = nodeName.Length > 0 ? nodeName : PartName(graph, sub, slice.MeshIndex);
       var hidden = IndexMeshVisibility.Hidden(nodeName, lodNames, volumeNames, out var hideReason);
-      AppendRange(mesh, target, vertices, uvs, faces, info.VertexOffset, skinned, sub.BoneIds, partName, sub.Material, !hidden, hideReason, ref rejected);
+      // An unskinned part is stored in its node's space (NodeMatrix above), so the node drives it: bind it
+      // rigidly to that node so an animated node (v3 tpl animNmb tracks, ClipBinding) moves the part.
+      var rigid = !skinned && graph.objects is { Count: > 0 } objects ? ((uint)sub.NodeId < (uint)objects.Count ? sub.NodeId : 0) : -1;
+      if (rigid >= 0)
+        rigidParts++;
+      AppendRange(mesh, target, vertices, uvs, faces, info.VertexOffset, skinned, sub.BoneIds, partName, sub.Material, !hidden, hideReason, ref rejected, rigid);
     }
   }
 
@@ -697,7 +706,8 @@ public static class TemplateMeshReader
     SaberMaterial? material,
     bool visible,
     string? hideReason,
-    ref int rejected)
+    ref int rejected,
+    int rigidJoint = -1)
   {
     if (vertices.Length == 0 || faces.Length == 0)
       return;
@@ -707,6 +717,8 @@ public static class TemplateMeshReader
     {
       var uv = (uint)i < (uint)uvs.Length ? uvs[i] : Vector2.Zero;
       AddVertex(target, vertices[i], uv, anySkin, boneIds);
+      if (!anySkin && rigidJoint >= 0)
+        target.Skin.Add(new SkinWeights { J0 = (ushort)rigidJoint, W0 = 1 });
     }
 
     var indexStart = target.Indices.Count;
@@ -744,13 +756,31 @@ public static class TemplateMeshReader
       AddMaterial(mesh, material, partName);
   }
 
+  /// <summary>
+  ///   World matrix of a node: MatrixModel is the local matrix (the retail inverse binds equal Inverse(world) only
+  ///   for local * parentWorld, see ReadSkeleton), so compose up the parent chain. A degenerate local is skipped.
+  /// </summary>
   private static Matrix4x4? NodeMatrix(objGEOM_MNG graph, int nodeId)
   {
-    if (graph.objects is null || (uint)nodeId >= (uint)graph.objects.Count)
+    var objects = graph.objects;
+    if (objects is null || (uint)nodeId >= (uint)objects.Count)
       return null;
-    var matrix = graph.objects[nodeId].MatrixModel;
-    var weight = MathF.Abs(matrix.M11) + MathF.Abs(matrix.M22) + MathF.Abs(matrix.M33) + MathF.Abs(matrix.M44);
-    return weight > 0.5f ? matrix : null;
+    static bool Valid(Matrix4x4 m) => MathF.Abs(m.M11) + MathF.Abs(m.M22) + MathF.Abs(m.M33) + MathF.Abs(m.M44) > 0.5f;
+    var matrix = objects[nodeId].MatrixModel;
+    if (!Valid(matrix))
+      return null;
+    var node = nodeId;
+    for (var guard = 0; guard < objects.Count; guard++)
+    {
+      var parent = objects[node].parentId;
+      if (parent < 0 || parent >= objects.Count || parent == node)
+        break;
+      if (Valid(objects[parent].MatrixModel))
+        matrix *= objects[parent].MatrixModel;
+      node = parent;
+    }
+
+    return matrix;
   }
 
   private static Vector3 TransformPoint(Vector3 point, Matrix4x4 matrix)

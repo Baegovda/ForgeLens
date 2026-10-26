@@ -262,6 +262,11 @@ public static class AssetExporter
       var bound = ClipBinding.Resolve(exportMesh.Bones, clip).Count(index => index >= 0);
       var by = ClipBinding.UsesAnimIndex(exportMesh.Bones, clip) ? " (by template animNmb)" : "";
       report.Messages.Add($"{clip.Name}: {bound} of {clip.Tracks.Count} tracks match {exportMesh.Name}{by}, {clip.Duration:0.###}s at {clip.SampleRate:0.###} fps.");
+      if (clip.RootMotion && clip.HasRootRotation)
+      {
+        var turn = clip.RootRotation.Max(key => 2 * MathF.Acos(Math.Min(1f, MathF.Abs(key.Value.W)))) * 180 / MathF.PI;
+        report.Messages.Add($"{clip.Name}: root rotation applied (up to {turn:0.#} deg). Turn clips need it; the two cinematic shots that carry one (pve_relay boss_intro / outro) end on the ground only without it, so export those with --no-root-motion.");
+      }
     }
 
     exportMesh.Clip = null;
