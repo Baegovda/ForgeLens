@@ -839,3 +839,72 @@ FBX check with assimp (`/workspace/phys_export/titus`): the model FBX has 581 no
   - Import to `/Game/SM2_Work/Tests/physics`.
   - `ue_sm2_physics.py verify`.
   - Capture browser vs UE side by side on the same clip (titus `tacticus_run_v01_intercessor`).
+
+## Browser VFX playback (2026-10-27, vfx)
+Branch `vfx-work` (from 642fb56), patches in `/workspace/patches/vfx/`; not pushed. Niagara/UE export is out of scope.
+
+### Code
+- `src/LibSaber.SM2.Assets/Effects/`:
+  - `SslText` parser
+  - `EffectLibrary`: sfx_group instancing and `__type` prototype inheritance
+  - `EffectDefinition`: emitters, lights, attached sub-emitters, alpha masks, draw target
+  - `EffectSimulation`: fixed 60 Hz, seeded, deterministic, with backward seek replaying from 0
+  - `EffectSprites`: camera-facing quads, sorting, flipbooks
+  - `PartAliases`: flipbook grid
+- `src/LibSaber.SM2Browser/Gpu/EffectRenderer.cs`: GPU pass with a lit ground grid, one draw per emitter batch with its blend state, HDR exposure + tonemap, soft particles, and an alpha-mask texture unit.
+- `MainWindow.Vfx.cs`:
+  - Selecting an `.sfx` (use the Effects filter + search box) plays it on the GPU preview.
+  - VFX bar: Restart, scrub (pauses), Loop, Ground. Space and the Play button toggle play/pause. Drag orbits, wheel zooms.
+  - Effects, textures and `part_aliases.ps` are read from the open catalog by basename.
+- Dev mode without a game folder: `SM2_VFX_LOOSE="sfxDir|part_aliases.ps|texDir" SM2_VFX_OPEN=<name>`.
+- Bench: `--vfxbench <sfxDir> <part_aliases.ps> <texDir> <out> name@sec[@distance]...` writes 4x2 sheets, perf numbers and a determinism check.
+  - Env vars: `SM2_VFX_ONLY`/`SM2_VFX_SKIP` (emitter filters), `SM2_VFX_EXPOSURE`, `SM2_VFX_LIT`, `SM2_VFX_FRAMES=1`.
+- Tests: `test/LibSaber.SM2.Assets.Tests/EffectTests.cs` (6) cover parse, group override, explosion count, constantFlow rate, genOnDie, determinism/seek, aliases and curves. The full suite passes (101).
+
+### REA (sm2_retail.exe; VA = strings_ascii offset + 0x140000000)
+- **Node types:** sfx_group @0x143646930, sfx_part @0x14363c148, sfx_trail @0x14363c280, CPU_EMITTER @0x14363bc80, GPU_EMITTER @0x14363bcf0.
+- **part_aliases.ps** is read by 0x1418fe5c0. Keys: nFrameX @0x143647ea0, nFrameY @0x143647ea8, nFrameMax @0x143647eb0 (0 means X*Y; clamp 255), motionVectorScale @0x143647ec0, Mesh.Vertex0..6 @0x143647ed4.
+- **blendType** parser is 0x141751cd0: blend=0, add=1, blend_add=2. **sorting** parser is 0x1417534f0. softDepth @0x143645530.
+- **attached** @0x143644cd0 → genOnFly @0x143644b38 / genOnCDT @0x143644b48 / genOnDie @0x143644b58. Entries are `{name, numParts @0x143644b18}`. Error string @0x143648810 says LCS-mode emitters cannot be attached.
+- **speedInherit** @0x143644878 is a {min,max} fraction of the parent velocity.
+- **Untyped emitter entries** (5499) are CPU emitters only when they carry `__node`. Orphans are skipped (this removed the orange square in arifle).
+- **Draw target:**
+  - `drawInSimulationTex = drawInSimulationEnabled` draws into the wind/water sim only, not colour (grenade wind_expl/water_expl).
+  - `animIn.channel = DISTORTION` is refraction only.
+  - Neither is drawn.
+
+### Coverage of the starter set (captures in `/workspace/browser_run_shots/vfx/`)
+| effect | emitters | drawn | not drawn |
+|---|---|---|---|
+| fx_bolter_muzzle_client | 14 + 1 light | 12 sprite + light | 2 lwiGeom mesh |
+| part_wpn_arifle_mzl_client_01 | 10 | 10 | 1 orphan |
+| part_mg_frag_grenade_expl | 33 | 31 | 2 sim-only |
+| part_mg_smoke_puff_01 | 3 | 3 | – |
+| fx_cine_bolter_tracer | 1 | 1 | – |
+| part_mag_ee_bolter_flesh | 9 | 6 | 3 mesh, 1 untyped |
+| part_mag_bullet_mid_blood_red | 3 | 3 | 1 orphan |
+| part_mag_blood_red | 27 | 27 | – |
+
+Perf on the box (llvmpipe, 512²):
+- sim ≤ 0.021 ms/step;
+- sprite build 0.02–1.6 ms;
+- GPU 2–25 ms (grenade spikes higher on llvmpipe);
+- every effect is deterministic;
+- the UI holds about 60 fps on the grenade.
+
+### Limits / open
+- Not rendered:
+  - lwiGeom mesh particles;
+  - sfx_trail*;
+  - distortion/refraction;
+  - wind/water sim draws;
+  - additionalContrast;
+  - GPU-only features (vector fields, depth collision).
+- Heuristics:
+  - size is treated as a radius;
+  - ratioDependency is simplified;
+  - blend_add is interpreted;
+  - Exposure 1/250 and lit ×100 were tuned on corpus medians;
+  - genOnFly is approximated (a burst for explosion targets, a per-parent rate for flow targets).
+- Standalone sockets: a socketed effect is placed 1.2 m up, pointing +X. Attaching to a model bone is not wired up yet (`EffectInstance.Socket` hook exists).
+- Grenade smoke reads a bit dark/blue. Not compared side by side with the game: this needs in-game captures on the PC when it is free.

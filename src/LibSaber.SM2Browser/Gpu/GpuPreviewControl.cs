@@ -17,6 +17,9 @@ internal sealed record GpuFrameRequest(
   float Time,
   PreviewSettings Settings, Func<float>? Clock = null);
 
+/// <summary>One standalone-VFX frame: built on the GL thread just before drawing (so playback follows vsync).</summary>
+internal sealed record EffectFrame(EffectLayer Layer, System.Numerics.Matrix4x4 View, System.Numerics.Matrix4x4 Projection, System.Numerics.Vector3 Eye);
+
 internal readonly record struct GpuFrameStats(int Width, int Height, int Samples, double CpuMs, double UploadMs, double Fps, string Info);
 
 /// <summary>
@@ -47,8 +50,19 @@ internal sealed class GpuPreviewControl : OpenGlControlBase
   /// <summary>Bench mode: runs instead of the normal frame, with the live renderer and the host framebuffer.</summary>
   public Func<GlPreview, int, bool>? BenchHook { get; set; }
 
+  /// <summary>Standalone VFX view: when set, frames come from this (width, height) callback instead of a mesh request.</summary>
+  public Func<int, int, EffectFrame?>? Effect { get; private set; }
+
+  public void ShowEffect(Func<int, int, EffectFrame?>? effect)
+  {
+    Effect = effect;
+    if (effect is not null) _request = null;
+    RequestNextFrameRendering();
+  }
+
   public void Show(GpuFrameRequest request)
   {
+    Effect = null;
     _request = request;
     RequestNextFrameRendering();
   }
@@ -96,6 +110,18 @@ internal sealed class GpuPreviewControl : OpenGlControlBase
     Dispatcher.UIThread.Post(() => Failed?.Invoke(reason));
   }
 
+  private void Tick()
+  {
+    _fpsFrames++;
+    var now = _clock.Elapsed.TotalSeconds;
+    if (now - _fpsStart >= 0.5)
+    {
+      _fps = _fpsFrames / (now - _fpsStart);
+      _fpsFrames = 0;
+      _fpsStart = now;
+    }
+  }
+
   protected override void OnOpenGlRender(GlInterface gl, int fb)
   {
     var renderer = _renderer;
@@ -114,6 +140,22 @@ internal sealed class GpuPreviewControl : OpenGlControlBase
       var scale = VisualRoot?.RenderScaling ?? 1.0;
       var width = Math.Max(1, (int)(Bounds.Width * scale));
       var height = Math.Max(1, (int)(Bounds.Height * scale));
+      if (Effect is { } effectSource)
+      {
+        var effectStart = _clock.Elapsed.TotalMilliseconds;
+        if (effectSource(width, height) is { } frame)
+        {
+          renderer.RenderEffect(frame.Layer, frame.View, frame.Projection, frame.Eye, width, height, fb);
+          FramesRendered++;
+          Tick();
+          Rendered?.Invoke(new GpuFrameStats(width, height, renderer.Samples, _clock.Elapsed.TotalMilliseconds - effectStart, renderer.LastEffectMs, _fps, renderer.Info));
+        }
+
+        if (Continuous || renderer.Pending)
+          RequestNextFrameRendering();
+        return;
+      }
+
       if (request is null)
       {
         gl.BindFramebuffer(0x8D40, fb);
@@ -127,14 +169,7 @@ internal sealed class GpuPreviewControl : OpenGlControlBase
       renderer.Render(request.Mesh, scene, width, height, request.Wireframe, fb);
       var cpu = _clock.Elapsed.TotalMilliseconds - start;
       FramesRendered++;
-      _fpsFrames++;
-      var now = _clock.Elapsed.TotalSeconds;
-      if (now - _fpsStart >= 0.5)
-      {
-        _fps = _fpsFrames / (now - _fpsStart);
-        _fpsFrames = 0;
-        _fpsStart = now;
-      }
+      Tick();
 
       var stats = new GpuFrameStats(width, height, renderer.Samples, cpu, renderer.LastUploadMs, _fps, renderer.Info);
       Rendered?.Invoke(stats);

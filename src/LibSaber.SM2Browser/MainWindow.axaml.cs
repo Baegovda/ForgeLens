@@ -105,6 +105,7 @@ public partial class MainWindow : Window
     {
       if (!string.IsNullOrWhiteSpace(_settings.LastFolder) && Directory.Exists(_settings.LastFolder))
         await LoadFolderAsync(_settings.LastFolder);
+      await OpenLooseEffectFromEnvironmentAsync();
     };
   }
 
@@ -290,6 +291,7 @@ public partial class MainWindow : Window
     _recent.Touch(file.Path, file.ArchiveName);
     ShowLoading();
     _playTimer.Stop();
+    StopEffect();
     _texture = null;
     _clip = null;
     if (file.Kind != AssetKind.Animation)
@@ -408,6 +410,14 @@ public partial class MainWindow : Window
         return;
       }
 
+      if (file.Path.EndsWith(".sfx", StringComparison.OrdinalIgnoreCase) && await TryShowEffectAsync(row.Index, file.Path, generation))
+      {
+        HideLoading(generation);
+        return;
+      }
+
+      if (generation != _previewGeneration)
+        return;
       var bytes = await Task.Run(() => _store.Read(row.Index));
       if (generation != _previewGeneration)
         return;
@@ -927,6 +937,13 @@ public partial class MainWindow : Window
       return;
     if (focused is ComboBox { IsDropDownOpen: true } || focused is ComboBoxItem)
       return;
+    if (_fx is not null)
+    {
+      e.Handled = true;
+      VfxTogglePlay();
+      return;
+    }
+
     if (_mesh is null || _clip is null || !_clip.HasCurves || !PlayButton.IsVisible)
       return;
     e.Handled = true; // and the focused button does not also get clicked
@@ -935,6 +952,12 @@ public partial class MainWindow : Window
 
   private void PlayClicked(object? sender, RoutedEventArgs e)
   {
+    if (_fx is not null)
+    {
+      VfxTogglePlay();
+      return;
+    }
+
     if (_playTimer.IsEnabled)
     {
       _playTimer.Stop();
@@ -1176,6 +1199,14 @@ public partial class MainWindow : Window
 
   private void ViewMoved(object? sender, PointerEventArgs e)
   {
+    if (_dragging && _fx is not null)
+    {
+      var p = e.GetPosition(ViewBorder);
+      VfxPointerMoved(p - _lastPoint);
+      _lastPoint = p;
+      return;
+    }
+
     if (!_dragging || _mesh is null)
       return;
     var point = e.GetPosition(ViewBorder);
@@ -1187,6 +1218,8 @@ public partial class MainWindow : Window
 
   private void ViewWheel(object? sender, PointerWheelEventArgs e)
   {
+    if (VfxWheel(e))
+      return;
     if (_mesh is null)
       return;
     if (_distance <= 0 && _mesh is not null)
