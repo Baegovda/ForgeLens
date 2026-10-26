@@ -42,10 +42,10 @@ internal static class HostVfxBench
     var stem = Path.GetFileName(dir.TrimEnd('/')).Replace(".tpl", "");
     var mesh = TemplateMeshReader.LoadRaw(File.ReadAllBytes(Path.Combine(dir, stem + ".tpl")),
       File.Exists(Path.Combine(dir, stem + ".tpl_data")) ? File.ReadAllBytes(Path.Combine(dir, stem + ".tpl_data")) : null, stem);
-    // Loose tpls carry LOD1 + merged Object* proxies only (LOD0 lives in lods_base): SM2_HOST_LOD1=1 shows LOD1 instead.
+    // LOD0 parts sit in several vertex pools; the merged Object* proxies are hidden by IndexMeshVisibility. SM2_HOST_LOD1=1 shows LOD1 instead.
     if (Environment.GetEnvironmentVariable("SM2_HOST_LOD1") == "1")
       foreach (var part in mesh.Parts)
-        (part.Visible, part.HideReason) = part.HideReason == "LOD" ? (true, null) : (false, "proxy");
+        (part.Visible, part.HideReason) = part.Name.EndsWith("_LOD1", StringComparison.OrdinalIgnoreCase) ? (true, null) : (false, "LOD");
     AnimationClip? clip = saniPath == "-" ? null : SaniReader.FromBytes(File.ReadAllBytes(saniPath),
       File.Exists(saniPath + "_data") ? File.ReadAllBytes(saniPath + "_data") : null, Path.GetFileNameWithoutExtension(saniPath));
     var vfx = new HostVfx

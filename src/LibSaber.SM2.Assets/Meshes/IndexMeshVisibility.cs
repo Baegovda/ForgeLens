@@ -38,6 +38,7 @@ public static class IndexMeshVisibility
     }
 
     AddCompositeLods(graph, lodNames);
+    AddMergedProxies(graph, lodNames);
 
     foreach (var obj in graph.objects)
     {
@@ -69,6 +70,28 @@ public static class IndexMeshVisibility
         volumeNames.Add(objName);
       else if (objName.StartsWith("rb_", StringComparison.Ordinal))
         volumeNames.Add(objName);
+    }
+  }
+
+  /// <summary>
+  ///   Weapons such as wpn_bolt_rifle_01 also carry 3ds Max default-named merged meshes (<c>Object0080</c> ..
+  ///   <c>Object0098</c>, children of the root, no mesh name) in every vertex pool next to the
+  ///   <c>_LODn</c> chain. They are whole-model proxies (one is a 1.2 m shell around the gun) and stack into a
+  ///   drum when shown with LOD0. Only applied when the template has a <c>_LOD</c> chain.
+  /// </summary>
+  internal static void AddMergedProxies(objGEOM_MNG graph, HashSet<string> lodNames)
+  {
+    var objects = graph.objects;
+    if (objects is null || !objects.Any(obj => (obj.GetMeshName() ?? "").Contains("_LOD", StringComparison.InvariantCultureIgnoreCase)))
+      return; // props and composites (rhino, doors) use Object* names for real geometry
+    foreach (var obj in objects)
+    {
+      var name = obj.GetName();
+      if (name is not { Length: > 6 } || !name.StartsWith("Object", StringComparison.Ordinal)
+          || !name.Skip(6).All(char.IsAsciiHexDigit) || !string.IsNullOrEmpty(obj.GetMeshName())
+          || (obj.Affixes ?? "").Contains("visibility_", StringComparison.Ordinal))
+        continue;
+      lodNames.Add(name);
     }
   }
 

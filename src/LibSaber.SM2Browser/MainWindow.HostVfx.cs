@@ -52,7 +52,7 @@ public partial class MainWindow
         File.Exists(Path.Combine(dir, stem + ".tpl_data")) ? File.ReadAllBytes(Path.Combine(dir, stem + ".tpl_data")) : null, stem);
       if (Environment.GetEnvironmentVariable("SM2_HOST_LOD1") == "1")
         foreach (var part in m.Parts)
-          (part.Visible, part.HideReason) = part.HideReason == "LOD" ? (true, null) : (false, "proxy");
+          (part.Visible, part.HideReason) = part.Name.EndsWith("_LOD1", StringComparison.OrdinalIgnoreCase) ? (true, null) : (false, "LOD");
       AnimationClip? c = parts.Length > 1 && File.Exists(parts[1])
         ? SaniReader.FromBytes(File.ReadAllBytes(parts[1]), File.Exists(parts[1] + "_data") ? File.ReadAllBytes(parts[1] + "_data") : null, Path.GetFileNameWithoutExtension(parts[1]))
         : null;
