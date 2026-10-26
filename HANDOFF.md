@@ -493,3 +493,27 @@ Open
 - Multi-character shots: each actor is rebased on its own; restore relative placement from each `.rebase.json`.
 - Additive rotation compose order (q_base·q_add vs q_add·q_base) is not proven from the decomp.
 - c10 ROOT carries its own heading track (180 → 149°); harmless with root motion off.
+
+## SM2Browser v4: anim ordering, Space, GPU blend passes (2026-10-26, browser_v4)
+
+Install: `C:\Users\Revaptor_FX\SM2Browser_v4\LibSaber.SM2Browser.exe` (MD5 C7B88AF9E83CE31C510E6CDD50A17DD1; first v4 build kept as `.bak1`). v3 untouched.
+
+**Space** toggles play/pause (tunnel KeyDown on the window). Ignored while a TextBox has focus (search, anim filter) or a ComboBox dropdown is open; needs a mesh, a clip with curves, and the Play button visible.
+
+**Anim list order** (`Animation/CharacterAnimations.cs`): "Bind pose" first, then ★ main, ☆ cinematic, then the rest (each: same-model name first, then path). Status bar shows the ★/☆ counts and the source; the tooltip lists the classes.
+- Data link, not names: `ssl/**/*.cls` (3471 text files) → class whose `geom = { nameTpl = "<tpl>" }` matches the model → walk the parent chain (trailing `__type = "<parent>"`) for `morphemeController.nameBundle` (Titus: story_titus → pc_marine_story_client → … → pc_marine_base_client, `nameBundle = "primaris"`) and `animSet` ("titus") → `morpheme/<bundle>/<bundle>.mr.resource` (JSON `res_desc_morpheme`), `linksAnimation` = ★ set (primaris: 1813 clips, tacticus + group_animations/tacticus_vs_*; calgar: 16).
+- ☆ = clip names the character (whole-word token: animSet + tpl stem, e.g. `titus`) and its path is cinematic (`/cinematics/`, `cinematic`, `/scenes/`, `xscene`, `_shot_`, `/shot_`, `/story_`, `story_`), excluding `/interplay/` and lipsync. Titus: e.g. `cinematics/story_cannon/.../shot_01/..._char_titus_intercessor.sani`.
+- No class/bundle → fallback: non-lipsync clips naming the token are ★.
+- No per-template `tpl/<x>.tpl/animations` folder exists; the class cache is built once per catalog (parallel regex scan, ~72 MB).
+
+**GPU blend passes** (`Gpu/GlPreview.cs`, `PreviewPartDraw.Blend/Tint/Aniso/SecondSpec/Center`), from the material (`blendMode` + diffuse alpha channel AKill/Transp):
+1. opaque; 2. masked: alpha test at 0.5, sharpened `(a-0.5)/fwidth(a)+0.5`, `SAMPLE_ALPHA_TO_COVERAGE` under MSAA; 3. translucent: premultiplied `ONE, ONE_MINUS_SRC_ALPHA`, depth write off, depth LESS, sorted back-to-front by part centroid.
+- Masked/translucent are two-sided (N flipped toward the eye). AlbedoTint applied.
+- Titus head findings (`SM2_PARTS_ONLY=1 --glbench` dumps every part's blend/channels/alpha stats):
+  - white/dark eye rims = `ch_eye_shadow_01` (96 tris, translucent, Transp(a), alpha mean 134) drawn opaque in v3; lashes `ch_eyelashes_02` (soft_cool, translucent, alpha mean 15) likewise; `ch_titus_head` variant "hair" (2539 tris, translucent) = hairline/brow shell.
+  - hair = same 13,582 cards twice: variant "hard" masked (AKill) + variant "soft" translucent (blendMode=blend). Hard pass writes depth; soft pass with LESS only fills the cut-away fringes (standard two-pass hair).
+  - hair shading: glt.anisotropic_spec (aniso 0.65, empty dirMap → default 90°, along B) + second spec on → Kajiya-Kay primary lobe on T and albedo-tinted secondary lobe on `normalize(T + shift*N)` (same as import_sm2_materials.py spec_layers), wrapped by N·L. Cotangent frame is derived from screen derivatives when the part has no normal map.
+- Before/after (v3-style all-opaque vs v4): `/workspace/browser_run_shots/v4/cmp_{front,left,right,back}.png`, `head_*_{before,after}.png` (bench: helmet hidden, target = eye-part centroid). PC: `Desktop\SM2_Work\Captures\v4_gpubench`.
+- Bench (RTX 4090, ANGLE D3D11, MSAA 8x): static 0.37–0.46 ms, playing 0.68–1.23 ms, vsync 116–120 fps.
+
+Caveats / pending: CPU renderer still ignores blend (draws all opaque). In-app GUI captures of the sorted Titus list and the GPU toggle check in the real window were not driven (user active on the PC at Unreal Editor); verify by opening cc_titus.tpl → Animations. Space-key behaviour verified by code path only.
