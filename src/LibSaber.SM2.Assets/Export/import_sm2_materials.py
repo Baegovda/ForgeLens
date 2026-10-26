@@ -92,6 +92,147 @@ def param_tex(material, name, x, y, sampler):
     return node
 
 
+def scalar(material, name, value, x, y):
+    node = expr(material, unreal.MaterialExpressionScalarParameter, x, y)
+    node.set_editor_property("parameter_name", name)
+    node.set_editor_property("default_value", value)
+    return node
+
+
+def const(material, value, x, y):
+    node = expr(material, unreal.MaterialExpressionConstant, x, y)
+    node.set_editor_property("r", value)
+    return node
+
+
+def switch(material, name, off, on, x, y):
+    # Every node that shares a static switch name shares its value on the instance.
+    node = expr(material, unreal.MaterialExpressionStaticSwitchParameter, x, y)
+    node.set_editor_property("parameter_name", name)
+    node.set_editor_property("default_value", False)
+    link(off, "", node, "False")
+    link(on, "", node, "True")
+    return node
+
+
+def scale_bias(material, value, scale_name, scale, bias_name, bias, x, y):
+    # saturate(value * scale + bias): the scale/bias pair of glt.second_spec.metalness/roughness.
+    k = scalar(material, scale_name, scale, x - 220, y)
+    b = scalar(material, bias_name, bias, x - 220, y + 80)
+    mul = expr(material, unreal.MaterialExpressionMultiply, x, y)
+    link(value, "", mul, "A")
+    link(k, "", mul, "B")
+    add = expr(material, unreal.MaterialExpressionAdd, x + 140, y)
+    link(mul, "", add, "A")
+    link(b, "", add, "B")
+    sat = expr(material, unreal.MaterialExpressionSaturate, x + 280, y)
+    link(add, "", sat, "")
+    return sat
+
+
+def second_spec_layer(material, base, metal, rough):
+    # glt.second_spec (sm2_retail.exe: glt+0x94, permutation GLT_USE_SECOND_SPEC). The game adds a second
+    # specular lobe with its own F0 color (metallicTint), metalness and roughness. Default Lit has one lobe,
+    # so UseSecondSpec blends the single lobe toward the second one by SecondSpecWeight * second metalness.
+    # UseSecondSpec off (the default) passes base, metal, and rough through unchanged.
+    x, y = 200, -900
+    m2 = scale_bias(material, metal, "SecondMetalnessScale", 1.0, "SecondMetalnessBias", 0.0, x, y)
+    r2 = scale_bias(material, rough, "SecondRoughnessScale", 0.0, "SecondRoughnessBias", 0.7, x, y + 220)
+    tint = expr(material, unreal.MaterialExpressionVectorParameter, x, y - 220)
+    tint.set_editor_property("parameter_name", "SecondSpecTint")
+    tint.set_editor_property("default_value", unreal.LinearColor(1.0, 1.0, 1.0, 0.0))
+    weight = scalar(material, "SecondSpecWeight", 0.5, x + 280, y - 120)
+    w = expr(material, unreal.MaterialExpressionMultiply, x + 500, y - 60)
+    link(m2, "", w, "A")
+    link(weight, "", w, "B")
+    # Tint alpha (the .td A byte) gates recoloring: A=0 is a white lobe that only moves metal/rough.
+    w_tint = expr(material, unreal.MaterialExpressionMultiply, x + 560, y - 200)
+    link(w, "", w_tint, "A")
+    link(tint, "A", w_tint, "B")
+    base2 = expr(material, unreal.MaterialExpressionLinearInterpolate, x + 700, y - 220)
+    link(base, "", base2, "A")
+    link(tint, "", base2, "B")
+    link(w_tint, "", base2, "Alpha")
+    one = const(material, 1.0, x + 500, y + 60)
+    metal2 = expr(material, unreal.MaterialExpressionLinearInterpolate, x + 700, y)
+    link(metal, "", metal2, "A")
+    link(one, "", metal2, "B")
+    link(w, "", metal2, "Alpha")
+    rough2 = expr(material, unreal.MaterialExpressionLinearInterpolate, x + 700, y + 220)
+    link(rough, "", rough2, "A")
+    link(r2, "", rough2, "B")
+    link(w, "", rough2, "Alpha")
+    return (
+        switch(material, "UseSecondSpec", base, base2, x + 900, y - 220),
+        switch(material, "UseSecondSpec", metal, metal2, x + 900, y),
+        switch(material, "UseSecondSpec", rough, rough2, x + 900, y + 220),
+    )
+
+
+def aniso_layer(material):
+    # glt.anisotropic_spec (glt+0x108, permutations GLT_USE_ANISO_SPEC / GLT_USE_ANISO_SPEC_DIR_MAP, texture slot
+    # GLT_TEX_ANISO_DIR). Mapped to Default Lit Anisotropy + Tangent. Off: anisotropy 0, tangent +X, specular 0.5,
+    # which is the same shading as leaving the pins unconnected. extra{} (the shifted second hair lobe) has no
+    # Default Lit equivalent; it stays in the sidecar.
+    anisotropy_pin = getattr(unreal.MaterialProperty, "MP_ANISOTROPY", None)
+    tangent_pin = getattr(unreal.MaterialProperty, "MP_TANGENT", None)
+    if anisotropy_pin is None or tangent_pin is None:
+        unreal.log_warning("SM2 this Unreal has no Anisotropy/Tangent material pins; anisotropic_spec is skipped")
+        return
+    mel = unreal.MaterialEditingLibrary
+    x, y = 200, 1600
+    amount = scalar(material, "AnisoAnisotropy", 0.5, x, y)
+    zero = const(material, 0.0, x, y + 80)
+    mel.connect_material_property(switch(material, "UseAnisoSpec", zero, amount, x + 300, y), "", anisotropy_pin)
+
+    # Tangent-space direction from angle (degrees): (cos, sin, 0). 90, the engine default, runs along V.
+    angle = scalar(material, "AnisoAngle", 90.0, x - 600, y + 220)
+    cos_node = expr(material, unreal.MaterialExpressionCosine, x - 400, y + 200)
+    cos_node.set_editor_property("period", 360.0)
+    link(angle, "", cos_node, "")
+    sin_node = expr(material, unreal.MaterialExpressionSine, x - 400, y + 280)
+    sin_node.set_editor_property("period", 360.0)
+    link(angle, "", sin_node, "")
+    xy = expr(material, unreal.MaterialExpressionAppendVector, x - 240, y + 240)
+    link(cos_node, "", xy, "A")
+    link(sin_node, "", xy, "B")
+    from_angle = expr(material, unreal.MaterialExpressionAppendVector, x - 100, y + 240)
+    link(xy, "", from_angle, "A")
+    link(zero, "", from_angle, "B")
+
+    # dirMap (_dm, usage "MD", neutral 127): RG direction encoded as 0..1.
+    dir_tex = param_tex(material, "AnisoDir", x - 900, y + 420, unreal.MaterialSamplerType.SAMPLERTYPE_MASKS)
+    rg = expr(material, unreal.MaterialExpressionComponentMask, x - 600, y + 420)
+    rg.set_editor_property("r", True)
+    rg.set_editor_property("g", True)
+    rg.set_editor_property("b", False)
+    rg.set_editor_property("a", False)
+    link(dir_tex, "RGBA", rg, "")
+    signed = expr(material, unreal.MaterialExpressionConstantBiasScale, x - 440, y + 420)
+    signed.set_editor_property("bias", -0.5)
+    signed.set_editor_property("scale", 2.0)
+    link(rg, "", signed, "")
+    from_map3 = expr(material, unreal.MaterialExpressionAppendVector, x - 280, y + 420)
+    link(signed, "", from_map3, "A")
+    link(zero, "", from_map3, "B")
+    from_map = expr(material, unreal.MaterialExpressionNormalize, x - 120, y + 420)
+    link(from_map3, "", from_map, "")
+    direction = switch(material, "UseAnisoDirMap", from_angle, from_map, x + 100, y + 300)
+    plus_x = expr(material, unreal.MaterialExpressionConstant3Vector, x + 100, y + 180)
+    plus_x.set_editor_property("constant", unreal.LinearColor(1.0, 0.0, 0.0, 0.0))
+    mel.connect_material_property(switch(material, "UseAnisoSpec", plus_x, direction, x + 300, y + 240), "", tangent_pin)
+
+    # intensity scales the highlight. Default Lit's Specular is 0.5 at intensity 1.
+    intensity = scalar(material, "AnisoIntensity", 1.0, x, y + 600)
+    half = const(material, 0.5, x, y + 680)
+    spec = expr(material, unreal.MaterialExpressionMultiply, x + 160, y + 600)
+    link(intensity, "", spec, "A")
+    link(half, "", spec, "B")
+    spec_sat = expr(material, unreal.MaterialExpressionSaturate, x + 300, y + 600)
+    link(spec, "", spec_sat, "")
+    mel.connect_material_property(switch(material, "UseAnisoSpec", half, spec_sat, x + 460, y + 640), "", unreal.MaterialProperty.MP_SPECULAR)
+
+
 def make_master(folder, asset_name="M_SM2", translucent=False):
     # translucent=True is the Transp(a) parent (glass, gibs caps): diffuse alpha drives Opacity.
     tools = unreal.AssetToolsHelpers.get_asset_tools()
@@ -234,11 +375,13 @@ def make_master(folder, asset_name="M_SM2", translucent=False):
     tinted = expr(material, unreal.MaterialExpressionMultiply, -200, -260)
     link(diffuse, "RGB", tinted, "A")
     link(tint, "", tinted, "B")
-    mel.connect_material_property(tinted, "", unreal.MaterialProperty.MP_BASE_COLOR)
+    base_out, metal_out, rough_out = second_spec_layer(material, tinted, metal, rough_switch)
+    mel.connect_material_property(base_out, "", unreal.MaterialProperty.MP_BASE_COLOR)
     mel.connect_material_property(opacity, "", unreal.MaterialProperty.MP_OPACITY if translucent else unreal.MaterialProperty.MP_OPACITY_MASK)
     mel.connect_material_property(detail_switch, "", unreal.MaterialProperty.MP_NORMAL)
-    mel.connect_material_property(metal, "", unreal.MaterialProperty.MP_METALLIC)
-    mel.connect_material_property(rough_switch, "", unreal.MaterialProperty.MP_ROUGHNESS)
+    mel.connect_material_property(metal_out, "", unreal.MaterialProperty.MP_METALLIC)
+    mel.connect_material_property(rough_out, "", unreal.MaterialProperty.MP_ROUGHNESS)
+    aniso_layer(material)
     mel.connect_material_property(ao_source, "", unreal.MaterialProperty.MP_AMBIENT_OCCLUSION)
     mel.connect_material_property(emit_mul, "", unreal.MaterialProperty.MP_EMISSIVE_COLOR)
     mel.connect_material_property(height_vec, "", unreal.MaterialProperty.MP_WORLD_POSITION_OFFSET)
@@ -324,6 +467,39 @@ def make_hidden(folder):
     return material
 
 
+def srgb_to_linear(c):
+    return pow(max(0.0, min(1.0, float(c))), 2.2)
+
+
+def apply_spec_layers(instance, slot, texture_for):
+    mel = unreal.MaterialEditingLibrary
+    second = slot.get("secondSpec")
+    mel.set_material_instance_static_switch_parameter_value(instance, "UseSecondSpec", bool(second))
+    if second:
+        # metallicTint is R, G, B, A in 0..1 (engine default A=0, white). RGB is sRGB like albedo_tint; A stays linear.
+        r, g, b, a = (list(second.get("metallicTint") or [1, 1, 1, 0]) + [1, 1, 1, 0])[:4]
+        lin = [srgb_to_linear(c) for c in (r, g, b)]
+        mel.set_material_instance_vector_parameter_value(instance, "SecondSpecTint", unreal.LinearColor(lin[0], lin[1], lin[2], float(a)))
+        metal = second.get("metalness") or {}
+        rough = second.get("roughness") or {}
+        mel.set_material_instance_scalar_parameter_value(instance, "SecondMetalnessScale", float(metal.get("scale", 1.0)))
+        mel.set_material_instance_scalar_parameter_value(instance, "SecondMetalnessBias", float(metal.get("bias", 0.0)))
+        mel.set_material_instance_scalar_parameter_value(instance, "SecondRoughnessScale", float(rough.get("scale", 0.0)))
+        mel.set_material_instance_scalar_parameter_value(instance, "SecondRoughnessBias", float(rough.get("bias", 0.7)))
+    aniso = slot.get("anisotropicSpec")
+    mel.set_material_instance_static_switch_parameter_value(instance, "UseAnisoSpec", bool(aniso))
+    dir_asset = None
+    if aniso:
+        mel.set_material_instance_scalar_parameter_value(instance, "AnisoAnisotropy", max(-1.0, min(1.0, float(aniso.get("anisotropy", 0.5)))))
+        mel.set_material_instance_scalar_parameter_value(instance, "AnisoAngle", float(aniso.get("angle", 90.0)))
+        mel.set_material_instance_scalar_parameter_value(instance, "AnisoIntensity", float(aniso.get("intensity", 1.0)))
+        if aniso.get("dirMap"):
+            dir_asset = texture_for(first_map(slot, "anisoDir"), False)
+            if dir_asset is not None:
+                mel.set_material_instance_texture_parameter_value(instance, "AnisoDir", dir_asset)
+    mel.set_material_instance_static_switch_parameter_value(instance, "UseAnisoDirMap", dir_asset is not None)
+
+
 def build(sidecar_path, folder):
     data = load_sidecar(sidecar_path)
     tools = unreal.AssetToolsHelpers.get_asset_tools()
@@ -403,6 +579,7 @@ def build(sidecar_path, folder):
             # The tint bytes are sRGB like the albedo they multiply; Unreal multiplies in linear.
             lin = [pow(float(c), 2.2) for c in albedo_tint[:3]]
             unreal.MaterialEditingLibrary.set_material_instance_vector_parameter_value(instance, "AlbedoTint", unreal.LinearColor(lin[0], lin[1], lin[2], 1.0))
+        apply_spec_layers(instance, slot, texture_for)
         unreal.EditorAssetLibrary.save_loaded_asset(instance)
         instances[name] = instance
         unreal.log("SM2 instance " + name)

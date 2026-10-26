@@ -763,6 +763,21 @@ public static class AssetExporter
       blend = slot.Part.Blend,
       albedoTint = slot.Part.AlbedoTint,
       blendMode = slot.Part.BlendMode,
+      // glt.second_spec / glt.anisotropic_spec (null when the variant leaves them disabled). Tints are R, G, B, A in 0..1.
+      secondSpec = slot.Part.SecondSpec is { } second ? new
+      {
+        metallicTint = second.MetallicTint,
+        metalness = new { scale = second.MetalnessScale, bias = second.MetalnessBias },
+        roughness = new { scale = second.RoughnessScale, bias = second.RoughnessBias },
+      } : null,
+      anisotropicSpec = slot.Part.AnisoSpec is { } aniso ? new
+      {
+        angle = aniso.Angle,
+        anisotropy = aniso.Anisotropy,
+        intensity = aniso.Intensity,
+        dirMap = aniso.DirMap.Length == 0 ? null : aniso.DirMap,
+        extra = new { anisotropy = aniso.ExtraAnisotropy, intensity = aniso.ExtraIntensity, shift = aniso.ExtraShift },
+      } : null,
       maps = slot.Part.Maps.Select(map => new
       {
         role = map.Role,
@@ -782,7 +797,7 @@ public static class AssetExporter
     {
       mesh = mesh.Name,
       fbx = Path.GetFileName(fbxPath),
-      note = "Each map's channels are the .td format_descr (logical channels). stored/packing[].stored say where each one physically is in the exported PNG: BC5 (DXN) keeps two channels, so Roughness(a) is in g; BC4 (DXT5A) keeps one, so AO(a) is in r. The game swizzles these in its shader (swizzleTexInShader). srgb false is a normal or a packed mask, so Unreal imports it linear. The FBX links diffuse, normal, and specular. import_sm2_materials.py builds a master material and one instance per slot from this file.",
+      note = "Each map's channels are the .td format_descr (logical channels). stored/packing[].stored say where each one physically is in the exported PNG: BC5 (DXN) keeps two channels, so Roughness(a) is in g; BC4 (DXT5A) keeps one, so AO(a) is in r. The game swizzles these in its shader (swizzleTexInShader). srgb false is a normal or a packed mask, so Unreal imports it linear. The FBX links diffuse, normal, and specular. import_sm2_materials.py builds a master material and one instance per slot from this file. secondSpec and anisotropicSpec are the variant's glt.second_spec and glt.anisotropic_spec (second lobe metalness/roughness = saturate(packed * scale + bias)); absent means disabled.",
       slots,
     }, JsonOptions));
     report.Written++;

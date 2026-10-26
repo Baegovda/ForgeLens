@@ -51,6 +51,10 @@ public sealed class MeshPart
   public float[]? AlbedoTint { get; set; }
   /// <summary>Raw <c>glt.blendMode</c> of the variant (<c>opaque</c> when unset).</summary>
   public string BlendMode { get; set; } = "opaque";
+  /// <summary><c>glt.second_spec</c> when the variant enables it (null keeps the single-lobe look).</summary>
+  public SecondSpec? SecondSpec { get; set; }
+  /// <summary><c>glt.anisotropic_spec</c> when the variant enables it with anisotropy above 0.01.</summary>
+  public AnisoSpec? AnisoSpec { get; set; }
   /// <summary>Index leaves LOD and collision shells unchecked. Defaults on so hand-built meshes still export whole.</summary>
   public bool Visible { get; set; } = true;
   /// <summary>"LOD" or "volume" when <see cref="Visible"/> was cleared by Index's default filter.</summary>
@@ -73,6 +77,8 @@ public sealed class MeshPart
       Blend = Blend,
       AlbedoTint = AlbedoTint,
       BlendMode = BlendMode,
+      SecondSpec = SecondSpec,
+      AnisoSpec = AnisoSpec,
       Visible = Visible,
       HideReason = HideReason,
     };

@@ -64,7 +64,7 @@ public static class MaterialMaps
   {
     var cache = new Dictionary<string, List<MaterialMap>>(StringComparer.OrdinalIgnoreCase);
     var texts = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
-    var variants = new Dictionary<string, (float[]? Tint, string? Mode)>(StringComparer.OrdinalIgnoreCase);
+    var variants = new Dictionary<string, (float[]? Tint, string? Mode, SecondSpec? Second, AnisoSpec? Aniso)>(StringComparer.OrdinalIgnoreCase);
     Attach(mesh.Parts);
     foreach (var level in mesh.Levels)
       Attach(level.Parts);
@@ -95,7 +95,11 @@ public static class MaterialMaps
         {
           var text = DefinitionText(catalog, store, hint, key[..key.IndexOf('\n')], texts);
           var block = text is null ? null : VariantBlock(text, part.Variant);
-          shading = (block is null ? null : AlbedoTint(block), block is null ? null : BlendMode(block));
+          shading = (
+            block is null ? null : AlbedoTint(block),
+            block is null ? null : BlendMode(block),
+            block is null ? null : SpecLayers.Second(block),
+            block is null ? null : SpecLayers.Aniso(block));
           variants[key] = shading;
         }
 
@@ -103,6 +107,8 @@ public static class MaterialMaps
         part.BlendMode = shading.Mode ?? "opaque";
         part.Blend = BlendOf(maps.FirstOrDefault(map => map.Role == "diffuse"), shading.Mode);
         part.AlbedoTint = tint;
+        part.SecondSpec = shading.Second;
+        part.AnisoSpec = shading.Aniso;
       }
     }
 
@@ -329,7 +335,8 @@ public static class MaterialMaps
       Role = role,
       Name = stem,
       Channels = channels.Length == 0 ? ImpliedChannels(role) : channels,
-      Srgb = IsSrgb(packing.Count == 0 ? Pack(ImpliedChannels(role)) : packing),
+      // anisoDir _dm maps say Diff(rgb) but hold a direction (usage "MD", fade color 127 = zero vector), so linear.
+      Srgb = role != "anisoDir" && IsSrgb(packing.Count == 0 ? Pack(ImpliedChannels(role)) : packing),
     };
     map.Packing.AddRange(packing.Count == 0 ? Pack(map.Channels) : packing);
     var textureIndex = TemplateMeshReader.ResolveTexture(catalog, hint, stem);
@@ -433,6 +440,8 @@ public static class MaterialMaps
       "texArraySpec" => "specular",
       "texArrayEmissiveMask" => "emissive",
       "texArrayDiffuse" => "diffuseArray",
+      // anisotropic_spec.dirMap (FUN_142579ff0 +8): hair flow map, bound as GLT_TEX_ANISO_DIR (0x143729de0).
+      "dirMap" => "anisoDir",
       _ => null,
     };
 
