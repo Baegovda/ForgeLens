@@ -283,9 +283,12 @@ public static class AssetExporter
       if (clip.HasAdditive)
         report.Messages.Add($"{clip.Name}: additive slot (0xF3/0xF7) present, written as {unique}. Import as a local-space additive with base = its frame 0.");
 
-      var bound = ClipBinding.Resolve(exportMesh.Bones, clip).Count(index => index >= 0);
+      var binding = ClipBinding.Resolve(exportMesh.Bones, clip);
+      var bound = binding.Count(index => index >= 0);
       var by = ClipBinding.UsesAnimIndex(exportMesh.Bones, clip) ? " (by template animNmb)" : "";
-      report.Messages.Add($"{clip.Name}: {bound} of {clip.Tracks.Count} tracks match {exportMesh.Name}{by}, {clip.Duration:0.###}s at {clip.SampleRate:0.###} fps.");
+      var unbound = clip.Tracks.Where((_, i) => i < binding.Length && binding[i] < 0).Select(track => track.BoneName).ToList();
+      var unboundNote = unbound.Count == 0 ? "" : $" Unmatched: {string.Join(", ", unbound.Take(8))}{(unbound.Count > 8 ? $" (+{unbound.Count - 8})" : "")}.";
+      report.Messages.Add($"{clip.Name}: {bound} of {clip.Tracks.Count} tracks match {exportMesh.Name}{by}, {clip.Duration:0.###}s at {clip.SampleRate:0.###} fps.{unboundNote}");
       if (clip.RootMotion && clip.HasRootRotation)
       {
         var turn = clip.RootRotation.Max(key => 2 * MathF.Acos(Math.Min(1f, MathF.Abs(key.Value.W)))) * 180 / MathF.PI;
