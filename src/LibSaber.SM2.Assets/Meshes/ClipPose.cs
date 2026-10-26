@@ -15,15 +15,30 @@ internal static class ClipPose
   public static void Apply(IReadOnlyList<Bone> bones, AnimationClip clip, float time, Matrix4x4[] local)
   {
     ApplyRaw(bones, clip, time, local);
-    if (!clip.RebaseFirstFrame)
-      return;
-    if (!ReferenceEquals(clip.RebaseKey, bones))
+    if (clip.RebaseFirstFrame)
     {
-      Rebase(bones, clip);
-      clip.RebaseKey = bones;
+      if (!ReferenceEquals(clip.RebaseKey, bones))
+      {
+        Rebase(bones, clip);
+        clip.RebaseKey = bones;
+      }
+
+      ApplyRebase(bones, clip, local);
     }
 
-    ApplyRebase(bones, clip, local);
+    // Baked secondary motion (jiggle bones, cloth helper bones) replaces those locals. Baked bones are never
+    // parentless, so the rebase above does not touch them.
+    if (clip.Baked is { } baked)
+    {
+      var indices = baked.Indices(bones, b => b.Name);
+      var k = 0;
+      foreach (var name in baked.Local.Keys)
+      {
+        var bone = indices[k++];
+        if (bone >= 0 && bone < local.Length && baked.TrySample(name, time, out var value))
+          local[bone] = value;
+      }
+    }
   }
 
   private static void ApplyRebase(IReadOnlyList<Bone> bones, AnimationClip clip, Matrix4x4[] local)

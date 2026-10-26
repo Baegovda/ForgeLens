@@ -708,3 +708,134 @@ Base d0ad14f. Branch `constructor`. Patch: `/workspace/patches/constructor/`.
 - **Cleanup (approved by the user, 2026-10-27 01:14 KST):**
   - `/Game/SM2_Work/_Legacy` (SM2_Test, SM2_v4, SM2) and `/Game/Test` held 0 files. Both were removed.
   - The registry check printed `GONE True True` (`Scripts\legacy\ue_rmpaths.py`).
+
+## Secondary physics: browser + Unreal (2026-10-27, physics)
+Base b7ae735. Patch: `/workspace/patches/physics/`. Captures: `/workspace/browser_run_shots/physics/`.
+
+The goal is the motion the game shows on purity seals, tabards, cloth strips, cloaks, cables and dangling parts.
+- The browser simulates it live.
+- The exporter bakes the same simulation into the FBX, so Unreal plays it with no runtime setup.
+
+### REA (sm2_retail.exe)
+Address conversion: rdata VA = file offset + 0x140001200; .text VA = file offset + 0x140000a00. Decompiles are in `/workspace/rea/dec_phys*`.
+
+**Where the data lives.** The character `.cls` (text SSL) carries it in two places:
+- `prop_cloth_sim.clothes[]`: `simMeshName`, `renderMeshes[]`, `maxInfluenceDist`, `distanceRemapPower`, `useTopologicalDistance`, and `config`.
+- `prop_phys_jiggle`, with one settings block per bone.
+
+The field-name strings are at 0x1435f10c0..0x1435f1510. `PhysicsLocator` finds the `.cls` whose `nameTpl` is the model (Titus → `pc_marine_pve_story_titus_client.cls`, Calgar → `npc_calgar_marine_client.cls`).
+
+**Jiggle (`PhysJiggleObject`).** `JiggleSolver` is an exact port of the step loop at 0x14147e5b5 (inside FUN_14147e500).
+- Settings layout:
+  - +0x10 stiffness, +0x14 mass, +0x18 damping, +0x1c gravity;
+  - +0x20 offsetDirection, default (0,0,1) @0x143609db8;
+  - +0x28 offsetDistance;
+  - +0x30/+0x38 constraintMin/Max, defaults (-1,-1,-1)/(1,1,1) @0x143609e08/0x143609dd8;
+  - +0x40 writeback flag.
+- The step:
+  - M = bindLocal × parentWorld, orthonormalised by FUN_140fd45e0. Target = M·(dir·dist).
+  - Spring: v = (v + (t−p)·k/m·dt [+ gravity/m on y]) · exp(−damping·dt).
+  - Per-axis clamp FUN_14171ad80 in the bone frame, scaled by dist (0x14147ea5b..0x14147eb3c).
+  - Sentinel 888.888 @0x1435571a0 before the first step. Teleport check at 0x14147ed64.
+  - The bone is re-aimed at the particle; it does not translate.
+
+**Cloth config.** The struct is registered at 0x141090c39..0x141091847, and the constructor ends at 0x14108f119.
+- Phases: the constructor at 0x141089140 gives stiffness 0.8, multiplier 1, compression 0.9 and stretch 1.1.
+- Other blocks and defaults:
+  - tether +0x40 (0.5, 1; 0x14108a660);
+  - motion +0x4c (0.5, 1; 0x141089966);
+  - separation +0x58 (off, 1, 1; 0x141089fe6);
+  - selfCollision +0x64 (off, 0.5, 0; ctor 0x14108efce);
+  - gravity +0x74 = (0, −9.8, 0) @0x14108f112;
+  - solverFrequency +0xe0 = 30;
+  - stiffnessFrequencyScale +0xe4 = 0.5;
+  - environment +0xb0 (airDrag 0.5, airLift 0.5, winds 0; 0x14108f03a..0x14108f0a4).
+- Collision shapes: capsules, spheres and boxes on bones.
+- Sim mesh: the `*_SIM` shell.
+  - COLOR0.r is the per-particle max distance; c ≤ 1e-4 means pinned (it follows skinning).
+  - Render parts bind to the closest sim triangle (barycentric plus normal height). The weight is 1 within `maxInfluenceDist`, else (maxInfluenceDist/d)^distanceRemapPower.
+
+### Browser (live)
+- Code: `Physics/{PhysicsParser, PhysicsSetup, PhysicsLocator, JiggleSolver, ClothSolver, PhysicsRuntime}.cs`.
+- `ClothSolver` is a PBD stand-in for NvCloth. It runs:
+  - phases (V/H/bend/shear) with compression and stretch limits;
+  - tethers and motion constraints (max distance);
+  - capsule, sphere and box collision;
+  - drag and lift wind with unit particle mass;
+  - substeps = solver frequency.
+- GPU preview: the `Physics` checkbox (shown when the model has a `.cls` setup).
+  - It resets on clip change, loop and time jump-back.
+  - About 0.7–0.9 ms per step, so 120 fps holds.
+- Render parts are matched by exact name, falling back to the name without `_LODn`. `cc_calgar.tpl` only has `cloak_REND_01_LOD1` etc. (`ClothEntry.DrivenParts`).
+
+### Export: baked into the FBX (`Physics/PhysicsBake.cs`, `Physics/PhysicsSidecar.cs`)
+Unreal cannot be set up live from Python (see below), so the exporter bakes the simulation (on by default; `--no-physics` turns it off).
+- **Jiggle:** the exact port runs over each clip at 60 Hz. Each jiggle bone's local transform is written as keys.
+- **Cloth:** `AddClothBones` adds helper bones `{SimMesh}_physNN`.
+  - There is one per free sim particle (`particlesPerBone` = 1, cap 1024 per cloth); pinned particles stay on skinning.
+  - Each helper is parented to the particle's dominant skin bone and placed at the particle.
+  - Every render vertex of the driven parts, in the base buffer and every LOD level, is re-skinned. Its closest sim triangle's corner bones get barycentric × influence weight; the original skin keeps the rest. The top 4 are kept and renormalised.
+  - Per frame, each helper's rotation is a polar-decomposition fit (Müller, warm-started) over the particle and its one-ring. Translation = the simulated particle.
+- **Clip settings:**
+  - Preroll is 1.5 s, holding frame 0 so springs and cloth settle.
+  - Baked locals are keyed by bone name (`AnimationClip.Baked` / `BakedBones`), so they survive `VisibleGeometry` and `UnrealRoot.Promote` copies.
+- **`--anim-only` exports** add the same helper bones (they are deterministic: same tpl and `.cls` give the same names), so the clips carry both jiggle and cloth curves.
+  - The UE skeleton needs the helpers, so a model exported before this patch must be re-exported and re-imported.
+  - Without them, Unreal ignores the cloth tracks and keeps the jiggle tracks.
+- **Sidecar `{model}.physics.json`:** the source values, what was baked per clip, and the Unreal mapping for a live setup. `ue_sm2_physics.py` is written next to it.
+
+Measured on the box (PhysBench, `SM2_PHYS_BAKE=1`). "baked" is the export skeleton played as plain skinning with physics off, which is exactly what Unreal plays:
+
+| Model / clip | Helpers | Jiggles | On vs off | Baked vs live | Reproduced |
+|---|---|---|---|---|---|
+| Titus run | 922 | 34 | 4.80 % px | 0.18 % | ≈96 % |
+| Calgar convoy run (cloak, belts, ribbons) | 1294 | 3 | 3.02 % px | 0.78 % | ≈74 % |
+
+Bake time: 0.5 s (Titus, 57 frames) and 3.0 s (Calgar, 399 frames).
+
+FBX check with assimp (`/workspace/phys_export/titus`): the model FBX has 581 nodes. The clip has 368 animation channels with physics and 281 without (34 jiggles + helpers).
+
+### Unreal mapping (sidecar `ue`, for a live AnimDynamics / Chaos Cloth setup)
+
+| SM2 | UE |
+|---|---|
+| jiggle offsetDirection·offsetDistance | AnimDynamics PendulumOffset = −dir·d·100 cm |
+| stiffness/mass | LinearSpringConstant = k/m |
+| damping | LinearDampingOverride = damping |
+| gravity/mass | GravityScale = (g/m)/−9.8 |
+| constraintMin/Max | linear limit along the offset = c.z·d·100; angular limits = atan(c) in degrees |
+| phases V/H × multiplier | Chaos Cloth EdgeStiffness = avg(V,H)·mult |
+| bend | BendingStiffness |
+| shear | AreaStiffness |
+| tether stiffness/scale | TetherStiffness / TetherScale |
+| damping | DampingCoefficient |
+| gravity | GravityOverride (cm, axis-converted) |
+| airDrag/airLift | Drag / Lift |
+| linear/angular velocity scale | LinearVelocityScale / AngularVelocityScale |
+| thickness, friction | CollisionThickness, FrictionCoefficient |
+| solverFrequency | SubdivisionCount = ceil(freq/60) |
+| COLOR0 max distance | MaxDistance mask (m → cm) |
+| capsules/spheres/boxes | physics asset bodies (cm) |
+
+### UE side (`tools/ue/ue_sm2_physics.py`, embedded and written next to the export)
+- `... -run=pythonscript -script="ue_sm2_physics.py <physics.json> <mesh asset> [/Game/SM2_Work/Tests/physics] verify"` checks that every jiggle and helper bone is in the skeleton and prints `SM2PHYS` lines.
+- `physasset` makes a physics asset through `SkeletalMeshEditorSubsystem.create_physics_asset`. It renames the result to a free `_N` name and never replaces an existing asset.
+- These cannot be done from Python, which is why the default is the bake:
+  - There is no clothing factory: "Create Cloth Asset from Selection" is UI only.
+  - AnimGraph nodes (AnimDynamics, RigidBody) cannot be added.
+  - Control Rig `RigUnit_PointSimulation` is disabled.
+
+### Limits and open items
+- NvCloth is approximated (PBD):
+  - wind uses unit particle mass;
+  - self-collision is skipped;
+  - box collision assumes size is the full extent.
+- Jiggle scalar defaults (when a `.cls` omits stiffness, mass or damping) are not verified. The teleport threshold is unknown.
+- The CPU renderer is not physics-driven; only the GPU preview is.
+- Baked clips are not loop-seamless (each clip is simulated from a settled frame 0).
+- Helper bone count is high (one per free particle). Unreal handles it, but `AddClothBones(particlesPerBone, maxBonesPerCloth)` can trade fidelity for fewer bones (4 per bone, cap 64 → Calgar 1.7 % residual).
+- **PENDING (PC was in use):**
+  - Export on the PC with this build.
+  - Import to `/Game/SM2_Work/Tests/physics`.
+  - `ue_sm2_physics.py verify`.
+  - Capture browser vs UE side by side on the same clip (titus `tacticus_run_v01_intercessor`).

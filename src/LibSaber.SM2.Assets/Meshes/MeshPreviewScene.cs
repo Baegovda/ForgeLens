@@ -68,6 +68,13 @@ public sealed class PreviewScene
   /// <summary>InverseBind * world per bone while a clip plays; null draws the bind pose.</summary>
   public Matrix4x4[]? SkinMatrices { get; init; }
   public IReadOnlyList<(Vector3 From, Vector3 To)> BoneLines { get; init; } = Array.Empty<(Vector3, Vector3)>();
+  /// <summary>
+  ///   Cloth-driven vertices for this frame, already posed in model space (draw them unskinned). Empty when
+  ///   physics is off.
+  /// </summary>
+  public IReadOnlyList<LibSaber.SM2.Assets.Physics.VertexOverride> VertexOverrides { get; init; } = Array.Empty<LibSaber.SM2.Assets.Physics.VertexOverride>();
+  /// <summary>Milliseconds the physics step took this frame (0 when off).</summary>
+  public double PhysicsMs { get; init; }
   public string Note { get; init; } = "";
 }
 
@@ -87,11 +94,14 @@ public static partial class MeshPreview
     var partFilter = settings?.Part ?? -1;
     var honorVisibility = partFilter < 0 && lod <= 0;
     var slices = CollectSlices(mesh, lod, partFilter, honorVisibility);
-    var clipActive = mesh.Bones.Count > 0 && mesh.Clip is { HasCurves: true };
+    var physics = settings?.Physics == true ? PhysicsFor(mesh) : null;
+    var clipActive = mesh.Bones.Count > 0 && (mesh.Clip is { HasCurves: true } || physics is not null);
     Matrix4x4[]? worlds = clipActive || showSkeleton ? BoneWorlds(mesh, timeSeconds) : null;
-    if (clipActive && settings?.InPlace == true)
+    physics?.Step(worlds!, timeSeconds, mesh.Clip?.Duration ?? 0);
+    var rebase = Matrix4x4.Identity;
+    if (clipActive && settings?.InPlace == true && mesh.Clip is { HasCurves: true })
     {
-      var rebase = InPlaceRebase(mesh);
+      rebase = InPlaceRebase(mesh);
       for (var i = 0; i < worlds!.Length; i++)
         worlds[i] *= rebase;
     }
@@ -195,6 +205,14 @@ public static partial class MeshPreview
         skinMatrices[i] = mesh.Bones[i].InverseBind * worlds![i];
     }
 
+    var overrides = new List<LibSaber.SM2.Assets.Physics.VertexOverride>();
+    if (physics is not null && skinMatrices is not null)
+    {
+      foreach (var batch in batches)
+        if (physics.Override(batch, skinMatrices, rebase) is { } over)
+          overrides.Add(over);
+    }
+
     var lines = new List<(Vector3, Vector3)>();
     if (showSkeleton && mesh.Bones.Count > 0 && worlds is not null)
     {
@@ -230,8 +248,27 @@ public static partial class MeshPreview
       FillLight = Vector3.Normalize(Vector3.Cross(Vector3.UnitY, eye - center) + Vector3.UnitY * 0.25f),
       SkinMatrices = skinMatrices,
       BoneLines = lines,
+      VertexOverrides = overrides,
+      PhysicsMs = physics?.LastStepMs ?? 0,
       Note = slices.Count == 0 && mesh.Bones.Count == 0 ? (string.IsNullOrEmpty(mesh.Message) ? "Nothing to draw." : mesh.Message) : mesh.Message,
     };
+  }
+
+  private static readonly ConditionalWeakTable<ExportedMesh, LibSaber.SM2.Assets.Physics.PhysicsRuntime> PhysicsCache = new();
+
+  /// <summary>The mesh's physics state (one per mesh object; a new clip on the same mesh resets it).</summary>
+  public static LibSaber.SM2.Assets.Physics.PhysicsRuntime? PhysicsFor(ExportedMesh mesh)
+  {
+    if (mesh.Physics is not { IsEmpty: false } setup || mesh.Bones.Count == 0)
+      return null;
+    var runtime = PhysicsCache.GetValue(mesh, m => new LibSaber.SM2.Assets.Physics.PhysicsRuntime(m, setup));
+    if (!ReferenceEquals(runtime.Setup, setup))
+    {
+      PhysicsCache.AddOrUpdate(mesh, runtime = new LibSaber.SM2.Assets.Physics.PhysicsRuntime(mesh, setup));
+    }
+
+    runtime.Track(mesh.Clip);
+    return runtime.IsEmpty ? null : runtime;
   }
 
   private static PreviewBlend BlendOf(MeshPart part)

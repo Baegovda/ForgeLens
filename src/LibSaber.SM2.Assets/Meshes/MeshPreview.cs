@@ -40,6 +40,8 @@ public sealed record PreviewSettings
   public bool InPlace { get; init; }
   /// <summary>Upper bound on worker threads; 0 uses every core.</summary>
   public int Threads { get; init; }
+  /// <summary>Run the class's cloth and jiggle physics (<see cref="ExportedMesh.Physics"/>) on the posed skeleton.</summary>
+  public bool Physics { get; init; }
 }
 /// <summary>
 ///   CPU preview renderer. Every frame it skins (only when a clip is active), projects each vertex once,

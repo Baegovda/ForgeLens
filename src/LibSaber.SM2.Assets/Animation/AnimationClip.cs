@@ -83,6 +83,13 @@ public sealed class AnimationClip
   internal Matrix4x4 RebaseBodyFix = Matrix4x4.Identity;
   internal int RebaseBodyUnder = -1;
 
+  /// <summary>
+  ///   Simulated bone locals baked by <see cref="LibSaber.SM2.Assets.Physics.PhysicsBake"/> (jiggle bones, cloth helper bones).
+  ///   <see cref="LibSaber.SM2.Assets.Meshes.ClipPose"/> writes them over the clip pose, so FBX and glTF carry the game's
+  ///   secondary motion without a runtime solver. Null for an unbaked clip.
+  /// </summary>
+  public BakedBones? Baked { get; set; }
+
   public bool HasCurves => Tracks.Exists(track => track.Translation.Count + track.Rotation.Count + track.Scale.Count > 0);
 
   public static Vector3 Sample(IReadOnlyList<VectorKey> keys, Vector3 fallback, float time)
@@ -123,4 +130,59 @@ public sealed class AnimationClip
     return keys[^1].Value;
   }
 
+}
+
+/// <summary>
+///   Per-bone local transforms sampled on a fixed grid (<see cref="Times"/>), keyed by bone name, so they survive the
+///   writers' skeleton copies and reordering (FbxWriter's VisibleGeometry / UnrealRoot.Promote).
+/// </summary>
+public sealed class BakedBones
+{
+  public required float[] Times { get; init; }
+  public Dictionary<string, Matrix4x4[]> Local { get; } = new(StringComparer.Ordinal);
+  private readonly System.Runtime.CompilerServices.ConditionalWeakTable<object, int[]> _indices = new();
+
+  /// <summary>Skeleton index of every <see cref="Local"/> entry (same order as <see cref="Local"/>.Keys), -1 when absent.</summary>
+  public int[] Indices<TBone>(IReadOnlyList<TBone> bones, Func<TBone, string> name) where TBone : class
+    => _indices.GetValue(bones, _ =>
+    {
+      var map = new Dictionary<string, int>(StringComparer.Ordinal);
+      for (var i = 0; i < bones.Count; i++)
+        map.TryAdd(name(bones[i]), i);
+      return Local.Keys.Select(k => map.TryGetValue(k, out var i) ? i : -1).ToArray();
+    });
+
+  public bool TrySample(string bone, float time, out Matrix4x4 local)
+  {
+    local = default;
+    if (!Local.TryGetValue(bone, out var frames) || frames.Length == 0 || Times.Length != frames.Length)
+      return false;
+    if (time <= Times[0] || frames.Length == 1)
+    {
+      local = frames[0];
+      return true;
+    }
+
+    var hi = Array.BinarySearch(Times, time);
+    if (hi >= 0)
+    {
+      local = frames[hi];
+      return true;
+    }
+
+    hi = ~hi;
+    if (hi >= frames.Length)
+    {
+      local = frames[^1];
+      return true;
+    }
+
+    var lo = hi - 1;
+    var span = Times[hi] - Times[lo];
+    var t = span <= 0 ? 0 : (time - Times[lo]) / span;
+    Matrix4x4.Decompose(frames[lo], out var s0, out var r0, out var p0);
+    Matrix4x4.Decompose(frames[hi], out var s1, out var r1, out var p1);
+    local = Matrix4x4.CreateScale(Vector3.Lerp(s0, s1, t)) * Matrix4x4.CreateFromQuaternion(Quaternion.Slerp(r0, r1, t)) * Matrix4x4.CreateTranslation(Vector3.Lerp(p0, p1, t));
+    return true;
+  }
 }

@@ -161,6 +161,28 @@ public sealed class MaterialDocument
   public List<string> Notes { get; } = new();
 }
 
+/// <summary>
+///   A cloth simulation shell (node name contains <c>_SIM</c>) captured at decode time, before any part
+///   compaction, so the physics code sees the game's sim particles with their paint (COLOR0).
+///   The engine requires OBJ_FVF_VERT | OBJ_FVF_NORM | OBJ_FVF_COLOR0 | OBJ_FVF_TEX0 on a sim mesh
+///   (sm2_retail.exe string near 0x1435f1790).
+/// </summary>
+public sealed class ClothSimShell
+{
+  public string Name { get; set; } = "";
+  /// <summary>Bind positions in model space (the same space as <see cref="ExportedMesh.Positions"/>).</summary>
+  public List<Vector3> Positions { get; } = new();
+  public List<Vector3> Normals { get; } = new();
+  public List<SkinWeights> Skin { get; } = new();
+  /// <summary>COLOR0 per particle (0..1). Empty when the buffer carries no colour.</summary>
+  public List<Vector4> Colors { get; } = new();
+  /// <summary>Triangles, local to this shell.</summary>
+  public List<int> Indices { get; } = new();
+  /// <summary>Surface (0 = LOD0) and first vertex of the shell in that surface.</summary>
+  public int Surface { get; set; }
+  public int VertexStart { get; set; }
+}
+
 public sealed class ExportedMesh
 {
   public string Name { get; set; } = "mesh";
@@ -172,8 +194,12 @@ public sealed class ExportedMesh
   public List<SkinWeights> Skin { get; } = new();
   public List<MeshPart> Parts { get; } = new();
   public List<MeshLod> Levels { get; } = new();
+  /// <summary>Cloth sim shells (<c>*_SIM</c>) with COLOR0, in decode order.</summary>
+  public List<ClothSimShell> ClothSims { get; } = new();
   public MaterialDocument? Material { get; set; }
   public AnimationClip? Clip { get; set; }
+  /// <summary>Cloth and jiggle setup from the character class (<c>prop_cloth_sim</c>, <c>prop_phys_jiggle</c>).</summary>
+  public LibSaber.SM2.Assets.Physics.PhysicsSetup? Physics { get; set; }
   public string Message { get; set; } = "";
 
   public bool HasTriangles => Indices.Count >= 3;
@@ -187,7 +213,7 @@ public sealed class ExportedMesh
   /// <summary>Copy with the same vertex data and shared bone, part and level objects (lists are new).</summary>
   public ExportedMesh ShallowCopy()
   {
-    var copy = new ExportedMesh { Name = Name, Material = Material, Clip = Clip, Message = Message };
+    var copy = new ExportedMesh { Name = Name, Material = Material, Clip = Clip, Physics = Physics, Message = Message };
     copy.Positions.AddRange(Positions);
     copy.Normals.AddRange(Normals);
     copy.Uvs.AddRange(Uvs);
@@ -196,6 +222,7 @@ public sealed class ExportedMesh
     copy.Skin.AddRange(Skin);
     copy.Parts.AddRange(Parts);
     copy.Levels.AddRange(Levels);
+    copy.ClothSims.AddRange(ClothSims);
     return copy;
   }
 
@@ -220,9 +247,11 @@ public sealed class ExportedMesh
       Name = Name,
       Material = Material,
       Clip = Clip,
+      Physics = Physics,
       Message = Message,
     };
     copy.Bones.AddRange(Bones);
+    copy.ClothSims.AddRange(ClothSims);
     var keepNormals = true;
     var keepUvs = true;
     var keepSkin = true;

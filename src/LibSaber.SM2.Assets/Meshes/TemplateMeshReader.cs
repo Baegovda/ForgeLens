@@ -70,7 +70,7 @@ public static class TemplateMeshReader
       template = Serializer<animTPL>.Deserialize(reader);
       ReadSkeleton(mesh, template, notes);
       if (template?.GeometryGraph is { } graph)
-        ReadGraph(mesh, graph, template, reader, catalog, store, fileIndex, description, notes);
+        ReadGraph(mesh, graph, template, reader, () => FindGeometryPayload(catalog, store, fileIndex, description), name => ResolveTexture(catalog, fileIndex, name) >= 0, notes);
     }
     catch (Exception ex)
     {
@@ -104,6 +104,24 @@ public static class TemplateMeshReader
     if (mesh.Bones.Count > 0)
       notes.Add($"{mesh.Bones.Count} bones.");
 
+    mesh.Message = string.Join(" ", notes.Where(note => note.Length > 0));
+    return mesh;
+  }
+
+  /// <summary>
+  ///   Decodes a loose <c>.tpl</c> (and its <c>.tpl_data</c>) without a catalog: skeleton, geometry and cloth sim
+  ///   shells only (no material maps). Used by tests and box-side tools on extracted files.
+  /// </summary>
+  public static ExportedMesh LoadRaw(byte[] tpl, byte[]? tplData, string name)
+  {
+    var mesh = new ExportedMesh { Name = name };
+    var notes = new List<string>();
+    using var stream = new MemoryStream(tpl, writable: false);
+    var reader = new NativeReader(stream, Endianness.LittleEndian);
+    var template = Serializer<animTPL>.Deserialize(reader);
+    ReadSkeleton(mesh, template, notes);
+    if (template?.GeometryGraph is { } graph)
+      ReadGraph(mesh, graph, template, reader, () => tplData, null, notes);
     mesh.Message = string.Join(" ", notes.Where(note => note.Length > 0));
     return mesh;
   }
@@ -244,16 +262,14 @@ public static class TemplateMeshReader
     objGEOM_MNG graph,
     animTPL template,
     NativeReader inline,
-    GameCatalog catalog,
-    ArchiveStore store,
-    int fileIndex,
-    resDESC_TPL? description,
+    Func<byte[]?> payload,
+    Func<string, bool>? textureResolves,
     List<string> notes)
   {
     if (graph.Buffers is null || graph.Buffers.Count == 0)
       return;
 
-    var external = graph.ContainsVertexBuffers ? null : FindGeometryPayload(catalog, store, fileIndex, description);
+    var external = graph.ContainsVertexBuffers ? null : payload();
     if (!graph.ContainsVertexBuffers && external is null)
     {
       notes.Add("The .tpl describes geometry buffers, but the paired .tpl_data is not in this folder.");
@@ -322,9 +338,9 @@ public static class TemplateMeshReader
       .Where(name => !string.IsNullOrWhiteSpace(name))
       .Distinct(StringComparer.OrdinalIgnoreCase)
       .ToList();
-    if (textureNames.Count > 0)
+    if (textureNames.Count > 0 && textureResolves is not null)
     {
-      var resolved = textureNames.Count(name => ResolveTexture(catalog, fileIndex, name!) >= 0);
+      var resolved = textureNames.Count(name => textureResolves(name!));
       notes.Add(resolved == 0
         ? "Part materials name diffuse textures, and none of them are in this folder, so the preview stays a lit solid color."
         : $"Resolved {resolved} of {textureNames.Count} diffuse textures for the preview.");
@@ -548,7 +564,7 @@ public static class TemplateMeshReader
         }
       }
 
-      var uvs = ReadUvs(reader, slice, sub, info.VertexOffset, vertices.Length);
+      var uvs = ReadUvs(reader, slice, sub, info.VertexOffset, vertices.Length, out var colors);
       var faces = new FaceSerializer(slice.Face).DeserializeRange(reader, faceStart, faceEnd).ToArray();
       var nodeName = NodeName(graph, sub.NodeId);
       var partName = nodeName.Length > 0 ? nodeName : PartName(graph, sub, slice.MeshIndex);
@@ -558,12 +574,48 @@ public static class TemplateMeshReader
       var rigid = !skinned && graph.objects is { Count: > 0 } objects ? ((uint)sub.NodeId < (uint)objects.Count ? sub.NodeId : 0) : -1;
       if (rigid >= 0)
         rigidParts++;
+      var simStart = target.Positions.Count;
       AppendRange(mesh, target, vertices, uvs, faces, info.VertexOffset, skinned, sub.BoneIds, partName, sub.Material, !hidden, hideReason, ref rejected, rigid, sub.NodeId);
+      if (partName.Contains("_SIM", StringComparison.OrdinalIgnoreCase) && target.Positions.Count > simStart)
+        CaptureClothSim(mesh, target, simStart, partName, colors, faces, info.VertexOffset);
     }
   }
 
-  private static Vector2[] ReadUvs(NativeReader reader, MeshSlice slice, GeometrySubMesh sub, int vertexOffset, int count)
+  private static void CaptureClothSim(ExportedMesh mesh, Surface target, int start, string name, Vector4[]? colors, Face[] faces, int indexBase)
   {
+    var count = target.Positions.Count - start;
+    var shell = new ClothSimShell
+    {
+      Name = name,
+      Surface = target.Name == "LOD0" ? 0 : int.TryParse(target.Name.AsSpan(3), out var lod) ? lod : -1,
+      VertexStart = start,
+    };
+    for (var i = 0; i < count; i++)
+    {
+      shell.Positions.Add(target.Positions[start + i]);
+      shell.Normals.Add(target.Normals[start + i]);
+      if (target.Skin.Count == target.Positions.Count)
+        shell.Skin.Add(target.Skin[start + i]);
+      if (colors is not null && i < colors.Length)
+        shell.Colors.Add(colors[i]);
+    }
+
+    foreach (var face in faces)
+    {
+      if (TryLocal(face.A, indexBase, count, out var a) && TryLocal(face.B, indexBase, count, out var b) && TryLocal(face.C, indexBase, count, out var c))
+      {
+        shell.Indices.Add(a);
+        shell.Indices.Add(b);
+        shell.Indices.Add(c);
+      }
+    }
+
+    mesh.ClothSims.Add(shell);
+  }
+
+  private static Vector2[] ReadUvs(NativeReader reader, MeshSlice slice, GeometrySubMesh sub, int vertexOffset, int count, out Vector4[]? colors)
+  {
+    colors = null;
     var uvs = new Vector2[count];
     if (slice.Uv is null || count == 0)
       return uvs;
@@ -581,6 +633,11 @@ public static class TemplateMeshReader
     {
       if (index >= uvs.Length)
         break;
+      if (data.HasColor0)
+      {
+        colors ??= new Vector4[count];
+        colors[index] = data.Color0;
+      }
       var source = UvChannel(data, set);
       // Index MeshBuilder.AddVertexUV multiplies the serializer UV by the submesh UvScaling
       // short (1 when the channel is absent). SceneViewModel then sets

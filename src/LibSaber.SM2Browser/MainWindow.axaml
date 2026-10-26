@@ -111,6 +111,8 @@
           <TextBlock x:Name="ScrubLabel" VerticalAlignment="Center" Text="0.00s" />
           <CheckBox x:Name="InPlaceToggle" Content="In place" IsChecked="True" Click="ViewChanged"
                     ToolTip.Tip="Rebase the clip so its first frame stands where the bind pose does (cinematic clips stay in view)" />
+          <CheckBox x:Name="PhysicsToggle" Content="Physics" IsChecked="True" Click="ViewChanged" IsVisible="False"
+                    ToolTip.Tip="Cloth (purity seals, tabards) and jiggle bones from the character class, simulated on the playing clip (GPU preview)" />
         </WrapPanel>
         <TextBlock x:Name="PreviewNote" DockPanel.Dock="Bottom" TextWrapping="Wrap" Margin="0,8,0,0" />
         <Border x:Name="ViewBorder" Background="#121418" ClipToBounds="True"

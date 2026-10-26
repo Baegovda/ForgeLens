@@ -12,6 +12,7 @@ using LibSaber.SM2.Assets.Animation;
 using LibSaber.SM2.Assets.Catalog;
 using LibSaber.SM2.Assets.Export;
 using LibSaber.SM2.Assets.Meshes;
+using LibSaber.SM2.Assets.Physics;
 using LibSaber.SM2.Assets.Textures;
 
 namespace LibSaber.SM2Browser;
@@ -813,6 +814,7 @@ public partial class MainWindow : Window
         Wireframe = WireToggle.IsChecked == true,
         Albedo = _albedo, Normals = _normals, Specular = _specular,
         MaxEdge = 4096, Supersample = 1, InPlace = InPlaceToggle.IsChecked == true,
+        Physics = PhysicsToggle.IsChecked == true,
       },
       // While playing, each presented frame samples the clip at its own time (not at the 16 ms timer's).
       playing ? () =>
@@ -968,9 +970,23 @@ public partial class MainWindow : Window
     AnimBox.SelectedIndex = 0;
     _suppressAnim = false;
     var modelPath = _previewFileIndex >= 0 ? catalog.GetFile(_previewFileIndex).Path : key;
+    var physicsMesh = _mesh;
     var (choices, owner) = await Task.Run(() =>
     {
       _clipHeaders ??= SaniIndex.ReadHeaders(catalog, store);
+      if (physicsMesh.Physics is null && physicsMesh.Bones.Count > 0)
+      {
+        try
+        {
+          physicsMesh.Physics = PhysicsLocator.Find(catalog, store, modelPath) ?? new PhysicsSetup();
+        }
+        catch (Exception exception)
+        {
+          physicsMesh.Physics = new PhysicsSetup();
+          physicsMesh.Physics.Notes.Add("class scan failed: " + exception.Message);
+        }
+      }
+
       CharacterAnimations.Result owner;
       try
       {
@@ -1005,6 +1021,17 @@ public partial class MainWindow : Window
       return;
     _animAll = choices;
     ApplyAnimFilter(keepSelection: false);
+    if (physicsMesh.Physics is { IsEmpty: false } physics)
+    {
+      PhysicsToggle.IsVisible = true;
+      var runtime = MeshPreview.PhysicsFor(physicsMesh);
+      ToolTip.SetTip(PhysicsToggle,
+        $"{physics.Cloths.Count} cloth(s), {physics.Jiggles.Count} jiggle bone(s) from {physics.SourceClass}" +
+        (runtime is { Missing.Count: > 0 } ? $"\nnot in this model: {string.Join(", ", runtime.Missing)}" : "") +
+        "\nGPU preview only; resets on clip change or scrub.");
+    }
+    else
+      PhysicsToggle.IsVisible = false;
     var main = choices.Count(c => c.Rank == ClipRank.Main);
     var cinematic = choices.Count(c => c.Rank == ClipRank.Cinematic);
     StatusText.Text = choices.Count == 0

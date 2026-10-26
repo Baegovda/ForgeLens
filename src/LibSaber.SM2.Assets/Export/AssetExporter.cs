@@ -5,6 +5,7 @@ using LibSaber.SM2.Assets.Animation;
 using LibSaber.SM2.Assets.Catalog;
 using LibSaber.SM2.Assets.Customization;
 using LibSaber.SM2.Assets.Meshes;
+using LibSaber.SM2.Assets.Physics;
 using LibSaber.SM2.Assets.Textures;
 
 namespace LibSaber.SM2.Assets.Export;
@@ -55,6 +56,14 @@ public sealed class ExportSettings
   ///   equips); <c>all</c> exports every armor piece. Other tpls are never filtered.
   /// </summary>
   public string? Variant { get; init; }
+  /// <summary>
+  ///   Secondary physics of the character class (cloth, jiggle bones; <see cref="PhysicsLocator"/>). Writes
+  ///   <c>{model}.physics.json</c>, bakes the simulated jiggle bones into every clip, and adds cloth
+  ///   helper bones (one per free sim particle, deterministic, also with <see cref="AnimationOnly"/>) that the cloth
+  ///   render meshes are skinned to, and bakes them too.
+  ///   The extractor's <c>--no-physics</c> turns this off.
+  /// </summary>
+  public bool Physics { get; init; } = true;
 }
 
 public sealed class ExportReport
@@ -230,6 +239,33 @@ public static class AssetExporter
     }
 
     exportMesh.Clip = null;
+    PhysicsSetup? physics = null;
+    ClothBoneRig? clothRig = null;
+    var physicsBaked = new Dictionary<string, PhysicsBakeReport>(StringComparer.OrdinalIgnoreCase);
+    if (settings.Physics && exportMesh.Bones.Count > 0)
+    {
+      try
+      {
+        physics = PhysicsLocator.Find(catalog, store, file.Path);
+        if (physics is { IsEmpty: false })
+        {
+          // Helper bones are deterministic (same tpl + cls -> same names and order), so --anim-only clips key the
+          // same bones the model export added; a skeleton imported without them just ignores those tracks.
+          if (physics.Cloths.Count > 0)
+            clothRig = PhysicsBake.AddClothBones(exportMesh, physics);
+          report.Messages.Add($"{file.Path}: physics from {physics.SourceClass}: {physics.Cloths.Count} cloths, {physics.Jiggles.Count} jiggle bones" +
+            (clothRig is null ? "" : $", {clothRig.Clusters.Count} cloth helper bones skinning {clothRig.SkinnedVertices} vertices") + ".");
+        }
+        else
+          physics = null;
+      }
+      catch (Exception ex)
+      {
+        physics = null;
+        report.Messages.Add($"{file.Path}: physics skipped ({ex.Message}).");
+      }
+    }
+
     IReadOnlyDictionary<string, string>? textureFiles = null;
     if (settings.WriteGltf && !settings.AnimationOnly)
     {
@@ -265,6 +301,20 @@ public static class AssetExporter
       while (!usedClips.Add(unique))
         unique = token + "_" + suffix++;
       exportMesh.Clip = clip;
+      if (physics is not null)
+      {
+        try
+        {
+          physicsBaked[unique] = PhysicsBake.Bake(exportMesh, clip, physics, clothRig);
+          exportMesh.Clip = clip;
+        }
+        catch (Exception ex)
+        {
+          clip.Baked = null;
+          report.Messages.Add($"{clip.Name}: physics bake skipped ({ex.Message}).");
+        }
+      }
+
       var relative = AnimationRelative(file.Path, unique);
       if (settings.WriteGltf)
       {
@@ -305,6 +355,18 @@ public static class AssetExporter
     }
 
     exportMesh.Clip = null;
+    foreach (var clip in settings.Clips)
+      clip.Baked = null;
+    if (physics is not null)
+    {
+      var physicsPath = Destination(outputDirectory, file.Path, ".physics.json", batch);
+      Directory.CreateDirectory(Path.GetDirectoryName(physicsPath)!);
+      File.WriteAllText(physicsPath, PhysicsSidecar.Serialize(exportMesh, physics, clothRig, physicsBaked));
+      report.Written++;
+      WriteUnrealScript(Path.Combine(Path.GetDirectoryName(physicsPath)!, "ue_sm2_physics.py"), report);
+      foreach (var (name, baked) in physicsBaked)
+        report.Messages.Add($"{name}: physics baked at {PhysicsBake.Rate:0} Hz, {baked.JiggleBones} jiggle and {baked.ClothBones} cloth helper bones, {baked.Frames} frames, {baked.MeanStepMs:0.00} ms/step.");
+    }
 
     if (settings.AnimationOnly)
       return;

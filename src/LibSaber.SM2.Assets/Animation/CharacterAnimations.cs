@@ -171,6 +171,10 @@ public static class CharacterAnimations
     return new Result(main, tokens, bundles, names, source);
   }
 
+  /// <summary>Archive path and parent class (<c>__type</c>) of a class by name, from the cached class scan.</summary>
+  public static (string Path, string? Parent)? FindClass(GameCatalog catalog, ArchiveStore store, string name)
+    => Classes(catalog, store).TryGetValue(name, out var info) ? (info.Path, info.Parent) : null;
+
   private static Dictionary<string, ClassInfo> Classes(GameCatalog catalog, ArchiveStore store)
   {
     lock (ClassCache)

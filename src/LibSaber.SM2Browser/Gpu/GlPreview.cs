@@ -50,6 +50,10 @@ internal sealed unsafe class GlPreview : IDisposable
     public int[] LineStart = Array.Empty<int>();
     public int[] LineLen = Array.Empty<int>();
     public bool Skinned;
+    public PreviewBatch? Source;
+    /// <summary>Vertex runs currently replaced by cloth output (restored from <see cref="Source"/> when physics stops).</summary>
+    public (int Start, int Count)[]? OverrideRuns;
+    public int[]? OverrideIndices;
   }
 
   public GlPreview(GL gl, bool es)
@@ -233,7 +237,7 @@ internal sealed unsafe class GlPreview : IDisposable
       indices[i] = (uint)index < (uint)count ? (uint)index : 0u;
     }
 
-    var gpu = new GpuBatch { Skinned = skin is not null };
+    var gpu = new GpuBatch { Skinned = skin is not null, Source = batch };
     gpu.Vao = _gl.GenVertexArray();
     gpu.Vbo = _gl.GenBuffer();
     gpu.Ibo = _gl.GenBuffer();
@@ -256,6 +260,132 @@ internal sealed unsafe class GlPreview : IDisposable
     _gl.BindVertexArray(0);
     _batches[batch.Key] = gpu;
     return gpu;
+  }
+
+  /// <summary>
+  ///   Writes cloth-driven vertices (already posed) into the batch VBO with a joint index past the palette, so the
+  ///   vertex shader passes them through unskinned. Runs no longer overridden are restored from the batch arrays.
+  /// </summary>
+  private void ApplyOverrides(PreviewScene scene)
+  {
+    var active = new HashSet<object>(ReferenceEqualityComparer.Instance);
+    foreach (var over in scene.VertexOverrides)
+    {
+      PreviewBatch? batch = null;
+      foreach (var candidate in scene.Batches)
+      {
+        if (ReferenceEquals(candidate.Key, over.BatchKey))
+        {
+          batch = candidate;
+          break;
+        }
+      }
+
+      if (batch is null || over.Indices.Length == 0)
+        continue;
+      var gpu = Upload(batch);
+      active.Add(batch.Key);
+      if (gpu.OverrideIndices is null || !gpu.OverrideIndices.AsSpan().SequenceEqual(over.Indices))
+      {
+        if (gpu.OverrideRuns is not null)
+          RestoreRuns(gpu);
+        gpu.OverrideIndices = over.Indices;
+        gpu.OverrideRuns = Runs(over.Indices);
+      }
+
+      var lookup = new Dictionary<int, int>(over.Indices.Length);
+      for (var k = 0; k < over.Indices.Length; k++)
+        lookup[over.Indices[k]] = k;
+      _gl.BindBuffer(BufferTargetARB.ArrayBuffer, gpu.Vbo);
+      foreach (var (start, count) in gpu.OverrideRuns!)
+      {
+        var data = Vertices(batch, start, count);
+        for (var v = 0; v < count; v++)
+        {
+          if (!lookup.TryGetValue(start + v, out var k))
+            continue;
+          var o = v * Stride;
+          var p = over.Positions[k];
+          var n = over.Normals[k];
+          data[o] = p.X; data[o + 1] = p.Y; data[o + 2] = p.Z;
+          data[o + 3] = n.X; data[o + 4] = n.Y; data[o + 5] = n.Z;
+          data[o + 8] = 1e6f; data[o + 9] = 0; data[o + 10] = 0; data[o + 11] = 0;
+          data[o + 12] = 1; data[o + 13] = 0; data[o + 14] = 0; data[o + 15] = 0;
+        }
+
+        fixed (float* pointer = data)
+          _gl.BufferSubData(BufferTargetARB.ArrayBuffer, (nint)(start * Stride * 4), (nuint)(data.Length * 4), pointer);
+      }
+    }
+
+    foreach (var (key, gpu) in _batches)
+    {
+      if (gpu.OverrideRuns is not null && !active.Contains(key))
+        RestoreRuns(gpu);
+    }
+  }
+
+  private void RestoreRuns(GpuBatch gpu)
+  {
+    if (gpu.Source is not null && gpu.OverrideRuns is not null)
+    {
+      _gl.BindBuffer(BufferTargetARB.ArrayBuffer, gpu.Vbo);
+      foreach (var (start, count) in gpu.OverrideRuns)
+      {
+        var data = Vertices(gpu.Source, start, count);
+        fixed (float* pointer = data)
+          _gl.BufferSubData(BufferTargetARB.ArrayBuffer, (nint)(start * Stride * 4), (nuint)(data.Length * 4), pointer);
+      }
+    }
+
+    gpu.OverrideRuns = null;
+    gpu.OverrideIndices = null;
+  }
+
+  /// <summary>Sorted indices grouped into runs (gaps under 32 vertices are bridged with their original data).</summary>
+  private static (int, int)[] Runs(int[] indices)
+  {
+    var sorted = indices.Distinct().OrderBy(i => i).ToArray();
+    var runs = new List<(int, int)>();
+    var i = 0;
+    while (i < sorted.Length)
+    {
+      var start = sorted[i];
+      var end = start;
+      while (i + 1 < sorted.Length && sorted[i + 1] - end <= 32)
+        end = sorted[++i];
+      runs.Add((start, end - start + 1));
+      i++;
+    }
+
+    return runs.ToArray();
+  }
+
+  private static float[] Vertices(PreviewBatch batch, int start, int count)
+  {
+    var data = new float[count * Stride];
+    var skin = batch.Skin;
+    for (var v = 0; v < count; v++)
+    {
+      var i = start + v;
+      if (i >= batch.Positions.Length)
+        break;
+      var o = v * Stride;
+      var p = batch.Positions[i];
+      var n = i < batch.Normals.Length ? batch.Normals[i] : Vector3.UnitY;
+      var t = i < batch.Uvs.Length ? batch.Uvs[i] : Vector2.Zero;
+      data[o] = p.X; data[o + 1] = p.Y; data[o + 2] = p.Z;
+      data[o + 3] = n.X; data[o + 4] = n.Y; data[o + 5] = n.Z;
+      data[o + 6] = t.X; data[o + 7] = t.Y;
+      if (skin is not null && i < skin.Length)
+      {
+        var s = skin[i];
+        data[o + 8] = s.J0; data[o + 9] = s.J1; data[o + 10] = s.J2; data[o + 11] = s.J3;
+        data[o + 12] = s.W0; data[o + 13] = s.W1; data[o + 14] = s.W2; data[o + 15] = s.W3;
+      }
+    }
+
+    return data;
   }
 
   private void EnsureLines(PreviewBatch batch, GpuBatch gpu)
@@ -390,6 +520,7 @@ internal sealed unsafe class GlPreview : IDisposable
       _gl.Uniform1(U("uBoneCount"), skin.Length);
     }
 
+    ApplyOverrides(scene);
     _gl.Uniform1(U("uMode"), 0);
     // Pass 1 opaque, pass 2 alpha-tested (alpha-to-coverage under MSAA), pass 3 blended back to front without
     // depth writes. Hair ships as a hard (masked) and a soft (blend) copy of the same cards: the soft pass uses

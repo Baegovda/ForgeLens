@@ -10,7 +10,7 @@ LibSaber.SM2Extractor — list and extract Warhammer 40,000: Space Marine 2 arch
 Usage:
   LibSaber.SM2Extractor list <archive-or-folder> [options]
   LibSaber.SM2Extractor extract <archive-or-folder> --output <folder> [options]
-  LibSaber.SM2Extractor export <game-folder> --asset <path> --format <fbx-unreal|gltf|both> --output <folder> [--lod <n>] [--anim <name|all>]... [--anim-only] [--anim-rebase <first-frame|none>] [--no-root-motion] [--include-cloth-sim] [--variant <spec>] [--tex-formats <list>]
+  LibSaber.SM2Extractor export <game-folder> --asset <path> --format <fbx-unreal|gltf|both> --output <folder> [--lod <n>] [--anim <name|all>]... [--anim-only] [--anim-rebase <first-frame|none>] [--no-root-motion] [--include-cloth-sim] [--no-physics] [--variant <spec>] [--tex-formats <list>]
 
 The game ships .pak archives with a sibling cache of the same name plus ".cache"
 (client_pc\something.pak and client_pc\something.pak.cache). .pck files with a
@@ -55,6 +55,11 @@ Options:
   --include-cloth-sim     Keep *_SIM cloth simulation meshes. The game only uses them to
                           drive the *_REND cloth (InitSimToRenderSkinning) and never draws
                           them, so they are skipped by default. export only.
+  --no-physics            Skip the class physics (cloth, jiggle bones). By default the export
+                          writes {model}.physics.json, bakes the simulated jiggle bones into
+                          every clip and adds cloth helper bones (skinned to the cloth render
+                          meshes, baked per clip) so Unreal plays the game's secondary motion
+                          with no runtime setup. export only.
   --variant <spec>        Armor variant for customizable constructor tpls (cc_sm_constructor_*,
                           cc_ch_constructor_*), which carry every armor piece of every region.
                           default: PREDEFINED_PRESET_1 of the tpl's appearance (the preset
@@ -100,6 +105,7 @@ Examples:
   public bool AnimationOnly { get; private init; }
   public bool RebaseFirstFrame { get; private init; } = true;
   public bool IncludeClothSim { get; private init; }
+  public bool Physics { get; private init; } = true;
   /// <summary><c>--variant</c> spec, or null for the default (PREDEFINED_PRESET_1 on constructor tpls).</summary>
   public string? Variant { get; private init; }
   public bool WriteDds { get; private init; } = true;
@@ -152,6 +158,7 @@ Examples:
     var rebaseSet = false;
     var rootMotionSet = false;
     var includeClothSim = false;
+    var physics = true;
     string? variant = null;
     string? texFormats = null;
     var positionals = new List<string>();
@@ -186,6 +193,12 @@ Examples:
       if (arg == "--no-overwrite")
       {
         overwrite = false;
+        continue;
+      }
+
+      if (arg == "--no-physics")
+      {
+        physics = false;
         continue;
       }
 
@@ -428,9 +441,9 @@ Examples:
       return false;
     }
 
-    if (verb != ExtractorVerb.Export && (asset is not null || format is not null || lodSet || animation is not null || rootMotionSet || includeClothSim || !unrealRootBone || animationOnly || rebaseSet || variant is not null || texFormats is not null))
+    if (verb != ExtractorVerb.Export && (asset is not null || format is not null || lodSet || animation is not null || rootMotionSet || includeClothSim || !physics || !unrealRootBone || animationOnly || rebaseSet || variant is not null || texFormats is not null))
     {
-      error = "--asset, --format, --lod, --anim, --anim-only, --anim-rebase, --no-root-motion, --fbx-armature-null, --include-cloth-sim, --variant, and --tex-formats are only valid with export.";
+      error = "--asset, --format, --lod, --anim, --anim-only, --anim-rebase, --no-root-motion, --fbx-armature-null, --include-cloth-sim, --no-physics, --variant, and --tex-formats are only valid with export.";
       return false;
     }
 
@@ -490,6 +503,7 @@ Examples:
       AnimationOnly = animationOnly,
       RebaseFirstFrame = rebase,
       IncludeClothSim = includeClothSim,
+      Physics = physics,
       Variant = variant,
       WriteDds = dds,
       WritePng = png,
