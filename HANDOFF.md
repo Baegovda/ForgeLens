@@ -561,3 +561,16 @@ Open:
    bone settings/iterations, or add a foot-planting/stride-warping step.
 2. Cadian finger bind curl is 12° straighter than Manny: add a small retarget-pose curl on `x*_fing2/3` if it shows.
 3. Feet hover 1–7 cm: that's bone height; check against the boot sole mesh before adding a static offset.
+
+### Retarget 2: jog foot sliding fixed (2026-10-26, retarget2)
+Cause (per-frame dump, `/workspace/retarget/rt_probe6.py`): the IK Goals op scales the source foot offset by the
+**leg-chain** ratio while root/pelvis move by the **pelvis-height** ratio. Titus legs are relatively short
+(leg ratio 1.396 vs pelvis 1.542), so the planted FOOT2 drifted ±8 cm with the stride. Earlier "IK has no effect"
+tests were the by-value chain-settings bug, not the solver.
+Fix (`leg_fix`, run by `configure_ops`, or `legfix <rtg> [ext] [z]`): leg chains `extension = pelvis ratio / leg ratio`
+(Titus 1.104, Cadian 1.049) and `static_offset.z = (ext-1)·(hip z − FOOT2 z)` (Titus +13.3, Cadian +4.4 cm) because
+extension also pulls the goal down along the leg. Pelvis `scale_horizontal` stays 1.0 (0.65/1.25 are worse).
+Planted-foot speed now vs Manny×ratio: Titus jog 29/25 vs 37/34, walk 222/175 vs 223/177; Cadian jog 22/20 vs 25/23,
+walk 151/138 vs 151/120. Root motion unchanged (= Manny×ratio). Feet min z: Titus +8 cm (was +6), Cadian +1.6.
+Still open: Cadian index curl −14…−20° (bind 12° straighter than Manny; needs a per-bone retarget-pose curl offset whose
+local bend axis has to be probed first); Titus foot lift could be scaled ~0.85 if the boots read as hovering.

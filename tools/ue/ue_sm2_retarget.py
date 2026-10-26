@@ -10,6 +10,7 @@
 #   info  <rig or rtg>                                       dump chains / ops
 #   config <rtg>                                             re-run op setup (fixes lost root motion), print op settings
 #   unalign <rtg>                                            reset finger bones in the retarget pose (finger curl fix)
+#   legfix <rtg> [ext] [z]                                   leg IK goal extension/lift (jog foot-sliding fix; auto by default)
 #   fingers <rtg> <FKChainRotationMode>                      finger chain FK rotation mode (experiments)
 #   fbx   <anim folder> <out dir>                            export retargeted sequences to FBX
 #   redirectors <folder>                                     list ObjectRedirectors (check nothing leaked into Mannequins)
@@ -158,6 +159,34 @@ def dump(obj, pre=""):
         except Exception: continue
         print(pre + k, str(v)[:90])
 
+def chain_len(pose, bones):
+    WS = unreal.AnimPoseSpaces.WORLD; X = unreal.AnimPoseExtensions
+    P = [X.get_bone_pose(pose, b, WS).translation for b in bones]
+    return sum((P[i + 1] - P[i]).length() for i in range(len(P) - 1)), P
+
+def leg_fix(c, ext=None, z=None):
+    # Foot sliding on jog: the IK goal op scales the source foot offset by the leg-chain ratio, while root and pelvis
+    # move by the pelvis-height ratio. When the SM2 legs are relatively shorter (Titus 1.40 vs pelvis 1.54) the planted
+    # foot drifts with the stride (+-8 cm, jog 97 cm/s vs 37 expected). Extension = pelvis ratio / leg ratio cancels it;
+    # extension also pulls the goal down along the leg, so lift it back by (ext-1) * hip height.
+    X = unreal.AnimPoseExtensions
+    S, T = enum("RetargetSourceOrTarget", "SOURCE"), enum("RetargetSourceOrTarget", "TARGET")
+    sm, tm = c.get_preview_mesh(S), c.get_preview_mesh(T)
+    ps, pt = X.get_reference_pose(sm.skeleton), X.get_reference_pose(tm.skeleton)
+    ls, P = chain_len(ps, ["thigh_l", "calf_l", "foot_l", "ball_l"]); lt, Q = chain_len(pt, ["LEG1L", "LEG2L", "FOOT1L", "FOOT2L"])
+    rp = X.get_bone_pose(pt, "CENTRE", unreal.AnimPoseSpaces.WORLD).translation.z / X.get_bone_pose(ps, "pelvis", unreal.AnimPoseSpaces.WORLD).translation.z
+    rl = lt / ls
+    if ext is None: ext = max(1.0, rp / rl)
+    if z is None: z = (ext - 1.0) * (Q[0].z - Q[-1].z)
+    oc, st = op_settings(c, "IKRetargetIKChainsController")
+    ch = st.get_editor_property("chains_to_retarget")
+    for i in range(len(ch)):
+        x = ch[i]
+        if "Leg" in str(x.get_editor_property("target_chain_name")):
+            x.set_editor_property("extension", ext); x.set_editor_property("static_offset", unreal.Vector(0, 0, z)); ch[i] = x
+    st.set_editor_property("chains_to_retarget", ch); oc.set_settings(st)
+    print("LEGFIX pelvis ratio %.3f leg ratio %.3f -> extension %.3f, goal z %+.1f cm" % (rp, rl, ext, z))
+
 def configure_ops(c):
     # Root motion: Manny 'root' -> SM2 'ROOT' (bone 0 of ROOT-rooted exports), pelvis CENTRE. Without this the
     # retargeted clips lose Manny's root motion (walk 450 cm -> 0).
@@ -170,6 +199,7 @@ def configure_ops(c):
     if oc:
         # 5.7: root bones come from each skeleton's bone 0 (Manny root, SM2 ROOT); the old *_root_bone fields are deprecated.
         print("OP Root Motion", {k: str(st.get_editor_property(k)) for k in ("root_motion_source", "root_height_source", "maintain_offset_from_pelvis")})
+    leg_fix(c)
     oc, st = op_settings(c, "IKRetargetPelvisMotionController")
     if oc:
         print("OP Pelvis Motion", {k: str(st.get_editor_property(k)) for k in ("scale_horizontal", "scale_vertical", "affect_ik_horizontal", "affect_ik_vertical", "translation_alpha")})
@@ -324,6 +354,10 @@ if __name__ == "__main__":
             o = unreal.FbxExportOption(); o.export_morph_targets = False; t.options = o
             ok = unreal.Exporter.run_asset_export_task(t)
             print("FBX", a.get_name(), ok, os.path.getsize(t.filename) if os.path.exists(t.filename) else -1)
+    elif mode == "legfix":
+        # legfix <rtg> [extension] [z]
+        a = unreal.load_asset(sys.argv[2]); c = unreal.IKRetargeterController.get_controller(a)
+        leg_fix(c, *(float(v) for v in sys.argv[3:5])); EAL.save_loaded_asset(a)
     elif mode == "unalign":
         a = unreal.load_asset(sys.argv[2]); c = unreal.IKRetargeterController.get_controller(a)
         unalign_fingers(c, tgt_mesh_for_fingers(c)); EAL.save_loaded_asset(a)
