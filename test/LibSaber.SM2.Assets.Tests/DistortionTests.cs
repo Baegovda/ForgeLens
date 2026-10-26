@@ -136,4 +136,17 @@ public class DistortionTests
     var power = batches.First(b => b.Distortion && b.Emitter.Name == "wave").Vertices[5];
     Assert.Equal(0.5f, power, 0.02f);
   }
+
+  [Fact]
+  public void DistanceFadeNearAndFar()
+  {
+    var near = new DistanceFade(1.8f, 0.9f, Alpha: 0.1f);
+    Assert.Equal(0f, near.Amount(3f));
+    Assert.Equal(1f, near.Amount(0.5f));
+    Assert.Equal(0.5f, near.Amount(1.35f), 0.001f);
+    var far = new DistanceFade(40f, 60f, Intens: 0f);
+    Assert.Equal(0f, far.Amount(10f));
+    Assert.Equal(0.25f, far.Amount(45f), 0.001f);
+    Assert.Equal(1f, far.Amount(80f));
+  }
 }

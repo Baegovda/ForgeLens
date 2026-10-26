@@ -67,7 +67,7 @@ public static class EffectSprites
       var vertices = new float[list.Count * 4 * SpriteBatch.Stride];
       var quads = 0;
       foreach (var (p, _) in list)
-        if (Quad(def, frames, p, right, up, back, vertices, quads * 4 * SpriteBatch.Stride, distort))
+        if (Quad(def, frames, p, right, up, back, vertices, quads * 4 * SpriteBatch.Stride, distort, eye))
           quads++;
       if (quads == 0) continue;
       batches.Add(new SpriteBatch { Emitter = def, Frames = frames, Vertices = vertices, QuadCount = quads, Depth = depthSum / list.Count, Distortion = distort });
@@ -102,24 +102,42 @@ public static class EffectSprites
     return f;
   }
 
-  private static bool Quad(EmitterDef def, TextureFrames frames, in Particle p, Vector3 right, Vector3 up, Vector3 back, float[] v, int o, bool distort = false)
+  /// <summary>When false, <see cref="EmitterDef.DegNear"/>/<see cref="EmitterDef.DegFar"/> are ignored (debug).</summary>
+  public static bool DistanceFades { get; set; } = Environment.GetEnvironmentVariable("SM2_VFX_DEG") != "0";
+
+  private static bool Quad(EmitterDef def, TextureFrames frames, in Particle p, Vector3 right, Vector3 up, Vector3 back, float[] v, int o, bool distort = false, Vector3? eye = null)
   {
     var n = Math.Clamp(p.Age / p.Life, 0f, 1f);
-    var size = def.Size.Sample(n, p.RandSize) * def.Scale;
+    float sizeK = 1, intensK = 1, alphaK = 1, dispK = 1;
+    if (DistanceFades && eye is { } cam && (def.DegNear is not null || def.DegFar is not null))
+    {
+      var dist = Vector3.Distance(p.Position, cam);
+      foreach (var fade in (ReadOnlySpan<DistanceFade?>)[def.DegNear, def.DegFar])
+      {
+        if (fade is null) continue;
+        var k = fade.Amount(dist);
+        sizeK *= 1 + (fade.Size - 1) * k;
+        intensK *= 1 + (fade.Intens - 1) * k;
+        alphaK *= 1 + (fade.Alpha - 1) * k;
+        dispK *= 1 + (fade.Disp - 1) * k;
+      }
+    }
+
+    var size = def.Size.Sample(n, p.RandSize) * def.Scale * sizeK;
     if (size <= 0) return false;
     var c = def.Color.Evaluate(n);
-    var intensity = def.ColorIntensity.Sample(n, p.RandIntensity);
-    var alpha = c.W * def.AlphaIntensity;
+    var intensity = def.ColorIntensity.Sample(n, p.RandIntensity) * intensK;
+    var alpha = c.W * def.AlphaIntensity * alphaK;
     if (alpha <= 0.0005f && def.Blend != EffectBlend.Add) return false;
     var rgb = new Vector3(c.X, c.Y, c.Z) * intensity;
     if (def.Lighting is not ("None" or ""))
       rgb *= LitScale * Math.Clamp(def.AmbientLight + 0.55f, 0f, 1f);
     if (distort)
     {
-      rgb = new Vector3(def.DistortPower.Sample(n, p.RandIntensity), 0f, 0f);
+      rgb = new Vector3(def.DistortPower.Sample(n, p.RandIntensity) * dispK, 0f, 0f);
       if (rgb.X <= 0f) return false;
-      alpha = Math.Clamp(c.W * def.AlphaIntensity, 0f, 1f);
-      if (def.Target == DrawTarget.Distortion && def.ParticleType == "distortion") alpha = 1f; // refraction-only: colour curve unused
+      alpha = Math.Clamp(c.W * def.AlphaIntensity * alphaK, 0f, 1f);
+      if (def.Target == DrawTarget.Distortion && def.ParticleType == "distortion") alpha = alphaK; // refraction-only: colour curve unused
     }
 
     var frame = Frame(def, frames, p);

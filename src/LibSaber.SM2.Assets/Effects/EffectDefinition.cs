@@ -26,6 +26,26 @@ public enum DrawTarget { Color, Distortion, Simulation }
 /// "Emitter `%s` can not be attached to emitter `%s` because it has LCS render mode." @0x143648810.</summary>
 public enum AttachEvent { Fly, Cdt, Die }
 
+/// <summary>
+///   <c>optimization.degNear</c> / <c>degFar</c>: by camera distance, size / intensity / alpha / distortion scale go from 1
+///   at <see cref="RadStart"/> to the <c>scale*</c> value at <see cref="RadEnd"/> (near: start 1.8 > end 0.9 fades
+///   particles in the camera's face; far: 40 -> 60 fades them out). Linear in distance; unlisted scales stay 1.
+/// </summary>
+public sealed record DistanceFade(float RadStart, float RadEnd, float Size = 1, float Intens = 1, float Alpha = 1, float Disp = 1)
+{
+  public float Amount(float distance)
+  {
+    var span = RadEnd - RadStart;
+    return MathF.Abs(span) < 1e-5f ? (span >= 0 ? (distance >= RadEnd ? 1 : 0) : (distance <= RadEnd ? 1 : 0)) : Math.Clamp((distance - RadStart) / span, 0f, 1f);
+  }
+
+  public static DistanceFade? Parse(System.Text.Json.Nodes.JsonObject? o)
+  {
+    if (o is null || o["radStart"] is null || o["radEnd"] is null) return null;
+    return new DistanceFade(o.Float("radStart", 0), o.Float("radEnd", 0), o.Float("scaleSize", 1), o.Float("scaleIntens", 1), o.Float("scaleAlpha", 1), o.Float("scaleDisp", 1));
+  }
+}
+
 /// <summary>A child emitter fired per parent particle.</summary>
 public sealed record AttachedEmitter(AttachEvent Event, string Name, float NumParts)
 {
@@ -55,6 +75,8 @@ public sealed class EmitterDef
   public string? SelfDistortTexture { get; init; }
   public ScalarParam SelfDistortPower { get; init; } = ScalarParam.Constant(0);
   public Vector2 SelfDistortSpeed { get; init; }
+  public DistanceFade? DegNear { get; init; }
+  public DistanceFade? DegFar { get; init; }
   /// <summary>Mesh particles (<c>typeParams.lwiGeom</c>).</summary>
   public MeshParticleDef? Geom { get; init; }
   public bool Visible { get; init; } = true;
@@ -407,6 +429,8 @@ public sealed class EffectDefinition
       DistortPower = distortPower,
       SelfDistortTexture = sdrChannel == "SELF_DISTORTION" ? sdr!.Obj("texture").Str("nameTex") : null,
       SelfDistortPower = sdrChannel == "SELF_DISTORTION" ? SslRead.Scalar(sdr!.Get("power"), 0.1f) : ScalarParam.Constant(0),
+      DegNear = DistanceFade.Parse(e.Obj("optimization")?.Obj("degNear")),
+      DegFar = DistanceFade.Parse(e.Obj("optimization")?.Obj("degFar")),
       SelfDistortSpeed = sdrChannel == "SELF_DISTORTION" && sdr!.Obj("texture")?.Obj("tcIn")?.Obj("transform")?.Get("speed") is { } sps ? SslRead.Range(sps, Vector2.Zero) : Vector2.Zero,
       AlphaMask = visuals.Obj("alphaMask") is { } am && (am.Bool("isEnabled", false) || am.Str("mode") == "Enabled") ? am.Obj("texture").Str("nameTex") : null,
       AlphaMaskRotation = visuals.Obj("alphaMask")?.Obj("texture")?.Obj("tcIn") is { } tci && SslRead.UnionKind(tci) is { } tk && tci.Obj(tk)?.Get("rotation") is { } rot ? SslRead.Range(rot, Vector2.Zero) : Vector2.Zero,
