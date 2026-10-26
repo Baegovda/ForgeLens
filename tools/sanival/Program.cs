@@ -25,6 +25,25 @@ if (args[0] == "--dump")
   return 0;
 }
 
+if (args[0] == "--root")
+{
+  // sanival --root <file.sani> [step] : print root-motion keys (translation, rotation).
+  var b = File.ReadAllBytes(args[1]);
+  var d = File.Exists(args[1] + "_data") ? File.ReadAllBytes(args[1] + "_data") : null;
+  var c = SaniReader.FromBytes(b, d);
+  var step = args.Length > 2 ? int.Parse(args[2]) : 1;
+  for (var i = 0; i < c.RootTranslation.Count; i += step)
+    Console.WriteLine($"{i} {c.RootTranslation[i].Time:0.000} T {c.RootTranslation[i].Value} R {(i < c.RootRotation.Count ? c.RootRotation[i].Value : default)}");
+  return 0;
+}
+
+if (args[0].StartsWith("--") || !Directory.Exists(args[0]) || !args[1].EndsWith(".tsv", StringComparison.OrdinalIgnoreCase))
+{
+  // Guard: an unknown flag or a wrong argument order must never overwrite a game file with the TSV.
+  Console.Error.WriteLine("usage: sanival <folder> <out.tsv> | --dump <file> <bone> | --root <file> [step]");
+  return 2;
+}
+
 var root = Path.GetFullPath(args[0]);
 using var output = new StreamWriter(args[1]);
 output.WriteLine("path\tstatus\tversion\tbones\tframes\ttracks\tnan\tmaxStepDeg\tscaleTracks\trootKeys\tadditive\tnotes");

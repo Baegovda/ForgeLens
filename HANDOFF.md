@@ -23,7 +23,7 @@ Check with GetMcpServerStatus / GetDynamicTools. Install missing ones with Searc
   - `rizin` at `~/.local/bin/rizin`.
   - dotnet at `/home/box/tools/dotnet`.
   - Game exe at `/workspace/rea/sm2_retail.exe`.
-  - Earlier RE outputs at `/workspace/rea/out`.
+  - RE outputs: `/workspace/rea/out` is empty now (the old SANI_FORMAT.md / decode_sani.py are gone). Ghidra project `/workspace/rea/ghidra_proj2` (program sm2) and decompiles in `/workspace/rea/dec/<addr>.c`; decompile more with `JAVA_HOME=/home/box/tools/jdk25 /home/box/ghidra/support/analyzeHeadless /workspace/rea/ghidra_proj2 sm2 -process sm2_retail.exe -noanalysis -readOnly -scriptPath /workspace/rea/ghidra_scripts -postScript Decomp.java /workspace/rea/dec <addrs>`.
   - Repo at `/workspace/LibSaber`.
   - If any of these are missing, reinstall them, or copy the exe from the PC (D:\Steam\steamapps\common\Space Marine 2). Copy it to C:\Users\Revaptor_FX first, because the D: path can be refused.
 - **PC:**
@@ -83,7 +83,7 @@ For any agent continuing this work: read this whole file before you do anything.
 - **Box (shared Linux machine):** repo clone at `/workspace/LibSaber`.
   - The game exe is at `/workspace/rea/sm2_retail.exe` (81 MB).
     - The REA MCP times out on it; run Ghidra headless or rizin directly instead.
-  - The .sani spec and a reference decoder are in `/workspace/rea/out/` (`SANI_FORMAT.md`, `decode_sani.py`).
+  - The .sani spec now lives in code comments: src/LibSaber.SM2.Assets/Animation/EtnaCurves.cs and SaniReader.cs (the old `/workspace/rea/out/SANI_FORMAT.md` is gone). Python reference: py/sani.py.
   - Push: on the box `git bundle create /workspace/sm2.bundle <lastpushed>..HEAD`, CopyFromBox to C:\Users\Revaptor_FX\sm2.bundle, then in C:\Users\Revaptor_FX\ls_push: `git fetch ..\sm2.bundle HEAD; git merge --ff-only FETCH_HEAD; git push origin HEAD`.
 - **Repo:** https://github.com/Baegovda/LibSaber. PR #1 is on branch `cursor/sm2-pck-extractor-4420`.
 
@@ -122,11 +122,7 @@ For any agent continuing this work: read this whole file before you do anything.
 2. **Transparent face slots.** Titus's head_01* slots are marked transparent. Confirm in the game what their alpha means before using the translucent parent on them.
 3. **VFX.** There is no `.sfx` to Niagara conversion; files are extracted raw only.
 4. **Rhino parts.** Check whether destroyed or variant parts are stacked on the hull.
-5. **.sani gaps.**
-   - F3/F7 second slot.
-   - version >= 3.
-   - F6 clips without `.sani_data` (preview frames only).
-   - Root-motion direction: the run moves along −Y while the mesh faces +Y.
+5. **.sani gaps.** Mostly done, see "sani gaps (2026-10-26)" below. Still open: binding of v3 empty-name tracks, and root *rotation* (decoded, not applied by the exporters).
 6. **Push and tests.** Push the local commits to PR #1 and get the tests running.
 
 ## Rules
@@ -168,7 +164,7 @@ For any agent continuing this work: read this whole file before you do anything.
 - Still open in item 5: F3/F7 second slot, version >= 3, F6 clips without .sani_data.
 
 ### Open
-3 VFX (UE Niagara builder from niagara.json), 5 .sani F3/F7 / v3 / F6-without-data, 6 tests (dotnet test hangs at restore; push now works via bundle).
+3 VFX (UE Niagara builder from niagara.json), 5 .sani (only v3 empty-name binding and root rotation left), 6 tests (dotnet test hangs at restore; push now works via bundle).
 
 ## Bulk .sani validation (2026-10-26)
 - Census of 23,227 .sani: v2 F6 sub2 20,244; v2 F2 sub2 1,223; v1 F6 787; v2 F6+F7 542; v2 F6 sub1 218; v1 F2 73; v3 F2+F3 61; v3 F6+F7 40; v2 F2+F3 21; v2 F2 sub1 18. F8 appears in 661 files.
@@ -228,3 +224,18 @@ Captures (`Desktop\SM2_Work\Captures\Step3\`):
 - Old-import "before" (`/Game/SM2_Work/cc_*`) vs step3 also differs on Titus armor (2-3 mean), which comes from older importer changes, not the new layers; use the `_AB_switches` sets to judge this step.
 - Head mode: the "side" camera sits inside the pauldron for Titus/Calgar and sees nothing; front/back are usable.
 Open: tune SecondSpecWeight (0.5) / aniso Specular against game references; the extra{} hair lobe is still sidecar-only.
+
+## sani gaps (2026-10-26)
+All five gaps from item 5, done REA-first (Ghidra project /workspace/rea/ghidra_proj2, decompiles in /workspace/rea/dec).
+- PC backup before install: C:\Users\Revaptor_FX\SM2Extractor.bak2 (old build). Raw file restored: Raw\sani_all\...\pve_relay_boss_intro_shot_01_char_vortex_beast1_vortex_beast.sani was overwritten by an old sanival call (TSV header, 92 bytes, kept as .sani.bak1) and restored from Raw\sani_all.zip (60,885 bytes). sanival now refuses an unknown flag / non-folder / non-.tsv output.
+- Loader FUN_14222fe40 accepts version 1..3; F2/F6 = slot 0 (clip+0x60), F3/F7 = slot 1 (clip+0x68), F4 = root (FUN_142234f10); codec factory FUN_142234c00 reads the sub u16 only when version > 1.
+1. **v3: FIXED.** vtbl 0x1437e74e0. Header FUN_14222d0d0 (8 counts nT nR nS nF cT cR cS cF), carve FUN_14222d550, planar T,R,S,F frames FUN_14222d6b0, frame size FUN_14222d7c0 = nT*4+nR*6+nS*6+nF*2 (sampler c810 is the reference). Name table FUN_1422336c0: bones (+24) then scalars (+28), interned by FUN_141c3fa90 (string-pool id; empty string -> id 0). Scalars go to AnimationClip.Scalars. v3/F7 .sani_data = F2 block + F3 block. Raw v3 sub-1 codec (vtbl 0x1437e72d0) not decoded (no retail file uses it).
+   - Open: v3 empty names (id 0) cannot bind by name; exporter names them unnamed_###. hologram_planet anim binds 0/47, door_mushroom close 128/130. Next RE: the consumer of the clip+0x40 id array.
+2. **F3/F7 second slot: FIXED (as additive flag).** Stats dumper FUN_141060280 prints HasAdditive (string 0x1435ef808) = clip+0x68 != 0. Numerically slot1 R(f) = R0(f)*inv(R0(0)) (max err 0.00x deg), T(f) = T0(f)-T0(0), scales 1 (cultist_stand_shoot, cadian_talk, door_mushroom close). Only slot 0 is exported; AnimationClip.HasAdditive is set.
+3. **F6 without .sani_data: NO-OP.** Census: 0 such files in retail; preview fallback kept.
+4. **v1 root motion: DECODED, partial in export.** F4 sub 1 vtbl 0x1437e77b8 ([1] FUN_14222ef50 exact, [2] FUN_14222ef80 lerp T + FUN_1427ae2c0 blend R, [3] FUN_14222f060 carve, [7] FUN_14222f0d0 load); size FUN_14222f140: float4 T[frames] then float4 R[frames] (w,x,y,z). Sub 2 root = vtbl 0x1437e7800. All 860 v1 files carry F4; 2 are non-identity (vortex_beast boss_intro / outro): T is all zero, R is non-identity (e.g. boss_intro frame 250 = (w .785, x -.366, y .354, z -.354)). ClipPose/FbxWriter/GltfWriter apply only root translation, so the FBX is byte-identical to the bak2 export (MD5 61234DEB...). Applying root rotation needs proof of how the engine composes it with the (already scene-placed) bones - open.
+5. **Rotation steps > 90 deg: NOT A BUG.** FUN_1427ae2c0 is slerp-approx with hemisphere flip (dot<0 -> negate), same shortest path as UE; codes are unsigned code*scale+min (no wrap). Box sample: 1548 snaps vs 27 one-frame spikes, mostly attach/hand/prop/IK bones. PC: 1967 files have a step > 90 deg. No code change.
+- Validation: PC Raw\sani_validation3.tsv 23,227 OK / 0 FAIL (v1 860, v2 22,266, v3 101); additive 664, scale tracks 101. Box /workspace/sani/val3.tsv 449/449 OK; v3 hologram_planet matches py/sani.py.
+- Tests: test/LibSaber.SM2.Assets.Tests/SaniGapTests.cs (4 synthetic tests; pass in a shim runner on the box, real `dotnet test` still hangs at restore there).
+- Tools: tools/sanival (`sanival <folder> <out.tsv>`, `--dump <file> <bone|index>`, `--root <file> [step]`), tools/ue/ue_sani_fix.py (import mesh + before/after anim; `check` prints AnimPose WORLD bone poses at 0/25/50/75/100%).
+- UE (/Game/SM2_Work/sani_fix): door_mushroom (mesh + after/door_mushroom__close, 3.267 s; before = no clip at all) - flower_base_bind_01 moves (-500,-310,-265) -> (-387,-274,207), flower_base_bind_04 pitch -74 -> -18, no NaN. cc_vortex_beast before/after boss_intro (19 s) identical poses (see gap 4). Captures Captures\sani_fix\door_mushroom_{before_bind,after_f000,f050,f100} (box /workspace/sani/captures): camera ends up inside the door's hull, so they are not useful visually; the AnimPose numbers are the evidence.
