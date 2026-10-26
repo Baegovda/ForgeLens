@@ -39,7 +39,8 @@ def run(json_path, mesh_path, dest="/Game/SM2_Work/Tests/physics", mode="verify"
     if mesh is None:
         print("SM2PHYS ERROR mesh not found: %s" % mesh_path); return False
     names = set(n.lower() for n in _bone_names(mesh))
-    jig = [j["name"] for j in data.get("jiggles", []) if j.get("found")]
+    # The sidecar mixes cases (System.Text.Json keeps C# member names: "Name", "Group"; anonymous ones: "found").
+    jig = [j.get("Name") or j.get("name") for j in data.get("jiggles", []) if j.get("found")]
     helpers = [h["bone"] for c in data.get("cloths", []) for h in (c.get("helperBones") or [])]
     miss_j = [n for n in jig if n.lower() not in names]
     miss_h = [n for n in helpers if n.lower() not in names]
