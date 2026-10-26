@@ -148,6 +148,9 @@ public partial class MainWindow
       .Concat(def.Emitters.Where(e => e.IsSprite && e.Target != DrawTarget.Color).Select(e => e.Target.ToString().ToLowerInvariant()))
       .Concat(def.Unsupported.Select(u => u.Type)).GroupBy(t => t).Select(g => $"{g.Key} x{g.Count()}").ToList();
     if (skipped.Count > 0) notes.Add("Not drawn: " + string.Join(", ", skipped) + ".");
+    if (def.Coverings.Count > 0)
+      notes.Add("Surface covering (paints the coveringMask of nearby surfaces, not a particle): "
+        + string.Join(", ", def.Coverings.Select(c => $"{c.Kind} r×{c.RadiusScale:0.##}{(c.Visible ? "" : " (off)")}")) + ".");
     notes.Add("Standalone view on a ground grid; socketed emitters sit 1.2 m up, pointing +X; effects with trails fly along +X at 40 m/s. Drag to orbit, wheel to zoom, Space plays.");
     PreviewNote.Text = string.Join(" ", notes);
     PreviewText.Text = "";

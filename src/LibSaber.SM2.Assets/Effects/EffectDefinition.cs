@@ -186,6 +186,12 @@ public sealed class EffectDefinition
   public IEnumerable<string?> Textures => Emitters.Select(e => e.Texture).Concat(Emitters.Select(e => e.AlphaMask)).Concat(Trails.Select(t => t.Render.Texture));
   /// <summary>Nodes kept out of the simulation (trails, mesh particles, ...): path and type.</summary>
   public List<(string Path, string Type)> Unsupported { get; } = [];
+  /// <summary>
+  ///   <c>em_covering_*</c> stubs: no particle type or visuals, only <c>physics.cdt.coveringInteraction.radiusScale</c>.
+  ///   They tell the engine to paint the covering layer (blood, water, ...: the <c>coveringMask</c> material channel) of
+  ///   the surfaces around the effect. Not a particle; the preview lists them instead of drawing.
+  /// </summary>
+  public List<CoveringDef> Coverings { get; } = [];
   public bool Loops => Trails.Count > 0 || Emitters.Any(e => e.Emission != EmissionKind.Explosion && e.EmitDuration <= 0);
 
   /// <summary>Seconds until the last particle of a non-looping effect dies (or a preview window for loops).</summary>
@@ -249,7 +255,9 @@ public sealed class EffectDefinition
                 // Untyped entries (5499 in the corpus, 89% isVisible=False) are CPU emitters when they are still in the
                 // editor graph (<c>__node</c>); untyped entries without a node are orphans and are not emitted.
                 if (et.Length == 0 && eo.ContainsKey("emission")) et = eo.ContainsKey("__node") ? "CPU_EMITTER" : "orphan";
-                if (et is "CPU_EMITTER" or "GPU_EMITTER")
+                if (CoveringDef.TryParse(eo, en, path + "/" + en, nameParent) is { } covering)
+                  def.Coverings.Add(covering);
+                else if (et is "CPU_EMITTER" or "GPU_EMITTER")
                   def.Emitters.Add(Emitter(eo, en, path + "/" + en, world, nameParent, partScale, duration, partTimeScale));
                 else if (eo.Count > 0)
                   def.Unsupported.Add((path + "/" + en, et.Length > 0 ? et : "emitter?"));
@@ -459,5 +467,20 @@ public sealed class EffectDefinition
             if (entry is JsonObject eo && eo.Str("name") is { Length: > 0 } target)
               result.Attached.Add(new AttachedEmitter(ev, target, eo.Float("numParts", 1f)));
     return result;
+  }
+}
+
+/// <summary>Covering interaction stub (see <see cref="EffectDefinition.Coverings"/>).</summary>
+public sealed record CoveringDef(string Path, string Kind, float RadiusScale, bool Visible, string NameParent)
+{
+  public static CoveringDef? TryParse(JsonObject node, string name, string path, string nameParent)
+  {
+    if (node.ContainsKey("typeParams") || node.ContainsKey("visuals") || node.ContainsKey("emission"))
+      return null;
+    var interaction = node.Obj("physics").Obj("cdt").Obj("coveringInteraction");
+    if (interaction is null && !name.StartsWith("em_covering", StringComparison.OrdinalIgnoreCase))
+      return null;
+    var kind = name.StartsWith("em_covering_", StringComparison.OrdinalIgnoreCase) ? name[12..] : "covering";
+    return new CoveringDef(path, kind, interaction.Float("radiusScale", 1f), node.Bool("isVisible", true), nameParent);
   }
 }

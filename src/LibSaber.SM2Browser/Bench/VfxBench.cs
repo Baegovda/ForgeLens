@@ -79,7 +79,7 @@ internal static class VfxBench
         var missing = def.Drawables.Where(e => e.Texture is { Length: > 0 } t && textures.IsMissing(t)).Select(e => e.Texture).Distinct().ToList();
         var sprites = def.Emitters.Count(e => e.IsSprite);
         var meshCount = def.Emitters.Count(e => e.Geom is not null);
-        Line($"{name}: emitters {def.Emitters.Count} (sprite {sprites}, mesh {meshCount}, other {def.Emitters.Count - sprites - meshCount}) lights {def.Lights.Count} trails {def.Trails.Count} other {def.Unsupported.Count} [{string.Join(", ", def.Unsupported.Select(u => u.Type).Distinct())}] duration {def.Duration:0.00}s capture {seconds:0.00}s missing textures [{string.Join(", ", missing)}] missing meshes [{string.Join(", ", missingMeshes)}]");
+        Line($"{name}: emitters {def.Emitters.Count} (sprite {sprites}, mesh {meshCount}, other {def.Emitters.Count - sprites - meshCount}) lights {def.Lights.Count} trails {def.Trails.Count} covering {def.Coverings.Count} other {def.Unsupported.Count} [{string.Join(", ", def.Unsupported.Select(u => u.Type).Distinct())}] duration {def.Duration:0.00}s capture {seconds:0.00}s missing textures [{string.Join(", ", missing)}] missing meshes [{string.Join(", ", missingMeshes)}]");
         var instance = EffectInstance.Standalone(def, 1);
         var camera = EffectCamera.Fit(instance, seconds);
         if (parts.Length > 2 && float.TryParse(parts[2], CultureInfo.InvariantCulture, out var distance))
