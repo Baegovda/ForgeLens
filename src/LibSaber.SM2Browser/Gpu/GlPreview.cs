@@ -32,6 +32,14 @@ internal sealed unsafe class GlPreview : IDisposable
   private readonly HashSet<PreviewImage> _srgb = new(ReferenceEqualityComparer.Instance);
   private object? _owner;
   private readonly Dictionary<string, int> _uniforms = new();
+  private string _header = "";
+  private EffectRenderer? _fx;
+
+  /// <summary>Particle effect drawn over the scene after the translucent pass (null = none).</summary>
+  public EffectLayer? Effect { get; set; }
+  public double LastEffectMs => _fx?.LastMs ?? 0;
+
+  private EffectRenderer Fx => _fx ??= new EffectRenderer(_gl, _header);
 
   /// <summary>Bench "before" frames: every part in the opaque pass, as v3 drew them.</summary>
   public bool LegacyOpaque { get; set; }
@@ -69,6 +77,7 @@ internal sealed unsafe class GlPreview : IDisposable
       ? "#version 300 es\nprecision highp float;\nprecision highp int;\nprecision highp sampler2D;\n"
       : "#version 330 core\n";
     _program = Link(header + VertexSource, header + FragmentSource);
+    _header = header;
     _gl.GetInteger(GLEnum.MaxSamples, out int maxSamples);
     Samples = Math.Clamp(maxSamples >= 8 ? 8 : maxSamples, 0, 8);
     _gl.GetFloat(MaxAnisotropyLimit, out float aniso);
@@ -536,6 +545,12 @@ internal sealed unsafe class GlPreview : IDisposable
     DrawPass(scene, skin, budget, PreviewBlend.Translucent);
     _gl.DepthMask(true);
     _gl.Disable(EnableCap.Blend);
+    if (Effect is { } effect)
+    {
+      Fx.Draw(effect, scene.View, scene.Projection, scene.Eye);
+      Pending |= Fx.Pending;
+      _gl.UseProgram(_program);
+    }
 
     // Overlays: flat colour, no depth test (as the CPU preview draws them on top).
     _gl.Disable(EnableCap.DepthTest);
@@ -581,6 +596,32 @@ internal sealed unsafe class GlPreview : IDisposable
     _gl.BindVertexArray(0);
     _gl.UseProgram(0);
     // MSAA resolve into our own RGBA8 target (same format, always legal), then a plain blit to the host.
+    _gl.BindFramebuffer(FramebufferTarget.ReadFramebuffer, _msFbo);
+    _gl.BindFramebuffer(FramebufferTarget.DrawFramebuffer, _rsFbo);
+    _gl.BlitFramebuffer(0, 0, width, height, 0, 0, width, height, ClearBufferMask.ColorBufferBit, BlitFramebufferFilter.Nearest);
+    _gl.BindFramebuffer(FramebufferTarget.ReadFramebuffer, _rsFbo);
+    _gl.BindFramebuffer(FramebufferTarget.DrawFramebuffer, (uint)targetFb);
+    _gl.BlitFramebuffer(0, 0, width, height, 0, 0, width, height, ClearBufferMask.ColorBufferBit, BlitFramebufferFilter.Nearest);
+    _gl.BindFramebuffer(FramebufferTarget.Framebuffer, (uint)targetFb);
+    _gl.ActiveTexture(TextureUnit.Texture0);
+  }
+
+  /// <summary>Effect-only frame (VFX standalone view): ground grid, lights and particles, no mesh.</summary>
+  public void RenderEffect(EffectLayer layer, Matrix4x4 view, Matrix4x4 projection, Vector3 eye, int width, int height, int targetFb)
+  {
+    Pending = false;
+    width = Math.Max(1, width);
+    height = Math.Max(1, height);
+    EnsureTargets(width, height);
+    _gl.BindFramebuffer(FramebufferTarget.Framebuffer, _msFbo);
+    _gl.Viewport(0, 0, (uint)width, (uint)height);
+    _gl.ClearColor(28 / 255f, 24 / 255f, 22 / 255f, 1f);
+    _gl.ClearDepth(1f);
+    _gl.Clear(ClearBufferMask.ColorBufferBit | ClearBufferMask.DepthBufferBit);
+    _gl.Disable(EnableCap.CullFace);
+    _gl.Disable(EnableCap.ScissorTest);
+    Fx.Draw(layer, view, projection, eye);
+    Pending = Fx.Pending;
     _gl.BindFramebuffer(FramebufferTarget.ReadFramebuffer, _msFbo);
     _gl.BindFramebuffer(FramebufferTarget.DrawFramebuffer, _rsFbo);
     _gl.BlitFramebuffer(0, 0, width, height, 0, 0, width, height, ClearBufferMask.ColorBufferBit, BlitFramebufferFilter.Nearest);
@@ -700,6 +741,8 @@ internal sealed unsafe class GlPreview : IDisposable
 
   public void Dispose()
   {
+    _fx?.Dispose();
+    _fx = null;
     Own(new object());
     DeleteTargets();
     if (_program != 0)

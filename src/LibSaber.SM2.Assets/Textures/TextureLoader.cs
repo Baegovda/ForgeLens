@@ -107,6 +107,34 @@ public static class TextureLoader
       };
     }
 
+    return FromResource(bytes, name =>
+    {
+      var index = catalog.ResolveReference(name, fileIndex);
+      return index < 0 ? null : store.Read(index);
+    });
+  }
+
+  /// <summary>
+  ///   Loose files: a <c>X.pct.resource</c> plus its <c>X_N.pct_mip</c> files in the same folder (or the parent's
+  ///   <c>pct</c>/<c>pct_mip</c> folders), as the extractor writes them.
+  /// </summary>
+  public static TextureDocument LoadLoose(string resourcePath)
+  {
+    var dir = Path.GetDirectoryName(Path.GetFullPath(resourcePath)) ?? ".";
+    var parent = Path.GetDirectoryName(dir) ?? dir;
+    return FromResource(File.ReadAllBytes(resourcePath), name =>
+    {
+      var file = Path.GetFileName(name.Replace("res://", "").Replace('\\', '/'));
+      foreach (var candidate in new[] { Path.Combine(dir, file), Path.Combine(parent, "pct_mip", file), Path.Combine(parent, "pct", file) })
+        if (File.Exists(candidate))
+          return File.ReadAllBytes(candidate);
+      return null;
+    });
+  }
+
+  /// <summary>Texture from the YAML <c>res_desc_pct</c> text; <paramref name="read"/> returns a named payload file or null.</summary>
+  public static TextureDocument FromResource(byte[] bytes, Func<string, byte[]?> read)
+  {
     resDESC description;
     try
     {
@@ -135,11 +163,9 @@ public static class TextureLoader
 
     if (!string.IsNullOrWhiteSpace(pct.pct))
     {
-      var pictureIndex = catalog.ResolveReference(pct.pct, fileIndex);
-      if (pictureIndex < 0)
-        throw new FileNotFoundException($"The resource points at '{pct.pct}', which is not in the catalog.");
-
-      payload = PictureBytes(store.Read(pictureIndex));
+      var picture = read(pct.pct)
+        ?? throw new FileNotFoundException($"The resource points at '{pct.pct}', which is not available.");
+      payload = PictureBytes(picture);
       message = $"Picture container {pct.pct}, {format}, {width}x{height}, {mips} mip(s), {faces} face(s).";
     }
     else
@@ -152,14 +178,13 @@ public static class TextureLoader
       var missing = new List<string>();
       for (var i = 0; i < names.Length; i++)
       {
-        var mipIndex = catalog.ResolveReference(names[i], fileIndex);
-        if (mipIndex < 0)
+        var mipBytes = read(names[i]);
+        if (mipBytes is null)
         {
           missing.Add(names[i]);
           continue;
         }
 
-        var mipBytes = store.Read(mipIndex);
         var expect = TextureInfo.MipByteSize(format, Math.Max(1, width >> i), Math.Max(1, height >> i));
         if (expect > 0 && mipBytes.Length < expect)
         {

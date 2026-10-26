@@ -1,0 +1,164 @@
+using System.Numerics;
+
+namespace LibSaber.SM2.Assets.Effects;
+
+/// <summary>One draw: every live particle of one emitter as camera-facing quads, ready for a vertex buffer.</summary>
+public sealed class SpriteBatch
+{
+  /// <summary>Floats per vertex: position(3) uv(2) colour(4, linear HDR rgb + alpha) alphaClip(1) softDepth(1).</summary>
+  public const int Stride = 13;
+  public required EmitterDef Emitter { get; init; }
+  public required TextureFrames Frames { get; init; }
+  public float[] Vertices { get; set; } = [];
+  public int QuadCount { get; set; }
+  /// <summary>View-space depth of the emitter's particles (larger = farther); batches draw far to near.</summary>
+  public float Depth { get; set; }
+}
+
+/// <summary>
+///   Turns an <see cref="EffectInstance"/> into sprite quads for a camera. Per particle: size over age
+///   (<c>ageSize</c> @0x143645588 or <c>constExprRange</c>), colour <c>(t,A,R,G,B)</c> over age times
+///   <c>colorIntensity</c> @0x1435630b8 (HDR) and <c>alphaIntensity</c> @0x143645238, flipbook frame from
+///   <c>speedFrame</c> @0x143644718 (<c>constExpr {framerate, frameOffset}</c> in frames/s, or <c>ageSpline</c> of
+///   frame over normalized age; <c>isFrameCycle</c> @0x143644708 wraps, else clamps) on the
+///   <see cref="PartAliases"/> grid, rotation <c>transforms.rotation {angle, speed}</c> in degrees,
+///   <c>isRandomFlip</c> @0x1436452e8, velocity alignment (<c>isAlignSpeed</c>, <c>ratioXY</c>) and
+///   <c>sorting</c> @0x143645dd8 inside the batch.
+/// </summary>
+public static class EffectSprites
+{
+  public static List<SpriteBatch> Build(EffectInstance instance, PartAliases aliases, Matrix4x4 view, Func<EmitterDef, bool>? include = null)
+  {
+    Matrix4x4.Invert(view, out var inv);
+    var right = Vector3.Normalize(new Vector3(inv.M11, inv.M12, inv.M13));
+    var up = Vector3.Normalize(new Vector3(inv.M21, inv.M22, inv.M23));
+    var back = Vector3.Normalize(new Vector3(inv.M31, inv.M32, inv.M33));
+    var eye = inv.Translation;
+    var batches = new List<SpriteBatch>();
+    foreach (var state in instance.Emitters)
+    {
+      var def = state.Def;
+      if (!def.IsSprite || !def.Visible || def.Target != DrawTarget.Color || state.Particles.Count == 0 || (include is not null && !include(def)))
+        continue;
+      var frames = aliases[def.Texture];
+      var list = new List<(Particle P, float Key)>(state.Particles.Count);
+      var depthSum = 0f;
+      foreach (var p in state.Particles)
+      {
+        var d = Vector3.Dot(p.Position - eye, -back);
+        depthSum += d;
+        var key = def.Sorting switch
+        {
+          EffectSorting.SpawnOrder => p.Order,
+          EffectSorting.SpawnOrderReversed => -p.Order,
+          _ => -d,
+        };
+        list.Add((p, key));
+      }
+
+      list.Sort((a, b) => a.Key.CompareTo(b.Key));
+      var vertices = new float[list.Count * 4 * SpriteBatch.Stride];
+      var quads = 0;
+      foreach (var (p, _) in list)
+        if (Quad(def, frames, p, right, up, back, vertices, quads * 4 * SpriteBatch.Stride))
+          quads++;
+      if (quads == 0) continue;
+      batches.Add(new SpriteBatch { Emitter = def, Frames = frames, Vertices = vertices, QuadCount = quads, Depth = depthSum / list.Count });
+    }
+
+    // Far to near between emitters; definition order breaks ties (emitters sharing a source).
+    return batches.Select((b, i) => (b, i)).OrderByDescending(x => MathF.Round(x.b.Depth, 2)).ThenBy(x => x.i).Select(x => x.b).ToList();
+  }
+
+  /// <summary>Scene light reaching lit (<c>lighting != None</c>) particles, in the same HDR units as <c>colorIntensity</c>.
+  /// Corpus: unlit additive intensity median ~450, lit blend median ~10, so a lit sprite sees roughly 100x (tuned against unlit fire at exposure 1/250).</summary>
+  public static float LitScale { get; set; } = 100f;
+
+  public static float Frame(EmitterDef def, TextureFrames frames, in Particle p)
+  {
+    var n = Math.Clamp(p.Age / p.Life, 0f, 1f);
+    var f = def.FrameMode switch
+    {
+      FrameMode.Constant => p.FrameStart + p.Age * p.FrameRate,
+      FrameMode.AgeSpline => def.FrameSpline.Sample(n, p.RandFrame),
+      _ => 0f,
+    };
+    var max = frames.FrameMax;
+    if (def.FrameCycle)
+    {
+      f %= max;
+      if (f < 0) f += max;
+    }
+
+    return f;
+  }
+
+  private static bool Quad(EmitterDef def, TextureFrames frames, in Particle p, Vector3 right, Vector3 up, Vector3 back, float[] v, int o)
+  {
+    var n = Math.Clamp(p.Age / p.Life, 0f, 1f);
+    var size = def.Size.Sample(n, p.RandSize) * def.Scale;
+    if (size <= 0) return false;
+    var c = def.Color.Evaluate(n);
+    var intensity = def.ColorIntensity.Sample(n, p.RandIntensity);
+    var alpha = c.W * def.AlphaIntensity;
+    if (alpha <= 0.0005f && def.Blend != EffectBlend.Add) return false;
+    var rgb = new Vector3(c.X, c.Y, c.Z) * intensity;
+    if (def.Lighting is not ("None" or ""))
+      rgb *= LitScale * Math.Clamp(def.AmbientLight + 0.55f, 0f, 1f);
+
+    var frame = Frame(def, frames, p);
+    if (def.KillAfterSequence && !def.FrameCycle && frame >= frames.FrameMax) return false;
+    var index = Math.Clamp((int)MathF.Floor(frame), 0, frames.FrameMax - 1);
+    var fx = index % frames.FramesX;
+    var fy = index / frames.FramesX;
+    var u0 = fx / (float)frames.FramesX;
+    var v0 = fy / (float)frames.FramesY;
+    var u1 = (fx + 1) / (float)frames.FramesX;
+    var v1 = (fy + 1) / (float)frames.FramesY;
+    if (p.Flip) (u0, u1) = (u1, u0);
+
+    Vector3 ax, ay;
+    var halfW = size;
+    var halfH = size;
+    var vel = p.Velocity;
+    var aligned = (def.AlignSpeed || def.StreakRatio > 0) && vel.LengthSquared() > 1e-6f;
+    if (aligned)
+    {
+      var screen = vel - Vector3.Dot(vel, back) * back;
+      if (screen.LengthSquared() < 1e-8f) screen = up;
+      ay = Vector3.Normalize(screen);
+      ax = Vector3.Cross(ay, back);
+      var ratio = def.RatioXY.X;
+      if (def.StreakRatio > 0) ratio = Math.Max(1f, 1f + vel.Length() * def.StreakRatio);
+      halfH = size * Math.Max(0.01f, ratio);
+    }
+    else
+    {
+      var cs = MathF.Cos(p.Rotation);
+      var sn = MathF.Sin(p.Rotation);
+      ax = right * cs + up * sn;
+      ay = -right * sn + up * cs;
+      var ratio = def.RatioXY.X;
+      if (MathF.Abs(ratio - 1f) > 1e-4f) halfH = size * ratio;
+    }
+
+    var center = p.Position + ax * (def.LocalOffset.X * halfW * 2f) + ay * (def.LocalOffset.Y * halfH * 2f);
+    var clip = Math.Clamp(def.AlphaClip.Sample(n, p.RandClip), 0f, 0.999f);
+    Span<(float X, float Y, float U, float V)> corners = [(-1, -1, u0, v1), (1, -1, u1, v1), (1, 1, u1, v0), (-1, 1, u0, v0)];
+    var mc = MathF.Cos(p.MaskAngle);
+    var ms = MathF.Sin(p.MaskAngle);
+    foreach (var (x, y, u, w) in corners)
+    {
+      var mu = 0.5f + 0.5f * (x * mc - y * ms);
+      var mv = 0.5f - 0.5f * (x * ms + y * mc);
+      var pos = center + ax * (x * halfW) + ay * (y * halfH);
+      v[o++] = pos.X; v[o++] = pos.Y; v[o++] = pos.Z;
+      v[o++] = u; v[o++] = w;
+      v[o++] = rgb.X; v[o++] = rgb.Y; v[o++] = rgb.Z; v[o++] = alpha;
+      v[o++] = clip; v[o++] = def.SoftDepth;
+      v[o++] = mu; v[o++] = mv;
+    }
+
+    return true;
+  }
+}
