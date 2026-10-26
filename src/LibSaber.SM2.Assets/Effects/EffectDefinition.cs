@@ -135,6 +135,13 @@ public sealed class EmitterDef
   public ColorCurve Color { get; init; } = ColorCurve.White;
   public ScalarParam ColorIntensity { get; init; } = ScalarParam.Constant(1);
   public float AlphaIntensity { get; init; } = 1f;
+  /// <summary>
+  ///   <c>visuals.textureTintControl</c> (0..1, @0x143645278, typeParams+0x140): how much of the texture's own RGB tints
+  ///   the particle. 0 uses the texture as intensity only (luminance), so channel-packed flipbooks such as
+  ///   <c>seq_fin_expl_g</c> (blue fire mask in B) draw grey/white smoke tinted by <see cref="Color"/>, not blue.
+  ///   Absent means 1 (texture colour as authored), which keeps every emitter that never sets it unchanged.
+  /// </summary>
+  public float TextureTint { get; init; } = 1f;
   public ScalarParam AlphaClip { get; init; } = ScalarParam.Constant(0);
   public float SoftDepth { get; init; }
   /// <summary><c>visuals.alphaMask</c> (enabled): second texture whose alpha multiplies the sprite, sampled over the whole quad
@@ -427,6 +434,7 @@ public sealed class EffectDefinition
       Color = SslRead.Color(visuals.Get("color")),
       ColorIntensity = SslRead.Scalar(visuals.Get("colorIntensity"), 1f),
       AlphaIntensity = SslRead.Scalar(visuals.Get("alphaIntensity"), 1f).Sample(0, 0.5f),
+      TextureTint = Math.Clamp(visuals.Float("textureTintControl", 1f), 0f, 1f),
       AlphaClip = SslRead.Scalar(visuals.Get("alphaClip"), 0f),
       SpeedInherit = SslRead.Range(particle.Obj("inherit")?.Get("speedInherit"), Vector2.Zero),
       SoftDepth = softDepth,

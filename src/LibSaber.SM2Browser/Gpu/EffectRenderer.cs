@@ -236,6 +236,7 @@ internal sealed unsafe class EffectRenderer : IDisposable
     _gl.Uniform1(_gl.GetUniformLocation(_sprite, "uGround"), layer.Ground ? 1 : 0);
     _gl.Uniform1(_gl.GetUniformLocation(_sprite, "uGroundY"), layer.GroundY);
     var modeLoc = _gl.GetUniformLocation(_sprite, "uMode");
+    var tintLoc = _gl.GetUniformLocation(_sprite, "uTint");
     _gl.Enable(EnableCap.DepthTest);
     _gl.DepthMask(false);
     _gl.Enable(EnableCap.Blend);
@@ -265,6 +266,7 @@ internal sealed unsafe class EffectRenderer : IDisposable
       }
 
       _gl.Uniform1(modeLoc, (int)batch.Emitter.Blend);
+      _gl.Uniform1(tintLoc, batch.Emitter.TextureTint);
       fixed (float* p = batch.Vertices)
         _gl.BufferData(BufferTargetARB.ArrayBuffer, (nuint)(batch.QuadCount * 4 * SpriteBatch.Stride * 4), p, BufferUsageARB.StreamDraw);
       _gl.DrawElements(PrimitiveType.Triangles, (uint)(batch.QuadCount * 6), DrawElementsType.UnsignedInt, (void*)0);
@@ -467,6 +469,7 @@ internal sealed unsafe class EffectRenderer : IDisposable
     uniform int uHasMask;
     uniform float uExposure;
     uniform int uMode;
+    uniform float uTint;
     uniform int uGround;
     uniform float uGroundY;
     out vec4 outColor;
@@ -479,7 +482,8 @@ internal sealed unsafe class EffectRenderer : IDisposable
       float a = clip > 0.0 ? clamp((t.a - clip) / (1.0 - clip), 0.0, 1.0) : t.a;
       if (uGround == 1 && vParams.y > 0.0)
         a *= clamp((vWorld.y - uGroundY) / vParams.y, 0.0, 1.0);
-      vec3 hdr = vColor.rgb * t.rgb;
+      vec3 tex = mix(vec3(dot(t.rgb, vec3(0.299, 0.587, 0.114))), t.rgb, uTint); // textureTintControl
+      vec3 hdr = vColor.rgb * tex;
       vec3 c = toGamma(vec3(1.0) - exp(-hdr * uExposure));
       float alpha = clamp(vColor.a, 0.0, 1.0) * a;
       if (uMode == 1) outColor = vec4(c * alpha, 0.0);          // add
