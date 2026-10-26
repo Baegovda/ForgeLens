@@ -1104,6 +1104,23 @@ public static class FbxWriter
   }
 
   private const double FbxTicksPerSecond = 46186158000d;
+
+  /// <summary>
+  ///   Sample times are float32 (n / rate), e.g. 100 / 30 = 3.33333325 s, which is 99.99999 frames. Unreal's FBX importer
+  ///   floors that to frame 99 and drops the last key (1 frame short whenever n / rate is not exact in float32).
+  ///   Snapping to the frame grid gives the exact tick (FbxTicksPerSecond / 30 is an integer).
+  /// </summary>
+  internal static long ToTick(float seconds, float sampleRate)
+  {
+    if (sampleRate > 0 && float.IsFinite(sampleRate))
+    {
+      var frame = Math.Round(seconds * (double)sampleRate);
+      if (Math.Abs(frame - seconds * (double)sampleRate) < 1e-3)
+        return (long)Math.Round(frame * FbxTicksPerSecond / sampleRate);
+    }
+
+    return (long)Math.Round(seconds * FbxTicksPerSecond);
+  }
   private const int LinearKeyFlags = (1 << 2) | (1 << 8) | (1 << 13) | (1 << 14);
   private static readonly float[] LinearKeyData = { 0f, 0f, BitConverter.Int32BitsToSingle(unchecked((int)0x0F3F0F3F)), 0f };
 
@@ -1261,10 +1278,10 @@ public static class FbxWriter
     PropNumber(props, "d|Y", rest.Y);
     PropNumber(props, "d|Z", rest.Z);
     for (var axis = 0; axis < 3; axis++)
-      WriteCurve(objects, curves[axis], boneName + channel + "XYZ"[axis], take.Samples, values, axis, axis switch { 0 => rest.X, 1 => rest.Y, _ => rest.Z });
+      WriteCurve(objects, curves[axis], boneName + channel + "XYZ"[axis], take.Samples, take.SampleRate, values, axis, axis switch { 0 => rest.X, 1 => rest.Y, _ => rest.Z });
   }
 
-  private static void WriteCurve(Node objects, long id, string name, float[] samples, float[] values, int axis, double rest)
+  private static void WriteCurve(Node objects, long id, string name, float[] samples, float sampleRate, float[] values, int axis, double rest)
   {
     var curve = objects.Add("AnimationCurve");
     curve.Int64(id);
@@ -1276,7 +1293,7 @@ public static class FbxWriter
     var axisValues = new float[samples.Length];
     for (var i = 0; i < samples.Length; i++)
     {
-      times[i] = (long)Math.Round(samples[i] * FbxTicksPerSecond);
+      times[i] = ToTick(samples[i], sampleRate);
       axisValues[i] = values[i * 3 + axis];
     }
 
@@ -1321,8 +1338,8 @@ public static class FbxWriter
       Name = name.Length == 0 ? "clip" : name;
       Samples = samples;
       SampleRate = sampleRate;
-      StartTick = samples.Length == 0 ? 0 : (long)Math.Round(samples[0] * FbxTicksPerSecond);
-      StopTick = samples.Length == 0 ? 0 : (long)Math.Round(samples[^1] * FbxTicksPerSecond);
+      StartTick = samples.Length == 0 ? 0 : ToTick(samples[0], sampleRate);
+      StopTick = samples.Length == 0 ? 0 : ToTick(samples[^1], sampleRate);
       if (StopTick <= StartTick)
         StopTick = StartTick + (long)Math.Round(FbxTicksPerSecond / 30d);
     }
