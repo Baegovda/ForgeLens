@@ -582,3 +582,61 @@ Planted-foot speed now vs Manny×ratio: Titus jog 29/25 vs 37/34, walk 222/175 v
 walk 151/138 vs 151/120. Root motion unchanged (= Manny×ratio). Feet min z: Titus +8 cm (was +6), Cadian +1.6.
 Still open: Cadian index curl −14…−20° (bind 12° straighter than Manny; needs a per-bone retarget-pose curl offset whose
 local bend axis has to be probed first); Titus foot lift could be scaled ~0.85 if the boots read as hovering.
+
+## Bulk validation (2026-10-27, step 4, bulk)
+Base b913484. Branch `bulk`. Tools in `tools/bulk/` (PC copies in `Desktop\SM2_Work\Scripts\bulk\`) and `tools/ue/ue_bulk.py` (`Scripts\ue_bulk.py`). The report is `/workspace/bulk/REPORT.md` with `contact_sheet.jpg`.
+- **Batch:** `manifest.csv` (37 assets: SM, Tyranid, Chaos, Human, Vehicle, Prop/Weapon/Door; 1-2 loco/idle clips per skeleton). Run order:
+  1. `bulk_export.ps1 [-Only a,b] [-Par N] [-Exe path]`: writes `Exports\bulk\<a>`. An existing folder is renamed to `<a>.bakN`. Writes `<a>.log` and merges `results.json`.
+  2. `bulk_ue.ps1 [-Only] [-Mode import|check]`: runs `ue_bulk.py` per asset into `/Game/SM2_Work/Tests/bulk/<a>`. An existing folder is renamed to `_bakN`. Writes `Exports\bulk\<a>.ue.json`.
+  3. `bulk_cap.ps1`: offscreen `ue_cap_lit.py` front/side/back captures into `Captures\bulk\<a>`. Don't name a variable `$c` there: PowerShell variables are case-insensitive, so `$c` clobbers `$C`.
+  4. On the box: run `make_report.py`, then `contact_sheet.py`.
+- **ue_bulk.py checks:**
+  - bones, ref-pose NaN, bounds;
+  - slot count vs sidecar, MI count;
+  - MI vs sidecar: switches, baseLayer, second spec, aniso;
+  - texture params equal to the first sidecar map of each role, sidecar missing maps, files on disk;
+  - per clip: frames, root motion flag, root displacement/speed, NaN, max bone distance.
+- **Fixed: glt.blendMode "none" was exported translucent.**
+  - 218 slots were affected:
+    - chimera hull;
+    - `ch_undersuit_v1/v2` on champions and constructors;
+    - `ch_lictor_legs_01`;
+    - `awp_censers_03`.
+  - A further 7 slots took a layer's nested `blendMode = "tex_blend"` (`ch_soldier_helmet_01`, ravenwing/lamenters helmets).
+  - REA: string-to-enum 0x14230f690 runs over the 20-entry table at 0x144cc9180 (none, black, opaque, blend, add, ...); enum-to-string is 0x14230f710.
+  - `MaterialMaps.BlendMode` now reads only the direct `glt` child. `BlendOf` treats none and opaque as opaque.
+  - Covered by `BlendModeTests`.
+- **Diagnostic:** the export log now names up to 8 unmatched clip tracks. The partial matches are expected:
+  - tacticus clips on non-Titus marines match 110-238/282: face_bind bones;
+  - swarm hormagaunt matches 62/101: tongue/eye bones;
+  - `CharacterWorldSpaceTM` never matches.
+- **Not bugs:**
+  - **termagant_caps texture params at defaults:** a stale UE import from the first export. A fresh import is clean.
+  - **Placeholder tpls:** `imp_*_dyn` doors are nav_silhouette boxes (8 verts); real doors are e.g. `imp_bur_door_03` and `refrt_imp_gate_door_02`, both added to the batch. `cc_rubric_marine` is grey-box `sc_grey_*`.
+  - **Bounds:** the log's "File bounds" are whole-tpl bounds and include markers and collision.
+- **Open:**
+  - **Constructor tpls** (`cc_sm_constructor_*`, `cc_ch_constructor_soldier`) hold every customization variant:
+    - 5,315 nodes and 274 textures;
+    - 375-670 s per export, ~8-10 GB RAM, 9-20 GB on disk;
+    - every texture is written 3x (dds+png+tga).
+    - The UE import of the sniper crashed the editor (RHI breadcrumbs during texture builds). They are not in the UE pass.
+    - Options: a `--variant` filter, or a png-only texture flag for fbx-unreal.
+  - **Fixed: Tyranid monsters and walkers had no root motion in UE (`UnrealRoot.HasSingleRoot`).**
+  - Affected: carnifex, lictor, hive tyrant, warrior, zoanthrope, dreadnought, helbrute.
+  - Their tpl hierarchy is `ObjectNNNN → ObjectNNNN → CENTRE` with no `ROOT`. FindPromotable declined, so FbxWriter kept the `{mesh}_Skeleton` Null. That Null became bone 0, and the 0xF4 motion sat on bone 1.
+  - Now a single parentless bone also drops the Null.
+  - Verified on the PC (`Exports\bulk_fix` → `/Game/SM2_Work/Tests/bulk_fix`): dreadnought `walk_fwd_v02_5_2ms` gives 526 cm/s, matching its name.
+  - Not re-exported: the non-animated single-root assets (chimera, servitor, servo skull, doors, weapons).
+  - Tests: `UnrealRootTests` (+3). `AnimFbx_IsSkeletonOnlyAndTheCurvesMove` now uses two roots so it keeps the Null.
+- **Checker and tools:**
+  - `ue_bulk.py` counts `M_SM2_ClothSimHidden` (collision/nav slots) as hidden, not as a mismatch.
+  - `ue_bulk.py` takes an optional set name: `import <asset> bulk_fix`.
+  - In `make_report.py`, `meta_fix/` overrides `meta/`. A zero-displacement loco clip with ROOT as bone 0 is a WARN (in-place; rubric `rubric_fwd`, lesser sorcerer `walk_fwd`; not verified in REA).
+- **Captures:**
+  - Captures right after a batch import can show grey placeholder textures while textures compile. 7 assets were recaptured into `Captures\bulk_re`.
+  - TODO: `ue_cap_lit.py` should wait for texture compilation.
+- **Result** (`/workspace/bulk/REPORT.md`): 37 assets, PASS 31, WARN 3 (captain partial tracks, rubric/sorcerer in-place clips), FAIL 3 (constructors, not imported).
+- **Disk:**
+  - Cleanup was approved by the user. Deleted `Exports\bulk\*.bakN`: 36 folders, 61.1 GB. C: free went from 4.9 GB to 66.0 GB; it was ~50 GB after the bulk_fix imports and DDC.
+  - Deleted 18 of the 24 `/Game/SM2_Work/Tests/bulk/*_bakN` folders through the editor API.
+  - 6 remain (calgar, chaplain, intercessor, primaris_captain, titus_assault, titus_deathwatch; ~2.2 GB on K:). The editor reports them in use: their new `_Skeleton` still references the renamed mesh. Delete them with `Scripts\bulk\ue_del_bak.py` after a UE restart.

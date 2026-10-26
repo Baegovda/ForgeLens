@@ -1,0 +1,10 @@
+{
+ "cc_sm_constructor_tank": "Constructor tpl with every customization variant (5,315 nodes, 274 textures, ~19 GB export). Not imported: UE import of the sniper constructor crashed the editor (RHIThread GPU crash during texture builds).",
+ "cc_sm_constructor_sniper": "Same as the tank constructor. A partial import remains in /Game/SM2_Work/Tests/bulk/cc_sm_constructor_sniper (the crash run).",
+ "cc_ch_constructor_soldier": "Same as the tank constructor (~9 GB export).",
+ "cc_rubric_marine": "Grey-box placeholder tpl (sc_grey_* diffuse). Real rubric models live elsewhere.",
+ "imp_door_small_01_dyn": "nav_silhouette logic shell (8 verts), not a visual door. See imp_bur_door_03 / refrt_imp_gate_door_02.",
+ "imp_gate_door_01_dyn": "nav_silhouette logic shell, see above.",
+ "cc_primaris_captain": "Expected: the tacticus clip carries face_bind/eye/tongue tracks that helmeted marines lack.",
+ "cc_termagant": "texture params at defaults in the first pass came from a stale earlier test import. The fresh import is clean."
+}
