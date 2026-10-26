@@ -1,8 +1,10 @@
-# Material-finishing pass: rerun the new import_sm2_materials (Substrate two-lobe graph) on an existing step3 export
+# Material-finishing pass (usage: <asset> apply|verify [export prefix]): rerun the new import_sm2_materials (Substrate two-lobe graph) on an existing step3 export
 # into /Game/SM2_Work/Characters/<asset>, then report switches/params vs the sidecar and the master stats.
 import sys, runpy, json, unreal
 name = sys.argv[1]; mode = sys.argv[2] if len(sys.argv) > 2 else "apply"
-root = r"C:/Users/Revaptor_FX/Desktop/SM2_Work/Exports/step3_" + name + "/tpl/" + name + ".tpl/"
+# Optional 3rd arg: export folder prefix (default step3_, e.g. mat3_ for a re-export with a newer CLI).
+prefix = sys.argv[3] if len(sys.argv) > 3 else "step3_"
+root = r"C:/Users/Revaptor_FX/Desktop/SM2_Work/Exports/" + prefix + name + "/tpl/" + name + ".tpl/"
 folder = "/Game/SM2_Work/Characters/" + name
 script = r"C:/Users/Revaptor_FX/Desktop/SM2_Work/Scripts/import_sm2_materials_mat.py"
 if mode == "apply":
