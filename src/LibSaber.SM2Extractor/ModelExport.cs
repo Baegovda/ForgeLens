@@ -198,6 +198,7 @@ public static class ModelExport
       Lod = options.Lod,
       Clips = clips,
       RootMotion = options.RootMotion,
+      UnrealRootBone = options.UnrealRootBone,
       IncludeClothSim = options.IncludeClothSim,
     };
   }

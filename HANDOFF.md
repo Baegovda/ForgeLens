@@ -342,3 +342,28 @@ Result: fewer white blotches, darker/more matte grey. Remaining differences:
 PC: content backup `Desktop\SM2_Work\Backup\Characters_mat2.bak1\cc_calgar`; scripts `.bak1/.bak2`; sidecar `.json.bak1`.
 Apply: `ue_mat_apply.py cc_calgar apply`, wait ~170 s, `ue_tmp_stream.py` (FullyLoadUsedTextures), then `ue_cap_lit.py capture ... view=ref`.
 Verify: `ue_mat_apply.py cc_calgar verify` -> `SLOTS 44 MIs 44 secondSpec 7 MISMATCH []`.
+
+## Animation → UE: survey + fix 1/2 (2026-10-26, anim_fix12)
+
+Survey report: box `/workspace/anim_survey/REPORT.md` (12 clips, 0 NaN, frame-drop fixed in d52abd2).
+Before/after sheets and UE check output: box `/workspace/anim_survey/fix12/`. UE: `/Game/SM2_Work/Tests/anim_survey/fix12/<asset>/`.
+
+1. **Import yaw: auto (no hardcoded 180).** `sm2_anim_import()` (same block in `tools/ue/ue_import_anim.py` (embedded in the exe), `ue_anim_survey.py`, `ue_sani_fix.py`)
+   imports at yaw 0, compares skeleton bone 0 at t=0 with the skeleton ref pose (component space) and reimports with the
+   90°-multiple difference if any. Fresh Interchange skeletons (old `_Skeleton` Null and new ROOT-rooted) → 0. The old
+   `Original/cc_titus_assault` skeleton (needed 180) was not re-tested (read-only), the auto rule should pick 180 there.
+2. **Root motion on bone 0 = ROOT.** Exe: the loader FUN_14222fe40 keeps the 0xF4 root track apart from the bone slots
+   (slot 0 clip+0x60, slot 1 clip+0x68, root clip+0x70; case 3 builds root+8 = R0^-1(T_last-T0), root+0x14 = R0^-1 R_last via
+   FUN_1427aa8a0/FUN_1427ad8b0; sampler FUN_14222f1b0, codec FUN_142234f10). It is an entity transform, not a skeleton
+   bone, and the tpl root object (Object00C9 etc.) and ROOT have identity MatrixLT. Export choice: ROOT carries it.
+   - `UnrealRoot.Promote` (fbx-unreal default; `--fbx-armature-null` = old hierarchy): ROOT becomes the only root, the tpl root object
+     becomes its child (same world bind, bone order and skin indices unchanged), and no `{mesh}_Skeleton` Null is written.
+     ClipPose applies 0xF4 to parentless bones, so the motion lands on ROOT = UE bone 0.
+   - The import helper sets EnableRootMotion + RootMotionRootLock ANIM_FIRST_FRAME (`noroot` to skip).
+   - glTF is unchanged: it has no Null, so its root bone (tpl root object) already carries the motion.
+   - Existing skeletons from older exports have a different hierarchy, so re-export and re-import the mesh (new skeleton).
+   - Verified (UE 5.7.4, `extract_root_track_transform`): Titus run ROOT 485.9 cm / 0.933 s, in place when extracted, facing +Y;
+     Hormagaunt run 506.7 cm / 0.633 s (= 800 cm/s; the old 480 / 0.600 lost a frame); Vortex slam 488.2 cm + 180° turn.
+     Before: bone 0 `_Skeleton` 0 cm, root motion off.
+- Build: `C:\Users\Revaptor_FX\SM2Extractor5\LibSaber.SM2Extractor.exe`. Tests: SM2.Assets 52/52, SM2Extractor 35/35.
+- Open: cinematic rebase (level-space c06/c10), `--anim-only` / multi-clip export, additive clip type, Mannequin RTG (see REPORT.md).

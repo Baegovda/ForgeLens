@@ -21,12 +21,22 @@ public static class FbxWriter
   private static readonly byte[] FootMagic = { 0xF8, 0x5A, 0x8C, 0x6A, 0xDE, 0xF5, 0xD9, 0x7E, 0xEC, 0xE9, 0x0C, 0xE3, 0x75, 0x8F, 0x29, 0x0B };
   private const string CreationStamp = "1970-01-01 10:00:00:000";
 
-  public static void Write(string path, ExportedMesh mesh, ExportSpace space, IReadOnlyDictionary<string, string>? textureFiles = null, bool animationOnly = false)
+  public static void Write(string path, ExportedMesh mesh, ExportSpace space, IReadOnlyDictionary<string, string>? textureFiles = null, bool animationOnly = false, bool unrealRoot = true)
   {
     // Unreal import uses Index's checked set. A caller that still holds the full
     // template (LOD shells and collision) must not ship those as extra meshes.
     if (space == ExportSpace.Unreal)
       mesh = mesh.VisibleGeometry();
+
+    // Unreal: ROOT is the hierarchy root and skeleton bone 0, and it carries the 0xF4 root motion (see UnrealRoot).
+    // No armature Null above it, because Interchange would make that Null bone 0.
+    var armature = true;
+    if (space == ExportSpace.Unreal && unrealRoot && UnrealRoot.FindPromotable(mesh.Bones, out _) >= 0)
+    {
+      mesh = UnrealRoot.Promote(mesh);
+      armature = false;
+    }
+    _armature = armature;
 
     var root = new Node("");
     var ids = new IdSource();
@@ -215,10 +225,10 @@ public static class FbxWriter
     var materials = animationOnly ? new List<MaterialRef>() : CollectMaterials(mesh);
     var textures = animationOnly ? new List<TextureRef>() : CollectTextures(mesh);
     var geometry = !animationOnly && mesh.HasTriangles ? 1 : 0;
-    var models = (animationOnly ? 0 : 1) + mesh.Bones.Count + (mesh.Bones.Count > 0 ? 1 : 0);
+    var models = (animationOnly ? 0 : 1) + mesh.Bones.Count + (HasArmature(mesh) ? 1 : 0);
     // Blender's armature FBX connects a Null NodeAttribute to the Null model. LimbNode
     // attributes alone leave that root without the attribute its DefaultAttributeIndex names.
-    var attributes = mesh.Bones.Count + (mesh.Bones.Count > 0 ? 1 : 0);
+    var attributes = mesh.Bones.Count + (HasArmature(mesh) ? 1 : 0);
     var deformers = !animationOnly && mesh.HasSkin && mesh.HasTriangles ? 1 + bones.Clusters.Count : 0;
     var poses = 1;
     var curves = take?.CurveCount ?? 0;
@@ -266,7 +276,7 @@ public static class FbxWriter
     var textures = animationOnly ? new List<TextureRef>() : CollectTextures(mesh);
     if (!animationOnly && mesh.HasTriangles)
       WriteGeometry(objects, mesh, space, ids, materials);
-    if (mesh.Bones.Count > 0)
+    if (HasArmature(mesh))
       WriteArmature(objects, mesh, ids);
     if (!animationOnly)
       WriteMeshModel(objects, mesh, ids);
@@ -635,9 +645,9 @@ public static class FbxWriter
     pose.String("BindPose");
     pose.Add("Type").String("BindPose");
     pose.Add("Version").Int32(100);
-    var poseNodes = (animationOnly ? 0 : 1) + mesh.Bones.Count + (mesh.Bones.Count > 0 ? 1 : 0);
+    var poseNodes = (animationOnly ? 0 : 1) + mesh.Bones.Count + (HasArmature(mesh) ? 1 : 0);
     pose.Add("NbPoseNodes").Int32(poseNodes);
-    if (mesh.Bones.Count > 0)
+    if (HasArmature(mesh))
     {
       var armNode = pose.Add("PoseNode");
       armNode.Add("Node").Int64(ids.Armature);
@@ -661,8 +671,8 @@ public static class FbxWriter
   private static void WriteConnections(Node root, ExportedMesh mesh, IdSource ids, BoneTables bones, bool animationOnly)
   {
     var connections = root.Add("Connections");
-    var sceneParent = mesh.Bones.Count > 0 ? ids.Armature : 0;
-    if (mesh.Bones.Count > 0)
+    var sceneParent = HasArmature(mesh) ? ids.Armature : 0;
+    if (HasArmature(mesh))
     {
       Connect(connections, "OO", ids.Armature, 0);
       Connect(connections, "OO", ids.ArmatureAttribute, ids.Armature);
@@ -1102,6 +1112,9 @@ public static class FbxWriter
 
     return builder.Length == 0 ? "object" : builder.ToString();
   }
+
+  [ThreadStatic] private static bool _armature;
+  private static bool HasArmature(ExportedMesh mesh) => mesh.Bones.Count > 0 && _armature;
 
   private const double FbxTicksPerSecond = 46186158000d;
 

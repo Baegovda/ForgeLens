@@ -179,6 +179,21 @@ public sealed class ExportedMesh
   ///   so a visible sim shell is kept and an unchecked LOD or collision shell is not.
   ///   Returns this instance when LOD0 is fully checked and no other level has a checked part.
   /// </summary>
+  /// <summary>Copy with the same vertex data and shared bone, part and level objects (lists are new).</summary>
+  public ExportedMesh ShallowCopy()
+  {
+    var copy = new ExportedMesh { Name = Name, Material = Material, Clip = Clip, Message = Message };
+    copy.Positions.AddRange(Positions);
+    copy.Normals.AddRange(Normals);
+    copy.Uvs.AddRange(Uvs);
+    copy.Indices.AddRange(Indices);
+    copy.Bones.AddRange(Bones);
+    copy.Skin.AddRange(Skin);
+    copy.Parts.AddRange(Parts);
+    copy.Levels.AddRange(Levels);
+    return copy;
+  }
+
   public ExportedMesh VisibleGeometry()
   {
     var levelVisible = false;

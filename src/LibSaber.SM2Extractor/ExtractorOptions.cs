@@ -38,6 +38,9 @@ Options:
                           The clip's 0xF4 track is added to the skeleton root translation.
   --no-root-motion        Leave that root translation off. The bone curves are unchanged.
                           export only.
+  --fbx-armature-null     Old FBX hierarchy: a {model}_Skeleton Null above the tpl root object.
+                          Default for fbx-unreal: ROOT is the hierarchy root (Unreal bone 0)
+                          and carries the root motion. export only.
   --include-cloth-sim     Keep *_SIM cloth simulation meshes. The game only uses them to
                           drive the *_REND cloth (InitSimToRenderSkinning) and never draws
                           them, so they are skipped by default. export only.
@@ -72,6 +75,7 @@ Examples:
   public int Lod { get; private init; }
   public string? Animation { get; private init; }
   public bool RootMotion { get; private init; } = true;
+  public bool UnrealRootBone { get; private init; } = true;
   public bool IncludeClothSim { get; private init; }
 
   public static ExtractorOptions Help()
@@ -114,6 +118,7 @@ Examples:
     var overwrite = true;
     var quiet = false;
     var rootMotion = true;
+    var unrealRootBone = true;
     var rootMotionSet = false;
     var includeClothSim = false;
     var positionals = new List<string>();
@@ -154,6 +159,12 @@ Examples:
       if (arg == "--include-cloth-sim")
       {
         includeClothSim = true;
+        continue;
+      }
+
+      if (arg == "--fbx-armature-null")
+      {
+        unrealRootBone = false;
         continue;
       }
 
@@ -325,7 +336,7 @@ Examples:
       return false;
     }
 
-    if (verb != ExtractorVerb.Export && (asset is not null || format is not null || lodSet || animation is not null || rootMotionSet || includeClothSim))
+    if (verb != ExtractorVerb.Export && (asset is not null || format is not null || lodSet || animation is not null || rootMotionSet || includeClothSim || !unrealRootBone))
     {
       error = "--asset, --format, --lod, --anim, --no-root-motion, and --include-cloth-sim are only valid with export.";
       return false;
@@ -379,6 +390,7 @@ Examples:
       Lod = lod,
       Animation = animation,
       RootMotion = rootMotion,
+      UnrealRootBone = unrealRootBone,
       IncludeClothSim = includeClothSim,
     };
     return true;

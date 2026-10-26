@@ -31,6 +31,11 @@ public sealed class ExportSettings
   /// <summary>Adds the clip's 0xF4 track to the skeleton root translation. The extractor's <c>--no-root-motion</c> turns this off.</summary>
   public bool RootMotion { get; init; } = true;
   /// <summary>
+  ///   Unreal FBX: make <c>ROOT</c> the hierarchy root (skeleton bone 0, carries root motion) and drop the
+  ///   <c>{mesh}_Skeleton</c> Null. The extractor's <c>--fbx-armature-null</c> turns this off (old hierarchy).
+  /// </summary>
+  public bool UnrealRootBone { get; init; } = true;
+  /// <summary>
   ///   Keep <c>*_SIM</c> cloth simulation meshes. SM2's cloth (<c>PropClothSim</c>, <c>simMeshName</c> /
   ///   <c>renderMeshes</c>) only skins the <c>*_REND</c> meshes from them and never draws them, so they are off by default.
   /// </summary>
@@ -219,7 +224,7 @@ public static class AssetExporter
     {
       var fbxPath = Destination(outputDirectory, file.Path, ".fbx", batch);
       textureFiles = TextureFiles(catalog, store, index, exportMesh, fbxPath, outputDirectory, settings, report, batch);
-      FbxWriter.Write(fbxPath, exportMesh, settings.Space, textureFiles);
+      FbxWriter.Write(fbxPath, exportMesh, settings.Space, textureFiles, unrealRoot: settings.UnrealRootBone);
       report.Written++;
       if (settings.WriteMaterials)
       {
@@ -252,7 +257,7 @@ public static class AssetExporter
         var fbxPath = Destination(outputDirectory, relative, ".fbx", batch);
         // Skeleton and curves only. A mesh in this file makes Interchange import nothing
         // when mesh import is off, and the legacy importer builds a second SkeletalMesh.
-        FbxWriter.Write(fbxPath, exportMesh, settings.Space, textureFiles, animationOnly: true);
+        FbxWriter.Write(fbxPath, exportMesh, settings.Space, textureFiles, animationOnly: true, unrealRoot: settings.UnrealRootBone);
         report.Written++;
         var animScript = Path.Combine(Path.GetDirectoryName(fbxPath)!, "ue_import_anim.py");
         if (!File.Exists(animScript) || usedClips.Count == 1)
@@ -553,7 +558,7 @@ public static class AssetExporter
       report.Written++;
       if (settings.WriteFbx && mesh.Bones.Count > 0)
       {
-        FbxWriter.Write(Destination(outputDirectory, file.Path, ".fbx", batch), mesh, settings.Space);
+        FbxWriter.Write(Destination(outputDirectory, file.Path, ".fbx", batch), mesh, settings.Space, unrealRoot: settings.UnrealRootBone);
         report.Written++;
       }
     }
