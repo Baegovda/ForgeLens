@@ -95,6 +95,7 @@ public static partial class MeshPreview
       rebase = InPlaceRebase(mesh);
       for (var i = 0; i < worlds!.Length; i++)
         worlds[i] *= rebase;
+      RemoveRootMotion(mesh, worlds, rebase);
     }
 
     var offset = Vector3.Zero;
@@ -367,11 +368,48 @@ public static partial class MeshPreview
 
     var reference = -1;
     var bestDepth = int.MaxValue;
+    // Only bones that carry deforming bones count: cam_anim / Gun_pose style helpers can sit metres away.
+    var carries = new bool[mesh.Bones.Count];
+    for (var i = 0; i < mesh.Bones.Count; i++)
+    {
+      if (!mesh.Bones[i].Influences)
+        continue;
+      for (var p = i; p >= 0 && p < mesh.Bones.Count && !carries[p]; p = mesh.Bones[p].Parent)
+        carries[p] = true;
+    }
+
+    if (carries.Any(c => c))
+    {
+      maxDisplacement = 0f;
+      for (var i = 0; i < first.Length; i++)
+        if (carries[i] && float.IsFinite(displacement[i]))
+          maxDisplacement = MathF.Max(maxDisplacement, displacement[i]);
+    }
+    else
+      Array.Fill(carries, true);
+
+    // Gameplay clips are authored in model space: ROOT (and its parents) sit on the bind pose at frame 0 and
+    // only the body below moves. Re-basing on the pelvis there would tilt and shift the whole model.
+    var rootBone = RootMotionBone(mesh);
+    if (rootBone >= 0 && carries[rootBone])
+    {
+      var placed = false;
+      for (var p = rootBone; p >= 0 && p < mesh.Bones.Count; p = mesh.Bones[p].Parent)
+        placed |= displacement[p] > 0.05f;
+      // Cinematic corpses carry the scene placement one level below ROOT (km away): keep re-basing those.
+      var near = 0f;
+      for (var i = 0; i < mesh.Bones.Count; i++)
+        if (carries[i] && mesh.Bones[i].Parent == rootBone && float.IsFinite(displacement[i]))
+          near = MathF.Max(near, displacement[i]);
+      if (!placed && near < 1f)
+        maxDisplacement = 0f;
+    }
+
     if (maxDisplacement > 0.05f)
     {
       for (var i = 0; i < mesh.Bones.Count; i++)
       {
-        if (!(displacement[i] >= maxDisplacement * 0.5f))
+        if (!carries[i] || !(displacement[i] >= maxDisplacement * 0.5f))
           continue;
         var depth = 0;
         for (var p = mesh.Bones[i].Parent; p >= 0 && p < mesh.Bones.Count && depth < 1024; p = mesh.Bones[p].Parent)
@@ -400,6 +438,50 @@ public static partial class MeshPreview
     lock (RebaseCache)
       RebaseCache.AddOrUpdate(clip, Tuple.Create(mesh, result));
     return result;
+  }
+
+  /// <summary>
+  ///   In place, part 2: removes the clip's root motion. The horizontal (XZ) travel of the <c>ROOT</c> bone since
+  ///   frame 0 is subtracted from every (already rebased) bone world, so dashes and walks stay on the spot; height
+  ///   (jumps) is kept. <paramref name="worlds"/> must be the rebased worlds of <paramref name="timeSeconds"/>.
+  /// </summary>
+  public static void RemoveRootMotion(ExportedMesh mesh, Matrix4x4[] worlds, Matrix4x4 rebase)
+  {
+    if (mesh.Clip is not { HasCurves: true } clip)
+      return;
+    var root = RootMotionBone(mesh);
+    if (root < 0 || root >= worlds.Length)
+      return;
+    Vector3 start;
+    lock (RootStartCache)
+    {
+      if (!RootStartCache.TryGetValue(clip, out var cached) || !ReferenceEquals(cached.Item1, mesh))
+      {
+        cached = Tuple.Create(mesh, Translation(BoneWorlds(mesh, 0f)[root] * rebase));
+        RootStartCache.AddOrUpdate(clip, cached);
+      }
+
+      start = cached.Item2;
+    }
+
+    var delta = Translation(worlds[root]) - start;
+    delta.Y = 0;
+    if (!float.IsFinite(delta.X) || !float.IsFinite(delta.Z) || delta.LengthSquared() < 1e-8f)
+      return;
+    var shift = Matrix4x4.CreateTranslation(-delta);
+    for (var i = 0; i < worlds.Length; i++)
+      worlds[i] *= shift;
+  }
+
+  private static readonly System.Runtime.CompilerServices.ConditionalWeakTable<AnimationClip, Tuple<ExportedMesh, Vector3>> RootStartCache = new();
+
+  /// <summary>The <c>ROOT</c> bone (SM2 rigs carry locomotion there), or -1.</summary>
+  public static int RootMotionBone(ExportedMesh mesh)
+  {
+    for (var i = 0; i < mesh.Bones.Count; i++)
+      if (string.Equals(mesh.Bones[i].Name, "ROOT", StringComparison.OrdinalIgnoreCase))
+        return i;
+    return -1;
   }
 
   /// <summary>Bounds of the drawn triangles from the cached arrays (bind pose, so the camera does not chase a clip).</summary>

@@ -106,6 +106,7 @@ public static partial class MeshPreview
       rebase = InPlaceRebase(mesh);
       for (var i = 0; i < worlds!.Length; i++)
         worlds[i] *= rebase;
+      RemoveRootMotion(mesh, worlds, rebase);
     }
 
     var batches = new List<PreviewBatch>(slices.Count);
