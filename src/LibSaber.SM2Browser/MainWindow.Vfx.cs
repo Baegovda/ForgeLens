@@ -59,6 +59,7 @@ public partial class MainWindow
   private EffectLibrary? _vfxLibrary;
   private PartAliases _vfxAliases = PartAliases.Empty;
   private EffectTextures? _vfxTextures;
+  private EffectMeshes _vfxMeshes = EffectMeshes.None;
   private VfxState? _fx;
   private bool _suppressVfxScrub;
   private bool _vfxStatsHooked;
@@ -73,6 +74,10 @@ public partial class MainWindow
     _vfxTextures = new EffectTextures(name =>
       catalog.FindByFileName(name + ".pct.resource") is { Count: > 0 } t ? TextureLoader.Load(catalog, store, t[0]) : null);
     _vfxTextures.Loaded = () => Avalonia.Threading.Dispatcher.UIThread.Post(() => { if (_fx is not null) GpuView.ShowEffect(GpuView.Effect); });
+    _vfxMeshes = new EffectMeshes(
+      name => catalog.FindByFileName(name + ".tpl") is { Count: > 0 } t ? LibSaber.SM2.Assets.Meshes.TemplateMeshReader.Load(catalog, store, t[0]) : null,
+      name => catalog.FindByFileName(name + ".td") is { Count: > 0 } t && SslText.LooksText(store.Read(t[0])) ? Encoding.UTF8.GetString(store.Read(t[0])) : null);
+    _vfxMeshes.Loaded = _vfxTextures.Loaded;
     _vfxCatalog = catalog;
   }
 
@@ -86,7 +91,8 @@ public partial class MainWindow
     return await ShowEffectAsync(Path.GetFileNameWithoutExtension(path), generation);
   }
 
-  /// <summary>Dev/QA without a game folder: SM2_VFX_LOOSE="sfxDir|part_aliases.ps|textureDir" and SM2_VFX_OPEN=name.</summary>
+  /// <summary>Dev/QA without a game folder: SM2_VFX_LOOSE="sfxDir|part_aliases.ps|textureDir[|meshDir]" and SM2_VFX_OPEN=name
+  /// (meshDir defaults to a <c>mesh</c> folder next to textureDir).</summary>
   private async Task OpenLooseEffectFromEnvironmentAsync()
   {
     if (Environment.GetEnvironmentVariable("SM2_VFX_LOOSE") is not { Length: > 0 } loose || Environment.GetEnvironmentVariable("SM2_VFX_OPEN") is not { Length: > 0 } name) return;
@@ -96,8 +102,10 @@ public partial class MainWindow
       _vfxLibrary = new EffectLibrary(new DirectoryEffectSource(parts[0]));
       _vfxAliases = PartAliases.Load(parts[1]);
       _vfxTextures = EffectTextures.FromDirectory(parts[2]);
+      _vfxMeshes = EffectMeshes.FromDirectory(parts.Length > 3 ? parts[3] : Path.Combine(Path.GetDirectoryName(Path.GetFullPath(parts[2]).TrimEnd('/', '\\')) ?? ".", "mesh"), parts[2]);
     });
     _vfxTextures!.Loaded = () => Avalonia.Threading.Dispatcher.UIThread.Post(() => { if (_fx is not null) GpuView.ShowEffect(GpuView.Effect); });
+    _vfxMeshes.Loaded = _vfxTextures.Loaded;
     FolderText.Text = "loose: " + parts[0];
     if (!await ShowEffectAsync(name, ++_previewGeneration)) PreviewNote.Text = name + ": not an effect";
   }
@@ -108,9 +116,10 @@ public partial class MainWindow
     {
       if (_vfxLibrary!.Resolve(name) is not { } tree) return null;
       var def = EffectDefinition.Build(name, tree);
-      if (def.Emitters.Count == 0 && def.Lights.Count == 0) return null;
-      _vfxTextures!.Prefetch(def.Emitters.Select(e => e.Texture).Concat(def.Emitters.Select(e => e.AlphaMask)));
-      var instance = new EffectInstance(def, 1) { Root = EffectInstance.StandaloneRoot(def) };
+      if (def.Emitters.Count == 0 && def.Lights.Count == 0 && def.Trails.Count == 0) return null;
+      _vfxTextures!.Prefetch(def.Textures);
+      _vfxMeshes.Prefetch(def.Emitters.Select(e => e.Geom?.Template));
+      var instance = EffectInstance.Standalone(def, 1);
       var camera = EffectCamera.Fit(instance, Math.Min(def.Duration, 3f));
       return new VfxState { Definition = def, Instance = instance, Camera = camera };
     });
@@ -133,13 +142,13 @@ public partial class MainWindow
     var sprites = def.Emitters.Count(e => e.IsSprite && e.Target == DrawTarget.Color);
     var notes = new List<string>
     {
-      $"{name}: {def.Emitters.Count} emitters ({sprites} sprite), {def.Lights.Count} lights, {def.Duration:0.00}s{(def.Loops ? " (loops)" : "")}.",
+      $"{name}: {def.Emitters.Count} emitters ({sprites} sprite, {def.Emitters.Count(e => e.Geom is not null)} mesh), {def.Lights.Count} lights, {def.Trails.Count} trails, {def.Duration:0.00}s{(def.Loops ? " (loops)" : "")}.",
     };
-    var skipped = def.Emitters.Where(e => !e.IsSprite).Select(e => e.ParticleType)
+    var skipped = def.Emitters.Where(e => !e.IsSprite && e.Geom is null).Select(e => e.ParticleType)
       .Concat(def.Emitters.Where(e => e.IsSprite && e.Target != DrawTarget.Color).Select(e => e.Target.ToString().ToLowerInvariant()))
       .Concat(def.Unsupported.Select(u => u.Type)).GroupBy(t => t).Select(g => $"{g.Key} x{g.Count()}").ToList();
     if (skipped.Count > 0) notes.Add("Not drawn: " + string.Join(", ", skipped) + ".");
-    notes.Add("Standalone view on a ground grid; socketed emitters sit 1.2 m up, pointing +X. Drag to orbit, wheel to zoom, Space plays.");
+    notes.Add("Standalone view on a ground grid; socketed emitters sit 1.2 m up, pointing +X; effects with trails fly along +X at 40 m/s. Drag to orbit, wheel to zoom, Space plays.");
     PreviewNote.Text = string.Join(" ", notes);
     PreviewText.Text = "";
     PreviewText.IsVisible = false;
@@ -199,6 +208,8 @@ public partial class MainWindow
         Lights = fx.Instance.Lights().ToList(),
         Texture = _vfxTextures.Get,
         Ground = VfxGroundIsOn,
+        Meshes = EffectMeshParticles.Build(fx.Instance),
+        Mesh = _vfxMeshes.Get,
       };
       fx.Particles = fx.Instance.ParticleCount;
       fx.Quads = layer.Quads;

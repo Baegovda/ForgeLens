@@ -908,3 +908,49 @@ Perf on the box (llvmpipe, 512²):
   - genOnFly is approximated (a burst for explosion targets, a per-parent rate for flow targets).
 - Standalone sockets: a socketed effect is placed 1.2 m up, pointing +X. Attaching to a model bone is not wired up yet (`EffectInstance.Socket` hook exists).
 - Grenade smoke reads a bit dark/blue. Not compared side by side with the game: this needs in-game captures on the PC when it is free.
+
+## VFX 2: mesh particles + trails (2026-10-27, vfx2)
+Based on 00d32bd. Patches in `/workspace/patches/vfx2/`. Captures in `/workspace/browser_run_shots/vfx2/` (before: `../vfx/`).
+
+### What was added
+- **lwiGeom mesh particles.** `Effects/EffectMeshParticles.cs` parses the particle into `MeshParticleDef` (REA: lwiGeom @0x143644870, parser 0x141760a45..0x141762f4d).
+  - `nameGeomTpl` names the template. `typeInst` (enumeration/range/default) picks the sub-object: template parts grouped by node, in node order.
+  - `initRotAxises.random`. `applyRotationFromEmitter`.
+  - `sfxMtlOverrides`:
+    - color (constExpr / ageSpline / ageSplineNew). Raw values are **R,G,B,A**. Evidence: the flesh splash `[255,44,3,155]` is blood red, and read as A,R,G,B it turns blue.
+    - emissiveIntensity, colorTransparency.
+  - Each instance's world matrix = scale(size×emitScale) · rotation (+Z aligned to velocity if `isAlignSpeed`) · translation.
+- **Browser side** (`SM2Browser/Effects/EffectMeshes.cs`): an async cache of tpl→GPU meshes (TemplateMeshReader). The material is read from the texture `.td`:
+  - `preset "sfx"`: premultiplied translucent, with `tint [A,R,G,B]` and `clipping.level`.
+  - `shader_blood_splash` (solid_blood) and `game_material "flesh"` (flesh_material): the texture is only a placeholder, so they draw white × override colour. Flesh gets an assumed dark red; this is not REA-confirmed.
+  - Everything else: opaque and lit.
+- **Mesh shader** (`EffectRenderer` `_mesh`):
+  - Lighting: key light plus ambient, plus the effect's point lights.
+  - Emissive ×25 for sfx materials only.
+  - Override colours are sRGB.
+  - Hue-preserving tonemap, so saturated blood stays red instead of going orange.
+- **sfx_trail ribbons** (`Effects/EffectTrails.cs`; REA strings 0x143645e08.., save serializer 0x1417b1031; the runtime builder was **not** traced):
+  - One point per sim step at the parent, split by `maxSegLength`. Points die after `timeLifeSeg`; the length is clipped by `maxTrailLength`.
+  - Width and colour are sampled along the ribbon.
+  - Shapes: billboard/cylinder (camera-facing), tape, cross (2 planes), star (3 planes).
+  - The union `__type` decides the shape (saves keep stale members).
+  - Standalone preview flies the root along +X at 40 m/s.
+  - `lighting.isEnabled` trails use the same LitScale as sprites.
+- **Mesh sources:**
+  - Bench: env `SM2_VFX_MESHES` or a sibling `mesh/` folder (`tpl/<name>.tpl/`).
+  - UI loose mode: 4th field of `SM2_VFX_LOOSE`.
+  - Catalog mode: by basename.
+- **Tests:** `EffectGeomTrailTests` (3) cover lwiGeom parse + RGBA colour, mesh spawn/expiry and trail segmenting/expiry. The full suite passes (104).
+
+### Coverage
+| effect | before (vfx) | after (vfx2) |
+|---|---|---|
+| fx_bolter_muzzle_client | 12 sprite + light; 2 mesh not drawn | 12 sprite + 2 mesh + light |
+| part_mag_ee_bolter_flesh | 6/9 (3 mesh + 1 untyped not drawn) | 6 sprite + 3 mesh (gibs + blood splashes); 1 untyped `emitter?` left |
+| trail_bolter_tracer_autority / trail_stalker_bolter_tracer_client | not supported | drawn (star / billboard ribbons) |
+| trail_bolter_smoke | not supported | simulated (139 pts), but nearly invisible: additive, colour ≤177/255 × intensity 2 |
+
+### Known gaps / next
+- Blood-splash VAT animation (`splash_5_v2_anim_data*`, `combineMtlAnimControl.animStage`) is not implemented, so the static rest mesh is drawn.
+- Distortion pass, socket attach to the selected model in the UI, and the grenade smoke colour are not done.
+- `smoke_spray_01` does not exist in retail (only `_02`/`_03`). It is genuinely missing in the game data, not an extraction miss.

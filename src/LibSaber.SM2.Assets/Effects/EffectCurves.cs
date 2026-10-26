@@ -27,6 +27,12 @@ public sealed class Curve1
   public float StartTime => _t[0];
   public float EndTime => _t[^1];
   public float Max => _v.Max();
+  public Curve1 Scaled(float k)
+  {
+    var flat = new float[_t.Length * 2];
+    for (var i = 0; i < _t.Length; i++) { flat[i * 2] = _t[i]; flat[i * 2 + 1] = _v[i] * k; }
+    return new Curve1(flat);
+  }
 
   public float Evaluate(float t)
   {
@@ -97,6 +103,7 @@ public sealed record ScalarParam(Curve1 Curve, Vector2 Disp, bool Cycled = false
   public static ScalarParam Constant(float value) => new(new Curve1([0f, value]), Vector2.Zero);
   public static ScalarParam Range(float min, float max) => new(new Curve1([0f, 0f]), new Vector2(min, max));
   public bool IsConstant => Curve.Count == 1;
+  public ScalarParam Scaled(float k) => this with { Curve = Curve.Scaled(k), Disp = Disp * k };
   public float Sample(float t, float r) => Curve.Evaluate(Cycled && Curve.EndTime > 0 ? t % Curve.EndTime : t) + Disp.X + (Disp.Y - Disp.X) * r;
 }
 
@@ -195,6 +202,16 @@ public static class SslRead
     var kind = UnionKind(node);
     var body = kind is null ? node : node.Get(kind);
     if (body is JsonObject o && o["spline"] is { } sp) body = sp;
+    // ageSplineNew: [{type, offset, value:[A,R,G,B]}, ...].
+    if (body is JsonArray keys && keys.Count > 0 && keys[0] is JsonObject)
+    {
+      var flat = new List<float>();
+      foreach (var k in keys.OfType<JsonObject>())
+        if (Floats(k["value"]) is { Length: 4 } v)
+          flat.AddRange([Num(k["offset"]) ?? 0f, v[0], v[1], v[2], v[3]]);
+      return flat.Count >= 5 ? new ColorCurve(flat.ToArray()) : ColorCurve.White;
+    }
+
     var f = Floats(body);
     if (f.Length >= 5) return new ColorCurve(f);
     if (f.Length == 4) return new ColorCurve([0f, f[0], f[1], f[2], f[3]]);

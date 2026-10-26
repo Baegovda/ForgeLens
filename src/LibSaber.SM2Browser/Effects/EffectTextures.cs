@@ -96,6 +96,13 @@ internal readonly record struct EffectCamera(Vector3 Center, float Yaw, float Pi
           sizes.Add(e.Def.Size.Sample(Math.Clamp(p.Age / p.Life, 0, 1), 0.5f) * e.Def.Scale);
         }
       }
+
+      foreach (var t in instance.Trails)
+        foreach (var p in t.Points)
+        {
+          xs.Add(p.Position.X); ys.Add(p.Position.Y); zs.Add(p.Position.Z);
+          sizes.Add(t.Def.Width.Max * t.Def.Scale);
+        }
     }
 
     instance.Reset();

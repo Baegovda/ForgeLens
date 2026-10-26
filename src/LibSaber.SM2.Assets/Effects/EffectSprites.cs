@@ -66,6 +66,7 @@ public static class EffectSprites
       batches.Add(new SpriteBatch { Emitter = def, Frames = frames, Vertices = vertices, QuadCount = quads, Depth = depthSum / list.Count });
     }
 
+    batches.AddRange(EffectTrailSprites.Build(instance, eye, include));
     // Far to near between emitters; definition order breaks ties (emitters sharing a source).
     return batches.Select((b, i) => (b, i)).OrderByDescending(x => MathF.Round(x.b.Depth, 2)).ThenBy(x => x.i).Select(x => x.b).ToList();
   }

@@ -17,6 +17,10 @@ internal sealed class EffectLayer
   public bool Ground { get; init; } = true;
   public float GroundY { get; init; }
   public float Exposure { get; init; } = 1f / 250f;
+  /// <summary>Mesh particles (lwiGeom) and their templates by name (null while loading).</summary>
+  public List<MeshBatch> Meshes { get; init; } = [];
+  public Func<string, Effects.EffectMesh?> Mesh { get; init; } = _ => Effects.EffectMesh.Missing;
+  public int MeshInstances => Meshes.Sum(m => m.Instances.Count);
   /// <summary>Total sprite quads (stats).</summary>
   public int Quads => Batches.Sum(b => b.QuadCount);
 }
@@ -31,7 +35,8 @@ internal sealed class EffectLayer
 internal sealed unsafe class EffectRenderer : IDisposable
 {
   private readonly GL _gl;
-  private readonly uint _sprite, _ground;
+  private readonly uint _sprite, _ground, _mesh;
+  private readonly Dictionary<string, (uint Vao, uint Vbo, uint Ibo)?> _meshes = new(StringComparer.OrdinalIgnoreCase);
   private readonly uint _vao, _vbo, _ibo, _groundVao, _groundVbo;
   private readonly Dictionary<string, uint> _textures = new(StringComparer.OrdinalIgnoreCase);
   private uint _white;
@@ -42,6 +47,7 @@ internal sealed unsafe class EffectRenderer : IDisposable
     _gl = gl;
     _sprite = Link(header + SpriteVs, header + SpriteFs);
     _ground = Link(header + GroundVs, header + GroundFs);
+    _mesh = Link(header + MeshVs, header + MeshFs);
     _vao = gl.GenVertexArray();
     _vbo = gl.GenBuffer();
     _ibo = gl.GenBuffer();
@@ -97,6 +103,7 @@ internal sealed unsafe class EffectRenderer : IDisposable
     _gl.BindAttribLocation(program, 2, "aColor");
     _gl.BindAttribLocation(program, 3, "aParams");
     _gl.BindAttribLocation(program, 4, "aMask");
+    _gl.BindAttribLocation(program, 5, "aNormal");
     _gl.LinkProgram(program);
     _gl.GetProgram(program, ProgramPropertyARB.LinkStatus, out var linked);
     if (linked == 0)
@@ -174,6 +181,9 @@ internal sealed unsafe class EffectRenderer : IDisposable
       _gl.DrawArrays(PrimitiveType.Triangles, 0, 6);
     }
 
+    DrawMeshes(layer, vp, eye, lights, translucent: false);
+    DrawMeshes(layer, vp, eye, lights, translucent: true);
+
     var quads = layer.Batches.Count == 0 ? 0 : layer.Batches.Max(b => b.QuadCount);
     if (quads > _iboQuads)
     {
@@ -240,8 +250,101 @@ internal sealed unsafe class EffectRenderer : IDisposable
     LastMs = watch.Elapsed.TotalMilliseconds;
   }
 
+  private (uint Vao, uint Vbo, uint Ibo)? MeshBuffers(Effects.EffectMesh mesh)
+  {
+    if (_meshes.TryGetValue(mesh.Name, out var cached)) return cached;
+    if (mesh.IsMissing) return _meshes[mesh.Name] = null;
+    var vao = _gl.GenVertexArray();
+    var vbo = _gl.GenBuffer();
+    var ibo = _gl.GenBuffer();
+    _gl.BindVertexArray(vao);
+    _gl.BindBuffer(BufferTargetARB.ArrayBuffer, vbo);
+    _gl.BufferData<float>(BufferTargetARB.ArrayBuffer, mesh.Vertices, BufferUsageARB.StaticDraw);
+    _gl.EnableVertexAttribArray(0);
+    _gl.VertexAttribPointer(0, 3, VertexAttribPointerType.Float, false, 32, (void*)0);
+    _gl.EnableVertexAttribArray(5);
+    _gl.VertexAttribPointer(5, 3, VertexAttribPointerType.Float, false, 32, (void*)12);
+    _gl.EnableVertexAttribArray(1);
+    _gl.VertexAttribPointer(1, 2, VertexAttribPointerType.Float, false, 32, (void*)24);
+    _gl.BindBuffer(BufferTargetARB.ElementArrayBuffer, ibo);
+    _gl.BufferData<uint>(BufferTargetARB.ElementArrayBuffer, mesh.Indices, BufferUsageARB.StaticDraw);
+    _gl.BindVertexArray(0);
+    return _meshes[mesh.Name] = (vao, vbo, ibo);
+  }
+
+  /// <summary>
+  ///   Mesh particles: each instance draws its template sub-object (<c>typeInst</c>) with the template's material.
+  ///   Opaque materials write depth and are lit by a key light plus the effect's lights; <c>preset "sfx"</c>
+  ///   materials blend premultiplied with their tint. <c>sfxMtlOverrides</c> colour/transparency multiply, and
+  ///   <c>emissiveIntensity</c> adds HDR glow through the same exposure as sprites.
+  /// </summary>
+  private void DrawMeshes(EffectLayer layer, Matrix4x4 vp, Vector3 eye, LightSample[] lights, bool translucent)
+  {
+    if (layer.Meshes.Count == 0) return;
+    _gl.UseProgram(_mesh);
+    SetMatrix(_mesh, "uVP", vp);
+    _gl.Uniform1(_gl.GetUniformLocation(_mesh, "uTex"), 0);
+    _gl.Uniform1(_gl.GetUniformLocation(_mesh, "uExposure"), layer.Exposure);
+    _gl.Uniform3(_gl.GetUniformLocation(_mesh, "uEye"), eye.X, eye.Y, eye.Z);
+    _gl.Uniform1(_gl.GetUniformLocation(_mesh, "uLightCount"), lights.Length);
+    for (var i = 0; i < lights.Length; i++)
+    {
+      var l = lights[i];
+      _gl.Uniform4(_gl.GetUniformLocation(_mesh, $"uLightPos[{i}]"), l.Position.X, l.Position.Y, l.Position.Z, Math.Max(0.01f, l.Radius));
+      _gl.Uniform3(_gl.GetUniformLocation(_mesh, $"uLightColor[{i}]"), l.Color.X * l.Intensity, l.Color.Y * l.Intensity, l.Color.Z * l.Intensity);
+    }
+
+    var model = _gl.GetUniformLocation(_mesh, "uModel");
+    var color = _gl.GetUniformLocation(_mesh, "uColor");
+    var emissive = _gl.GetUniformLocation(_mesh, "uEmissive");
+    var clip = _gl.GetUniformLocation(_mesh, "uClip");
+    var mode = _gl.GetUniformLocation(_mesh, "uTranslucent");
+    _gl.Enable(EnableCap.DepthTest);
+    _gl.DepthMask(!translucent);
+    if (translucent)
+    {
+      _gl.Enable(EnableCap.Blend);
+      _gl.BlendFuncSeparate(BlendingFactor.One, BlendingFactor.OneMinusSrcAlpha, BlendingFactor.One, BlendingFactor.OneMinusSrcAlpha);
+    }
+    else _gl.Disable(EnableCap.Blend);
+
+    _gl.Uniform1(mode, translucent ? 1 : 0);
+    _gl.ActiveTexture(TextureUnit.Texture0);
+    foreach (var batch in layer.Meshes)
+    {
+      var mesh = layer.Mesh(batch.Geom.Template);
+      if (mesh is null) { Pending = true; continue; }
+      if (MeshBuffers(mesh) is not { } buffers || mesh.Variants.Count == 0) continue;
+      _gl.BindVertexArray(buffers.Vao);
+      foreach (var inst in batch.Instances)
+      {
+        var parts = mesh.Variants[Math.Clamp(inst.Variant, 0, mesh.Variants.Count - 1)];
+        var m = inst.World;
+        _gl.UniformMatrix4(model, 1, false, (float*)&m);
+        foreach (var (start, count, material) in parts)
+        {
+          if (material.Translucent != translucent) continue;
+          var tex = Texture(layer, material.Texture);
+          if (tex == 0) continue;
+          _gl.BindTexture(TextureTarget.Texture2D, tex);
+          var c = inst.Color * material.Tint;
+          _gl.Uniform4(color, c.X, c.Y, c.Z, c.W);
+          _gl.Uniform1(emissive, inst.Emissive);
+          _gl.Uniform1(clip, material.Clip);
+          _gl.DrawElements(PrimitiveType.Triangles, (uint)count, DrawElementsType.UnsignedInt, (void*)(start * 4));
+        }
+      }
+    }
+
+    _gl.BindVertexArray(0);
+    _gl.DepthMask(true);
+  }
+
   public void Dispose()
   {
+    foreach (var b in _meshes.Values)
+      if (b is { } x) { _gl.DeleteVertexArray(x.Vao); _gl.DeleteBuffer(x.Vbo); _gl.DeleteBuffer(x.Ibo); }
+    _gl.DeleteProgram(_mesh);
     foreach (var id in _textures.Values.Distinct())
       if (id != _white) _gl.DeleteTexture(id);
     _gl.DeleteTexture(_white);
@@ -306,6 +409,67 @@ internal sealed unsafe class EffectRenderer : IDisposable
       if (uMode == 1) outColor = vec4(c * alpha, 0.0);          // add
       else if (uMode == 2) outColor = vec4(c * a, alpha);        // blend_add
       else outColor = vec4(c * alpha, alpha);                    // blend
+    }
+    """;
+
+  private const string MeshVs = """
+    in vec3 aPos;
+    in vec3 aNormal;
+    in vec2 aTex;
+    uniform mat4 uVP;
+    uniform mat4 uModel;
+    out vec3 vWorld;
+    out vec3 vNormal;
+    out vec2 vUv;
+    void main()
+    {
+      vec4 w = uModel * vec4(aPos, 1.0);
+      vWorld = w.xyz;
+      vNormal = mat3(uModel) * aNormal;
+      vUv = aTex;
+      gl_Position = uVP * w;
+    }
+    """;
+
+  private const string MeshFs = """
+    in vec3 vWorld;
+    in vec3 vNormal;
+    in vec2 vUv;
+    uniform sampler2D uTex;
+    uniform vec4 uColor;
+    uniform float uEmissive;
+    uniform float uClip;
+    uniform int uTranslucent;
+    uniform float uExposure;
+    uniform vec3 uEye;
+    uniform int uLightCount;
+    uniform vec4 uLightPos[8];
+    uniform vec3 uLightColor[8];
+    out vec4 outColor;
+    vec3 toGamma(vec3 c) { return mix(c * 12.92, 1.055 * pow(c, vec3(1.0 / 2.4)) - 0.055, step(0.0031308, c)); }
+    void main()
+    {
+      vec4 t = texture(uTex, vUv);
+      float a = uColor.a * (uTranslucent == 1 ? t.a : 1.0);
+      if (uTranslucent == 1 && uClip > 0.0) a *= clamp((t.a - uClip) / max(1e-3, 1.0 - uClip), 0.0, 1.0);
+      vec3 n = normalize(gl_FrontFacing ? vNormal : -vNormal);
+      vec3 base = t.rgb * pow(uColor.rgb, vec3(2.2)); // override colours are sRGB
+      // Scene light in sprite HDR units (key + sky ~ EffectSprites.LitScale) plus the effect's point lights.
+      vec3 light = vec3(200.0) * (0.35 + 0.65 * max(dot(n, normalize(vec3(0.4, 0.8, 0.3))), 0.0));
+      for (int i = 0; i < uLightCount; i++)
+      {
+        vec3 d = uLightPos[i].xyz - vWorld;
+        float r = uLightPos[i].w;
+        float fall = clamp(1.0 - dot(d, d) / (r * r), 0.0, 1.0);
+        light += uLightColor[i] * fall * fall * max(dot(n, normalize(d)), 0.0);
+      }
+      // emissive glow only for sfx (translucent) materials; lit combine_material shaders (blood splash) stay surface-lit
+      vec3 hdr = base * light + base * uEmissive * (uTranslucent == 1 ? 25.0 : 0.0);
+      // Hue-preserving tonemap: per-channel 1-exp() turns saturated surfaces (blood red) orange/white under the key light.
+      float lum = max(dot(hdr, vec3(0.2126, 0.7152, 0.0722)) * uExposure, 1e-5);
+      vec3 c = toGamma(min(hdr * uExposure * ((1.0 - exp(-lum)) / lum), vec3(1.0)));
+      if (uTranslucent == 1) outColor = vec4(c * a, a);
+      else outColor = vec4(c, 1.0);
     }
     """;
 

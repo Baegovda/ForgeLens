@@ -46,6 +46,9 @@ public struct Particle
   public float FrameStart, FrameRate;
   public bool Flip;
   public int Order;
+  /// <summary>Mesh particles: template sub-object and initial orientation.</summary>
+  public int Variant;
+  public Quaternion Orientation;
 }
 
 public sealed class EmitterState(EmitterDef def, int index)
@@ -96,6 +99,11 @@ public sealed class EffectInstance
   /// <summary>Height of the collision ground plane for <c>physics.cdt</c> (null = no ground).</summary>
   public float? Ground { get; set; } = 0f;
   public IReadOnlyList<EmitterState> Emitters => _emitters;
+  /// <summary>Optional moving placement (e.g. a projectile path for trails); overrides <see cref="Root"/> per step.</summary>
+  public Func<float, Matrix4x4>? RootMotion { get; set; }
+  public IReadOnlyList<TrailState> Trails => _trails;
+  private readonly List<TrailState> _trails = [];
+  private Matrix4x4 CurrentRoot => RootMotion?.Invoke(Time) ?? Root;
   public int ParticleCount => _emitters.Sum(e => e.Particles.Count);
 
   /// <summary>
@@ -106,12 +114,39 @@ public sealed class EffectInstance
   public static Matrix4x4 StandaloneRoot(EffectDefinition def)
   {
     static bool Socket(string n) => n.Length > 0 && !n.Equals("sfx_source_pt", StringComparison.OrdinalIgnoreCase);
-    var socketed = def.Emitters.Any(e => Socket(e.NameParent) && !e.IsAttachedChild) || def.Lights.Any(l => Socket(l.NameParent));
+    var socketed = def.Emitters.Any(e => Socket(e.NameParent) && !e.IsAttachedChild) || def.Lights.Any(l => Socket(l.NameParent)) || def.Trails.Any(t => Socket(t.NameParent));
     return socketed ? Matrix4x4.CreateRotationZ(-MathF.PI / 2f) * Matrix4x4.CreateTranslation(0, 1.2f, 0) : Matrix4x4.Identity;
+  }
+
+  /// <summary>
+  ///   Preview motion for effects with trails and no host: the root flies along its own +Y (world +X after
+  ///   <see cref="StandaloneRoot"/>) at <paramref name="speed"/> m/s over [-span, span], restarting at the far end.
+  /// </summary>
+  public static Func<float, Matrix4x4>? StandaloneMotion(EffectDefinition def, Matrix4x4 root, float speed = 40f, float span = 5f)
+  {
+    if (def.Trails.Count == 0) return null;
+    var axis = Vector3.TransformNormal(Vector3.UnitY, root);
+    if (axis.LengthSquared() < 1e-8f) axis = Vector3.UnitX;
+    axis = Vector3.Normalize(axis);
+    var period = 2f * span / speed + 0.15f;
+    return t =>
+    {
+      var x = Math.Min(-span + (t % period) * speed, span);
+      return root * Matrix4x4.CreateTranslation(axis * x);
+    };
+  }
+
+  /// <summary>An instance placed for previewing without a host (<see cref="StandaloneRoot"/> plus <see cref="StandaloneMotion"/>).</summary>
+  public static EffectInstance Standalone(EffectDefinition def, ulong seed = 1, float trailSpeed = 40f)
+  {
+    var root = StandaloneRoot(def);
+    return new EffectInstance(def, seed) { Root = root, RootMotion = StandaloneMotion(def, root, trailSpeed) };
   }
 
   public void Reset()
   {
+    _trails.Clear();
+    foreach (var t in Definition.Trails) _trails.Add(new TrailState(t));
     _emitters.Clear();
     Time = 0;
     StepCount = 0;
@@ -143,14 +178,37 @@ public sealed class EffectInstance
   {
     foreach (var e in _emitters)
       StepEmitter(e, Step * e.Def.TimeScale, prewarm: false);
+    foreach (var t in _trails)
+      StepTrail(t, Step);
     StepCount++;
     Time = StepCount * Step;
   }
 
   private Matrix4x4 EmitterWorld(EmitterDef def)
   {
-    var parent = def.NameParent.Length > 0 && Socket?.Invoke(def.NameParent, Time) is { } socket ? socket : Root;
+    var parent = def.NameParent.Length > 0 && Socket?.Invoke(def.NameParent, Time) is { } socket ? socket : CurrentRoot;
     return def.Transform * parent;
+  }
+
+  /// <summary>One point per step at the parent (long jumps split by <c>maxSegLength</c>); points die after
+  /// <c>timeLifeSeg</c>. A jump over 10 m (preview restart, teleport) starts a new trail.</summary>
+  private void StepTrail(TrailState t, float dt)
+  {
+    var def = t.Def;
+    var parent = def.NameParent.Length > 0 && Socket?.Invoke(def.NameParent, Time) is { } socket ? socket : CurrentRoot;
+    var pos = (def.Transform * parent).Translation;
+    t.Time += dt;
+    for (var i = 0; i < t.Points.Count; i++) { var p = t.Points[i]; p.Age += dt; t.Points[i] = p; }
+    t.Points.RemoveAll(p => p.Age > def.TimeLifeSeg);
+    if (t.Started && Vector3.Distance(t.Head, pos) > 10f) t.Points.Clear();
+    var last = t.Points.Count > 0 ? t.Points[^1].Position : t.Started ? t.Head : pos;
+    var d = Vector3.Distance(last, pos);
+    var seg = def.MaxSegLength * def.Scale;
+    var splits = d > seg ? Math.Min(64, (int)MathF.Ceiling(d / seg)) : 1;
+    for (var k = 1; k <= splits; k++)
+      t.Points.Add(new TrailPoint { Position = Vector3.Lerp(last, pos, k / (float)splits), Age = dt * (1f - k / (float)splits) });
+    t.Head = pos;
+    t.Started = true;
   }
 
   private void StepEmitter(EmitterState e, float dt, bool prewarm)
@@ -312,7 +370,20 @@ public sealed class EffectInstance
       Flip = def.RandomFlip && r.Float() < 0.5f,
       MaskAngle = def.AlphaMask is null ? 0f : r.Range(def.AlphaMaskRotation) * MathF.PI / 180f,
       Order = _order++,
+      Orientation = Quaternion.Identity,
     };
+    if (def.Geom is { } geom)
+    {
+      // Drawn only for mesh emitters, so sprite emitters keep their random sequence.
+      p.Variant = geom.InstanceMin + (int)MathF.Floor(r.Float() * (geom.InstanceMax - geom.InstanceMin + 1));
+      var a = geom.RandomAxes;
+      var q = Quaternion.Identity;
+      if (a.X > 0) q *= Quaternion.CreateFromAxisAngle(Vector3.UnitX, r.Float() * MathF.Tau);
+      if (a.Y > 0) q *= Quaternion.CreateFromAxisAngle(Vector3.UnitY, r.Float() * MathF.Tau);
+      if (a.Z > 0) q *= Quaternion.CreateFromAxisAngle(Vector3.UnitZ, r.Float() * MathF.Tau);
+      p.Orientation = q;
+    }
+
     e.Spawned++;
     return p;
   }
@@ -344,7 +415,7 @@ public sealed class EffectInstance
     {
       if (Time > light.Duration) continue;
       var n = Math.Clamp(Time / light.Duration, 0f, 1f);
-      var parent = light.NameParent.Length > 0 && Socket?.Invoke(light.NameParent, Time) is { } socket ? socket : Root;
+      var parent = light.NameParent.Length > 0 && Socket?.Invoke(light.NameParent, Time) is { } socket ? socket : CurrentRoot;
       var world = light.Transform * parent;
       var c = light.Color.Evaluate(n);
       yield return new LightSample(light, world.Translation, new Vector3(c.X, c.Y, c.Z), light.Radius.Evaluate(n), light.Intensity.Evaluate(n));

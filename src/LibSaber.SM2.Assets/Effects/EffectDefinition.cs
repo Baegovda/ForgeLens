@@ -43,6 +43,8 @@ public sealed class EmitterDef
   /// <summary><c>typeParams</c> union member: <c>default</c> (sprites), <c>lwiGeom</c> (mesh particles), ...</summary>
   public string ParticleType { get; init; } = "default";
   public bool IsSprite => ParticleType == "default";
+  /// <summary>Mesh particles (<c>typeParams.lwiGeom</c>).</summary>
+  public MeshParticleDef? Geom { get; init; }
   public bool Visible { get; init; } = true;
   public string NameParent { get; init; } = "";
   public Matrix4x4 Transform { get; init; } = Matrix4x4.Identity;
@@ -137,9 +139,13 @@ public sealed class EffectDefinition
   public required string Name { get; init; }
   public List<EmitterDef> Emitters { get; } = [];
   public List<LightDef> Lights { get; } = [];
+  public List<TrailDef> Trails { get; } = [];
+  /// <summary>Every drawable render state: sprite emitters and trail ribbons.</summary>
+  public IEnumerable<EmitterDef> Drawables => Emitters.Where(e => e.IsSprite).Concat(Trails.Select(t => t.Render));
+  public IEnumerable<string?> Textures => Emitters.Select(e => e.Texture).Concat(Emitters.Select(e => e.AlphaMask)).Concat(Trails.Select(t => t.Render.Texture));
   /// <summary>Nodes kept out of the simulation (trails, mesh particles, ...): path and type.</summary>
   public List<(string Path, string Type)> Unsupported { get; } = [];
-  public bool Loops => Emitters.Any(e => e.Emission != EmissionKind.Explosion && e.EmitDuration <= 0);
+  public bool Loops => Trails.Count > 0 || Emitters.Any(e => e.Emission != EmissionKind.Explosion && e.EmitDuration <= 0);
 
   /// <summary>Seconds until the last particle of a non-looping effect dies (or a preview window for loops).</summary>
   public float Duration
@@ -161,6 +167,7 @@ public sealed class EffectDefinition
 
       foreach (var l in Lights)
         d = Math.Max(d, l.Duration);
+      if (Trails.Count > 0) d = Math.Max(d, 2f);
       return Math.Min(d, 30f);
     }
   }
@@ -238,6 +245,9 @@ public sealed class EffectDefinition
         });
         break;
       }
+      case "sfx_trail":
+        def.Trails.Add(TrailDef.Parse(node, path, world, nameParent, scale * node.Float("scale", 1f)));
+        break;
       default:
         def.Unsupported.Add((path, type.Length > 0 ? type : "?"));
         break;
@@ -324,6 +334,7 @@ public sealed class EffectDefinition
       Path = path,
       IsGpu = gpu,
       ParticleType = particleType,
+      Geom = particleType == "lwiGeom" ? MeshParticleDef.Parse(tp) : null,
       Visible = e.Bool("isVisible", true),
       NameParent = e.Str("nameParent") is { Length: > 0 } np ? np : parentName,
       Transform = local * parent,

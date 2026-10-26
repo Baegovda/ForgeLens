@@ -35,6 +35,7 @@ internal static class VfxBench
     var library = new EffectLibrary(new DirectoryEffectSource(args[1]));
     var aliases = PartAliases.Load(args[2]);
     var textures = EffectTextures.FromDirectory(args[3]);
+    var meshes = EffectMeshes.FromDirectory(Environment.GetEnvironmentVariable("SM2_VFX_MESHES") is { Length: > 0 } md ? md : Path.Combine(Path.GetDirectoryName(Path.GetFullPath(args[3]).TrimEnd('/')) ?? ".", "mesh"), args[3]);
     var output = args[4];
     var names = args.Skip(5).ToList();
     Directory.CreateDirectory(output);
@@ -69,12 +70,17 @@ internal static class VfxBench
 
         var def = EffectDefinition.Build(name, tree);
         var seconds = parts.Length > 1 ? float.Parse(parts[1], CultureInfo.InvariantCulture) : Math.Min(def.Duration, 3f);
-        textures.Prefetch(def.Emitters.Select(e => e.Texture).Concat(def.Emitters.Select(e => e.AlphaMask)));
+        textures.Prefetch(def.Textures);
+        meshes.Prefetch(def.Emitters.Select(e => e.Geom?.Template));
+        meshes.WaitAll(TimeSpan.FromMinutes(2));
+        textures.Prefetch(def.Emitters.Where(e => e.Geom is not null).SelectMany(e => meshes.Get(e.Geom!.Template)?.Variants.SelectMany(v => v.Select(x => x.Material.Texture)) ?? []));
         textures.WaitAll(TimeSpan.FromMinutes(2));
-        var missing = def.Emitters.Where(e => e.IsSprite && e.Texture is { Length: > 0 } t && textures.IsMissing(t)).Select(e => e.Texture).Distinct().ToList();
+        var missingMeshes = def.Emitters.Where(e => e.Geom is not null && meshes.Get(e.Geom.Template) is { IsMissing: true }).Select(e => e.Geom!.Template).Distinct().ToList();
+        var missing = def.Drawables.Where(e => e.Texture is { Length: > 0 } t && textures.IsMissing(t)).Select(e => e.Texture).Distinct().ToList();
         var sprites = def.Emitters.Count(e => e.IsSprite);
-        Line($"{name}: emitters {def.Emitters.Count} (sprite {sprites}, mesh {def.Emitters.Count - sprites}) lights {def.Lights.Count} other {def.Unsupported.Count} [{string.Join(", ", def.Unsupported.Select(u => u.Type).Distinct())}] duration {def.Duration:0.00}s capture {seconds:0.00}s missing textures [{string.Join(", ", missing)}]");
-        var instance = new EffectInstance(def, 1) { Root = EffectInstance.StandaloneRoot(def) };
+        var meshCount = def.Emitters.Count(e => e.Geom is not null);
+        Line($"{name}: emitters {def.Emitters.Count} (sprite {sprites}, mesh {meshCount}, other {def.Emitters.Count - sprites - meshCount}) lights {def.Lights.Count} trails {def.Trails.Count} other {def.Unsupported.Count} [{string.Join(", ", def.Unsupported.Select(u => u.Type).Distinct())}] duration {def.Duration:0.00}s capture {seconds:0.00}s missing textures [{string.Join(", ", missing)}] missing meshes [{string.Join(", ", missingMeshes)}]");
+        var instance = EffectInstance.Standalone(def, 1);
         var camera = EffectCamera.Fit(instance, seconds);
         if (parts.Length > 2 && float.TryParse(parts[2], CultureInfo.InvariantCulture, out var distance))
           camera = camera with { Distance = distance };
@@ -98,6 +104,8 @@ internal static class VfxBench
             Batches = EffectSprites.Build(instance, aliases, view, Filter),
             Lights = instance.Lights().ToList(),
             Texture = textures.Get,
+            Meshes = EffectMeshParticles.Build(instance),
+            Mesh = meshes.Get,
           };
           buildMs.Add(w.Elapsed.TotalMilliseconds);
           fingerprint.Append(Hash(layer)).Append(';');
@@ -112,13 +120,13 @@ internal static class VfxBench
             Buffer.BlockCopy(pixels, y * Size * 4, sheet, ((oy + y) * Cols * Size + ox) * 4, Size * 4);
           if (Environment.GetEnvironmentVariable("SM2_VFX_FRAMES") == "1")
             PreviewBench.Png(Path.Combine(output, $"{name}_f{f}_{t:0.000}s.png"), pixels, Size, Size);
-          Line($"  t={t:0.000}s particles {instance.ParticleCount} quads {layer.Quads} batches {layer.Batches.Count} lights {layer.Lights.Count}");
+          Line($"  t={t:0.000}s particles {instance.ParticleCount} quads {layer.Quads} meshes {layer.MeshInstances} batches {layer.Batches.Count} lights {layer.Lights.Count}");
         }
 
         PreviewBench.Png(Path.Combine(output, name + "_sheet.png"), sheet, Cols * Size, Rows * Size);
         // Determinism: replay from zero with the same seed (scrub backwards) and compare every frame's quads.
         var replay = new StringBuilder();
-        var again = new EffectInstance(def, 1) { Root = EffectInstance.StandaloneRoot(def) };
+        var again = EffectInstance.Standalone(def, 1);
         for (var f = frames - 1; f >= 0; f--)
           again.Seek(seconds * (f + 0.5f) / frames);
         for (var f = 0; f < frames; f++)
@@ -128,7 +136,7 @@ internal static class VfxBench
         }
 
         var sw = Stopwatch.StartNew();
-        var full = new EffectInstance(def, 1) { Root = EffectInstance.StandaloneRoot(def) };
+        var full = EffectInstance.Standalone(def, 1);
         full.Seek(seconds);
         var stepMs = sw.Elapsed.TotalMilliseconds / Math.Max(1, full.StepCount);
         Line($"  peak particles {peak}; sim {stepMs:0.000} ms/step (60 Hz); sprite build mean {buildMs.Average():0.00} ms; GPU draw+finish mean {gpuMs.Average():0.00} ms max {gpuMs.Max():0.00} ms; deterministic {(fingerprint.ToString() == replay.ToString() ? "yes" : "NO")}");
