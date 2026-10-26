@@ -1,5 +1,7 @@
 # LibSaber
 
+> Agents / contributors continuing the Space Marine 2 work: start with [`AGENTS.md`](AGENTS.md) and [`docs/handoff/`](docs/handoff/).
+
 A work-in-progress library for parsing game files used by Saber Interactive's Saber3D engine.
 
 [![wakatime](https://wakatime.com/badge/github/Wildenhaus/LibSaber.svg)](https://wakatime.com/badge/github/Wildenhaus/LibSaber)

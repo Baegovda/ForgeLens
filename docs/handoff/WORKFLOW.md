@@ -1,0 +1,145 @@
+# WORKFLOW — how the work is done
+
+## 1. Where things run
+| Kind of work | Runs on | How |
+|---|---|---|
+| Code, parsing, analysis, Ghidra/rizin RE, unit tests, headless browser captures, reports | **Bot's Linux box** (persistent, shared by the user's agents) | `Shell` without machineId |
+| Anything needing the full game install, the real exe GUI, Unreal Editor, in-game captures | **User's Windows PC "Revaptor-FX"** | `ListMachines` → machine id (`d3fb99ad-25ca-45c1-81af-41e5ca09104a` at time of writing), then `Shell`/`Read` with that machineId (PowerShell) |
+| Pushing to GitHub | **Cursor cloud agent** | format-patch → cloud agent `git am -3`, build, test, fast-forward push (§4) |
+- The box is cheaper per step (fewer round trips): do analysis and rendering there. Only exe/UE/game-data steps go to the PC.
+- Move files between them with `CopyToBox` (PC → `/workspace/...`) and `CopyFromBox` (box → PC). Check the size after copying; a copy once delivered a stale file.
+
+### Before any PC step: is the user gaming?
+```powershell
+(Get-Process | ? MainWindowTitle | Select -Expand ProcessName) -join ','   # look for a game (e.g. AgainstTheStorm), not just UnrealEditor
+```
+If a game is running, do only light read-only steps on the PC. Start PC processes hidden and at idle priority so they never take focus:
+```powershell
+$p = Start-Process -FilePath $exe -ArgumentList $a -WindowStyle Hidden -PassThru; $p.PriorityClass = 'Idle'; $p.WaitForExit()
+```
+
+## 2. Paths
+### PC (verified 2026-10-27 by read-only listing)
+- Home `C:\Users\Revaptor_FX`
+  - `uemcp_call.py`: the UEMCP client.
+  - `ls_push\`: clone used by the old bundle push.
+  - `SM2Extractor*`, `SM2Browser_v2..v4`, `SM2Browser_e6cadfa`: older installed builds (`.bakN` kept).
+- Work folder `C:\Users\Revaptor_FX\Desktop\SM2_Work\`:
+  - `Scripts\`: PC copies of `tools/ue/*.py` (+ `.bakN`), `uerun.ps1`, `bulk\`, `legacy\`, `ue_verify\`, `sanival*`.
+  - `Exports\<set>\<asset>\`: CLI exports, e.g. `bulk`, `bulk_fix`, `physics`, `mat3_*`, `step3_*`, `retarget`, `anim_finish`. Logs sit beside them.
+  - `Captures\<stage>\`: UE captures, e.g. `bulk`, `bulk_re`, `ue_verify`, `Mat`, `Step3`, `v4_gpubench`. Also `Captures2`.
+  - `Bin\`: CLI builds `SM2Extractor7..10`, **`SM2Extractor_e4ceb7d`** (current), `SM2Extractor_uev`.
+  - `Raw\`: extracted game files used for RE/bench, e.g. `Raw\vfx\texN`, `sani_all`.
+  - `Backup\`: content backups `*.bakN`.
+  - Also `Anim\`, `Tools\rootprobe.exe`.
+- Game: `D:\Steam\steamapps\common\Space Marine 2\client_pc`. Some D: reads are refused; copy to `C:\Users\Revaptor_FX\` first.
+- Unreal 5.7.4 project: `K:\Unreal Projects\UE_VFX_57`.
+  - Log: `Saved\Logs\UE_VFX_57.log`. Crash reports: `Saved\Crashes\`.
+  - Content `/Game/SM2_Work/{Animations, Characters, Materials, Original (read-only), Props, Tests/<stage>}`.
+  - Tests folders now: `anim_finish(2)`, `anim_survey`, `bulk`, `bulk_fix`, `mat2_hair`, `physics`, `pre_step3`, `retarget`, `rhino_stacked`, `sani_before`, `step3_ab_off`, `v4`.
+- Tools on the PC: Python 3.10 (`pip install uemcp mcp`), git, gh (logged in as the repo owner).
+- No Ghidra project on the PC; RE happens on the box.
+
+### Box
+- Repo: `/workspace/LibSaber`, with worktrees `/workspace/LibSaber-*` (one per worker; **never share a worktree with another running worker**). Make your own: `git worktree add -b <name> /workspace/LibSaber-<name> origin/cursor/sm2-pck-extractor-4420`.
+- Patches: `/workspace/patches/<stage>/000N-*.patch`.
+- RE:
+  - exe `/workspace/rea/sm2_retail.exe` (81 MB);
+  - Ghidra project `/workspace/rea/ghidra_proj2` (program `sm2`);
+  - decompiles `/workspace/rea/dec*/<addr>.c` (`dec_phys*`, `dec_cust`, `dec_deg`, `dec_tint`, `dec_sani`, ...);
+  - Ghidra `/home/box/ghidra`, JDK `/home/box/tools/jdk25`, rizin `~/.local/bin/rizin`.
+- .NET 8 SDK: `/home/box/tools/dotnet` (8.0.427).
+- Raw game data pulled from the PC: `/workspace/vfx_raw`, `/workspace/vfx3_raw` (`ssl`, `td`, `tpl`, `pct`), `/workspace/phys_raw`.
+- Outputs:
+  - captures `/workspace/browser_run_shots/<stage>/`;
+  - bulk report `/workspace/bulk/REPORT.md`;
+  - UE verify sheets `/workspace/ue_verify/`.
+- If the box is new or empty: clone the repo, install .NET 8 + Ghidra, and copy `sm2_retail.exe` from the game folder via the PC (`CopyToBox`). Re-run Ghidra analysis (slow; it once ran out of memory, so give it a big heap).
+
+## 3. Build and test (box)
+```bash
+export DOTNET_ROOT=/home/box/tools/dotnet PATH=/home/box/tools/dotnet:$PATH
+cd /workspace/LibSaber-<yours>
+dotnet build-server shutdown            # avoid MSB3883 / locked shared compiler server
+dotnet build LibSaber.sln -c Release -m:1
+dotnet test test/LibSaber.SM2.Assets.Tests      -c Release -m:1
+dotnet test test/LibSaber.SM2Extractor.Tests    -c Release -m:1
+dotnet test test/LibSaber.Tests                 -c Release -m:1
+# HaloCEA tests: out of scope (they fail).
+```
+- Build serially (`-m:1`). Several workers share the box, and parallel builds hit MSB3883 (file in use).
+- Windows builds for the PC, self-contained single-file:
+  ```bash
+  dotnet publish src/LibSaber.SM2Extractor -c Release -p:PublishProfile=win-x64 -o /workspace/<out_cli>
+  dotnet publish src/LibSaber.SM2Browser   -c Release -p:PublishProfile=win-x64 -o /workspace/<out_browser>
+  ```
+  Zip with Python, `CopyFromBox` to `C:\Users\Revaptor_FX\`, and `Expand-Archive` into a **new** folder (`Desktop\SM2_Work\Bin\SM2Extractor_<sha>`). Never overwrite an older build; keep it, or rename it `.bakN`.
+- CLI export (PC):
+  ```
+  LibSaber.SM2Extractor.exe export "D:\Steam\steamapps\common\Space Marine 2\client_pc" --asset tpl/<n>.tpl --format fbx-unreal --output <dir> [--anim tpl/<n>.tpl/animations/<clip>.sani | "glob*"] [--anim-only] [--variant default|all|...] [--tex-formats png] [--no-physics] [--no-root-motion]
+  ```
+- Pull a few game files to the box for RE/bench: on the PC, run `extract "<client_pc>" --output <Raw\...> -q --filter <glob>...` (hidden, idle priority), `Compress-Archive`, then `CopyToBox`. Example: `/workspace/vfx_raw/extract_tex6.ps1`.
+
+## 4. Pushing to PR #1 (cloud agent)
+The box has no GitHub write login. Pushes go through a Cursor cloud agent with repo access (the user enabled cloud agents and granted GitHub access to Baegovda/LibSaber).
+1. On the box, commit on top of the **latest remote tip** (`git fetch` first). Identity: `-c user.name="Cursor Agent" -c user.email=cursoragent@cursor.com`.
+2. `git format-patch origin/cursor/sm2-pck-extractor-4420..HEAD -o /workspace/patches/<stage>/`
+3. Send a follow-up to the cloud agent (CloudAgent reply, mode **queue**). At time of writing that agent is `bc-abf903a2-7eaf-532a-9a9c-bd757453bf47`. If it's gone, launch a new one on the repo/branch with the same instructions. Include the patch contents and these instructions:
+   - check out `cursor/sm2-pck-extractor-4420` and pull;
+   - `git am -3 <patches>`;
+   - `dotnet build-server shutdown`, then build serially (`-m:1`; MSB3883 otherwise);
+   - run the three SM2 test projects (expected counts in STATUS.md);
+   - if green, **fast-forward push** (no force push) and report the new tip and test counts.
+4. Verify with `git fetch` that the tip moved. Report the commit to the user with the PR link.
+- Fallback (older, PC-based): `git bundle create /workspace/sm2.bundle <lastpushed>..HEAD` → `CopyFromBox` to `C:\Users\Revaptor_FX\sm2.bundle` → in `C:\Users\Revaptor_FX\ls_push`: `git fetch ..\sm2.bundle HEAD; git merge --ff-only FETCH_HEAD; git push origin HEAD`.
+
+## 5. Unreal (UEMCP)
+- The editor must be open. UEMCP listens on 127.0.0.1 only.
+- Run a script: `Desktop\SM2_Work\Scripts\uerun.ps1 <script.py> <args...>`. It writes `ue_args.json` and calls `python C:\Users\Revaptor_FX\uemcp_call.py ue_python ue_args.json`.
+- Smoke test: `python uemcp_call.py` lists the tools.
+- Key scripts (`tools/ue/`, PC copies in `Scripts\`):
+  - `ue_bulk.py import|check <asset> [set]`: import + checker into `/Game/SM2_Work/Tests/<set>/<asset>`.
+  - `ue_import_anim.py`: anim-only FBX via the legacy importer (Interchange bug UE-307815). It does yaw auto, root-motion policy and 60 Hz for baked clips.
+  - `ue_mat_apply.py`, `ue_step3*.py`: materials.
+  - `ue_sm2_physics.py <physics.json> <mesh> [folder] verify|physasset`, `ue_phys_probe.py`: physics.
+  - `ue_cap_lit.py` (modes capture/pose/export/fit, each **a separate call**; same-call export returns a stale render target): lit captures. Wait for shaders/textures to finish compiling, or the capture comes out grey.
+- Restarting the editor is allowed (save all first). Long imports run inside one editor tick; import big sets one asset at a time.
+
+## 6. Headless browser captures (box)
+The browser has bench modes that render offscreen through Mesa llvmpipe; Avalonia's llvmpipe blacklist is cleared in `Program.cs`. Run them under Xvfb:
+```bash
+xvfb-run -a -s "-screen 0 1920x1080x24" dotnet run --project src/LibSaber.SM2Browser -c Release -- <mode> ...
+```
+| Mode | Args |
+|---|---|
+| `--glbench` | `<game folder|synthetic> <model> <out> [frames]` (GPU preview, also on the PC for real numbers; `SM2_PARTS_ONLY=1`) |
+| `--bench` | `<game> <model> <out> [frames]` (CPU old vs new) |
+| `--physbench` | `<tplDir> <sani> <clsRoot> <out> [seconds] [every]` (`SM2_PHYS_BAKE=1` compares baked vs live) |
+| `--vfxbench` | `<sfxDir> <part_aliases.ps> <texDir> <out> name@sec[@dist]...` (`SM2_VFX_ONLY/SKIP/EXPOSURE/LIT/FRAMES/MESHES/DISTORT/DEG`) |
+| `--hostvfxbench` | `<tplDir> <sani|-> <sfxDir> <aliases.ps> <texDir> <out> <effect|-> [bone|-] [seconds] [every]` |
+- Interactive dev mode without a game folder: `SM2_VFX_LOOSE="sfxDir|part_aliases.ps|texDir|meshDir" SM2_VFX_OPEN=<name>`, `SM2_MODEL_OPEN="tplDir[|sani]"`, `SM2_HOST_*`.
+- Make before/after sheets with Python (PIL) and save them under `/workspace/browser_run_shots/<stage>/`.
+- On the PC, `--glbench` gives real GPU numbers (RTX 4090, ANGLE D3D11). Run it only when no game is running.
+
+## 7. Bulk validation (`tools/bulk/`, PC copies in `Scripts\bulk\`)
+1. `bulk_export.ps1 [-Only a,b] [-Par N] [-Exe path]` → `Exports\bulk\<a>` (an existing folder is renamed `.bakN`), plus `results.json`.
+2. `bulk_ue.ps1 [-Only] [-Mode import|check]` → `/Game/SM2_Work/Tests/bulk/<a>` and `<a>.ue.json`.
+3. `bulk_cap.ps1` → `Captures\bulk\<a>`. Don't use a PowerShell variable `$c` next to `$C`: variable names are case-insensitive.
+4. On the box: `make_report.py` → `REPORT.md`, then `contact_sheet.py`.
+- `manifest.csv` lists the 37 assets. `ctor_export.ps1 -InPlace` re-exports the constructors.
+
+## 8. Stage routine (what "done" means for a stage)
+1. REA evidence first, with addresses noted.
+2. Code + tests on the box, in your own worktree.
+3. Captures (box headless, and/or UE on the PC when it's free).
+4. Append a dated section to HANDOFF.md and update `docs/handoff/STATUS.md`.
+5. Format-patch → cloud agent push.
+6. Short Korean report to the user with the % and what's next.
+
+## 9. The 20-minute progress report routine
+The user wants automatic interim reports. Create a recurring routine (see the bot's `routines` skill), e.g. named `sm2-20`, every 20 minutes. It should:
+- check running executors/subagents, the box worktrees (`git log -3`, `git status`), new files in `/workspace/patches/*` and `/workspace/browser_run_shots/*`, and, only if cheap, the PC capture folders;
+- write a 2–4 line Korean report: what finished, what is running, **progress %**, ETA (추정), blockers;
+- **stay quiet if nothing changed** since the last report. Never send a stale or duplicate report, and never say "nothing is running" while an executor is active;
+- when the VFX track completes, don't start Niagara: hand back to the main agent so it **asks the user** about Niagara.
+Delete or pause the routine when the user says to stop, or when all approved work is done.

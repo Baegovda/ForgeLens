@@ -1,3 +1,5 @@
+> **New agent: read [`AGENTS.md`](AGENTS.md) first** (entry point, rules, user preferences), then `docs/handoff/` (STATUS, ROADMAP, WORKFLOW, RE_NOTES, FORMATS). Where this file's bootstrap below conflicts with them (push method, next step, owner), AGENTS.md / docs/handoff win. This file stays the chronological log: append a dated section per stage.
+
 # >>> NEW AGENT: START HERE (bootstrap) <<<
 
 You were given only this repo link. Follow these steps in order before you do anything else. When you finish, you should be able to continue exactly where the previous agent stopped.

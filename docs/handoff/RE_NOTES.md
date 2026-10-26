@@ -1,0 +1,91 @@
+# RE_NOTES — sm2_retail.exe evidence index
+
+All addresses are virtual addresses in `sm2_retail.exe` (retail Steam build, 81 MB; box copy `/workspace/rea/sm2_retail.exe`, Ghidra project `/workspace/rea/ghidra_proj2`, program `sm2`).
+- Conversions used: rdata VA = file offset + 0x140001200; .text VA = file offset + 0x140000a00; for `strings`-style offsets, VA = offset + 0x140000000.
+- `FUN_xxxxxxxx` = Ghidra function. `@0x...` = string address. Plain `0x...` = instruction, table or constant.
+- Decompile more with:
+  ```
+  JAVA_HOME=/home/box/tools/jdk25 /home/box/ghidra/support/analyzeHeadless /workspace/rea/ghidra_proj2 sm2 -process sm2_retail.exe -noanalysis -readOnly -scriptPath /workspace/rea/ghidra_scripts -postScript Decomp.java /workspace/rea/dec <addrs>
+  ```
+- The REA MCP times out on this exe, so use Ghidra headless or rizin directly.
+- **Status column:** **proven** = read from code/data; **data** = inferred from game data with the exe only giving the field names; **heuristic** = not proven.
+
+## Meshes / templates
+| Evidence | What it proves | Status | Code |
+|---|---|---|---|
+| `simMeshName` @0x1435f1440, `renderMeshes`, nvcloth lib | `*_SIM` parts are cloth-sim shells that are never rendered | proven | IndexMeshVisibility / export skip |
+| tpl affixes `compound_skin_lod_index`, `lod_composite_*` (not plaintext in exe) | Rhino-style composite LOD levels: show only index 0 | data | `IndexMeshVisibility.AddCompositeLods` |
+| `tessellation_parameters` FUN_1421df540 (@0x1436ea3f8), `pn_triangles` @0x1436ea3e0, `phong` @0x1436ea3f0 | tessellation exists in the engine, but 0 of 37,403 `.td` use it, so the preview needs none | proven | – |
+| `CONFIG.useSaniAnimationsInTpl` path FUN_141db55f0 → FUN_142232230; sort FUN_14127d230 | v3 empty-name tracks bind by tpl `animNmb` rank | proven | `ClipBinding.cs` |
+| MatrixModel local (ReadSkeleton pairing) | unskinned parts are baked in world space and rigidly bound | proven (data) | `TemplateMeshReader` |
+| merged `Object*` proxies on LOD-chain weapons | hidden (bolter "drum") | data | d181b5c |
+
+## Materials / shaders
+| Evidence | What it proves | Status | Code |
+|---|---|---|---|
+| `swizzleTexInShader` 0x14233bf50 | `(a)` labels are logical channels: BC5 roughness in g, BC4 AO in r | proven | `MaterialMaps` sidecar `stored` |
+| `blendMode` @0x14355b708; table 0x144cc9180 (20 entries: none, black, opaque, blend, add, …); str→enum 0x14230f690; enum→str 0x14230f710; older table ref 0x144cc9190 | translucency comes from the variant's direct `glt.blendMode`; `none` = opaque | proven | `MaterialMaps.BlendMode/BlendOf`, `BlendModeTests` |
+| `akill` @0x14364a800 (table 0x144ccc7e0), compares at 0x14173bb19/0x14173bb54 | alpha test is independent of blendMode | proven | MaterialMaps |
+| glt field map FUN_1425c1d00: albedo_tint +0x30, metallicTint +0x40, second_spec +0x94, anisotropic_spec +0x108 | layer offsets | proven | `SpecLayers.cs` |
+| second_spec FUN_142576200; aniso FUN_142579ff0; text reader FUN_1425b9500; legacy ARGB pack FUN_142621620 | field layouts; `.td` colours are [A,R,G,B] | proven | SpecLayers |
+| permutations FUN_1423b7640 (0x1423b801f aniso > 0.01 [0x143c843ac]; 0x1423b819a second spec); define names FUN_1423b6260 (`GLT_USE_ANISO_SPEC` 0x1437f88a0, `_DIR_MAP` 0x1437f88b8, `GLT_USE_SECOND_SPEC` 0x1437f89c0) | when each layer is active | proven | SpecLayers |
+| aniso packer FUN_1423ba150 (0x1423ba35c..3ec k = 1−clamp(a,0,0.95); 0x1423ba3f4 shift) + PS 03840/00004/00042 GLSL | lobe math for the UE Substrate graph | proven (shader) | `import_sm2_materials.py` |
+| PS 00004_1 direct-light AO `saturate(2AO−1+|NdotL|)` | DirectAo approximation for hair | proven formula, UE approximation | import script `DirectAo` block |
+
+## Animation (.sani / ETNA)
+| Evidence | What it proves | Status | Code |
+|---|---|---|---|
+| loader FUN_14222fe40 (versions 1..3; slot0 clip+0x60, slot1 +0x68, root +0x70); codec factory FUN_142234c00 | file layout, F2/F3/F6/F7/F4 blocks | proven | `SaniReader.cs`, `EtnaCurves.cs` |
+| sampler FUN_142229bb0; root motion FUN_14222f1b0 / FUN_142234f10 | class-A codec, modified Rodrigues rotations | proven | EtnaCurves |
+| class A vtbl 0x1437e73e0 (hdr FUN_14222bed0, carve FUN_14222bff0); v3 vtbl 0x1437e74e0 (FUN_14222d0d0/d550/d6b0/d7c0); raw sub-1 vtbl 0x1437e71c0; v3 raw 0x1437e72d0 (unused) | every retail codec | proven | EtnaCurves |
+| root sub-1 vtbl 0x1437e77b8 (FUN_14222ef50/ef80/f060/f0d0/f140), sub-2 0x1437e7800; slerp FUN_1427ae2c0 | v1 root motion; rotation steps > 90° are not a bug | proven | EtnaCurves |
+| case 3: R0⁻¹(T_last−T0) via FUN_1427aa8a0 / FUN_1427ace20 / FUN_1427ad8b0 | root rotation applied; first-frame rebase is consistent | proven | `ClipPose` |
+| `HasAdditive` @0x1435ef808, dumper FUN_141060280 | slot 1 = additive | proven | `__ADD` export |
+| Morpheme `TaskBlend2TransformBuffsAdditive` @0x143b7fee8 → FUN_142cddd90; feather FUN_142ce01c0; registrar FUN_142c961b0 | additive blend math | proven (compose order not) | UE import policy |
+| `MorphemeController.useAnimRootMotion` +0x41 (@0x1435da538, reg 0x140e4e9be in FUN_140e4b2f0) | root motion is per controller | proven | export warning |
+| ETNA block 245 = anim events | event tracks | data | `AnimEvents.cs` |
+
+## Customization (constructor tpls)
+| Evidence | What it proves | Status | Code |
+|---|---|---|---|
+| HideObj **FUN_14133eae0**, ShowObj 0x14133fec0 (→ FUN_141349c70), HideObjs 0x14133eaf0, ShowObjsOnly 0x141347dd0 | geom script bindings | proven | `ArmorVariant.cs` |
+| FUN_14133e750 → name lookup FUN_141d912a0, flags node+0x18 → **FUN_142216790**(tree,node,0x140000,hide) walking FUN_14225c680, bits node+0x1c; pattern FUN_142781420/890, FUN_141d99490 | hiding is recursive over the subtree (group hide hides children) | proven | ArmorVariant |
+| `SetActivePresetToDefault` + `"PREDEFINED_PRESET_1"` in `character_customization_outfit_state_release.sslbin` | default look = preset 1 | data | `--variant default` |
+| `customizable_character_dummy_*.cls` (`team`, `masteryType`) | team/class per constructor | data | `CharacterFromDummyClass` |
+
+## Physics
+| Evidence | What it proves | Status | Code |
+|---|---|---|---|
+| field strings 0x1435f10c0..0x1435f1510 | `.cls` `prop_cloth_sim.clothes[]` / `prop_phys_jiggle` fields | proven | `PhysicsParser.cs` |
+| jiggle step loop **0x14147e5b5** in FUN_14147e500; orthonormalise FUN_140fd45e0; clamp FUN_14171ad80 (0x14147ea5b..eb3c); sentinel 888.888 @0x1435571a0; teleport 0x14147ed64; defaults dir (0,0,1) @0x143609db8, min/max @0x143609e08/@0x143609dd8 | exact jiggle port | proven (scalar defaults and teleport threshold not) | `JiggleSolver.cs` |
+| cloth config registration 0x141090c39..0x141091847, ctor ends 0x14108f119; phases 0x141089140; tether 0x14108a660; motion 0x141089966; separation 0x141089fe6; selfCollision 0x14108efce; gravity 0x14108f112; environment 0x14108f03a..0x14108f0a4 | cloth defaults | proven | `PhysicsSetup.cs` |
+| `*_SIM` COLOR0.r = max distance (≤1e-4 pinned) | motion constraints | data | `ClothSolver.cs` |
+| NvCloth solver itself | **approximated** with PBD | heuristic | ClothSolver |
+
+## VFX (.sfx / SSL)
+| Evidence | What it proves | Status | Code |
+|---|---|---|---|
+| node types: **sfx_group @0x143646930**, sfx_part @0x14363c148, sfx_trail @0x14363c280, CPU_EMITTER @0x14363bc80, GPU_EMITTER @0x14363bcf0, nameTex @0x143644760, lwiGeom @0x143645a70, ageSpline @0x143644580, emitDir @0x1436445f0 | `.sfx` is SSL text with tagged unions (`__type = local__X`) | proven | `EffectLibrary`, `SslText` |
+| emission union: constantFlow @0x143644cf8, explosion @0x143644d18 (struct @0x143644be0, load 0x141777823), dynamicFlow @0x143644d08 | spawn models | proven | `EffectSimulation` |
+| part_aliases reader **0x1418fe5c0** (from 0x141a90761): nFrameX/Y @0x143647ea0/ea8, nFrameMax @0x143647eb0 (0 = X·Y, clamp 255), motionVectorScale @0x143647ec0, Mesh.Vertex0..6 @0x143647ed4 | flipbook grid | proven | `PartAliases` |
+| blendType parser **0x141751cd0** / writer 0x141751dd0: blend 0, add 1, blend_add 2 | enum only; **blend_add's blend state is interpreted** | proven / heuristic | `EffectDefinition` |
+| sorting @0x143645dd8, parser 0x1417534f0; softDepth @0x143645530 | sort modes, soft particles | proven | EffectSprites / Renderer |
+| attached @0x143644cd0 → genOnFly @0x143644b38, genOnCDT @0x143644b48, genOnDie @0x143644b58, numParts @0x143644b18; LCS error @0x143648810 | child emitters; **genOnFly timing approximated** | proven / heuristic | EffectSimulation |
+| speedInherit @0x143644878; emitScale @0x143645da0 | inheritance, scaling | proven | EffectDefinition |
+| ageSize @0x143645588, colorIntensity @0x1435630b8, alphaIntensity @0x143645238, speedFrame @0x143644718, isFrameCycle @0x143644708, isRandomFlip @0x1436452e8 | sprite params | proven (size = half-width checked; exposure ×1/250 and lit ×100 heuristic) | EffectSprites |
+| channel strings DIFFUSE/ALPHA_MASK/SELF_DISTORTION/GLOSS/DISTORTION near 0x1436442d0 | draw targets; DISTORTION = refraction only | proven | EffectDefinition |
+| lwiGeom @0x143644870 (block 0x141760a45..0x141762f4d), nameGeomTpl @0x1436447b0, typeInst @0x1436447e8, sfxMtlOverrides @0x143644810, colorTransparency @0x143644700 | mesh particles; override colours are **R,G,B,A** (blood check) | proven + data | `EffectMeshParticles` |
+| trail serializer 0x1417b1031: maxTrailLength @0x143645e08, maxSegLength @0x143645e18, timeLifeSeg @0x143645e28, addFirstPointOnStart @0x143645e88; visuals 0x1417b06cd (colorIntensityMultiplier @0x143645cf8, alphaMult @0x143645d30, fixateTex @0x143645c00); shapes billboard @0x1436459f0, tape @0x1436459c0, cross @0x1436459d0, star @0x1436459e0; topology @0x1436458b0 | trail params; **the runtime ribbon builder was not traced** | proven / heuristic | `EffectTrails` |
+| `visuals.textureTintControl` @0x143645278 (typeParams+0x140) | 0 = texture used as luminance (grenade smoke blue cast) | proven field, shader mix heuristic | f99b30f series |
+| `optimization.degNear/degFar` reflection strings | camera-distance fades; **curve shape assumed linear** | heuristic | eaa33bd |
+| socket emit axis: no `emitDir` + `parentArea.direction isEmitByNormal` → bone **+Z** | from data (part_mzl_bolter siblings say z+, jetpack jets z+) | data | `EffectDefinition.EmitByNormal` |
+| anim event → VFX: blueprint `.sso` graphs (BulkVfxOnMorphemeEvents, MorphemeEvent → sfx starter BFS); stop nodes BlueprintNodeVfxStop / SfxLibraryStopsfx / StopPackOfVfx / StopAllSfx | which events fire which effects | data | `AnimEventVfxMap` |
+| `em_covering_*` (only `physics.cdt.coveringInteraction.radiusScale`) | surface painters (coveringMask), not particles | data | `CoveringDef` |
+
+## Not found / open RE questions
+- Composite-LOD affix strings are hashed (not plaintext).
+- HLSL lobe source is not in the exe; the decoded PS bytecode was used instead.
+- Rows 8/9 material CPU packer not located.
+- Trail runtime builder, genOnFly runtime, blend_add blend state, `additionalContrast` shader, VAT splash vertex layout.
+- Jiggle scalar defaults and teleport threshold.
+- rubric/sorcerer in-place loco clips.
