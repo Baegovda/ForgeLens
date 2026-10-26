@@ -14,6 +14,8 @@ internal static class Program
       return Bench.PhysBench.Run(args);
     if (args.Length > 0 && args[0] == "--vfxbench")
       return Bench.VfxBench.Run(args);
+    if (args.Length > 0 && args[0] == "--hostvfxbench")
+      return Bench.HostVfxBench.Run(args);
     if (args.Length > 0 && args[0] == "--glbench")
       return Bench.GpuBench.Run(args);
     return BuildAvaloniaApp().StartWithClassicDesktopLifetime(args);

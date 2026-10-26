@@ -66,6 +66,13 @@ public sealed class EmitterDef
   /// <summary><c>angleEmission</c>: half-angle of the emission cone in degrees (180 = sphere; sparks use 180).</summary>
   public float AngleEmission { get; init; }
   public Vector3 EmitDir { get; init; } = Vector3.UnitY;
+  /// <summary>
+  ///   No <c>emitDir</c> (point source, <c>parentArea.direction = isEmitByNormal</c>): emit along the parent's normal.
+  ///   On a bone socket that is the bone's +Z (wpn tip: barrel axis; part_mzl_bolter's flame_front_01 has no emitDir
+  ///   while its sibling flame_circle_2 says z+ and flame_cross_6/8 sit 0.25 behind the tip on the brake vents, x+/x-);
+  ///   unparented it stays the ground normal +Y.
+  /// </summary>
+  public bool EmitByNormal { get; init; }
   public ScalarParam SpeedNorm { get; init; } = ScalarParam.Constant(0);
   public ScalarParam SpeedTang { get; init; } = ScalarParam.Constant(0);
   public float InitialOffset { get; init; }
@@ -352,6 +359,7 @@ public sealed class EffectDefinition
       MaxParticles = maxParticles,
       AngleEmission = emission.Float("angleEmission", 0f),
       EmitDir = Axis(dirName, custom),
+      EmitByNormal = dirName is null,
       SpeedNorm = SslRead.Scalar(emission.Get("speedNorm"), 0f),
       SpeedTang = SslRead.Scalar(emission.Get("speedTang"), 0f),
       InitialOffset = emission.Float("initialOffset", 0f),

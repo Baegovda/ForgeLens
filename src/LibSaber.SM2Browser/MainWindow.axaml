@@ -114,6 +114,27 @@
           <CheckBox x:Name="PhysicsToggle" Content="Physics" IsChecked="True" Click="ViewChanged" IsVisible="False"
                     ToolTip.Tip="Cloth (purity seals, tabards) and jiggle bones from the character class, simulated on the playing clip (GPU preview)" />
         </WrapPanel>
+        <WrapPanel x:Name="HostVfxBar" DockPanel.Dock="Top" Orientation="Horizontal" Margin="0,2,0,0" IsVisible="False">
+          <WrapPanel.Styles>
+            <Style Selector="WrapPanel > :is(Control)">
+              <Setter Property="Margin" Value="0,0,6,4" />
+            </Style>
+          </WrapPanel.Styles>
+          <TextBlock Text="VFX on model" VerticalAlignment="Center" />
+          <TextBox x:Name="HostVfxName" Width="220" Watermark="effect, e.g. fx_bolter_muzzle_client"
+                   ToolTip.Tip=".sfx name. Emitters, lights and trails go on their nameParent bone (tip, jet_big_l, sfx_*); the rest on the socket at the right." />
+          <ComboBox x:Name="HostVfxSocket" Width="200" SelectionChanged="HostVfxOptionsChanged"
+                    ToolTip.Tip="Root socket for the parts without a nameParent of this model (Auto = model origin)" />
+          <Button Content="Attach" Click="HostVfxAttachClicked" />
+          <Button Content="Clear" Click="HostVfxClearClicked" />
+          <CheckBox x:Name="HostVfxLoopToggle" Content="Loop" IsChecked="True" Click="HostVfxOptionsChanged"
+                    ToolTip.Tip="On: the attached effect replays on its own clock. Off: it follows the clip time (scrub)." />
+          <CheckBox x:Name="HostVfxEventsToggle" Content="Anim events" Click="HostVfxOptionsChanged"
+                    ToolTip.Tip="Play the effects the clip's morpheme events start (event track -> blueprint .sso BlueprintNodeBulkVfxOnMorphemeEvents / OnMrEvent -> VfxRestart / StartSfx)" />
+          <TextBox x:Name="HostVfxFilter" Width="150" Watermark="blueprints, e.g. power_sword"
+                   ToolTip.Tip="Comma-separated blueprint name filters (the weapon / character the clip belongs to). Empty = every blueprint." />
+          <TextBlock x:Name="HostVfxStatus" VerticalAlignment="Center" Opacity="0.75" FontSize="11" MaxWidth="900" TextTrimming="CharacterEllipsis" />
+        </WrapPanel>
         <WrapPanel x:Name="VfxBar" DockPanel.Dock="Top" Orientation="Horizontal" Margin="0,2,0,0" IsVisible="False">
           <WrapPanel.Styles>
             <Style Selector="WrapPanel > :is(Control)">

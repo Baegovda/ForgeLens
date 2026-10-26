@@ -30,6 +30,8 @@ public sealed class AnimationClip
   public List<BoneTrack> Tracks { get; } = new();
   public List<string> Notes { get; } = new();
   public List<string> Sequences { get; } = new();
+  /// <summary>Morpheme event tracks (ETNA block 245), see <see cref="AnimEvents"/>.</summary>
+  public List<AnimEventTrack> EventTracks { get; } = new();
   public List<string> Bones { get; } = new();
   public float SampleRate { get; set; }
 

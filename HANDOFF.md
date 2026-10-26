@@ -954,3 +954,18 @@ Based on 00d32bd. Patches in `/workspace/patches/vfx2/`. Captures in `/workspace
 - Blood-splash VAT animation (`splash_5_v2_anim_data*`, `combineMtlAnimControl.animStage`) is not implemented, so the static rest mesh is drawn.
 - Distortion pass, socket attach to the selected model in the UI, and the grenade smoke colour are not done.
 - `smoke_spray_01` does not exist in retail (only `_02`/`_03`). It is genuinely missing in the game data, not an extraction miss.
+
+## vfx3 (part 1): effects on model sockets + anim-event cues
+
+- `EffectHost` (Assets/Effects): bone sockets from pose worlds (`SetPose`), `Attach(def, bone)`, wildcard `name*`; `sfx_source_pt` = root.
+- Emission axis REA: emitter without `emitDir` (`parentArea.direction isEmitByNormal`) emits along the parent normal; on a bone that is
+  bone **+Z** (`EffectDefinition.EmitByNormal`; wpn tip barrel = +Z, part_mzl_bolter flame_circle_2 z+, fx_jetpack_attack jets z+ on jet bones). No parent: +Y as before.
+- Anim events: ETNA block 245 (`AnimEvents.Parse`, `AnimationClip.EventTracks`), times normalised 0..1. Event→VFX is data-driven in
+  blueprint .sso graphs (`AnimEventVfxMap`: BulkVfxOnMorphemeEvents + exec BFS from MorphemeEvent nodes to sfx starters + string pipes).
+  Map unions all blueprints -> per-blueprint source filter (UI "blueprints" box / `SM2_VFX_BP_FILTER`). `*_stop_effect` events not handled.
+- UI: HostVfxBar (effect name, socket combo "Auto (nameParent)" / bones, Attach, Clear, Loop, Anim events, filter). Overlay via
+  `GpuFrameRequest.Overlay`. Env: `SM2_MODEL_OPEN="tplDir[|sani]"`, `SM2_HOST_OPEN`, `SM2_HOST_EVENTS=1`, `SM2_HOST_LOD1`, `SM2_HOST_CAM`, `SM2_HOST_PLAY`, `SM2_HOST_DEBUG=1` (per-frame quad log).
+- Bench: `--hostvfxbench <tplDir> <sani|-> <sfxDir> <aliases.ps> <texDir> <out> <effect|-> [bone|-] [seconds] [every]`.
+- Known issues (todo, vfx3 item 5): fx_jetpack_attack sprites huge (ageSize spline 0..33 x scale; size treated as half-width) -> size semantics
+  need REA; `degNear` near-camera fade not implemented; loose wpn_bolt_rifle_01 tpl decodes LOD1 parts + Object* proxies (drum shape);
+  tacticus dash clip on cc_titus_assault leaves ROOT ~9.5 m away even with In place.

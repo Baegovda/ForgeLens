@@ -67,6 +67,8 @@ public sealed class PreviewScene
   public Vector3 FillLight { get; init; }
   /// <summary>InverseBind * world per bone while a clip plays; null draws the bind pose.</summary>
   public Matrix4x4[]? SkinMatrices { get; init; }
+  /// <summary>Posed bone worlds (after the in-place rebase) when a clip plays or the skeleton shows; null otherwise.</summary>
+  public Matrix4x4[]? BoneWorlds { get; init; }
   public IReadOnlyList<(Vector3 From, Vector3 To)> BoneLines { get; init; } = Array.Empty<(Vector3, Vector3)>();
   /// <summary>
   ///   Cloth-driven vertices for this frame, already posed in model space (draw them unskinned). Empty when
@@ -247,6 +249,7 @@ public static partial class MeshPreview
       KeyLight = Vector3.Normalize((eye - center) + Vector3.UnitY * distance * 0.45f),
       FillLight = Vector3.Normalize(Vector3.Cross(Vector3.UnitY, eye - center) + Vector3.UnitY * 0.25f),
       SkinMatrices = skinMatrices,
+      BoneWorlds = worlds,
       BoneLines = lines,
       VertexOverrides = overrides,
       PhysicsMs = physics?.LastStepMs ?? 0,

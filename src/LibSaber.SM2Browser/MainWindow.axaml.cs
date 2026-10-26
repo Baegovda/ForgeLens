@@ -74,6 +74,7 @@ public partial class MainWindow : Window
   public MainWindow()
   {
     InitializeComponent();
+    InitHostVfx();
     RecentList.ItemsSource = _recent.Items;
     // A closed, focused ComboBox steps its selection on the mouse wheel; on the clip list that silently
     // loads a different (possibly 100 s cinematic) clip while the user is just scrolling the window.
@@ -106,6 +107,7 @@ public partial class MainWindow : Window
       if (!string.IsNullOrWhiteSpace(_settings.LastFolder) && Directory.Exists(_settings.LastFolder))
         await LoadFolderAsync(_settings.LastFolder);
       await OpenLooseEffectFromEnvironmentAsync();
+      await OpenLooseModelFromEnvironmentAsync();
     };
   }
 
@@ -831,8 +833,9 @@ public partial class MainWindow : Window
       {
         var t = _time + (float)Math.Clamp(_playClock.Elapsed.TotalSeconds - _playLast, 0, 0.1);
         return clip!.Duration > 0 && t > clip.Duration ? 0 : t;
-      } : null);
-    GpuView.Continuous = playing;
+      } : null,
+      HostVfxOverlay());
+    GpuView.Continuous = playing || HostVfxActive;
     PreviewImage.IsVisible = false;
     GpuView.IsVisible = true;
     SmoothToggle.IsEnabled = false;

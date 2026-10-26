@@ -15,7 +15,8 @@ internal sealed record GpuFrameRequest(
   bool Skeleton,
   bool Wireframe,
   float Time,
-  PreviewSettings Settings, Func<float>? Clock = null);
+  PreviewSettings Settings, Func<float>? Clock = null,
+  Func<ExportedMesh, PreviewScene, float, EffectLayer?>? Overlay = null);
 
 /// <summary>One standalone-VFX frame: built on the GL thread just before drawing (so playback follows vsync).</summary>
 internal sealed record EffectFrame(EffectLayer Layer, System.Numerics.Matrix4x4 View, System.Numerics.Matrix4x4 Projection, System.Numerics.Vector3 Eye);
@@ -165,7 +166,10 @@ internal sealed class GpuPreviewControl : OpenGlControlBase
       }
 
       var start = _clock.Elapsed.TotalMilliseconds;
-      var scene = MeshPreview.BuildScene(request.Mesh, width, height, request.Camera, request.Skeleton, request.Clock?.Invoke() ?? request.Time, request.Settings);
+      var time = request.Clock?.Invoke() ?? request.Time;
+      var scene = MeshPreview.BuildScene(request.Mesh, width, height, request.Camera, request.Skeleton, time, request.Settings);
+      // Effects on the model (sockets / anim events): drawn by GlPreview after the translucent pass, depth-tested.
+      renderer.Effect = request.Overlay?.Invoke(request.Mesh, scene, time);
       renderer.Render(request.Mesh, scene, width, height, request.Wireframe, fb);
       var cpu = _clock.Elapsed.TotalMilliseconds - start;
       FramesRendered++;

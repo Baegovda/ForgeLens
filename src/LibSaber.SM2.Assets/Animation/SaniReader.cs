@@ -189,7 +189,10 @@ public static class SaniReader
       var payload = bytes.AsSpan(cursor + 6, end - (cursor + 6));
       packed += payload.Length;
       if (id == 245)
+      {
         CollectNames(payload, events);
+        clip.EventTracks.AddRange(AnimEvents.Parse(payload));
+      }
       cursor = end;
     }
 
