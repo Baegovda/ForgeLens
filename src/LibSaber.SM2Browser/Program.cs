@@ -6,8 +6,12 @@ internal static class Program
 {
 
   [STAThread]
-  public static void Main(string[] args)
-    => BuildAvaloniaApp().StartWithClassicDesktopLifetime(args);
+  public static int Main(string[] args)
+  {
+    if (args.Length > 0 && args[0] == "--bench")
+      return Bench.PreviewBench.Run(args);
+    return BuildAvaloniaApp().StartWithClassicDesktopLifetime(args);
+  }
 
   public static AppBuilder BuildAvaloniaApp()
     => AppBuilder.Configure<App>()

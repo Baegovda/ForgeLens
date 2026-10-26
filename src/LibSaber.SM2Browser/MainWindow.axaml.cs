@@ -57,12 +57,26 @@ public partial class MainWindow : Window
   private int _animGeneration;
   private bool _suppressAnim;
   private bool _suppressScrub;
+  private readonly System.Diagnostics.Stopwatch _playClock = System.Diagnostics.Stopwatch.StartNew();
+  private double _playLast;
+  private List<AnimChoice> _animAll = new();
+  private string _modelKey = "";
+  private readonly WriteableBitmap?[] _frames = new WriteableBitmap?[2];
+  private int _frameFlip;
+  private readonly System.Diagnostics.Stopwatch _fpsClock = System.Diagnostics.Stopwatch.StartNew();
+  private int _fpsFrames;
+  private double _fpsStart;
+  private double _fps;
   private List<SaniIndex.Header>? _clipHeaders;
 
   public MainWindow()
   {
     InitializeComponent();
     RecentList.ItemsSource = _recent.Items;
+    // A closed, focused ComboBox steps its selection on the mouse wheel; on the clip list that silently
+    // loads a different (possibly 100 s cinematic) clip while the user is just scrolling the window.
+    foreach (var box in new ComboBox[] { AnimBox, LodBox, PartBox })
+      box.AddHandler(PointerWheelChangedEvent, (_, e) => { if (!box.IsDropDownOpen) e.Handled = true; }, RoutingStrategies.Tunnel);
     ShowFiles();
     _searchTimer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(250) };
     _searchTimer.Tick += (_, _) =>
@@ -70,12 +84,14 @@ public partial class MainWindow : Window
       _searchTimer.Stop();
       RefreshFiles();
     };
-    _playTimer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(33) };
+    _playTimer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(16) };
     _playTimer.Tick += (_, _) =>
     {
       if (_clip is null)
         return;
-      _time += 0.033f;
+      var now = _playClock.Elapsed.TotalSeconds;
+      _time += (float)Math.Clamp(now - _playLast, 0, 0.1);
+      _playLast = now;
       if (_clip.Duration > 0 && _time > _clip.Duration)
         _time = 0;
       SyncScrub();
@@ -321,6 +337,8 @@ public partial class MainWindow : Window
         var mesh = loaded.decoded;
         _mesh = mesh;
         _previewFileIndex = row.Index;
+        _modelKey = ModelKey(file.Path);
+        SmoothToggle.IsVisible = mesh.HasTriangles;
         _albedo = loaded.Item2.Albedo;
         _normals = loaded.Item2.Normals;
         _specular = loaded.Item2.Specular;
@@ -494,8 +512,7 @@ public partial class MainWindow : Window
     Add(mesh.Parts);
     foreach (var level in mesh.Levels)
       Add(level.Parts);
-    toggles.Sort((a, b) => string.Compare(a.Label, b.Label, StringComparison.OrdinalIgnoreCase));
-    MeshList.ItemsSource = toggles;
+    MeshList.ItemsSource = MeshToggle.Group(toggles);
     _suppressMesh = false;
   }
 
@@ -584,17 +601,16 @@ public partial class MainWindow : Window
     var normals = _normals;
     var specular = _specular;
     var previewGeneration = _previewGeneration;
+    var inPlace = InPlaceToggle.IsChecked == true;
     var bounds = ViewBorder.Bounds;
-    var width = bounds.Width < 64 ? 720 : (int)bounds.Width;
-    var height = bounds.Height < 64 ? 900 : (int)bounds.Height;
-    if (fast)
-    {
-      width /= 2;
-      height /= 2;
-    }
-
-    width = Math.Clamp(width, 32, 1100);
-    height = Math.Clamp(height, 32, 1400);
+    var scaling = RenderScaling > 0 ? RenderScaling : 1.0;
+    // Render at physical pixels so the image is not stretched (stretching magnified every aliased texel).
+    var width = bounds.Width < 64 ? 720 : (int)(bounds.Width * scaling);
+    var height = bounds.Height < 64 ? 900 : (int)(bounds.Height * scaling);
+    width = Math.Clamp(width, 32, 2048);
+    height = Math.Clamp(height, 32, 2048);
+    var moving = fast || _playTimer.IsEnabled;
+    var supersample = !moving && SmoothToggle.IsChecked == true && (long)width * height <= 2_400_000 ? 2 : 1;
     Task.Run(() =>
     {
       var pixels = MeshPreview.Render(
@@ -605,8 +621,12 @@ public partial class MainWindow : Window
         skeleton,
         time,
         out var note,
-        new PreviewSettings { Lod = lod, Part = part, Wireframe = wire, Albedo = albedo, Normals = normals, Specular = specular, MaxEdge = 1400 });
-      return (pixels, width, height, note);
+        new PreviewSettings
+        {
+          Lod = lod, Part = part, Wireframe = wire, Albedo = albedo, Normals = normals, Specular = specular,
+          MaxEdge = 2048, Supersample = supersample, InPlace = inPlace,
+        });
+      return (pixels, width, height, note, MeshPreview.LastRenderMs, supersample);
     }).ContinueWith(task =>
     {
       Dispatcher.UIThread.Post(() =>
@@ -614,6 +634,7 @@ public partial class MainWindow : Window
         if (generation == _drawGeneration && task.Status == TaskStatus.RanToCompletion)
         {
           ShowPixels(task.Result.pixels, task.Result.width, task.Result.height);
+          UpdateStats(task.Result.Item5, task.Result.width, task.Result.height, task.Result.supersample);
           if (!string.IsNullOrEmpty(task.Result.note))
             PreviewNote.Text = task.Result.note;
           HideLoading(previewGeneration);
@@ -632,12 +653,12 @@ public partial class MainWindow : Window
     });
   }
 
-  private readonly record struct PreviewTextures(
+  internal readonly record struct PreviewTextures(
     Dictionary<string, PreviewImage> Albedo,
     Dictionary<string, PreviewImage> Normals,
     Dictionary<string, PreviewImage> Specular);
 
-  private static PreviewTextures ResolvePreview(GameCatalog catalog, ArchiveStore store, ExportedMesh mesh, int hint)
+  internal static PreviewTextures ResolvePreview(GameCatalog catalog, ArchiveStore store, ExportedMesh mesh, int hint)
   {
     var albedo = new Dictionary<string, PreviewImage>(StringComparer.OrdinalIgnoreCase);
     var normals = new Dictionary<string, PreviewImage>(StringComparer.OrdinalIgnoreCase);
@@ -708,7 +729,16 @@ public partial class MainWindow : Window
 
   private void ShowPixels(byte[] pixels, int width, int height)
   {
-    var bitmap = new WriteableBitmap(new Avalonia.PixelSize(width, height), new Avalonia.Vector(96, 96), Avalonia.Platform.PixelFormat.Bgra8888, Avalonia.Platform.AlphaFormat.Opaque);
+    // Two reused bitmaps: swapping the Source makes the Image redraw without a fresh allocation per frame.
+    _frameFlip ^= 1;
+    var bitmap = _frames[_frameFlip];
+    if (bitmap is null || bitmap.PixelSize.Width != width || bitmap.PixelSize.Height != height)
+    {
+      bitmap?.Dispose();
+      bitmap = new WriteableBitmap(new Avalonia.PixelSize(width, height), new Avalonia.Vector(96, 96), Avalonia.Platform.PixelFormat.Bgra8888, Avalonia.Platform.AlphaFormat.Opaque);
+      _frames[_frameFlip] = bitmap;
+    }
+
     using (var frame = bitmap.Lock())
     {
       for (var y = 0; y < height; y++)
@@ -718,6 +748,24 @@ public partial class MainWindow : Window
     }
 
     PreviewImage.Source = bitmap;
+    PreviewImage.InvalidateVisual();
+  }
+
+  private void UpdateStats(double renderMs, int width, int height, int supersample)
+  {
+    _fpsFrames++;
+    var now = _fpsClock.Elapsed.TotalSeconds;
+    if (now - _fpsStart >= 0.5)
+    {
+      _fps = _fpsFrames / (now - _fpsStart);
+      _fpsFrames = 0;
+      _fpsStart = now;
+    }
+
+    var mode = supersample > 1 ? $" {supersample}x{supersample} AA" : "";
+    RenderStats.Text = _playTimer.IsEnabled || _dragging
+      ? $"{width}x{height}{mode} · {renderMs:0} ms · {_fps:0} fps"
+      : $"{width}x{height}{mode} · {renderMs:0} ms";
   }
 
   private static string Describe(AnimationClip clip)
@@ -754,6 +802,7 @@ public partial class MainWindow : Window
     }
 
     _mesh.Clip = _clip;
+    _playLast = _playClock.Elapsed.TotalSeconds;
     _playTimer.Start();
     PlayButton.Content = "Pause";
   }
@@ -765,6 +814,8 @@ public partial class MainWindow : Window
     var catalog = _catalog;
     var store = _store;
     var names = _mesh.Bones.Select(bone => bone.Name).ToArray();
+    ResetClip(bumpGeneration: false);
+    var key = _modelKey;
     AnimBar.IsVisible = true;
     _suppressAnim = true;
     AnimBox.ItemsSource = new[] { new AnimChoice { Label = "Finding animations…", Index = -1 } };
@@ -773,24 +824,26 @@ public partial class MainWindow : Window
     var choices = await Task.Run(() =>
     {
       _clipHeaders ??= SaniIndex.ReadHeaders(catalog, store);
-      var rows = new List<AnimChoice> { new() { Label = "Bind pose", Index = -1 } };
+      var rows = new List<AnimChoice>();
       foreach (var header in SaniIndex.Compatible(_clipHeaders, names))
       {
         var file = Path.GetFileName(header.Path);
-        rows.Add(new AnimChoice { Label = $"{file}  ({header.Duration:0.00}s)", Index = header.Index });
+        var same = key.Length > 0 && header.Path.Contains(key, StringComparison.OrdinalIgnoreCase);
+        rows.Add(new AnimChoice { Label = $"{(same ? "★ " : "")}{file}  ({header.Duration:0.00}s)", Index = header.Index, Path = header.Path, SameModel = same });
       }
 
+      // Clips named after this model first, then by path.
+      rows.Sort((a, b) => a.SameModel != b.SameModel ? (a.SameModel ? -1 : 1) : string.Compare(a.Path, b.Path, StringComparison.OrdinalIgnoreCase));
       return rows;
     });
     if (generation != _animGeneration || _mesh is null)
       return;
-    _suppressAnim = true;
-    AnimBox.ItemsSource = choices;
-    AnimBox.SelectedIndex = 0;
-    _suppressAnim = false;
-    StatusText.Text = choices.Count <= 1
+    _animAll = choices;
+    ApplyAnimFilter(keepSelection: false);
+    var same = choices.Count(c => c.SameModel);
+    StatusText.Text = choices.Count == 0
       ? "No animation shares 8 or more bone names with this model."
-      : $"{choices.Count - 1:N0} animations share bone names with this model.";
+      : $"{choices.Count:N0} animations share bone names with this model ({same:N0} named after '{key}', listed first).";
   }
 
   private async void AnimChanged(object? sender, SelectionChangedEventArgs e)
@@ -803,12 +856,7 @@ public partial class MainWindow : Window
     PlayButton.Content = "Play";
     if (choice.Index < 0)
     {
-      _clip = null;
-      _mesh.Clip = null;
-      _time = 0;
-      PlayButton.IsVisible = false;
-      ScrubSlider.IsEnabled = false;
-      ScrubLabel.Text = "0.00s";
+      ResetClip();
       PreviewNote.Text = "Bind pose.";
       DrawMesh();
       return;
@@ -826,6 +874,58 @@ public partial class MainWindow : Window
       ? $"{clip.Name}: {clip.Tracks.Count} tracks, {clip.Duration:0.###}s. Bones this clip does not name stay on the bind pose."
       : (clip.Notes.Count == 0 ? "This clip has no curve keys." : clip.Notes[0]);
     DrawMesh();
+  }
+
+  /// <summary>Back to the bind pose: no clip, time zero, slider and label reset, pending clip loads ignored.</summary>
+  private void ResetClip(bool bumpGeneration = true)
+  {
+    _playTimer.Stop();
+    PlayButton.Content = "Play";
+    PlayButton.IsVisible = false;
+    if (bumpGeneration)
+      ++_animGeneration;
+    _clip = null;
+    _clipIndex = -1;
+    if (_mesh is not null)
+      _mesh.Clip = null;
+    _time = 0;
+    ScrubSlider.IsEnabled = false;
+    SyncScrub();
+  }
+
+  private void AnimFilterChanged(object? sender, TextChangedEventArgs e)
+    => ApplyAnimFilter(keepSelection: true);
+
+  /// <summary>Live substring filter (case-insensitive) over the compatible clips; Bind pose always stays first.</summary>
+  private void ApplyAnimFilter(bool keepSelection)
+  {
+    var text = AnimFilter.Text?.Trim() ?? "";
+    var selected = keepSelection ? AnimBox.SelectedItem as AnimChoice : null;
+    var rows = new List<AnimChoice> { BindChoice };
+    foreach (var choice in _animAll)
+    {
+      if (text.Length == 0 || choice.Path.Contains(text, StringComparison.OrdinalIgnoreCase))
+        rows.Add(choice);
+    }
+
+    _suppressAnim = true;
+    AnimBox.ItemsSource = rows;
+    AnimBox.SelectedIndex = selected is not null && rows.Contains(selected) ? rows.IndexOf(selected) : 0;
+    _suppressAnim = false;
+    if (text.Length > 0)
+      StatusText.Text = $"{rows.Count - 1:N0} of {_animAll.Count:N0} animations match '{text}'.";
+  }
+
+  private static readonly AnimChoice BindChoice = new() { Label = "Bind pose", Index = -1 };
+
+  /// <summary>The model's own name, for example <c>titus</c> from <c>cc_titus.tpl</c>.</summary>
+  private static string ModelKey(string path)
+  {
+    var stem = Path.GetFileNameWithoutExtension(path);
+    var tokens = stem.Split(new[] { '_', '-', '.', ' ' }, StringSplitOptions.RemoveEmptyEntries)
+      .Where(token => token.Length >= 3 && !token.All(char.IsDigit))
+      .ToArray();
+    return tokens.Length == 0 ? stem : tokens.OrderByDescending(token => token.Length).First();
   }
 
   private void ApplyClipToMesh(AnimationClip clip)
@@ -1116,5 +1216,7 @@ public sealed class AnimChoice
 {
   public string Label { get; init; } = "";
   public int Index { get; init; } = -1;
+  public string Path { get; init; } = "";
+  public bool SameModel { get; init; }
   public override string ToString() => Label;
 }

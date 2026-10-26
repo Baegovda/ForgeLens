@@ -8,6 +8,8 @@ public readonly struct OrbitCamera
   public float Yaw { get; init; }
   public float Pitch { get; init; }
   public float Distance { get; init; }
+  /// <summary>Orbit pivot. Null orbits the centre of the drawn bounds.</summary>
+  public Vector3? Target { get; init; }
 }
 
 public sealed class PreviewImage
@@ -19,7 +21,8 @@ public sealed class PreviewImage
   public string Channels { get; init; } = "";
 }
 
-public sealed class PreviewSettings
+
+public sealed record PreviewSettings
 {
   public int Lod { get; init; }
   /// <summary>Index into the active LOD's parts. Negative draws every part.</summary>
@@ -31,10 +34,26 @@ public sealed class PreviewSettings
   /// <summary>Packed specular maps. <see cref="PreviewImage.Channels"/> selects metal, roughness, and AO.</summary>
   public IReadOnlyDictionary<string, PreviewImage>? Specular { get; init; }
   public int MaxEdge { get; init; } = 1280;
+  /// <summary>Supersampling factor per axis (1 = off, 2 = 4 samples per pixel). Box-filtered down.</summary>
+  public int Supersample { get; init; } = 1;
+  /// <summary>Rebase the clip so its first frame sits where the bind pose stands (cinematic clips stay in view).</summary>
+  public bool InPlace { get; init; }
+  /// <summary>Upper bound on worker threads; 0 uses every core.</summary>
+  public int Threads { get; init; }
 }
-
+/// <summary>
+///   CPU preview renderer. Every frame it skins (only when a clip is active), projects each vertex once,
+///   bins triangles into horizontal bands and rasterises the bands in parallel. Shading is per pixel with
+///   interpolated vertex normals (smooth, as the game's vertex shader passes them), perspective-correct UVs,
+///   bilinear sampling from a cached box-filtered mip chain chosen per triangle, Toksvig specular AA from the
+///   normal-map mip length, and optional supersampling that is box-filtered down.
+/// </summary>
 public static class MeshPreview
 {
+  public static double LastRenderMs { get; private set; }
+
+  /// <summary>Per-stage milliseconds of the last frame, for the bench and the status line.</summary>
+  public static string LastStages { get; private set; } = "";
 
   public static byte[] Render(
     ExportedMesh mesh,
@@ -46,47 +65,52 @@ public static class MeshPreview
     out string note,
     PreviewSettings? settings = null)
   {
-    var maxEdge = Math.Clamp(settings?.MaxEdge ?? 1280, 8, 2048);
+    var watch = System.Diagnostics.Stopwatch.StartNew();
+    var maxEdge = Math.Clamp(settings?.MaxEdge ?? 1280, 8, 4096);
     width = Math.Clamp(width, 8, maxEdge);
     height = Math.Clamp(height, 8, maxEdge);
-    var pixels = new byte[width * height * 4];
-    var depth = new float[width * height];
-    for (var i = 0; i < pixels.Length; i += 4)
-    {
-      pixels[i] = 22;
-      pixels[i + 1] = 24;
-      pixels[i + 2] = 28;
-      pixels[i + 3] = 255;
-    }
-
-    Array.Fill(depth, float.PositiveInfinity);
+    var ss = Math.Clamp(settings?.Supersample ?? 1, 1, 3);
+    var w = width * ss;
+    var h = height * ss;
+    var target = new Target(w, h);
     note = mesh.Message;
     var lod = Math.Max(0, settings?.Lod ?? 0);
     var partFilter = settings?.Part ?? -1;
     var honorVisibility = partFilter < 0 && lod <= 0;
     var slices = CollectSlices(mesh, lod, partFilter, honorVisibility);
+    var parallel = new ParallelOptions { MaxDegreeOfParallelism = settings?.Threads > 0 ? settings.Threads : Environment.ProcessorCount };
     if (slices.Count == 0 && mesh.Bones.Count == 0)
     {
       note = string.IsNullOrEmpty(note) ? "Nothing to draw." : note;
-      return pixels;
+      return target.Resolve(width, height, ss);
     }
 
-    if (!TrySliceBounds(slices, partFilter, honorVisibility, out var center, out var extent))
+    var clipActive = mesh.Bones.Count > 0 && mesh.Clip is { HasCurves: true };
+    Matrix4x4[]? worlds = clipActive || showSkeleton ? BoneWorlds(mesh, timeSeconds) : null;
+    var rebase = Matrix4x4.Identity;
+    if (clipActive && settings?.InPlace == true)
+    {
+      rebase = InPlaceRebase(mesh);
+      for (var i = 0; i < worlds!.Length; i++)
+        worlds[i] *= rebase;
+    }
+
+    var offset = Vector3.Zero;
+
+    var tBounds = watch.Elapsed.TotalMilliseconds;
+    if (!FastBounds(slices, partFilter, honorVisibility, out var center, out var extent))
     {
       if (mesh.Bones.Count == 0)
       {
         note = string.IsNullOrEmpty(note) ? "Nothing to draw." : note;
-        return pixels;
+        return target.Resolve(width, height, ss);
       }
 
-      center = Vector3.Zero;
-      extent = Vector3.One;
-      var worldsOnly = BoneWorlds(mesh, timeSeconds);
       var min = new Vector3(float.MaxValue);
       var max = new Vector3(float.MinValue);
-      foreach (var world in worldsOnly)
+      foreach (var world in worlds ?? BoneWorlds(mesh, timeSeconds))
       {
-        var point = Translation(world);
+        var point = Translation(world) + offset;
         min = Vector3.Min(min, point);
         max = Vector3.Max(max, point);
       }
@@ -95,141 +119,176 @@ public static class MeshPreview
       extent = Vector3.Max(max - min, new Vector3(0.05f));
     }
 
-    var distance = camera.Distance > 0
-      ? camera.Distance
-      : FitDistance(extent, width / (float)height);
+    if (camera.Target is { } pivot)
+      center = pivot;
+    var distance = camera.Distance > 0 ? camera.Distance : FitDistance(extent, width / (float)height);
     var pitch = Math.Clamp(camera.Pitch, -1.2f, 1.2f);
     var planar = MathF.Cos(pitch);
-    var eye = center + new Vector3(
-      planar * MathF.Sin(camera.Yaw),
-      MathF.Sin(pitch),
-      planar * MathF.Cos(camera.Yaw)) * distance;
+    var eye = center + new Vector3(planar * MathF.Sin(camera.Yaw), MathF.Sin(pitch), planar * MathF.Cos(camera.Yaw)) * distance;
     var view = Matrix4x4.CreateLookAt(eye, center, Vector3.UnitY);
     var projection = Matrix4x4.CreatePerspectiveFieldOfView(MathF.PI / 4f, width / (float)height, Math.Max(0.01f, distance * 0.01f), distance * 40f);
     var viewProjection = view * projection;
-    var key = Vector3.Normalize((eye - center) + Vector3.UnitY * distance * 0.45f);
-    var fill = Vector3.Normalize(Vector3.Cross(Vector3.UnitY, eye - center) + Vector3.UnitY * 0.25f);
+    var light = new Lights
+    {
+      Key = Vector3.Normalize((eye - center) + Vector3.UnitY * distance * 0.45f),
+      Fill = Vector3.Normalize(Vector3.Cross(Vector3.UnitY, eye - center) + Vector3.UnitY * 0.25f),
+      Eye = eye,
+    };
 
+    Matrix4x4[]? skinMatrices = null;
+    if (clipActive)
+    {
+      skinMatrices = new Matrix4x4[mesh.Bones.Count];
+      for (var i = 0; i < skinMatrices.Length; i++)
+        skinMatrices[i] = mesh.Bones[i].InverseBind * worlds![i];
+    }
+
+    double msSetup = watch.Elapsed.TotalMilliseconds, msSkin = 0, msProject = 0, msBin = 0, msRaster = 0;
     foreach (var slice in slices)
     {
-      var posed = PosedPositions(mesh, slice.Positions, slice.Skin, timeSeconds);
-      var indices = slice.Indices;
-      var parts = slice.Parts;
-      var normals = slice.Normals;
-      var uvs = slice.Uvs;
-      if (indices.Count >= 3)
+      var stage = watch.Elapsed.TotalMilliseconds;
+      var prepared = Prepare(slice);
+      var positions = prepared.Positions;
+      var normals = prepared.Normals;
+      if (skinMatrices is not null && prepared.Skin is not null)
+        Skin(prepared, skinMatrices, offset, parallel, out positions, out normals);
+
+      msSkin += watch.Elapsed.TotalMilliseconds - stage;
+      stage = watch.Elapsed.TotalMilliseconds;
+      var vertexCount = positions.Length;
+      var sx = new float[vertexCount];
+      var sy = new float[vertexCount];
+      var sz = new float[vertexCount];
+      var iw = new float[vertexCount];
+      Parallel.For(0, (vertexCount + 4095) / 4096, parallel, chunk =>
       {
-        var partIndex = 0;
-        for (var i = 0; i + 2 < indices.Count; i += 3)
+        var end = Math.Min(vertexCount, (chunk + 1) * 4096);
+        for (var i = chunk * 4096; i < end; i++)
         {
-          while (partIndex < parts.Count && i >= parts[partIndex].IndexStart + parts[partIndex].IndexCount)
-            partIndex++;
-          if (partFilter >= 0 && partIndex != partFilter)
-            continue;
-          if (honorVisibility && partIndex < parts.Count && !parts[partIndex].Visible)
-            continue;
-          if (partIndex < parts.Count && i < parts[partIndex].IndexStart)
-            continue;
-
-          var a = indices[i];
-          var b = indices[i + 1];
-          var c = indices[i + 2];
-          if ((uint)a >= (uint)posed.Count || (uint)b >= (uint)posed.Count || (uint)c >= (uint)posed.Count)
-            continue;
-          if (!Project(posed[a], viewProjection, width, height, out var ax, out var ay, out var az))
-            continue;
-          if (!Project(posed[b], viewProjection, width, height, out var bx, out var by, out var bz))
-            continue;
-          if (!Project(posed[c], viewProjection, width, height, out var cx, out var cy, out var cz))
-            continue;
-
-          var normal = normals.Count == posed.Count
-            ? normals[a] + normals[b] + normals[c]
-            : Vector3.Cross(posed[b] - posed[a], posed[c] - posed[a]);
-          if (normal.LengthSquared() < 1e-8f)
-            normal = Vector3.UnitY;
-          else
-            normal = Vector3.Normalize(normal);
-          var shade = Math.Clamp(
-            0.24f + 0.68f * Math.Clamp(Vector3.Dot(normal, key), 0f, 1f) + 0.22f * Math.Clamp(Vector3.Dot(normal, fill), 0f, 1f),
-            0f, 1f);
-          var shift = partIndex * 17 % 36 - 12;
-          byte br = (byte)Math.Clamp(96 + shift / 3, 48, 200);
-          byte bg = (byte)Math.Clamp(118 + shift / 2, 48, 210);
-          byte bb = (byte)Math.Clamp(156 + shift, 48, 230);
-          PreviewImage? albedo = null;
-          PreviewImage? normalMap = null;
-          PreviewImage? specularMap = null;
-          if (partIndex < parts.Count)
+          var clip = Vector4.Transform(new Vector4(positions[i], 1), viewProjection);
+          if (clip.W <= 0.0001f)
           {
-            var part = parts[partIndex];
-            if (settings?.Albedo is { } textures && part.Texture is { } textureName && textures.TryGetValue(textureName, out var image))
-              albedo = image;
-            if (settings?.Normals is { } normalTextures && part.Normal is { } normalName && normalTextures.TryGetValue(normalName, out var normalImage))
-              normalMap = normalImage;
-            if (settings?.Specular is { } specTextures && part.Specular is { } specName && specTextures.TryGetValue(specName, out var specImage))
-              specularMap = specImage;
+            iw[i] = 0;
+            continue;
           }
 
-          if (albedo is null)
-          {
-            Fill(pixels, depth, width, height, ax, ay, az, bx, by, bz, cx, cy, cz,
-              (byte)(bb * shade), (byte)(bg * shade), (byte)(br * shade));
-          }
-          else
-          {
-            var au = (uint)a < (uint)uvs.Count ? uvs[a].X : 0;
-            var av = (uint)a < (uint)uvs.Count ? uvs[a].Y : 0;
-            var bu = (uint)b < (uint)uvs.Count ? uvs[b].X : 0;
-            var bv = (uint)b < (uint)uvs.Count ? uvs[b].Y : 0;
-            var cu = (uint)c < (uint)uvs.Count ? uvs[c].X : 0;
-            var cv = (uint)c < (uint)uvs.Count ? uvs[c].Y : 0;
-            if (normalMap is null && specularMap is null)
-            {
-              FillTextured(pixels, depth, width, height, ax, ay, az, bx, by, bz, cx, cy, cz,
-                au, av, bu, bv, cu, cv, albedo, shade);
-            }
-            else
-            {
-              var geometric = normals.Count == posed.Count ? normals[a] : normal;
-              FillLit(pixels, depth, width, height, ax, ay, az, bx, by, bz, cx, cy, cz,
-                au, av, bu, bv, cu, cv, albedo, normalMap, specularMap,
-                posed[a], posed[b], posed[c], geometric, key, eye);
-            }
-          }
+          var inv = 1f / clip.W;
+          sx[i] = (clip.X * inv * 0.5f + 0.5f) * w;
+          sy[i] = (1f - (clip.Y * inv * 0.5f + 0.5f)) * h;
+          sz[i] = clip.Z * inv;
+          iw[i] = inv;
         }
+      });
+
+      msProject += watch.Elapsed.TotalMilliseconds - stage;
+      stage = watch.Elapsed.TotalMilliseconds;
+      // Part state for this frame: visibility and resolved textures.
+      var partCount = slice.Parts.Count;
+      var partDraw = new bool[Math.Max(1, partCount)];
+      var partMat = new PartMaterial[Math.Max(1, partCount)];
+      for (var p = 0; p < partCount; p++)
+      {
+        var part = slice.Parts[p];
+        partDraw[p] = (partFilter < 0 || p == partFilter) && (!honorVisibility || part.Visible);
+        var shift = p * 17 % 36 - 12;
+        partMat[p] = new PartMaterial
+        {
+          Albedo = Lookup(settings?.Albedo, part.Texture),
+          Normal = Lookup(settings?.Normals, part.Normal),
+          Specular = Lookup(settings?.Specular, part.Specular),
+          SpecChannels = settings?.Specular is not null && part.Specular is not null && settings.Specular.TryGetValue(part.Specular, out var specImage) ? specImage.Channels : "",
+          Solid = new Vector3(Math.Clamp(156 + shift, 48, 230), Math.Clamp(118 + shift / 2, 48, 210), Math.Clamp(96 + shift / 3, 48, 200)),
+        }.Resolve();
       }
 
-      if (settings?.Wireframe == true && indices.Count >= 3)
+      if (partCount == 0)
       {
-        var partIndex = 0;
-        for (var i = 0; i + 2 < indices.Count; i += 3)
+        partDraw[0] = true;
+        partMat[0] = new PartMaterial { Solid = new Vector3(156, 118, 96) }.Resolve();
+      }
+
+      var triCount = prepared.Indices.Length / 3;
+      var bandHeight = Math.Max(4, h / (parallel.MaxDegreeOfParallelism * 3));
+      var bandCount = (h + bandHeight - 1) / bandHeight;
+      var indices = prepared.Indices;
+      var triPart = prepared.TriPart;
+      // Bin triangles into bands in parallel: each chunk keeps its own band lists.
+      var chunkCount = Math.Max(1, Math.Min(parallel.MaxDegreeOfParallelism * 2, (triCount + 8191) / 8192));
+      var bins = new List<int>[chunkCount, bandCount];
+      Parallel.For(0, chunkCount, parallel, chunk =>
+      {
+        var start = (int)((long)triCount * chunk / chunkCount);
+        var end = (int)((long)triCount * (chunk + 1) / chunkCount);
+        for (var t = start; t < end; t++)
         {
-          while (partIndex < parts.Count && i >= parts[partIndex].IndexStart + parts[partIndex].IndexCount)
-            partIndex++;
-          if (partFilter >= 0 && partIndex != partFilter)
+          var part = triPart[t];
+          if (part < 0 || !partDraw[partCount == 0 ? 0 : part])
             continue;
-          if (honorVisibility && partIndex < parts.Count && !parts[partIndex].Visible)
+          int a = indices[t * 3], b = indices[t * 3 + 1], c = indices[t * 3 + 2];
+          if ((uint)a >= (uint)vertexCount || (uint)b >= (uint)vertexCount || (uint)c >= (uint)vertexCount)
             continue;
-          var a = indices[i];
-          var b = indices[i + 1];
-          var c = indices[i + 2];
-          if ((uint)a >= (uint)posed.Count || (uint)b >= (uint)posed.Count || (uint)c >= (uint)posed.Count)
+          if (iw[a] == 0 || iw[b] == 0 || iw[c] == 0)
             continue;
-          if (!Project(posed[a], viewProjection, width, height, out var ax, out var ay, out _))
+          var minY = MathF.Min(sy[a], MathF.Min(sy[b], sy[c]));
+          var maxY = MathF.Max(sy[a], MathF.Max(sy[b], sy[c]));
+          var minX = MathF.Min(sx[a], MathF.Min(sx[b], sx[c]));
+          var maxX = MathF.Max(sx[a], MathF.Max(sx[b], sx[c]));
+          if (maxY < 0 || minY >= h || maxX < 0 || minX >= w)
             continue;
-          if (!Project(posed[b], viewProjection, width, height, out var bx, out var by, out _))
+          // Skip triangles that cover no pixel centre (sub-pixel slivers are the bulk of a 300k-triangle body).
+          if ((int)MathF.Floor(maxX - 0.5f) < (int)MathF.Ceiling(minX - 0.5f) || (int)MathF.Floor(maxY - 0.5f) < (int)MathF.Ceiling(minY - 0.5f))
             continue;
-          if (!Project(posed[c], viewProjection, width, height, out var cx, out var cy, out _))
+          var b0 = Math.Clamp((int)minY / bandHeight, 0, bandCount - 1);
+          var b1 = Math.Clamp((int)maxY / bandHeight, 0, bandCount - 1);
+          for (var band = b0; band <= b1; band++)
+            (bins[chunk, band] ??= new List<int>(64)).Add(t);
+        }
+      });
+
+      msBin += watch.Elapsed.TotalMilliseconds - stage;
+      stage = watch.Elapsed.TotalMilliseconds;
+      var frame = new Frame
+      {
+        Target = target, Sx = sx, Sy = sy, Sz = sz, Iw = iw,
+        Positions = positions, Normals = normals, Uvs = prepared.Uvs, Indices = indices, TriPart = triPart,
+        Materials = partMat, Light = light, PartCountZero = partCount == 0,
+      };
+      Parallel.For(0, bandCount, parallel, band =>
+      {
+        var y0 = band * bandHeight;
+        var y1 = Math.Min(h, y0 + bandHeight);
+        for (var chunk = 0; chunk < chunkCount; chunk++)
+        {
+          var list = bins[chunk, band];
+          if (list is null)
             continue;
-          Line(pixels, width, height, (int)ax, (int)ay, (int)bx, (int)by, 210, 220, 230);
-          Line(pixels, width, height, (int)bx, (int)by, (int)cx, (int)cy, 210, 220, 230);
-          Line(pixels, width, height, (int)cx, (int)cy, (int)ax, (int)ay, 210, 220, 230);
+          foreach (var t in list)
+            RasterTriangle(frame, t, y0, y1);
+        }
+      });
+      msRaster += watch.Elapsed.TotalMilliseconds - stage;
+
+      if (settings?.Wireframe == true)
+      {
+        var thick = ss;
+        for (var t = 0; t < triCount; t++)
+        {
+          var part = triPart[t];
+          if (part < 0 || !partDraw[partCount == 0 ? 0 : part])
+            continue;
+          int a = indices[t * 3], b = indices[t * 3 + 1], c = indices[t * 3 + 2];
+          if ((uint)a >= (uint)vertexCount || (uint)b >= (uint)vertexCount || (uint)c >= (uint)vertexCount)
+            continue;
+          if (iw[a] == 0 || iw[b] == 0 || iw[c] == 0)
+            continue;
+          Line(target.Pixels, w, h, (int)sx[a], (int)sy[a], (int)sx[b], (int)sy[b], 210, 220, 230);
+          Line(target.Pixels, w, h, (int)sx[b], (int)sy[b], (int)sx[c], (int)sy[c], 210, 220, 230);
+          Line(target.Pixels, w, h, (int)sx[c], (int)sy[c], (int)sx[a], (int)sy[a], 210, 220, 230);
         }
       }
     }
 
-    if (showSkeleton && mesh.Bones.Count > 0)
+    if (showSkeleton && mesh.Bones.Count > 0 && worlds is not null)
     {
       var deformOnly = false;
       var fileOnly = false;
@@ -239,7 +298,6 @@ public static class MeshPreview
         fileOnly |= mesh.Bones[i].FileBind;
       }
 
-      var worlds = BoneWorlds(mesh, timeSeconds);
       for (var i = 0; i < mesh.Bones.Count; i++)
       {
         if (deformOnly && !mesh.Bones[i].Influences)
@@ -249,15 +307,627 @@ public static class MeshPreview
         var parent = mesh.Bones[i].Parent;
         if (parent < 0 || parent >= mesh.Bones.Count)
           continue;
-        if (!Project(Translation(worlds[parent]), viewProjection, width, height, out var x0, out var y0, out _))
+        if (!Project(Translation(worlds[parent]) + offset, viewProjection, w, h, out var x0, out var y0, out _))
           continue;
-        if (!Project(Translation(worlds[i]), viewProjection, width, height, out var x1, out var y1, out _))
+        if (!Project(Translation(worlds[i]) + offset, viewProjection, w, h, out var x1, out var y1, out _))
           continue;
-        Line(pixels, width, height, (int)x0, (int)y0, (int)x1, (int)y1, 80, 190, 230);
+        for (var k = 0; k < ss; k++)
+          Line(target.Pixels, w, h, (int)x0 + k, (int)y0, (int)x1 + k, (int)y1, 80, 190, 230);
       }
     }
 
-    return pixels;
+    var beforeResolve = watch.Elapsed.TotalMilliseconds;
+    var result = target.Resolve(width, height, ss);
+    LastRenderMs = watch.Elapsed.TotalMilliseconds;
+    LastStages = $"clear+bounds {msSetup:0.0} (bounds {msSetup - tBounds:0.0}) prep/skin {msSkin:0.0} project {msProject:0.0} bin {msBin:0.0} raster {msRaster:0.0} resolve {LastRenderMs - beforeResolve:0.0}";
+    return result;
+  }
+
+  private static readonly System.Runtime.CompilerServices.ConditionalWeakTable<AnimationClip, Tuple<ExportedMesh, Matrix4x4>> RebaseCache = new();
+
+  /// <summary>
+  ///   Rigid transform that puts the clip's first frame where the bind pose stands, measured on the topmost
+  ///   deforming bone (pelvis/root). Cinematic clips carry the scene placement in that bone, which otherwise
+  ///   moves the model out of the orbit camera. Applied to every bone world for every frame of the clip.
+  /// </summary>
+  public static Matrix4x4 InPlaceRebase(ExportedMesh mesh)
+  {
+    if (mesh.Bones.Count == 0 || mesh.Clip is not { HasCurves: true } clip)
+      return Matrix4x4.Identity;
+    lock (RebaseCache)
+    {
+      if (RebaseCache.TryGetValue(clip, out var cached) && ReferenceEquals(cached.Item1, mesh))
+        return cached.Item2;
+    }
+
+    var first = BoneWorlds(mesh, 0f);
+    mesh.Clip = null;
+    Matrix4x4[] bind;
+    try
+    {
+      bind = BoneWorlds(mesh, 0f);
+    }
+    finally
+    {
+      mesh.Clip = clip;
+    }
+
+    // Reference: the topmost bone among those the clip displaces most. Bones the clip does not name stay
+    // on the bind pose, so the scene placement lives on whichever animated bone carries the whole body.
+    var displacement = new float[first.Length];
+    var maxDisplacement = 0f;
+    for (var i = 0; i < first.Length; i++)
+    {
+      displacement[i] = Vector3.Distance(Translation(first[i]), Translation(bind[i]));
+      if (float.IsFinite(displacement[i]))
+        maxDisplacement = MathF.Max(maxDisplacement, displacement[i]);
+    }
+
+    var reference = -1;
+    var bestDepth = int.MaxValue;
+    if (maxDisplacement > 0.05f)
+    {
+      for (var i = 0; i < mesh.Bones.Count; i++)
+      {
+        if (!(displacement[i] >= maxDisplacement * 0.5f))
+          continue;
+        var depth = 0;
+        for (var p = mesh.Bones[i].Parent; p >= 0 && p < mesh.Bones.Count && depth < 1024; p = mesh.Bones[p].Parent)
+          depth++;
+        if (depth < bestDepth || (depth == bestDepth && mesh.Bones[i].Influences && reference >= 0 && !mesh.Bones[reference].Influences))
+        {
+          bestDepth = depth;
+          reference = i;
+        }
+      }
+    }
+
+    var result = Matrix4x4.Identity;
+    if (reference >= 0 && Matrix4x4.Invert(first[reference], out var inverse))
+    {
+      // Keep only rotation and translation so a scaled scene root cannot shrink the model.
+      var candidate = inverse * bind[reference];
+      if (Matrix4x4.Decompose(candidate, out _, out var rotation, out var translation))
+        result = Matrix4x4.CreateFromQuaternion(Quaternion.Normalize(rotation)) * Matrix4x4.CreateTranslation(translation);
+      else
+        result = candidate;
+    }
+
+    if (!float.IsFinite(result.M41) || !float.IsFinite(result.M11))
+      result = Matrix4x4.Identity;
+    lock (RebaseCache)
+      RebaseCache.AddOrUpdate(clip, Tuple.Create(mesh, result));
+    return result;
+  }
+
+  /// <summary>Bounds of the drawn triangles from the cached arrays (bind pose, so the camera does not chase a clip).</summary>
+  private static bool FastBounds(List<DrawSlice> slices, int partFilter, bool honorVisibility, out Vector3 center, out Vector3 extent)
+  {
+    var min = new Vector3(float.MaxValue);
+    var max = new Vector3(float.MinValue);
+    var any = false;
+    foreach (var slice in slices)
+    {
+      var prepared = Prepare(slice);
+      var parts = slice.Parts;
+      var draw = new bool[Math.Max(1, parts.Count)];
+      for (var p = 0; p < parts.Count; p++)
+        draw[p] = (partFilter < 0 || p == partFilter) && (!honorVisibility || parts[p].Visible);
+      if (parts.Count == 0)
+        draw[0] = true;
+      var positions = prepared.Positions;
+      var indices = prepared.Indices;
+      var triPart = prepared.TriPart;
+      for (var t = 0; t < triPart.Length; t++)
+      {
+        var part = triPart[t];
+        if (part < 0 || !draw[part])
+          continue;
+        for (var k = 0; k < 3; k++)
+        {
+          var index = indices[t * 3 + k];
+          if ((uint)index >= (uint)positions.Length)
+            continue;
+          var point = positions[index];
+          min = Vector3.Min(min, point);
+          max = Vector3.Max(max, point);
+          any = true;
+        }
+      }
+    }
+
+    if (!any)
+    {
+      center = Vector3.Zero;
+      extent = Vector3.One;
+      return false;
+    }
+
+    center = (min + max) * 0.5f;
+    extent = Vector3.Max(max - min, new Vector3(0.05f));
+    return true;
+  }
+
+  private static PreviewImage? Lookup(IReadOnlyDictionary<string, PreviewImage>? map, string? name)
+    => map is not null && name is not null && map.TryGetValue(name, out var image) && image.Width > 0 && image.Height > 0
+      && image.Bgra.Length >= image.Width * image.Height * 4 ? image : null;
+
+  private sealed class Target
+  {
+    public readonly int Width;
+    public readonly int Height;
+    public readonly byte[] Pixels;
+    public readonly float[] Depth;
+
+    public Target(int width, int height)
+    {
+      Width = width;
+      Height = height;
+      Pixels = new byte[width * height * 4];
+      Depth = new float[width * height];
+      Array.Fill(Depth, float.PositiveInfinity);
+      var bg = BitConverter.ToUInt32(new byte[] { 22, 24, 28, 255 });
+      MemoryMarshalFill(Pixels, bg);
+    }
+
+    private static void MemoryMarshalFill(byte[] pixels, uint value)
+      => System.Runtime.InteropServices.MemoryMarshal.Cast<byte, uint>(pixels.AsSpan()).Fill(value);
+
+    public byte[] Resolve(int width, int height, int ss)
+    {
+      if (ss == 1)
+        return Pixels;
+      var output = new byte[width * height * 4];
+      var inv = 1f / (ss * ss);
+      Parallel.For(0, height, y =>
+      {
+        for (var x = 0; x < width; x++)
+        {
+          int b = 0, g = 0, r = 0;
+          for (var j = 0; j < ss; j++)
+          {
+            var row = ((y * ss + j) * Width + x * ss) * 4;
+            for (var i = 0; i < ss; i++)
+            {
+              b += Pixels[row + i * 4];
+              g += Pixels[row + i * 4 + 1];
+              r += Pixels[row + i * 4 + 2];
+            }
+          }
+
+          var o = (y * width + x) * 4;
+          output[o] = (byte)(b * inv + 0.5f);
+          output[o + 1] = (byte)(g * inv + 0.5f);
+          output[o + 2] = (byte)(r * inv + 0.5f);
+          output[o + 3] = 255;
+        }
+      });
+      return output;
+    }
+  }
+
+  private struct Lights
+  {
+    public Vector3 Key;
+    public Vector3 Fill;
+    public Vector3 Eye;
+  }
+
+  private sealed class PartMaterial
+  {
+    public PreviewImage? Albedo;
+    public PreviewImage? Normal;
+    public PreviewImage? Specular;
+    public string SpecChannels = "";
+    public Vector3 Solid;
+    public MipChain? AlbedoMips;
+    public MipChain? NormalMips;
+    public MipChain? SpecMips;
+    public bool RoughInAlpha;
+    public bool AoInBlue;
+
+    public PartMaterial Resolve()
+    {
+      AlbedoMips = Albedo is null ? null : MipChain.For(Albedo);
+      NormalMips = Normal is null ? null : MipChain.For(Normal);
+      SpecMips = Specular is null ? null : MipChain.For(Specular);
+      RoughInAlpha = SpecChannels.Contains("Roughness(a)", StringComparison.OrdinalIgnoreCase);
+      AoInBlue = SpecChannels.Contains("AO(b)", StringComparison.OrdinalIgnoreCase) || SpecChannels.Length == 0;
+      return this;
+    }
+  }
+
+  private sealed class Frame
+  {
+    public required Target Target;
+    public required float[] Sx, Sy, Sz, Iw;
+    public required Vector3[] Positions;
+    public required Vector3[] Normals;
+    public required Vector2[] Uvs;
+    public required int[] Indices;
+    public required int[] TriPart;
+    public required PartMaterial[] Materials;
+    public required Lights Light;
+    public bool PartCountZero;
+  }
+
+  private sealed class Prepared
+  {
+    public required Vector3[] Positions;
+    public required Vector3[] Normals;
+    public required Vector2[] Uvs;
+    public required int[] Indices;
+    public required int[] TriPart;
+    public SkinWeights[]? Skin;
+  }
+
+  private static readonly System.Runtime.CompilerServices.ConditionalWeakTable<object, Prepared> PreparedCache = new();
+
+  private static Prepared Prepare(DrawSlice slice)
+    => PreparedCache.GetValue(slice.Indices, _ =>
+    {
+      var positions = slice.Positions.ToArray();
+      var normals = slice.Normals.Count == positions.Length ? slice.Normals.ToArray() : ComputeNormals(positions, slice.Indices);
+      var uvs = slice.Uvs.Count == positions.Length ? slice.Uvs.ToArray() : new Vector2[positions.Length];
+      var indices = slice.Indices.ToArray();
+      var triPart = new int[indices.Length / 3];
+      var parts = slice.Parts;
+      if (parts.Count == 0)
+        Array.Fill(triPart, 0);
+      else
+      {
+        Array.Fill(triPart, -1);
+        for (var p = 0; p < parts.Count; p++)
+        {
+          var start = Math.Max(0, parts[p].IndexStart);
+          var end = Math.Min(indices.Length, parts[p].IndexStart + parts[p].IndexCount);
+          for (var i = start - start % 3; i < end && i / 3 < triPart.Length; i += 3)
+            triPart[i / 3] = p;
+        }
+      }
+
+      return new Prepared
+      {
+        Positions = positions,
+        Normals = normals,
+        Uvs = uvs,
+        Indices = indices,
+        TriPart = triPart,
+        Skin = slice.Skin.Count == positions.Length ? slice.Skin.ToArray() : null,
+      };
+    });
+
+  private static Vector3[] ComputeNormals(Vector3[] positions, IReadOnlyList<int> indices)
+  {
+    var normals = new Vector3[positions.Length];
+    for (var i = 0; i + 2 < indices.Count; i += 3)
+    {
+      int a = indices[i], b = indices[i + 1], c = indices[i + 2];
+      if ((uint)a >= (uint)positions.Length || (uint)b >= (uint)positions.Length || (uint)c >= (uint)positions.Length)
+        continue;
+      var n = Vector3.Cross(positions[b] - positions[a], positions[c] - positions[a]);
+      normals[a] += n;
+      normals[b] += n;
+      normals[c] += n;
+    }
+
+    for (var i = 0; i < normals.Length; i++)
+      normals[i] = normals[i].LengthSquared() > 1e-12f ? Vector3.Normalize(normals[i]) : Vector3.UnitY;
+    return normals;
+  }
+
+  private static void Skin(Prepared prepared, Matrix4x4[] matrices, Vector3 offset, ParallelOptions parallel, out Vector3[] positions, out Vector3[] normals)
+  {
+    var count = prepared.Positions.Length;
+    var outPos = new Vector3[count];
+    var outNrm = new Vector3[count];
+    var src = prepared.Positions;
+    var srcN = prepared.Normals;
+    var skin = prepared.Skin!;
+    Parallel.For(0, (count + 4095) / 4096, parallel, chunk =>
+    {
+      var end = Math.Min(count, (chunk + 1) * 4096);
+      for (var i = chunk * 4096; i < end; i++)
+      {
+        var weights = skin[i];
+        var total = weights.W0 + weights.W1 + weights.W2 + weights.W3;
+        if (total <= 0)
+        {
+          outPos[i] = src[i] + offset;
+          outNrm[i] = srcN[i];
+          continue;
+        }
+
+        var p = Vector3.Zero;
+        var n = Vector3.Zero;
+        Accumulate(src[i], srcN[i], matrices, weights.J0, weights.W0, ref p, ref n);
+        Accumulate(src[i], srcN[i], matrices, weights.J1, weights.W1, ref p, ref n);
+        Accumulate(src[i], srcN[i], matrices, weights.J2, weights.W2, ref p, ref n);
+        Accumulate(src[i], srcN[i], matrices, weights.J3, weights.W3, ref p, ref n);
+        outPos[i] = p + offset;
+        outNrm[i] = n.LengthSquared() > 1e-12f ? Vector3.Normalize(n) : srcN[i];
+      }
+    });
+    positions = outPos;
+    normals = outNrm;
+  }
+
+  private static void Accumulate(Vector3 position, Vector3 normal, Matrix4x4[] matrices, int bone, float weight, ref Vector3 p, ref Vector3 n)
+  {
+    if (weight == 0)
+      return;
+    if ((uint)bone >= (uint)matrices.Length)
+    {
+      p += position * weight;
+      n += normal * weight;
+      return;
+    }
+
+    p += Vector3.Transform(position, matrices[bone]) * weight;
+    n += Vector3.TransformNormal(normal, matrices[bone]) * weight;
+  }
+
+  private static bool Project(Vector3 position, Matrix4x4 viewProjection, int width, int height, out float x, out float y, out float z)
+  {
+    var clip = Vector4.Transform(new Vector4(position, 1), viewProjection);
+    if (clip.W <= 0.0001f)
+    {
+      x = y = z = 0;
+      return false;
+    }
+
+    x = (clip.X / clip.W * 0.5f + 0.5f) * width;
+    y = (1f - (clip.Y / clip.W * 0.5f + 0.5f)) * height;
+    z = clip.Z / clip.W;
+    return true;
+  }
+
+  private static void RasterTriangle(Frame f, int t, int bandY0, int bandY1)
+  {
+    var idx = f.Indices;
+    int a = idx[t * 3], b = idx[t * 3 + 1], c = idx[t * 3 + 2];
+    float ax = f.Sx[a], ay = f.Sy[a], bx = f.Sx[b], by = f.Sy[b], cx = f.Sx[c], cy = f.Sy[c];
+    var area = Edge(ax, ay, bx, by, cx, cy);
+    if (MathF.Abs(area) < 1e-6f)
+      return;
+    var target = f.Target;
+    var width = target.Width;
+    var minX = Math.Max(0, (int)MathF.Floor(MathF.Min(ax, MathF.Min(bx, cx))));
+    var maxX = Math.Min(width - 1, (int)MathF.Ceiling(MathF.Max(ax, MathF.Max(bx, cx))));
+    var minY = Math.Max(bandY0, (int)MathF.Floor(MathF.Min(ay, MathF.Min(by, cy))));
+    var maxY = Math.Min(bandY1 - 1, (int)MathF.Ceiling(MathF.Max(ay, MathF.Max(by, cy))));
+    if (minX > maxX || minY > maxY)
+      return;
+
+    var material = f.Materials[f.PartCountZero ? 0 : f.TriPart[t]];
+    var invArea = 1f / area;
+    float az = f.Sz[a], bz = f.Sz[b], cz = f.Sz[c];
+    float aw = f.Iw[a], bw = f.Iw[b], cw = f.Iw[c];
+    var na = f.Normals[a];
+    var nb = f.Normals[b];
+    var nc = f.Normals[c];
+    var ua = f.Uvs[a];
+    var ub = f.Uvs[b];
+    var uc = f.Uvs[c];
+    var pa = f.Positions[a];
+    var pb = f.Positions[b];
+    var pc = f.Positions[c];
+
+    // Per-triangle tangent frame from UV derivatives.
+    var e1 = pb - pa;
+    var e2 = pc - pa;
+    var d1 = ub - ua;
+    var d2 = uc - ua;
+    var det = d1.X * d2.Y - d1.Y * d2.X;
+    var tangent = Vector3.UnitX;
+    var bitangent = Vector3.UnitZ;
+    var hasFrame = false;
+    if (MathF.Abs(det) > 1e-12f)
+    {
+      var invDet = 1f / det;
+      tangent = (e1 * d2.Y - e2 * d1.Y) * invDet;
+      bitangent = (e2 * d1.X - e1 * d2.X) * invDet;
+      hasFrame = tangent.LengthSquared() > 1e-16f && bitangent.LengthSquared() > 1e-16f;
+    }
+
+    // Mip level: texels covered per screen pixel, constant across the triangle.
+    var uvArea = MathF.Abs(det) * 0.5f;
+    var screenArea = MathF.Abs(area) * 0.5f;
+    var albedo = material.AlbedoMips;
+    var normalMip = material.NormalMips;
+    var specMip = material.SpecMips;
+    var albedoLevel = albedo?.Level(uvArea, screenArea) ?? 0;
+    var normalLevel = normalMip?.Level(uvArea, screenArea) ?? 0;
+    var specLevel = specMip?.Level(uvArea, screenArea) ?? 0;
+    var roughInAlpha = material.RoughInAlpha;
+    var aoInBlue = material.AoInBlue;
+    var light = f.Light;
+    var view = light.Eye - (pa + pb + pc) / 3f;
+    view = view.LengthSquared() < 1e-12f ? Vector3.UnitZ : Vector3.Normalize(view);
+    var half = Vector3.Normalize(light.Key + view);
+    var pixels = target.Pixels;
+    var depth = target.Depth;
+
+    for (var y = minY; y <= maxY; y++)
+    {
+      var py = y + 0.5f;
+      var row = y * width;
+      for (var x = minX; x <= maxX; x++)
+      {
+        var px = x + 0.5f;
+        var w0 = Edge(bx, by, cx, cy, px, py) * invArea;
+        var w1 = Edge(cx, cy, ax, ay, px, py) * invArea;
+        var w2 = 1f - w0 - w1;
+        if (w0 < 0 || w1 < 0 || w2 < 0)
+          continue;
+        var z = w0 * az + w1 * bz + w2 * cz;
+        var index = row + x;
+        if (z >= depth[index])
+          continue;
+        depth[index] = z;
+
+        // Perspective-correct attribute weights.
+        var q0 = w0 * aw;
+        var q1 = w1 * bw;
+        var q2 = w2 * cw;
+        var qs = 1f / (q0 + q1 + q2);
+        q0 *= qs;
+        q1 *= qs;
+        q2 *= qs;
+        var normal = na * q0 + nb * q1 + nc * q2;
+        normal = normal.LengthSquared() > 1e-12f ? Vector3.Normalize(normal) : Vector3.UnitY;
+        var u = ua.X * q0 + ub.X * q1 + uc.X * q2;
+        var v = ua.Y * q0 + ub.Y * q1 + uc.Y * q2;
+
+        Vector3 baseColor;
+        if (albedo is not null)
+          baseColor = albedo.Sample(albedoLevel, u, v, out _);
+        else
+          baseColor = material.Solid;
+
+        var lit = normal;
+        var gloss = 1f;
+        if (normalMip is not null && hasFrame)
+        {
+          var bgr = normalMip.Sample(normalLevel, u, v, out _);
+          var raw = new Vector3(bgr.Z, bgr.Y, bgr.X) * (2f / 255f) - Vector3.One;
+          var len = raw.Length();
+          if (len > 1e-4f)
+          {
+            // Gram-Schmidt the triangle tangent against the smooth normal.
+            var tn = tangent - normal * Vector3.Dot(tangent, normal);
+            var bn = bitangent - normal * Vector3.Dot(bitangent, normal);
+            if (tn.LengthSquared() > 1e-16f && bn.LengthSquared() > 1e-16f)
+            {
+              var mapped = Vector3.Normalize(tn) * raw.X + Vector3.Normalize(bn) * raw.Y + normal * raw.Z;
+              if (mapped.LengthSquared() > 1e-8f)
+                lit = Vector3.Normalize(mapped);
+            }
+
+            gloss = Math.Clamp(len, 0.05f, 1f);
+          }
+        }
+
+        var metal = 0f;
+        var rough = 0.45f;
+        var ao = 1f;
+        if (specMip is not null)
+        {
+          var s = specMip.Sample(specLevel, u, v, out var sa);
+          metal = s.Z / 255f;
+          rough = roughInAlpha ? sa / 255f : s.Y / 255f;
+          ao = aoInBlue ? s.X / 255f : 1f;
+        }
+
+        var ndotl = Math.Clamp(Vector3.Dot(lit, light.Key), 0f, 1f);
+        var ndotf = Math.Clamp(Vector3.Dot(lit, light.Fill), 0f, 1f);
+        var ndoth = Math.Clamp(Vector3.Dot(lit, half), 0f, 1f);
+        var exponent = 8f + (1f - Math.Clamp(rough, 0f, 1f)) * 56f;
+        // Toksvig: a shortened averaged normal widens the lobe so mip-filtered bumps do not sparkle.
+        exponent = gloss * exponent / (gloss + exponent * (1f - gloss));
+        var spec = MathF.Pow(ndoth, exponent) * (0.04f + metal * 0.85f) * ndotl * ((exponent + 8f) / 64f);
+        var diffuse = (0.16f + 0.72f * ndotl + 0.18f * ndotf) * (0.25f + 0.75f * ao);
+        var pixel = index * 4;
+        var specByte = spec * 255f;
+        pixels[pixel] = (byte)Math.Clamp(baseColor.X * diffuse + specByte, 0, 255);
+        pixels[pixel + 1] = (byte)Math.Clamp(baseColor.Y * diffuse + specByte, 0, 255);
+        pixels[pixel + 2] = (byte)Math.Clamp(baseColor.Z * diffuse + specByte, 0, 255);
+        pixels[pixel + 3] = 255;
+      }
+    }
+  }
+
+  /// <summary>Box-filtered mip chain of a BGRA image, cached per image. Samples are bilinear with wrap.</summary>
+  private sealed class MipChain
+  {
+    private static readonly System.Runtime.CompilerServices.ConditionalWeakTable<PreviewImage, MipChain> Cache = new();
+    private readonly int[] _w;
+    private readonly int[] _h;
+    private readonly byte[][] _data;
+
+    private MipChain(PreviewImage image)
+    {
+      var w = new List<int> { image.Width };
+      var h = new List<int> { image.Height };
+      var data = new List<byte[]> { image.Bgra };
+      while (w[^1] > 1 || h[^1] > 1)
+      {
+        int pw = w[^1], ph = h[^1];
+        int nw = Math.Max(1, pw / 2), nh = Math.Max(1, ph / 2);
+        var src = data[^1];
+        var dst = new byte[nw * nh * 4];
+        for (var y = 0; y < nh; y++)
+        {
+          var y0 = Math.Min(ph - 1, y * 2);
+          var y1 = Math.Min(ph - 1, y * 2 + 1);
+          for (var x = 0; x < nw; x++)
+          {
+            var x0 = Math.Min(pw - 1, x * 2);
+            var x1 = Math.Min(pw - 1, x * 2 + 1);
+            for (var ch = 0; ch < 4; ch++)
+            {
+              var sum = src[(y0 * pw + x0) * 4 + ch] + src[(y0 * pw + x1) * 4 + ch] + src[(y1 * pw + x0) * 4 + ch] + src[(y1 * pw + x1) * 4 + ch];
+              dst[(y * nw + x) * 4 + ch] = (byte)((sum + 2) >> 2);
+            }
+          }
+        }
+
+        w.Add(nw);
+        h.Add(nh);
+        data.Add(dst);
+      }
+
+      _w = w.ToArray();
+      _h = h.ToArray();
+      _data = data.ToArray();
+    }
+
+    public static MipChain For(PreviewImage image)
+    {
+      lock (Cache)
+        return Cache.GetValue(image, img => new MipChain(img));
+    }
+
+    public int Level(float uvArea, float screenArea)
+    {
+      if (screenArea <= 1e-6f)
+        return _w.Length - 1;
+      var texels = uvArea * _w[0] * _h[0];
+      var level = 0.5f * MathF.Log2(Math.Max(texels / screenArea, 1e-6f));
+      return Math.Clamp((int)MathF.Round(level), 0, _w.Length - 1);
+    }
+
+    /// <summary>Returns (b, g, r) in 0..255 and alpha.</summary>
+    public Vector3 Sample(int level, float u, float v, out float alpha)
+    {
+      var w = _w[level];
+      var h = _h[level];
+      var data = _data[level];
+      u -= MathF.Floor(u);
+      v -= MathF.Floor(v);
+      var fx = u * w - 0.5f;
+      var fy = v * h - 0.5f;
+      var x0 = (int)MathF.Floor(fx);
+      var y0 = (int)MathF.Floor(fy);
+      var tx = fx - x0;
+      var ty = fy - y0;
+      var x1 = x0 + 1;
+      var y1 = y0 + 1;
+      x0 = ((x0 % w) + w) % w;
+      x1 = ((x1 % w) + w) % w;
+      y0 = ((y0 % h) + h) % h;
+      y1 = ((y1 % h) + h) % h;
+      var i00 = (y0 * w + x0) * 4;
+      var i10 = (y0 * w + x1) * 4;
+      var i01 = (y1 * w + x0) * 4;
+      var i11 = (y1 * w + x1) * 4;
+      float w00 = (1 - tx) * (1 - ty), w10 = tx * (1 - ty), w01 = (1 - tx) * ty, w11 = tx * ty;
+      var b = data[i00] * w00 + data[i10] * w10 + data[i01] * w01 + data[i11] * w11;
+      var g = data[i00 + 1] * w00 + data[i10 + 1] * w10 + data[i01 + 1] * w01 + data[i11 + 1] * w11;
+      var r = data[i00 + 2] * w00 + data[i10 + 2] * w10 + data[i01 + 2] * w01 + data[i11 + 2] * w11;
+      alpha = data[i00 + 3] * w00 + data[i10 + 3] * w10 + data[i01 + 3] * w01 + data[i11 + 3] * w11;
+      return new Vector3(b, g, r);
+    }
   }
 
   public static float FitDistance(ExportedMesh mesh, float aspect, int lod = 0, int part = -1)
@@ -429,44 +1099,6 @@ public static class MeshPreview
     skin = level.Skin;
     return true;
   }
-
-  private static IReadOnlyList<Vector3> PosedPositions(
-    ExportedMesh mesh,
-    IReadOnlyList<Vector3> positions,
-    IReadOnlyList<SkinWeights> skin,
-    float time)
-  {
-    if (skin.Count != positions.Count || mesh.Bones.Count == 0 || mesh.Clip is null || !mesh.Clip.HasCurves)
-      return positions;
-
-    var worlds = BoneWorlds(mesh, time);
-    var binds = new Matrix4x4[mesh.Bones.Count];
-    for (var i = 0; i < binds.Length; i++)
-      binds[i] = mesh.Bones[i].InverseBind * worlds[i];
-
-    var posed = new List<Vector3>(positions.Count);
-    for (var i = 0; i < positions.Count; i++)
-    {
-      var weights = skin[i];
-      var position = positions[i];
-      var accumulated = Transform(position, binds, weights.J0) * weights.W0;
-      accumulated += Transform(position, binds, weights.J1) * weights.W1;
-      accumulated += Transform(position, binds, weights.J2) * weights.W2;
-      accumulated += Transform(position, binds, weights.J3) * weights.W3;
-      var weight = weights.W0 + weights.W1 + weights.W2 + weights.W3;
-      posed.Add(weight > 0 ? accumulated : position);
-    }
-
-    return posed;
-  }
-
-  private static Vector3 Transform(Vector3 position, Matrix4x4[] binds, int bone)
-  {
-    if ((uint)bone >= (uint)binds.Length)
-      return position;
-    return Vector3.Transform(position, binds[bone]);
-  }
-
   public static Matrix4x4[] BoneWorlds(ExportedMesh mesh, float time)
   {
     var worlds = new Matrix4x4[mesh.Bones.Count];
@@ -552,255 +1184,6 @@ public static class MeshPreview
 
   private static Vector3 Translation(Matrix4x4 matrix)
     => new(matrix.M41, matrix.M42, matrix.M43);
-
-  private static bool Project(Vector3 position, Matrix4x4 viewProjection, int width, int height, out float x, out float y, out float z)
-  {
-    var clip = Vector4.Transform(new Vector4(position, 1), viewProjection);
-    if (clip.W <= 0.0001f)
-    {
-      x = y = z = 0;
-      return false;
-    }
-
-    var ndcX = clip.X / clip.W;
-    var ndcY = clip.Y / clip.W;
-    x = (ndcX * 0.5f + 0.5f) * (width - 1);
-    y = (1f - (ndcY * 0.5f + 0.5f)) * (height - 1);
-    z = clip.Z / clip.W;
-    return true;
-  }
-
-  private static void Fill(
-    byte[] pixels, float[] depth, int width, int height,
-    float ax, float ay, float az, float bx, float by, float bz, float cx, float cy, float cz,
-    byte b, byte g, byte r)
-  {
-    var minX = Math.Clamp((int)MathF.Floor(MathF.Min(ax, MathF.Min(bx, cx))), 0, width - 1);
-    var maxX = Math.Clamp((int)MathF.Ceiling(MathF.Max(ax, MathF.Max(bx, cx))), 0, width - 1);
-    var minY = Math.Clamp((int)MathF.Floor(MathF.Min(ay, MathF.Min(by, cy))), 0, height - 1);
-    var maxY = Math.Clamp((int)MathF.Ceiling(MathF.Max(ay, MathF.Max(by, cy))), 0, height - 1);
-    var area = Edge(ax, ay, bx, by, cx, cy);
-    if (MathF.Abs(area) < 0.0001f)
-      return;
-
-    for (var y = minY; y <= maxY; y++)
-    {
-      var row = y * width;
-      for (var x = minX; x <= maxX; x++)
-      {
-        var px = x + 0.5f;
-        var py = y + 0.5f;
-        var w0 = Edge(bx, by, cx, cy, px, py);
-        var w1 = Edge(cx, cy, ax, ay, px, py);
-        var w2 = Edge(ax, ay, bx, by, px, py);
-        if (area < 0)
-        {
-          w0 = -w0;
-          w1 = -w1;
-          w2 = -w2;
-        }
-
-        if (w0 < 0 || w1 < 0 || w2 < 0)
-          continue;
-
-        var z = (w0 * az + w1 * bz + w2 * cz) / MathF.Abs(area);
-        var index = row + x;
-        if (z >= depth[index])
-          continue;
-        depth[index] = z;
-        var pixel = index * 4;
-        pixels[pixel] = b;
-        pixels[pixel + 1] = g;
-        pixels[pixel + 2] = r;
-        pixels[pixel + 3] = 255;
-      }
-    }
-  }
-
-  private static void FillTextured(
-    byte[] pixels, float[] depth, int width, int height,
-    float ax, float ay, float az, float bx, float by, float bz, float cx, float cy, float cz,
-    float au, float av, float bu, float bv, float cu, float cv,
-    PreviewImage image, float shade)
-  {
-    var minX = Math.Clamp((int)MathF.Floor(MathF.Min(ax, MathF.Min(bx, cx))), 0, width - 1);
-    var maxX = Math.Clamp((int)MathF.Ceiling(MathF.Max(ax, MathF.Max(bx, cx))), 0, width - 1);
-    var minY = Math.Clamp((int)MathF.Floor(MathF.Min(ay, MathF.Min(by, cy))), 0, height - 1);
-    var maxY = Math.Clamp((int)MathF.Ceiling(MathF.Max(ay, MathF.Max(by, cy))), 0, height - 1);
-    var area = Edge(ax, ay, bx, by, cx, cy);
-    var absArea = MathF.Abs(area);
-    if (absArea < 0.0001f || image.Width <= 0 || image.Height <= 0 || image.Bgra.Length < image.Width * image.Height * 4)
-      return;
-
-    for (var y = minY; y <= maxY; y++)
-    {
-      var row = y * width;
-      for (var x = minX; x <= maxX; x++)
-      {
-        var px = x + 0.5f;
-        var py = y + 0.5f;
-        var w0 = Edge(bx, by, cx, cy, px, py);
-        var w1 = Edge(cx, cy, ax, ay, px, py);
-        var w2 = Edge(ax, ay, bx, by, px, py);
-        if (area < 0)
-        {
-          w0 = -w0;
-          w1 = -w1;
-          w2 = -w2;
-        }
-
-        if (w0 < 0 || w1 < 0 || w2 < 0)
-          continue;
-
-        var inv = 1f / absArea;
-        var z = (w0 * az + w1 * bz + w2 * cz) * inv;
-        var index = row + x;
-        if (z >= depth[index])
-          continue;
-        depth[index] = z;
-        var u = (w0 * au + w1 * bu + w2 * cu) * inv;
-        var v = (w0 * av + w1 * bv + w2 * cv) * inv;
-        Sample(image, u, v, out var tb, out var tg, out var tr);
-        var pixel = index * 4;
-        pixels[pixel] = (byte)(tb * shade);
-        pixels[pixel + 1] = (byte)(tg * shade);
-        pixels[pixel + 2] = (byte)(tr * shade);
-        pixels[pixel + 3] = 255;
-      }
-    }
-  }
-
-  private static void FillLit(
-    byte[] pixels, float[] depth, int width, int height,
-    float ax, float ay, float az, float bx, float by, float bz, float cx, float cy, float cz,
-    float au, float av, float bu, float bv, float cu, float cv,
-    PreviewImage albedo, PreviewImage? normalMap, PreviewImage? specular,
-    Vector3 p0, Vector3 p1, Vector3 p2, Vector3 geometric, Vector3 key, Vector3 eye)
-  {
-    var minX = Math.Clamp((int)MathF.Floor(MathF.Min(ax, MathF.Min(bx, cx))), 0, width - 1);
-    var maxX = Math.Clamp((int)MathF.Ceiling(MathF.Max(ax, MathF.Max(bx, cx))), 0, width - 1);
-    var minY = Math.Clamp((int)MathF.Floor(MathF.Min(ay, MathF.Min(by, cy))), 0, height - 1);
-    var maxY = Math.Clamp((int)MathF.Ceiling(MathF.Max(ay, MathF.Max(by, cy))), 0, height - 1);
-    var area = Edge(ax, ay, bx, by, cx, cy);
-    var absArea = MathF.Abs(area);
-    if (absArea < 0.0001f || albedo.Width <= 0 || albedo.Height <= 0 || albedo.Bgra.Length < albedo.Width * albedo.Height * 4)
-      return;
-
-    geometric = geometric.LengthSquared() < 1e-8f ? Vector3.UnitY : Vector3.Normalize(geometric);
-    var tangent = Vector3.UnitX;
-    var bitangent = Vector3.UnitZ;
-    var e1 = p1 - p0;
-    var e2 = p2 - p0;
-    var d1 = new Vector2(bu - au, bv - av);
-    var d2 = new Vector2(cu - au, cv - av);
-    var det = d1.X * d2.Y - d1.Y * d2.X;
-    if (MathF.Abs(det) > 1e-8f)
-    {
-      var invDet = 1f / det;
-      var rawT = (e1 * d2.Y - e2 * d1.Y) * invDet;
-      var rawB = (e2 * d1.X - e1 * d2.X) * invDet;
-      rawT -= geometric * Vector3.Dot(rawT, geometric);
-      if (rawT.LengthSquared() > 1e-8f)
-        tangent = Vector3.Normalize(rawT);
-      rawB -= geometric * Vector3.Dot(rawB, geometric);
-      bitangent = rawB.LengthSquared() > 1e-8f ? Vector3.Normalize(rawB) : Vector3.Normalize(Vector3.Cross(geometric, tangent));
-    }
-
-    var view = eye - (p0 + p1 + p2) / 3f;
-    view = view.LengthSquared() < 1e-8f ? Vector3.UnitZ : Vector3.Normalize(view);
-    var half = Vector3.Normalize(key + view);
-    var channels = specular?.Channels ?? "";
-    var roughInAlpha = channels.Contains("Roughness(a)", StringComparison.OrdinalIgnoreCase);
-    var aoInBlue = channels.Contains("AO(b)", StringComparison.OrdinalIgnoreCase) || channels.Length == 0;
-
-    for (var y = minY; y <= maxY; y++)
-    {
-      var row = y * width;
-      for (var x = minX; x <= maxX; x++)
-      {
-        var px = x + 0.5f;
-        var py = y + 0.5f;
-        var w0 = Edge(bx, by, cx, cy, px, py);
-        var w1 = Edge(cx, cy, ax, ay, px, py);
-        var w2 = Edge(ax, ay, bx, by, px, py);
-        if (area < 0)
-        {
-          w0 = -w0;
-          w1 = -w1;
-          w2 = -w2;
-        }
-
-        if (w0 < 0 || w1 < 0 || w2 < 0)
-          continue;
-
-        var inv = 1f / absArea;
-        var z = (w0 * az + w1 * bz + w2 * cz) * inv;
-        var index = row + x;
-        if (z >= depth[index])
-          continue;
-        depth[index] = z;
-        var u = (w0 * au + w1 * bu + w2 * cu) * inv;
-        var v = (w0 * av + w1 * bv + w2 * cv) * inv;
-        Sample(albedo, u, v, out var tb, out var tg, out var tr);
-        var lit = geometric;
-        if (normalMap is not null && normalMap.Width > 0)
-        {
-          Sample(normalMap, u, v, out var nb, out var ng, out var nr);
-          var nx = nr / 255f * 2f - 1f;
-          var ny = ng / 255f * 2f - 1f;
-          var nz = nb / 255f * 2f - 1f;
-          var mapped = tangent * nx + bitangent * ny + geometric * nz;
-          if (mapped.LengthSquared() > 1e-6f)
-            lit = Vector3.Normalize(mapped);
-        }
-
-        var metal = 0f;
-        var rough = 0.45f;
-        var ao = 1f;
-        if (specular is not null && specular.Width > 0)
-        {
-          Sample(specular, u, v, out var sb, out var sg, out var sr);
-          var sa = Alpha(specular, u, v);
-          metal = sr / 255f;
-          rough = roughInAlpha ? sa / 255f : sg / 255f;
-          ao = aoInBlue ? sb / 255f : 1f;
-        }
-
-        var ndotl = Math.Clamp(Vector3.Dot(lit, key), 0f, 1f);
-        var ndoth = Math.Clamp(Vector3.Dot(lit, half), 0f, 1f);
-        var shine = MathF.Pow(ndoth, 8f + (1f - Math.Clamp(rough, 0f, 1f)) * 56f);
-        var spec = shine * (0.04f + metal * 0.85f) * ndotl;
-        var diffuse = (0.18f + 0.82f * ndotl) * (0.25f + 0.75f * ao);
-        var pixel = index * 4;
-        pixels[pixel] = (byte)Math.Clamp(tb * diffuse + spec * 255f, 0, 255);
-        pixels[pixel + 1] = (byte)Math.Clamp(tg * diffuse + spec * 255f, 0, 255);
-        pixels[pixel + 2] = (byte)Math.Clamp(tr * diffuse + spec * 255f, 0, 255);
-        pixels[pixel + 3] = 255;
-      }
-    }
-  }
-
-  private static void Sample(PreviewImage image, float u, float v, out byte b, out byte g, out byte r)
-  {
-    u -= MathF.Floor(u);
-    v -= MathF.Floor(v);
-    var x = Math.Clamp((int)(u * image.Width), 0, image.Width - 1);
-    var y = Math.Clamp((int)(v * image.Height), 0, image.Height - 1);
-    var texel = (y * image.Width + x) * 4;
-    b = image.Bgra[texel];
-    g = image.Bgra[texel + 1];
-    r = image.Bgra[texel + 2];
-  }
-
-  private static byte Alpha(PreviewImage image, float u, float v)
-  {
-    u -= MathF.Floor(u);
-    v -= MathF.Floor(v);
-    var x = Math.Clamp((int)(u * image.Width), 0, image.Width - 1);
-    var y = Math.Clamp((int)(v * image.Height), 0, image.Height - 1);
-    var texel = (y * image.Width + x) * 4;
-    return image.Bgra.Length > texel + 3 ? image.Bgra[texel + 3] : (byte)255;
-  }
 
   private static float Edge(float ax, float ay, float bx, float by, float cx, float cy)
     => (cx - ax) * (by - ay) - (cy - ay) * (bx - ax);

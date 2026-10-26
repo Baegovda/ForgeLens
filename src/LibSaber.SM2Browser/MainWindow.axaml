@@ -73,7 +73,12 @@
       <GridSplitter Grid.Column="3" Width="6" Background="#2C3138" ResizeDirection="Columns" />
       <Grid Grid.Column="4" ColumnDefinitions="*,6,240" MinWidth="320">
       <DockPanel Grid.Column="0" Margin="8,8,4,8" MinWidth="280">
-        <StackPanel DockPanel.Dock="Top" Orientation="Horizontal" Spacing="6">
+        <WrapPanel DockPanel.Dock="Top" Orientation="Horizontal">
+          <WrapPanel.Styles>
+            <Style Selector="WrapPanel > :is(Control)">
+              <Setter Property="Margin" Value="0,0,6,4" />
+            </Style>
+          </WrapPanel.Styles>
           <TextBlock Text="Mip" VerticalAlignment="Center" />
           <ComboBox x:Name="MipBox" Width="64" SelectionChanged="MipChanged" />
           <TextBlock Text="Face" VerticalAlignment="Center" />
@@ -84,14 +89,26 @@
           <ComboBox x:Name="PartBox" Width="220" IsVisible="False" SelectionChanged="ViewChanged" />
           <ToggleButton x:Name="WireToggle" Content="Wireframe" IsChecked="False" IsVisible="False" Click="ViewChanged" />
           <ToggleButton x:Name="SkeletonToggle" Content="Skeleton" IsChecked="False" IsVisible="False" Click="ViewChanged" />
+          <ToggleButton x:Name="SmoothToggle" Content="AA" IsChecked="True" IsVisible="False" Click="ViewChanged"
+                        ToolTip.Tip="2x2 supersampling on still frames (drag and playback render 1x)" />
           <Button x:Name="PlayButton" Content="Play" IsVisible="False" Click="PlayClicked" />
-        </StackPanel>
-        <StackPanel x:Name="AnimBar" DockPanel.Dock="Top" Orientation="Horizontal" Spacing="6" Margin="0,6,0,0" IsVisible="False">
+          <TextBlock x:Name="RenderStats" VerticalAlignment="Center" Opacity="0.7" FontSize="11" />
+        </WrapPanel>
+        <WrapPanel x:Name="AnimBar" DockPanel.Dock="Top" Orientation="Horizontal" Margin="0,2,0,0" IsVisible="False">
+          <WrapPanel.Styles>
+            <Style Selector="WrapPanel > :is(Control)">
+              <Setter Property="Margin" Value="0,0,6,4" />
+            </Style>
+          </WrapPanel.Styles>
           <TextBlock Text="Anim" VerticalAlignment="Center" />
-          <ComboBox x:Name="AnimBox" Width="420" SelectionChanged="AnimChanged" />
+          <TextBox x:Name="AnimFilter" Width="180" Watermark="Filter clips" TextChanged="AnimFilterChanged"
+                   ToolTip.Tip="Substring, case-insensitive. Clips named after this model are listed first." />
+          <ComboBox x:Name="AnimBox" Width="360" SelectionChanged="AnimChanged" />
           <Slider x:Name="ScrubSlider" Width="180" Minimum="0" Maximum="1" IsEnabled="False" ValueChanged="ScrubChanged" />
           <TextBlock x:Name="ScrubLabel" VerticalAlignment="Center" Text="0.00s" />
-        </StackPanel>
+          <CheckBox x:Name="InPlaceToggle" Content="In place" IsChecked="True" Click="ViewChanged"
+                    ToolTip.Tip="Rebase the clip so its first frame stands where the bind pose does (cinematic clips stay in view)" />
+        </WrapPanel>
         <TextBlock x:Name="PreviewNote" DockPanel.Dock="Bottom" TextWrapping="Wrap" Margin="0,8,0,0" />
         <Border x:Name="ViewBorder" Background="#121418" ClipToBounds="True"
                 PointerPressed="ViewPressed" PointerMoved="ViewMoved" PointerReleased="ViewReleased" PointerWheelChanged="ViewWheel">
@@ -111,15 +128,15 @@
       <GridSplitter Grid.Column="1" Width="6" Background="#2C3138" ResizeDirection="Columns" />
       <DockPanel Grid.Column="2" Margin="4,8,8,8">
         <TextBlock DockPanel.Dock="Top" Text="Meshes" FontWeight="SemiBold" Margin="4,0,0,4" />
-        <ListBox x:Name="MeshList" Background="#14161A">
-          <ListBox.ItemTemplate>
-            <DataTemplate x:DataType="local:MeshToggle">
+        <TreeView x:Name="MeshList" Background="#14161A">
+          <TreeView.ItemTemplate>
+            <TreeDataTemplate x:DataType="local:MeshToggle" ItemsSource="{Binding Children}">
               <CheckBox IsChecked="{Binding Visible}" ToolTip.Tip="{Binding Tip}" Margin="2,1">
                 <TextBlock Text="{Binding Label}" TextTrimming="CharacterEllipsis" />
               </CheckBox>
-            </DataTemplate>
-          </ListBox.ItemTemplate>
-        </ListBox>
+            </TreeDataTemplate>
+          </TreeView.ItemTemplate>
+        </TreeView>
       </DockPanel>
       </Grid>
     </Grid>

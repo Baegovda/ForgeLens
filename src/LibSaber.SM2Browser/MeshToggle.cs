@@ -24,6 +24,36 @@ public sealed class MeshToggle : INotifyPropertyChanged
 
   public string Label => _part.Name;
 
+  /// <summary>LOD variants of this mesh (<c>_LOD1</c>.. <c>_LODn</c>), shown collapsed under it.</summary>
+  public List<MeshToggle> Children { get; } = new();
+
+  /// <summary>Base name with a trailing LOD suffix removed (<c>body_LOD2</c> becomes <c>body</c>).</summary>
+  public static string BaseName(string name)
+    => LodSuffix.Replace(name, "");
+
+  public static bool IsLod(string name)
+    => LodSuffix.IsMatch(name);
+
+  private static readonly System.Text.RegularExpressions.Regex LodSuffix =
+    new(@"[_\.\- ]?lod_?\d+$", System.Text.RegularExpressions.RegexOptions.IgnoreCase | System.Text.RegularExpressions.RegexOptions.CultureInvariant);
+
+  /// <summary>Nests LOD variants under their base mesh. A group without a base row promotes its lowest LOD.</summary>
+  public static List<MeshToggle> Group(IEnumerable<MeshToggle> toggles)
+  {
+    var roots = new List<MeshToggle>();
+    foreach (var group in toggles.GroupBy(t => BaseName(t.Label), StringComparer.OrdinalIgnoreCase))
+    {
+      var items = group.OrderBy(t => IsLod(t.Label) ? 1 : 0).ThenBy(t => t.Label, StringComparer.OrdinalIgnoreCase).ToList();
+      var root = items[0];
+      root.Children.Clear();
+      root.Children.AddRange(items.Skip(1));
+      roots.Add(root);
+    }
+
+    roots.Sort((a, b) => string.Compare(a.Label, b.Label, StringComparison.OrdinalIgnoreCase));
+    return roots;
+  }
+
   public string Tip { get; }
 
   public bool Visible
