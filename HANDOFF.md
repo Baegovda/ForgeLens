@@ -969,3 +969,18 @@ Based on 00d32bd. Patches in `/workspace/patches/vfx2/`. Captures in `/workspace
 - Known issues (todo, vfx3 item 5): fx_jetpack_attack sprites huge (ageSize spline 0..33 x scale; size treated as half-width) -> size semantics
   need REA; `degNear` near-camera fade not implemented; loose wpn_bolt_rifle_01 tpl decodes LOD1 parts + Object* proxies (drum shape);
   tacticus dash clip on cc_titus_assault leaves ROOT ~9.5 m away even with In place.
+
+## vfx3 part 2 (Grok Bot, 2026-10-27)
+- d6b28f4 missing-texture sprites are skipped (were white quads; this was the "oversized jetpack flame"; size = half-width is right).
+- e5628ce distortion pass: `typeParams.distortion` (normal map, power ageSpline) + `visuals.sdr` DISTORTION. Scene grabbed once,
+  quads redrawn with offset (RG*2-1)*power*alpha*`SM2_VFX_DISTORT` (default 0.04, heuristic). SELF_DISTORTION parsed only.
+- 904110b anim-event stop cues: BlueprintNodeVfxStop / SfxLibraryStopsfx / StopPackOfVfx / StopAllSfx and duration-event
+  OnDeactivate/OnExit set `EffectInstance.StopTime` (emission, trails, lights stop; live particles finish). Retail: 62 stop events.
+- a8abb8c `optimization.degNear/degFar` linear ramp (radStart->radEnd) on size/intens/alpha/disp for sprites (`SM2_VFX_DEG=0` off).
+  Field set confirmed in exe reflection strings; curve shape not REA'd. Not on trails/mesh particles yet.
+- ac0a3d3 bolter drum: Object0080..0098 merged proxies (root children, no mesh name) hidden on templates with a _LOD chain.
+  Note LOD0 of rigid weapons is spread over several vertex pools (by vertex format); the preview already draws visible parts of all pools.
+- 8df6d52 In place: rebase reference must carry deforming bones (cam_anim was picked), gameplay clips get no rebase,
+  `MeshPreview.RemoveRootMotion` strips ROOT XZ travel per frame.
+- Todo: REA grenade smoke colour, trail_bolter_smoke faintness, ratio, blend_add, exposure/light scale, genOnFly;
+  untyped flesh emitter (part_mag_ee_bolter_flesh); VAT blood splashes; SELF_DISTORTION render; degNear on trails/meshes.
