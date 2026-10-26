@@ -135,6 +135,7 @@ public static class TemplateMeshReader
         Name = name,
         Parent = parent >= 0 && parent < objects.Count && parent != i ? parent : -1,
         Local = obj.MatrixModel,
+        AnimIndex = obj.animNmb,
       });
     }
 

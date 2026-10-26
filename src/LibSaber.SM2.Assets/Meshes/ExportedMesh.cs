@@ -19,6 +19,8 @@ public sealed class Bone
   public Matrix4x4 InverseBind { get; set; } = Matrix4x4.Identity;
   public bool FileBind { get; set; }
   public bool Influences { get; set; }
+  /// <summary>The template object's <c>animNmb</c> (-1 = not animated). See <see cref="ClipBinding"/>.</summary>
+  public int AnimIndex { get; set; } = -1;
 }
 
 public struct SkinWeights

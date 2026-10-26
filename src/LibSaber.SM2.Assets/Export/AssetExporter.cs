@@ -259,8 +259,9 @@ public static class AssetExporter
           WriteUnrealScript(animScript, report);
       }
 
-      var bound = clip.Tracks.Count(track => exportMesh.Bones.Exists(bone => bone.Name == track.BoneName));
-      report.Messages.Add($"{clip.Name}: {bound} of {clip.Tracks.Count} tracks match {exportMesh.Name}, {clip.Duration:0.###}s at {clip.SampleRate:0.###} fps.");
+      var bound = ClipBinding.Resolve(exportMesh.Bones, clip).Count(index => index >= 0);
+      var by = ClipBinding.UsesAnimIndex(exportMesh.Bones, clip) ? " (by template animNmb)" : "";
+      report.Messages.Add($"{clip.Name}: {bound} of {clip.Tracks.Count} tracks match {exportMesh.Name}{by}, {clip.Duration:0.###}s at {clip.SampleRate:0.###} fps.");
     }
 
     exportMesh.Clip = null;

@@ -46,10 +46,21 @@ public sealed class AnimationClip
   /// <summary>0xF4 root translation in source meters, Y-up. Empty when the clip has no root track.</summary>
   public List<VectorKey> RootTranslation { get; } = new();
 
-  /// <summary>0xF4 root rotation. Stored so it can be checked against the codec. Export applies translation only.</summary>
+  /// <summary>0xF4 root rotation. Applied with <see cref="RootTranslation"/>, see <see cref="RootMotion"/>.</summary>
   public List<QuatKey> RootRotation { get; } = new();
 
-  /// <summary>When true, <see cref="RootTranslation"/> is added to every skeleton bone whose parent is the scene.</summary>
+  /// <summary>True when any <see cref="RootRotation"/> key differs from identity (vector part above 1e-5, about 0.001 degrees).</summary>
+  public bool HasRootRotation => RootRotation.Exists(key => key.Value.X * key.Value.X + key.Value.Y * key.Value.Y + key.Value.Z * key.Value.Z > 1e-10f);
+
+  /// <summary>
+  ///   When true, the 0xF4 root transform is applied to every skeleton bone whose parent is the scene:
+  ///   local * R_root * T_root (System.Numerics row vectors: rotate about the model origin, then translate).
+  ///   The loader FUN_14222fe40 sums the root track the same way. It samples frame 0 and the last frame
+  ///   (vtbl +8), inverts R0 (FUN_1427aa8a0, conjugate / |q|^2), and stores R0^-1 * (T_last - T0) at root+8
+  ///   (FUN_1427ace20 rotates by the inverse) and R0^-1 * R_last at root+0x14 (FUN_1427ad8b0, product).
+  ///   So T is a parent-space offset that R does not rotate, i.e. p' = R p + T.
+  ///   Rotation is applied only when <see cref="HasRootRotation"/>, which keeps identity-root clips byte-identical.
+  /// </summary>
   public bool RootMotion { get; set; } = true;
 
   public bool HasCurves => Tracks.Exists(track => track.Translation.Count + track.Rotation.Count + track.Scale.Count > 0);

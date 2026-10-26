@@ -7,7 +7,7 @@ namespace LibSaber.SM2.Assets.Meshes;
 ///   Writes one clip sample over skeleton bind locals. A rotation key is the bone's local
 ///   rotation, so it replaces the bind rotation. A translation key is the local translation.
 ///   Missing channels keep the bind value. When <see cref="AnimationClip.RootMotion"/> is set,
-///   the 0xF4 root translation is added to every bone with no parent.
+///   the 0xF4 root transform (rotation, then translation) is applied to every bone with no parent.
 /// </summary>
 internal static class ClipPose
 {
@@ -17,20 +17,11 @@ internal static class ClipPose
     for (var i = 0; i < bones.Count; i++)
       local[i] = bones[i].Local;
 
-    foreach (var track in clip.Tracks)
+    var binding = ClipBinding.Resolve(bones, clip);
+    for (var t = 0; t < clip.Tracks.Count; t++)
     {
-      var index = track.Bone;
-      if (index < 0)
-      {
-        for (var i = 0; i < bones.Count; i++)
-        {
-          if (string.Equals(bones[i].Name, track.BoneName, StringComparison.Ordinal))
-          {
-            index = i;
-            break;
-          }
-        }
-      }
+      var track = clip.Tracks[t];
+      var index = binding[t];
 
       if ((uint)index >= (uint)local.Length)
         continue;
@@ -49,14 +40,24 @@ internal static class ClipPose
       local[index] = Matrix4x4.CreateScale(scale) * Matrix4x4.CreateFromQuaternion(rotation) * Matrix4x4.CreateTranslation(translation);
     }
 
-    if (!clip.RootMotion || clip.RootTranslation.Count == 0)
+    if (!clip.RootMotion || (clip.RootTranslation.Count == 0 && !clip.HasRootRotation))
       return;
 
     var root = AnimationClip.Sample(clip.RootTranslation, Vector3.Zero, time);
+    var turn = clip.HasRootRotation;
+    var rootMatrix = turn
+      ? Matrix4x4.CreateFromQuaternion(Quaternion.Normalize(AnimationClip.Sample(clip.RootRotation, Quaternion.Identity, time))) * Matrix4x4.CreateTranslation(root)
+      : Matrix4x4.Identity;
     for (var i = 0; i < bones.Count; i++)
     {
       if (bones[i].Parent >= 0)
         continue;
+      if (turn)
+      {
+        // p' = R_root * p + T_root (see AnimationClip.RootMotion).
+        local[i] *= rootMatrix;
+        continue;
+      }
       if (!Matrix4x4.Decompose(local[i], out var scale, out var rotation, out var translation))
       {
         local[i].M41 += root.X;
