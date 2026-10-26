@@ -1,6 +1,7 @@
 # Step 3 lit variant of ue_cap.py (owner's ue_cap.py untouched). Adds three SM2Cap-tagged movable point lights
 # (key/fill/rim, radius-limited, removed again by "export") and a manual exposure so FINAL captures show specular.
-# Extra optional args: intensity=<cd> (default 40) ev=<bias> (default 0) off=<folder> (swap in <MI>_off copies from ue_step3_ab.py).
+# Extra optional args: intensity=<cd> (default 40) ev=<bias> (default 0) off=<folder> (swap in <MI>_off copies from ue_step3_ab.py)
+# fit (frame the whole skeletal mesh from its imported bounds instead of the actor bounds).
 # view=ref (head mode): one close-up "ref.png" three-quarter camera matching the Calgar in-game reference
 # (face toward +Y, camera at +Y/+X so the bionic side is on the image right) with a front-left key light.
 # Capture: "capture" renders into kept render targets, "export" (a later call) writes PNGs; exporting in the same call
@@ -45,6 +46,12 @@ if mode in ("capture", "pose"):
         print("posed")
     else:
         o, e = a.get_actor_bounds(False); r = max(e.x, e.y, e.z) * 2.2
+        if "fit" in sys.argv and isinstance(m, unreal.SkeletalMesh):
+            # Whole-body framing from the imported mesh bounds. The actor bounds of a skeletal mesh actor follow its
+            # physics-asset / bone bounds and can be much smaller than the mesh (constructor tpls: only shin to
+            # shoulder was in frame), so the default framing crops. Distance fits the largest half extent in the 45 deg FOV.
+            bb = m.get_bounds(); e = bb.box_extent; o = a.get_actor_location() + bb.origin
+            r = max(e.x, e.y, e.z) / 0.4142 * 1.2
         if head and isinstance(m, unreal.SkeletalMesh):
             comp = a.skeletal_mesh_component
             names = [str(b) for b in comp.get_all_socket_names()]
