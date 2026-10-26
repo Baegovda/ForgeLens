@@ -48,6 +48,27 @@ public sealed class AnisoSpec
   public float ExtraShift { get; set; } = 0.2f;
 }
 
+/// <summary>
+///   Glt-level base lobe inputs: <c>metallicTint</c> (glt+0x40), <c>reflectance</c> (glt+8), <c>metalness</c> {scale, bias}
+///   (glt+0x8c) and <c>roughness</c> {scale, bias} (glt+0x138); offsets from the FUN_1425c1d00 reader. In the glt pixel
+///   shaders (PS 00004_1 lines 405-423, 3646) metal = saturate(row8.x * packedMetal + row8.y),
+///   roughness = saturate(row9.x * packedRough + row9.y), albedo *= lerp(albedo_tint, metallicTint, metal) and the dielectric
+///   F0 is 0.16 * reflectance^2 (0.04 at the default 0.5). Defaults are the full-dump values (709 metalness {1, 0},
+///   670 roughness {1, 0}, 377 metallicTint [0, 255, 255, 255], 236 reflectance 0.5). The CPU packer that fills
+///   rows 8/9 was not located; the mapping rests on the field names, defaults, and the scale/bias form shared with
+///   second_spec (rows 18.w/7.w, 19.x/19.y).
+/// </summary>
+public sealed class BaseLayer
+{
+  /// <summary>R, G, B, A in 0..1 (the .td stores A, R, G, B bytes). Default white.</summary>
+  public float[] MetallicTint { get; set; } = { 1f, 1f, 1f, 0f };
+  public float Reflectance { get; set; } = 0.5f;
+  public float MetalnessScale { get; set; } = 1f;
+  public float MetalnessBias { get; set; }
+  public float RoughnessScale { get; set; } = 1f;
+  public float RoughnessBias { get; set; }
+}
+
 public static class SpecLayers
 {
   private const float AnisoThreshold = 0.01f; // [0x143c843ac], compared at 0x1423b8031
@@ -74,6 +95,32 @@ public static class SpecLayers
     }
 
     var rough = Child(block, "roughness");
+    if (rough is not null)
+    {
+      result.RoughnessScale = Number(rough, "scale") ?? result.RoughnessScale;
+      result.RoughnessBias = Number(rough, "bias") ?? result.RoughnessBias;
+    }
+
+    return result;
+  }
+
+  /// <summary>Glt-level metallicTint, reflectance, metalness and roughness scale/bias (defaults when unset).</summary>
+  public static BaseLayer Base(string variantBlock)
+  {
+    var glt = Glt(variantBlock);
+    var result = new BaseLayer();
+    var tint = TintOf(WithoutBlocks(glt), "metallicTint");
+    if (tint is not null)
+      result.MetallicTint = tint;
+    result.Reflectance = Number(glt, "reflectance") ?? result.Reflectance;
+    var metal = Child(glt, "metalness");
+    if (metal is not null)
+    {
+      result.MetalnessScale = Number(metal, "scale") ?? result.MetalnessScale;
+      result.MetalnessBias = Number(metal, "bias") ?? result.MetalnessBias;
+    }
+
+    var rough = Child(glt, "roughness");
     if (rough is not null)
     {
       result.RoughnessScale = Number(rough, "scale") ?? result.RoughnessScale;
@@ -172,6 +219,25 @@ public static class SpecLayers
 
       if (depth <= inner)
         text.Append(c);
+    }
+
+    return text.ToString();
+  }
+
+  /// <summary>The block with nested <c>{ }</c> bodies removed (arrays kept), so <c>second_spec.metallicTint</c> does not match.</summary>
+  private static string WithoutBlocks(string block)
+  {
+    var text = new StringBuilder(block.Length);
+    var depth = 0;
+    var inner = block.StartsWith('{') ? 1 : 0;
+    foreach (var c in block)
+    {
+      if (c == '{')
+        depth++;
+      if (depth <= inner)
+        text.Append(c);
+      if (c == '}')
+        depth--;
     }
 
     return text.ToString();

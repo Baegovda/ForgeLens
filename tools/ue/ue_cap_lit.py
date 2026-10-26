@@ -1,6 +1,8 @@
 # Step 3 lit variant of ue_cap.py (owner's ue_cap.py untouched). Adds three SM2Cap-tagged movable point lights
 # (key/fill/rim, radius-limited, removed again by "export") and a manual exposure so FINAL captures show specular.
 # Extra optional args: intensity=<cd> (default 40) ev=<bias> (default 0) off=<folder> (swap in <MI>_off copies from ue_step3_ab.py).
+# view=ref (head mode): one close-up "ref.png" three-quarter camera matching the Calgar in-game reference
+# (face toward +Y, camera at +Y/+X so the bionic side is on the image right) with a front-left key light.
 # Capture: "capture" renders into kept render targets, "export" (a later call) writes PNGs; exporting in the same call
 # returned stale frames. For an animated pose run "pose" (same args) first in its own call, then "capture", then "export".
 import unreal, sys, builtins
@@ -68,7 +70,11 @@ if mode in ("capture", "pose"):
         kv = float(next((x[10:] for x in sys.argv if x.startswith("intensity=")), 40))
         ev = float(next((x[3:] for x in sys.argv if x.startswith("ev=")), 0))
         lit = []
-        for off, mul in ((unreal.Vector(-1.0, -0.6, 0.5), 1.0), (unreal.Vector(-0.6, 1.0, 0.1), 0.35), (unreal.Vector(1.0, 0.3, 0.6), 0.8)):
+        ref = "view=ref" in sys.argv
+        rigs = ((unreal.Vector(-1.0, -0.6, 0.5), 1.0), (unreal.Vector(-0.6, 1.0, 0.1), 0.35), (unreal.Vector(1.0, 0.3, 0.6), 0.8))
+        if ref:
+            rigs = ((unreal.Vector(-0.7, 1.0, 0.8), 1.0), (unreal.Vector(1.0, 0.7, 0.0), 0.3), (unreal.Vector(0.4, -1.0, 0.7), 0.6))
+        for off, mul in rigs:
             L = eas.spawn_actor_from_class(unreal.PointLight, o + off * r * 1.2); L.tags = [unreal.Name("SM2Cap")]
             lc = L.point_light_component
             lc.set_mobility(unreal.ComponentMobility.MOVABLE)
@@ -86,13 +92,23 @@ if mode in ("capture", "pose"):
                     comp.set_material(i, unreal.load_asset(p)); swapped += 1
             print("off swapped", swapped)
         pending = []
-        for tag, d, yaw in (("front", unreal.Vector(-1, 0, 0), 0), ("side", unreal.Vector(0, -1, 0), 90), ("back", unreal.Vector(1, 0, 0), 180)):
+        views = (("front", unreal.Vector(-1, 0, 0), 0), ("side", unreal.Vector(0, -1, 0), 90), ("back", unreal.Vector(1, 0, 0), 180))
+        if ref:
+            d = unreal.Vector(0.3, 1.0, 0.1); d = d / d.length()
+            o = o + unreal.Vector(0, 2.0, 7.0)
+            views = (("ref", d * 0.85, 0),)
+        for tag, d, yaw in views:
             rt = unreal.RenderingLibrary.create_render_target2d(w, 1024, 1024, unreal.TextureRenderTargetFormat.RTF_RGBA8)
-            cam = eas.spawn_actor_from_class(unreal.SceneCapture2D, o + d * r, unreal.Rotator(roll=0, pitch=0, yaw=yaw)); cam.tags = [unreal.Name("SM2Cap")]
+            pos = o + d * r
+            rot = unreal.MathLibrary.find_look_at_rotation(pos, o) if ref else unreal.Rotator(roll=0, pitch=0, yaw=yaw)
+            cam = eas.spawn_actor_from_class(unreal.SceneCapture2D, pos, rot); cam.tags = [unreal.Name("SM2Cap")]
             c = cam.capture_component2d
             c.set_editor_property("texture_target", rt)
             c.set_editor_property("capture_source", unreal.SceneCaptureSource.SCS_BASE_COLOR if src == "base" else unreal.SceneCaptureSource.SCS_FINAL_COLOR_LDR)
             c.set_editor_property("fov_angle", 45)
+            if ref:
+                fs = unreal.EngineShowFlagsSetting(); fs.set_editor_property("show_flag_name", "DepthOfField"); fs.set_editor_property("enabled", False)
+                c.set_editor_property("show_flag_settings", [fs])
             pps = c.get_editor_property("post_process_settings")
             pps.set_editor_property("override_auto_exposure_method", True); pps.set_editor_property("auto_exposure_method", unreal.AutoExposureMethod.AEM_MANUAL)
             pps.set_editor_property("override_auto_exposure_apply_physical_camera_exposure", True); pps.set_editor_property("auto_exposure_apply_physical_camera_exposure", False)

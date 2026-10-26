@@ -776,6 +776,14 @@ public static class AssetExporter
         metalness = new { scale = second.MetalnessScale, bias = second.MetalnessBias },
         roughness = new { scale = second.RoughnessScale, bias = second.RoughnessBias },
       } : null,
+      // glt-level base lobe inputs (always written; engine defaults when the .td leaves them unset).
+      baseLayer = new
+      {
+        metallicTint = slot.Part.BaseLayer.MetallicTint,
+        reflectance = slot.Part.BaseLayer.Reflectance,
+        metalness = new { scale = slot.Part.BaseLayer.MetalnessScale, bias = slot.Part.BaseLayer.MetalnessBias },
+        roughness = new { scale = slot.Part.BaseLayer.RoughnessScale, bias = slot.Part.BaseLayer.RoughnessBias },
+      },
       anisotropicSpec = slot.Part.AnisoSpec is { } aniso ? new
       {
         angle = aniso.Angle,
@@ -803,7 +811,7 @@ public static class AssetExporter
     {
       mesh = mesh.Name,
       fbx = Path.GetFileName(fbxPath),
-      note = "Each map's channels are the .td format_descr (logical channels). stored/packing[].stored say where each one physically is in the exported PNG: BC5 (DXN) keeps two channels, so Roughness(a) is in g; BC4 (DXT5A) keeps one, so AO(a) is in r. The game swizzles these in its shader (swizzleTexInShader). srgb false is a normal or a packed mask, so Unreal imports it linear. The FBX links diffuse, normal, and specular. import_sm2_materials.py builds a master material and one instance per slot from this file. secondSpec and anisotropicSpec are the variant's glt.second_spec and glt.anisotropic_spec (second lobe metalness/roughness = saturate(packed * scale + bias)); absent means disabled. With Substrate the script builds base + second as two added Slabs (SecondSpecGain 4 without aniso, 1 with aniso; aniso extra{} drives the second slab).",
+      note = "Each map's channels are the .td format_descr (logical channels). stored/packing[].stored say where each one physically is in the exported PNG: BC5 (DXN) keeps two channels, so Roughness(a) is in g; BC4 (DXT5A) keeps one, so AO(a) is in r. The game swizzles these in its shader (swizzleTexInShader). srgb false is a normal or a packed mask, so Unreal imports it linear. The FBX links diffuse, normal, and specular. import_sm2_materials.py builds a master material and one instance per slot from this file. secondSpec and anisotropicSpec are the variant's glt.second_spec and glt.anisotropic_spec (second lobe metalness/roughness = saturate(packed * scale + bias)); absent means disabled. baseLayer is the glt-level metallicTint, reflectance and metalness/roughness {scale, bias} (base metal/rough = saturate(packed * scale + bias), albedo *= lerp(albedo_tint, metallicTint, metal), dielectric F0 = 0.16 * reflectance^2). With Substrate the script builds base + second as two added Slabs (SecondSpecGain 4 without aniso, 1 with aniso; aniso extra{} drives the second slab).",
       slots,
     }, JsonOptions));
     report.Written++;

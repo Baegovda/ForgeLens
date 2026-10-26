@@ -78,4 +78,58 @@ public class SpecLayersTests
     Assert.Null(SpecLayers.Aniso("{\n anisotropic_spec = {\n  enabled = true\n  anisotropy = 0.005\n }\n}"));
     Assert.Null(SpecLayers.Aniso("{\n anisotropic_spec = {\n  enabled = false\n }\n}"));
   }
+
+  // ch_calgar_head_hair_01.td, materials.hard (glt-level metalness/roughness bias, warm metallicTint).
+  private const string CalgarHair = """
+    {
+       shaders = {
+          glt = {
+             metallicTint = [
+                0,
+                255,
+                244,
+                229
+             ]
+             metalness = {
+                bias = 0.110000
+             }
+             second_spec = {
+                enabled = true
+                metallicTint = [
+                   0,
+                   173,
+                   216,
+                   255
+                ]
+                metalness = {
+                   bias = 0.160000
+                }
+                roughness = {
+                   bias = 0.650000
+                }
+             }
+             roughness = {
+                bias = 0.200000
+             }
+             __type_id = "glt_sh_templ"
+          }
+       }
+    }
+    """;
+
+  [Fact]
+  public void BaseLayer_ReadsGltLevelOnly()
+  {
+    var layer = SpecLayers.Base(CalgarHair);
+    Assert.Equal(1f, layer.MetalnessScale);
+    Assert.Equal((double)0.11f, (double)layer.MetalnessBias, 4);
+    Assert.Equal(1f, layer.RoughnessScale);
+    Assert.Equal((double)0.2f, (double)layer.RoughnessBias, 4);
+    Assert.Equal(0.5f, layer.Reflectance);
+    Assert.Equal(new[] { 1f, 244 / 255f, 229 / 255f, 0f }, layer.MetallicTint);
+    var defaults = SpecLayers.Base(Hormagaunt);
+    Assert.Equal(0f, defaults.MetalnessBias);
+    Assert.Equal(1f, defaults.RoughnessScale);
+    Assert.Equal(new[] { 1f, 1f, 1f, 0f }, defaults.MetallicTint);
+  }
 }

@@ -313,3 +313,32 @@ UE verify (`tools/ue/ue_mat_apply.py <asset> apply|verify`, PC `Desktop\SM2_Work
 Caveats / next:
 - Calgar hair (extra.intensity 20, saturated F0 -> 1) looks blotchy and too bright: UE also lights the second slab with IBL (game: direct only), and intensity can only go through F0 <= 1. Candidate fix: scale the second slab by a Substrate coverage or drop its IBL via a specular-only light-function trick; needs an in-game reference.
 - Shift is a frame rotation approximation; DIR_MAP decode (RG*2-1) not verified against the shader.
+
+## Calgar hair fix (2026-10-26, mat2)
+
+Reference: in-game close-up (short grey buzz cut, matte, almost no aniso streak).
+Compare image: box `/workspace/mat/captures/calgar_hair_ref_compare.jpg` (reference | before c1c4de0 | after).
+
+Exe evidence (PS 00004_1 / 00042_0 GLSL):
+- Base spec layer (`glt` level) metal/rough scale+bias, metallicTint, reflectance (F0 = lerp(0.16*refl^2, albedo, metal)):
+  now parsed (`SpecLayers.Base()` -> `BaseLayer`), written to the sidecar as `baseLayer` and applied by the importer.
+- Direct-light AO: every local light (diffuse + both spec lobes) is scaled by `saturate(2*AO - 1 + |NdotL|)` (00004_1 ~l.4167),
+  AO = spec.B mixed by per-instance weights (`_66[_339*108+36..39]`; CPU writer not located).
+- Dir-map tangent decode (00042_0 l.487-489, 2697-2716) matches the importer (no angle rotation when dirMap is present).
+
+APPROXIMATION (clearly labelled in `import_sm2_materials.py`, `DirectAo` block):
+- UE/Substrate has no per-light hook, so `occ` = NdotL-weighted mean of the game's factor over the hemisphere
+  (closed form, AO>=0.5: 1-u^3/3, u=2-2AO; AO<0.5: 2/3-d+d^3/3, d=1-2AO) multiplies base diffuse, base F0/F90 and second-slab F0/F90.
+- `DirectAoStrength` = 1 only on slots with an aniso dirMap (hair); 0 elsewhere, so other materials are unchanged.
+
+Result: fewer white blotches, darker/more matte grey. Remaining differences:
+- the UE aniso path is still brighter and more streaky than the game (A/B: `tools/ue/ue_hair_ab.py` modes nosecond/noaniso/nospec; nospec is the most matte);
+- the capture rig has almost no IBL while the in-game shot is ambient-dominated;
+- the hair cards read more voluminous than the in-game buzz cut;
+- UE uses Smith V on both lobes (the game has no V on the second lobe); no per-slab IBL exclusion in Substrate;
+- the rows 8/9 CPU packer is not located; the MetallicTint lerp is done in linear space;
+- other characters (hormagaunt, titus) receive the baseLayer bias too: re-check them.
+
+PC: content backup `Desktop\SM2_Work\Backup\Characters_mat2.bak1\cc_calgar`; scripts `.bak1/.bak2`; sidecar `.json.bak1`.
+Apply: `ue_mat_apply.py cc_calgar apply`, wait ~170 s, `ue_tmp_stream.py` (FullyLoadUsedTextures), then `ue_cap_lit.py capture ... view=ref`.
+Verify: `ue_mat_apply.py cc_calgar verify` -> `SLOTS 44 MIs 44 secondSpec 7 MISMATCH []`.

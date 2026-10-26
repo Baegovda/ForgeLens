@@ -64,7 +64,7 @@ public static class MaterialMaps
   {
     var cache = new Dictionary<string, List<MaterialMap>>(StringComparer.OrdinalIgnoreCase);
     var texts = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
-    var variants = new Dictionary<string, (float[]? Tint, string? Mode, SecondSpec? Second, AnisoSpec? Aniso)>(StringComparer.OrdinalIgnoreCase);
+    var variants = new Dictionary<string, (float[]? Tint, string? Mode, SecondSpec? Second, AnisoSpec? Aniso, BaseLayer Base)>(StringComparer.OrdinalIgnoreCase);
     Attach(mesh.Parts);
     foreach (var level in mesh.Levels)
       Attach(level.Parts);
@@ -99,7 +99,8 @@ public static class MaterialMaps
             block is null ? null : AlbedoTint(block),
             block is null ? null : BlendMode(block),
             block is null ? null : SpecLayers.Second(block),
-            block is null ? null : SpecLayers.Aniso(block));
+            block is null ? null : SpecLayers.Aniso(block),
+            block is null ? new BaseLayer() : SpecLayers.Base(block));
           variants[key] = shading;
         }
 
@@ -109,6 +110,7 @@ public static class MaterialMaps
         part.AlbedoTint = tint;
         part.SecondSpec = shading.Second;
         part.AnisoSpec = shading.Aniso;
+        part.BaseLayer = shading.Base;
       }
     }
 

@@ -22,6 +22,15 @@ for slot in mesh.materials:
     got = tuple(mel.get_material_instance_static_switch_parameter_value(mi, k) for k in ("UseSecondSpec", "UseAnisoSpec", "UseAnisoDirMap"))
     exp = (bool(ss), bool(a), bool(a.get("dirMap")))
     if got != exp: bad.append((sn, "switch", got, exp))
+    bl = s.get("baseLayer")
+    if bl:
+        chk = {"MetalnessScale": bl["metalness"]["scale"], "MetalnessBias": bl["metalness"]["bias"], "RoughnessScale": bl["roughness"]["scale"], "RoughnessBias": bl["roughness"]["bias"], "Reflectance": bl["reflectance"]}
+        for k, v in chk.items():
+            if abs(sc(mi, k) - v) > 1e-3: bad.append((sn, k, sc(mi, k), v))
+        t = mel.get_material_instance_vector_parameter_value(mi, "MetallicTint")
+        lin = [pow(c, 2.2) for c in bl["metallicTint"][:3]]
+        if max(abs(t.r - lin[0]), abs(t.g - lin[1]), abs(t.b - lin[2])) > 1e-3: bad.append((sn, "MetallicTint", (t.r, t.g, t.b), lin))
+        if any(abs(chk[k] - d) > 1e-6 for k, d in (("MetalnessBias", 0), ("RoughnessBias", 0))): print("BASE", sn, chk)
     if ss:
         on += 1
         chk = {"SecondMetalnessScale": ss["metalness"]["scale"], "SecondMetalnessBias": ss["metalness"]["bias"], "SecondRoughnessScale": ss["roughness"]["scale"], "SecondRoughnessBias": ss["roughness"]["bias"], "SecondSpecGain": 1.0 if a else 4.0}
@@ -30,6 +39,7 @@ for slot in mesh.materials:
         t = mel.get_material_instance_vector_parameter_value(mi, "SecondSpecTint")
         lin = [pow(c, 2.2) for c in ss["metallicTint"][:3]]
         if max(abs(t.r - lin[0]), abs(t.g - lin[1]), abs(t.b - lin[2])) > 1e-3: bad.append((sn, "tint", (t.r, t.g, t.b), lin))
+    if abs(sc(mi, "DirectAoStrength") - (1.0 if a.get("dirMap") else 0.0)) > 1e-3: bad.append((sn, "DirectAoStrength", sc(mi, "DirectAoStrength"), 1.0 if a.get("dirMap") else 0.0))
     if a:
         e = a.get("extra") or {}
         chk = {"AnisoAnisotropy": a["anisotropy"], "AnisoAngle": a["angle"], "AnisoIntensity": a["intensity"], "AnisoExtraAnisotropy": e.get("anisotropy", 0.5), "AnisoExtraIntensity": e.get("intensity", 1.0), "AnisoExtraShift": e.get("shift", 0.2)}
