@@ -42,7 +42,19 @@ public sealed class EmitterDef
   public bool IsGpu { get; init; }
   /// <summary><c>typeParams</c> union member: <c>default</c> (sprites), <c>lwiGeom</c> (mesh particles), ...</summary>
   public string ParticleType { get; init; } = "default";
-  public bool IsSprite => ParticleType == "default";
+  public bool IsSprite => ParticleType is "default" or "distortion";
+  /// <summary>
+  ///   Screen-space refraction source: a normal map (RG = offset) scaled by <see cref="DistortPower"/> over age.
+  ///   From <c>typeParams.distortion</c> (<c>visuals.texture</c> + <c>visuals.power</c>, refraction only), a texture whose
+  ///   <c>animIn.channel = DISTORTION</c> (refraction only), or <c>visuals.sdr</c> with its texture on channel
+  ///   <c>DISTORTION</c> (the sprite draws colour and also refracts). <c>SELF_DISTORTION</c> sdr warps the sprite's own UVs instead.
+  /// </summary>
+  public string? DistortTexture { get; init; }
+  public ScalarParam DistortPower { get; init; } = ScalarParam.Constant(1);
+  /// <summary><c>sdr</c> on channel <c>SELF_DISTORTION</c>: normal map that warps the sprite's own texture lookup.</summary>
+  public string? SelfDistortTexture { get; init; }
+  public ScalarParam SelfDistortPower { get; init; } = ScalarParam.Constant(0);
+  public Vector2 SelfDistortSpeed { get; init; }
   /// <summary>Mesh particles (<c>typeParams.lwiGeom</c>).</summary>
   public MeshParticleDef? Geom { get; init; }
   public bool Visible { get; init; } = true;
@@ -316,6 +328,13 @@ public sealed class EffectDefinition
 
     var texture = visuals.Obj("texture");
     var anim = texture.Obj("animIn");
+    var sdr = visuals.Obj("sdr") is { } so && so.Bool("isEnabled", false) ? so : null;
+    var sdrChannel = sdr?.Obj("texture")?.Obj("animIn")?.Str("channel");
+    var channelDistort = anim is not null && SslRead.UnionKind(anim) == "channel" && anim.Obj("channel").Str("channel") == "DISTORTION";
+    string? distortTex = particleType == "distortion" || channelDistort ? texture.Str("nameTex")
+      : sdrChannel == "DISTORTION" ? sdr!.Obj("texture").Str("nameTex") : null;
+    var distortPower = particleType == "distortion" ? SslRead.Scalar(visuals.Get("power"), 1f)
+      : sdrChannel == "DISTORTION" ? SslRead.Scalar(sdr!.Get("power"), 1f) : ScalarParam.Constant(1f);
     var animBody = anim.Obj(SslRead.UnionKind(anim) ?? "params");
     var speedFrame = animBody.Obj("speedFrame");
     var frameKind = SslRead.UnionKind(speedFrame);
@@ -382,8 +401,13 @@ public sealed class EffectDefinition
       SpeedInherit = SslRead.Range(particle.Obj("inherit")?.Get("speedInherit"), Vector2.Zero),
       SoftDepth = softDepth,
       Target = SslRead.UnionKind(tp.Obj("drawInSimulationTex")) == "drawInSimulationEnabled" ? DrawTarget.Simulation
-        : anim is not null && SslRead.UnionKind(anim) == "channel" && anim.Obj("channel").Str("channel") == "DISTORTION" ? DrawTarget.Distortion
+        : particleType == "distortion" || channelDistort ? DrawTarget.Distortion
         : DrawTarget.Color,
+      DistortTexture = distortTex,
+      DistortPower = distortPower,
+      SelfDistortTexture = sdrChannel == "SELF_DISTORTION" ? sdr!.Obj("texture").Str("nameTex") : null,
+      SelfDistortPower = sdrChannel == "SELF_DISTORTION" ? SslRead.Scalar(sdr!.Get("power"), 0.1f) : ScalarParam.Constant(0),
+      SelfDistortSpeed = sdrChannel == "SELF_DISTORTION" && sdr!.Obj("texture")?.Obj("tcIn")?.Obj("transform")?.Get("speed") is { } sps ? SslRead.Range(sps, Vector2.Zero) : Vector2.Zero,
       AlphaMask = visuals.Obj("alphaMask") is { } am && (am.Bool("isEnabled", false) || am.Str("mode") == "Enabled") ? am.Obj("texture").Str("nameTex") : null,
       AlphaMaskRotation = visuals.Obj("alphaMask")?.Obj("texture")?.Obj("tcIn") is { } tci && SslRead.UnionKind(tci) is { } tk && tci.Obj(tk)?.Get("rotation") is { } rot ? SslRead.Range(rot, Vector2.Zero) : Vector2.Zero,
       Lighting = lighting,

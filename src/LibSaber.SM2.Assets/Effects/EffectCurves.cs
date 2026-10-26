@@ -184,7 +184,7 @@ public static class SslRead
     var body = node.Get(kind);
     return kind switch
     {
-      "ageSpline" or "spline" or "timeSpline" or "ageSize" => body is JsonArray ? new ScalarParam(new Curve1(Floats(body)), Vector2.Zero) : Spline(body, body.Get("spline")),
+      "ageSpline" or "spline" or "timeSpline" or "ageSize" => body is JsonArray ? new ScalarParam(new Curve1(Floats(body)), Vector2.Zero) : Spline(body, body.Get("spline") ?? body.Get(kind)), // sdr.power: { ageSpline = { ageSpline = [..] } }
       _ => Scalar(body, fallback),
     };
   }

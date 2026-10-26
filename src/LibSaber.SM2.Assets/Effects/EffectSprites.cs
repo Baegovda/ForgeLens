@@ -13,6 +13,8 @@ public sealed class SpriteBatch
   public int QuadCount { get; set; }
   /// <summary>View-space depth of the emitter's particles (larger = farther); batches draw far to near.</summary>
   public float Depth { get; set; }
+  /// <summary>Refraction pass: <see cref="EmitterDef.DistortTexture"/> quads whose colour is (power, 0, 0, alpha).</summary>
+  public bool Distortion { get; init; }
 }
 
 /// <summary>
@@ -38,9 +40,14 @@ public static class EffectSprites
     foreach (var state in instance.Emitters)
     {
       var def = state.Def;
-      if (!def.IsSprite || !def.Visible || def.Target != DrawTarget.Color || state.Particles.Count == 0 || (include is not null && !include(def)))
+      if (!def.IsSprite || !def.Visible || def.Target == DrawTarget.Simulation || state.Particles.Count == 0 || (include is not null && !include(def)))
         continue;
-      var frames = aliases[def.Texture];
+      var passes = new List<bool>(2);
+      if (def.Target == DrawTarget.Color) passes.Add(false);
+      if (def.DistortTexture is { Length: > 0 }) passes.Add(true);
+      foreach (var distort in passes)
+      {
+      var frames = aliases[distort ? def.DistortTexture : def.Texture];
       var list = new List<(Particle P, float Key)>(state.Particles.Count);
       var depthSum = 0f;
       foreach (var p in state.Particles)
@@ -60,10 +67,11 @@ public static class EffectSprites
       var vertices = new float[list.Count * 4 * SpriteBatch.Stride];
       var quads = 0;
       foreach (var (p, _) in list)
-        if (Quad(def, frames, p, right, up, back, vertices, quads * 4 * SpriteBatch.Stride))
+        if (Quad(def, frames, p, right, up, back, vertices, quads * 4 * SpriteBatch.Stride, distort))
           quads++;
       if (quads == 0) continue;
-      batches.Add(new SpriteBatch { Emitter = def, Frames = frames, Vertices = vertices, QuadCount = quads, Depth = depthSum / list.Count });
+      batches.Add(new SpriteBatch { Emitter = def, Frames = frames, Vertices = vertices, QuadCount = quads, Depth = depthSum / list.Count, Distortion = distort });
+      }
     }
 
     batches.AddRange(EffectTrailSprites.Build(instance, eye, include));
@@ -94,7 +102,7 @@ public static class EffectSprites
     return f;
   }
 
-  private static bool Quad(EmitterDef def, TextureFrames frames, in Particle p, Vector3 right, Vector3 up, Vector3 back, float[] v, int o)
+  private static bool Quad(EmitterDef def, TextureFrames frames, in Particle p, Vector3 right, Vector3 up, Vector3 back, float[] v, int o, bool distort = false)
   {
     var n = Math.Clamp(p.Age / p.Life, 0f, 1f);
     var size = def.Size.Sample(n, p.RandSize) * def.Scale;
@@ -106,6 +114,13 @@ public static class EffectSprites
     var rgb = new Vector3(c.X, c.Y, c.Z) * intensity;
     if (def.Lighting is not ("None" or ""))
       rgb *= LitScale * Math.Clamp(def.AmbientLight + 0.55f, 0f, 1f);
+    if (distort)
+    {
+      rgb = new Vector3(def.DistortPower.Sample(n, p.RandIntensity), 0f, 0f);
+      if (rgb.X <= 0f) return false;
+      alpha = Math.Clamp(c.W * def.AlphaIntensity, 0f, 1f);
+      if (def.Target == DrawTarget.Distortion && def.ParticleType == "distortion") alpha = 1f; // refraction-only: colour curve unused
+    }
 
     var frame = Frame(def, frames, p);
     if (def.KillAfterSequence && !def.FrameCycle && frame >= frames.FrameMax) return false;

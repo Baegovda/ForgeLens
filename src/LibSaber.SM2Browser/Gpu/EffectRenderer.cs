@@ -35,7 +35,12 @@ internal sealed class EffectLayer
 internal sealed unsafe class EffectRenderer : IDisposable
 {
   private readonly GL _gl;
-  private readonly uint _sprite, _ground, _mesh;
+  private readonly uint _sprite, _ground, _mesh, _distort;
+  private readonly Dictionary<string, uint> _linear = new(StringComparer.OrdinalIgnoreCase);
+  /// <summary>Screen offset (UV) at distortion power 1 and a full-strength normal; not REA'd (the refraction shader is in the GPU blob).</summary>
+  public static float DistortionStrength { get; set; } =
+    float.TryParse(Environment.GetEnvironmentVariable("SM2_VFX_DISTORT"), System.Globalization.CultureInfo.InvariantCulture, out var d) ? d : 0.04f;
+  public int DistortionQuads { get; private set; }
   private readonly Dictionary<string, (uint Vao, uint Vbo, uint Ibo)?> _meshes = new(StringComparer.OrdinalIgnoreCase);
   private readonly uint _vao, _vbo, _ibo, _groundVao, _groundVbo;
   private readonly Dictionary<string, uint> _textures = new(StringComparer.OrdinalIgnoreCase);
@@ -48,6 +53,7 @@ internal sealed unsafe class EffectRenderer : IDisposable
     _sprite = Link(header + SpriteVs, header + SpriteFs);
     _ground = Link(header + GroundVs, header + GroundFs);
     _mesh = Link(header + MeshVs, header + MeshFs);
+    _distort = Link(header + SpriteVs, header + DistortFs);
     _vao = gl.GenVertexArray();
     _vbo = gl.GenBuffer();
     _ibo = gl.GenBuffer();
@@ -118,13 +124,13 @@ internal sealed unsafe class EffectRenderer : IDisposable
   }
   public double LastMs { get; private set; }
 
-  private uint Upload(EffectImage image)
+  private uint Upload(EffectImage image, bool linear = false)
   {
     var id = _gl.GenTexture();
     _gl.BindTexture(TextureTarget.Texture2D, id);
     _gl.PixelStore(PixelStoreParameter.UnpackAlignment, 1);
     var levels = 1 + (int)Math.Floor(Math.Log2(Math.Max(image.Width, image.Height)));
-    _gl.TexStorage2D(TextureTarget.Texture2D, (uint)levels, SizedInternalFormat.Srgb8Alpha8, (uint)image.Width, (uint)image.Height);
+    _gl.TexStorage2D(TextureTarget.Texture2D, (uint)levels, linear ? SizedInternalFormat.Rgba8 : SizedInternalFormat.Srgb8Alpha8, (uint)image.Width, (uint)image.Height);
     fixed (byte* p = image.Rgba)
       _gl.TexSubImage2D(TextureTarget.Texture2D, 0, 0, 0, (uint)image.Width, (uint)image.Height, PixelFormat.Rgba, PixelType.UnsignedByte, p);
     _gl.GenerateMipmap(TextureTarget.Texture2D);
@@ -157,10 +163,22 @@ internal sealed unsafe class EffectRenderer : IDisposable
     return id;
   }
 
+  /// <summary>Normal maps for refraction: linear (an sRGB decode bends the zero offset 0.5 to 0.21).</summary>
+  private uint LinearTexture(EffectLayer layer, string name)
+  {
+    if (_linear.TryGetValue(name, out var id)) return id == uint.MaxValue ? 0 : id;
+    var image = layer.Texture(name);
+    if (image is null) { Pending = true; return 0; }
+    id = image.Width > 0 ? Upload(image, linear: true) : uint.MaxValue;
+    if (id == uint.MaxValue) MissingTextures.Add(name);
+    _linear[name] = id;
+    return id == uint.MaxValue ? 0 : id;
+  }
+
   private void SetMatrix(uint program, string name, Matrix4x4 m) => _gl.UniformMatrix4(_gl.GetUniformLocation(program, name), 1, false, (float*)&m);
 
   /// <summary>Draws into the bound framebuffer; depth test on, depth writes only for the ground.</summary>
-  public void Draw(EffectLayer layer, Matrix4x4 view, Matrix4x4 projection, Vector3 eye)
+  public void Draw(EffectLayer layer, Matrix4x4 view, Matrix4x4 projection, Vector3 eye, Func<uint>? grabScene = null, Vector2 viewport = default)
   {
     var watch = System.Diagnostics.Stopwatch.StartNew();
     Pending = false;
@@ -226,6 +244,7 @@ internal sealed unsafe class EffectRenderer : IDisposable
     _gl.ActiveTexture(TextureUnit.Texture0);
     foreach (var batch in layer.Batches)
     {
+      if (batch.Distortion) continue;
       var tex = Texture(layer, batch.Emitter.Texture);
       if (tex == 0) continue;
       var mask = batch.Emitter.AlphaMask is { } mn ? Texture(layer, mn) : 0u;
@@ -251,11 +270,57 @@ internal sealed unsafe class EffectRenderer : IDisposable
       _gl.DrawElements(PrimitiveType.Triangles, (uint)(batch.QuadCount * 6), DrawElementsType.UnsignedInt, (void*)0);
     }
 
+    DrawDistortion(layer, vp, grabScene, viewport);
     _gl.DepthMask(true);
     _gl.Disable(EnableCap.Blend);
     _gl.BindVertexArray(0);
     _gl.UseProgram(0);
     LastMs = watch.Elapsed.TotalMilliseconds;
+  }
+
+  /// <summary>
+  ///   Refraction: after all colour, the frame so far is copied (<paramref name="grabScene"/>) and each distortion quad
+  ///   re-draws the pixels under it from that copy, offset by its normal map (RG*2-1) x power x alpha, faded toward the
+  ///   quad edge. Batches go far to near; each samples the same copy (one grab per frame, as one distortion buffer).
+  /// </summary>
+  private void DrawDistortion(EffectLayer layer, Matrix4x4 vp, Func<uint>? grabScene, Vector2 viewport)
+  {
+    DistortionQuads = 0;
+    if (grabScene is null || viewport.X <= 0 || DistortionStrength <= 0 || !layer.Batches.Any(b => b.Distortion)) return;
+    var textures = new List<(SpriteBatch Batch, uint Tex)>();
+    foreach (var batch in layer.Batches)
+      if (batch.Distortion && LinearTexture(layer, batch.Emitter.DistortTexture!) is var t and > 0)
+        textures.Add((batch, t));
+    if (textures.Count == 0) return;
+    var scene = grabScene();
+    if (scene == 0) return;
+    _gl.UseProgram(_distort);
+    SetMatrix(_distort, "uVP", vp);
+    _gl.Uniform1(_gl.GetUniformLocation(_distort, "uTex"), 0);
+    _gl.Uniform1(_gl.GetUniformLocation(_distort, "uScene"), 2);
+    _gl.Uniform2(_gl.GetUniformLocation(_distort, "uInvSize"), 1f / viewport.X, 1f / viewport.Y);
+    _gl.Uniform1(_gl.GetUniformLocation(_distort, "uStrength"), DistortionStrength);
+    _gl.ActiveTexture(TextureUnit.Texture2);
+    _gl.BindTexture(TextureTarget.Texture2D, scene);
+    _gl.Enable(EnableCap.DepthTest);
+    _gl.DepthMask(false);
+    _gl.Enable(EnableCap.Blend);
+    _gl.BlendFuncSeparate(BlendingFactor.One, BlendingFactor.OneMinusSrcAlpha, BlendingFactor.Zero, BlendingFactor.One);
+    _gl.BindVertexArray(_vao);
+    _gl.BindBuffer(BufferTargetARB.ArrayBuffer, _vbo);
+    foreach (var (batch, tex) in textures)
+    {
+      _gl.ActiveTexture(TextureUnit.Texture0);
+      _gl.BindTexture(TextureTarget.Texture2D, tex);
+      fixed (float* p = batch.Vertices)
+        _gl.BufferData(BufferTargetARB.ArrayBuffer, (nuint)(batch.QuadCount * 4 * SpriteBatch.Stride * 4), p, BufferUsageARB.StreamDraw);
+      _gl.DrawElements(PrimitiveType.Triangles, (uint)(batch.QuadCount * 6), DrawElementsType.UnsignedInt, (void*)0);
+      DistortionQuads += batch.QuadCount;
+    }
+
+    _gl.ActiveTexture(TextureUnit.Texture2);
+    _gl.BindTexture(TextureTarget.Texture2D, 0);
+    _gl.ActiveTexture(TextureUnit.Texture0);
   }
 
   private (uint Vao, uint Vbo, uint Ibo)? MeshBuffers(Effects.EffectMesh mesh)
@@ -353,6 +418,9 @@ internal sealed unsafe class EffectRenderer : IDisposable
     foreach (var b in _meshes.Values)
       if (b is { } x) { _gl.DeleteVertexArray(x.Vao); _gl.DeleteBuffer(x.Vbo); _gl.DeleteBuffer(x.Ibo); }
     _gl.DeleteProgram(_mesh);
+    _gl.DeleteProgram(_distort);
+    foreach (var id in _linear.Values)
+      if (id != uint.MaxValue) _gl.DeleteTexture(id);
     foreach (var id in _textures.Values.Distinct())
       if (id != _white && id != uint.MaxValue) _gl.DeleteTexture(id);
     _gl.DeleteTexture(_white);
@@ -417,6 +485,29 @@ internal sealed unsafe class EffectRenderer : IDisposable
       if (uMode == 1) outColor = vec4(c * alpha, 0.0);          // add
       else if (uMode == 2) outColor = vec4(c * a, alpha);        // blend_add
       else outColor = vec4(c * alpha, alpha);                    // blend
+    }
+    """;
+
+  private const string DistortFs = """
+    in vec2 vUv;
+    in vec4 vColor;
+    in vec2 vMask;
+    uniform sampler2D uTex;
+    uniform sampler2D uScene;
+    uniform vec2 uInvSize;
+    uniform float uStrength;
+    out vec4 outColor;
+    void main()
+    {
+      vec4 n = texture(uTex, vUv);
+      vec2 q = vMask * 2.0 - 1.0;                       // quad-space -1..1 (unrotated by the mask angle is fine: radial)
+      float edge = 1.0 - smoothstep(0.6, 1.0, length(q));
+      float k = vColor.r * clamp(vColor.a, 0.0, 1.0) * edge;
+      vec2 offset = (n.rg * 2.0 - 1.0) * uStrength * k;
+      vec2 uv = gl_FragCoord.xy * uInvSize;
+      vec3 c = texture(uScene, clamp(uv + offset, vec2(0.0), vec2(1.0))).rgb;
+      float a = clamp(k * 4.0, 0.0, 1.0);
+      outColor = vec4(c * a, a);
     }
     """;
 

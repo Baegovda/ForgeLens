@@ -24,7 +24,7 @@ internal sealed unsafe class GlPreview : IDisposable
   private uint _program;
   private uint _boneTex;
   private int _boneRows;
-  private uint _msFbo, _msColor, _msDepth, _rsFbo, _rsColor;
+  private uint _msFbo, _msColor, _msDepth, _rsFbo, _rsColor, _grabFbo, _grabTex;
   private int _fbW, _fbH;
   private uint _lineVao, _lineVbo;
   private readonly Dictionary<object, GpuBatch> _batches = new(ReferenceEqualityComparer.Instance);
@@ -186,8 +186,36 @@ internal sealed unsafe class GlPreview : IDisposable
     _gl.DeleteRenderbuffer(_msColor);
     _gl.DeleteRenderbuffer(_msDepth);
     _gl.DeleteRenderbuffer(_rsColor);
-    _msFbo = _rsFbo = _msColor = _msDepth = _rsColor = 0;
+    if (_grabFbo != 0) { _gl.DeleteFramebuffer(_grabFbo); _gl.DeleteTexture(_grabTex); }
+    _msFbo = _rsFbo = _msColor = _msDepth = _rsColor = _grabFbo = _grabTex = 0;
   }
+
+  /// <summary>Resolves the MSAA colour so far into a texture for the refraction pass, then rebinds the MSAA target.</summary>
+  private uint GrabScene()
+  {
+    if (_grabFbo == 0)
+    {
+      _grabTex = _gl.GenTexture();
+      _gl.BindTexture(TextureTarget.Texture2D, _grabTex);
+      _gl.TexStorage2D(TextureTarget.Texture2D, 1, SizedInternalFormat.Rgba8, (uint)_fbW, (uint)_fbH);
+      _gl.TexParameter(TextureTarget.Texture2D, TextureParameterName.TextureMinFilter, (int)GLEnum.Linear);
+      _gl.TexParameter(TextureTarget.Texture2D, TextureParameterName.TextureMagFilter, (int)GLEnum.Linear);
+      _gl.TexParameter(TextureTarget.Texture2D, TextureParameterName.TextureWrapS, (int)GLEnum.ClampToEdge);
+      _gl.TexParameter(TextureTarget.Texture2D, TextureParameterName.TextureWrapT, (int)GLEnum.ClampToEdge);
+      _grabFbo = _gl.GenFramebuffer();
+      _gl.BindFramebuffer(FramebufferTarget.Framebuffer, _grabFbo);
+      _gl.FramebufferTexture2D(FramebufferTarget.Framebuffer, FramebufferAttachment.ColorAttachment0, TextureTarget.Texture2D, _grabTex, 0);
+      if (_gl.CheckFramebufferStatus(FramebufferTarget.Framebuffer) != GLEnum.FramebufferComplete) return 0;
+    }
+
+    _gl.BindFramebuffer(FramebufferTarget.ReadFramebuffer, _msFbo);
+    _gl.BindFramebuffer(FramebufferTarget.DrawFramebuffer, _grabFbo);
+    _gl.BlitFramebuffer(0, 0, _fbW, _fbH, 0, 0, _fbW, _fbH, ClearBufferMask.ColorBufferBit, BlitFramebufferFilter.Nearest);
+    _gl.BindFramebuffer(FramebufferTarget.Framebuffer, _msFbo);
+    return _grabTex;
+  }
+
+  public int DistortionQuads => _fx?.DistortionQuads ?? 0;
 
   /// <summary>Drops every buffer and texture of the previous mesh when a different mesh is drawn.</summary>
   private void Own(object owner)
@@ -548,7 +576,7 @@ internal sealed unsafe class GlPreview : IDisposable
     _gl.Disable(EnableCap.Blend);
     if (Effect is { } effect)
     {
-      Fx.Draw(effect, scene.View, scene.Projection, scene.Eye);
+      Fx.Draw(effect, scene.View, scene.Projection, scene.Eye, GrabScene, new Vector2(width, height));
       Pending |= Fx.Pending;
       _gl.UseProgram(_program);
     }
@@ -621,7 +649,7 @@ internal sealed unsafe class GlPreview : IDisposable
     _gl.Clear(ClearBufferMask.ColorBufferBit | ClearBufferMask.DepthBufferBit);
     _gl.Disable(EnableCap.CullFace);
     _gl.Disable(EnableCap.ScissorTest);
-    Fx.Draw(layer, view, projection, eye);
+    Fx.Draw(layer, view, projection, eye, GrabScene, new Vector2(width, height));
     Pending = Fx.Pending;
     _gl.BindFramebuffer(FramebufferTarget.ReadFramebuffer, _msFbo);
     _gl.BindFramebuffer(FramebufferTarget.DrawFramebuffer, _rsFbo);
