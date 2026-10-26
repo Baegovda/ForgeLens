@@ -14,6 +14,29 @@ public static class ClipResolver
   {
     error = "";
     headers ??= SaniIndex.ReadHeaders(catalog, store);
+    var parts = SplitTokens(token);
+    if (parts.Count > 1)
+    {
+      // Several clips in one run: "a;b", "a,b", or a glob each. Order kept, duplicates dropped.
+      var all = new List<SaniIndex.Header>();
+      var seen = new HashSet<int>();
+      var missing = new List<string>();
+      foreach (var part in parts)
+      {
+        var hits = Choose(catalog, store, modelIndex, part, out _, headers);
+        if (hits.Count == 0)
+          missing.Add(part);
+        foreach (var hit in hits)
+          if (seen.Add(hit.Index))
+            all.Add(hit);
+      }
+
+      if (missing.Count > 0)
+        error = "No .sani matches '" + string.Join("', '", missing) + "'.";
+      return all;
+    }
+
+    token = parts.Count == 1 ? parts[0] : token;
     if (token.Equals("all", StringComparison.OrdinalIgnoreCase))
     {
       var mesh = TemplateMeshReader.Load(catalog, store, modelIndex);
@@ -27,6 +50,17 @@ public static class ClipResolver
     if (matched.Count == 0)
       error = $"No .sani matches '{token}'.";
     return matched;
+  }
+
+  /// <summary>Splits an <c>--anim</c> value on ';', ',' and newlines. A value starting with '@' names a list file.</summary>
+  public static List<string> SplitTokens(string token)
+  {
+    var text = token;
+    if (text.StartsWith('@') && File.Exists(text[1..]))
+      text = File.ReadAllText(text[1..]);
+    return text.Split(new[] { ';', ',', '\n', '\r' }, StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+      .Where(part => part.Length > 0 && !part.StartsWith('#'))
+      .ToList();
   }
 
   /// <summary>Loads clips by catalog index, keeping those with curve keys. Problems go to <paramref name="notes"/>.</summary>

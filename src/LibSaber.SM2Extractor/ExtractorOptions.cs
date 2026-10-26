@@ -10,7 +10,7 @@ LibSaber.SM2Extractor — list and extract Warhammer 40,000: Space Marine 2 arch
 Usage:
   LibSaber.SM2Extractor list <archive-or-folder> [options]
   LibSaber.SM2Extractor extract <archive-or-folder> --output <folder> [options]
-  LibSaber.SM2Extractor export <game-folder> --asset <path> --format <fbx-unreal|gltf|both> --output <folder> [--lod <n>] [--anim <name|all>] [--no-root-motion] [--include-cloth-sim]
+  LibSaber.SM2Extractor export <game-folder> --asset <path> --format <fbx-unreal|gltf|both> --output <folder> [--lod <n>] [--anim <name|all>]... [--anim-only] [--anim-rebase <first-frame|none>] [--no-root-motion] [--include-cloth-sim]
 
 The game ships .pak archives with a sibling cache of the same name plus ".cache"
 (client_pc\something.pak and client_pc\something.pak.cache). .pck files with a
@@ -36,6 +36,17 @@ Options:
                           that shares at least 8 bone names with the model. export only.
                           Bones the clip does not name stay on the bind pose.
                           The clip's 0xF4 track is added to the skeleton root translation.
+                          Repeat --anim, or separate tokens with ';' or ',', to export many
+                          clips in one run. A token with * or ? is a glob on the whole .sani
+                          path (animation/primaris/assault/*_run_*). @list.txt reads tokens
+                          from a file, one per line. Clips with the additive slot (0xF3/0xF7)
+                          end in __ADD.
+  --anim-only             Write the clip files only: no bind mesh, materials, or textures.
+                          Use with a skeleton that is already in the Unreal project.
+  --anim-rebase <mode>    first-frame (default): move each clip's first frame to the bind
+                          position and heading, so level-space cinematics start at the origin.
+                          The removed offset goes to {clip}.rebase.json. Clips that already
+                          start at the bind are unchanged. none keeps level space.
   --no-root-motion        Leave that root translation off. The bone curves are unchanged.
                           export only.
   --fbx-armature-null     Old FBX hierarchy: a {model}_Skeleton Null above the tpl root object.
@@ -76,6 +87,8 @@ Examples:
   public string? Animation { get; private init; }
   public bool RootMotion { get; private init; } = true;
   public bool UnrealRootBone { get; private init; } = true;
+  public bool AnimationOnly { get; private init; }
+  public bool RebaseFirstFrame { get; private init; } = true;
   public bool IncludeClothSim { get; private init; }
 
   public static ExtractorOptions Help()
@@ -119,6 +132,9 @@ Examples:
     var quiet = false;
     var rootMotion = true;
     var unrealRootBone = true;
+    var animationOnly = false;
+    var rebase = true;
+    var rebaseSet = false;
     var rootMotionSet = false;
     var includeClothSim = false;
     var positionals = new List<string>();
@@ -159,6 +175,25 @@ Examples:
       if (arg == "--include-cloth-sim")
       {
         includeClothSim = true;
+        continue;
+      }
+
+      if (arg == "--anim-only")
+      {
+        animationOnly = true;
+        continue;
+      }
+
+      if (TryTakeValue(args, ref i, arg, "--anim-rebase", "--anim-rebase", out var rebaseValue))
+      {
+        if (rebaseValue is not ("first-frame" or "none"))
+        {
+          error = "--anim-rebase takes first-frame or none.";
+          return false;
+        }
+
+        rebase = rebaseValue == "first-frame";
+        rebaseSet = true;
         continue;
       }
 
@@ -237,19 +272,13 @@ Examples:
 
       if (TryTakeValue(args, ref i, arg, "--anim", "--anim", out var animValue))
       {
-        if (animation is not null)
-        {
-          error = "Animation specified more than once.";
-          return false;
-        }
-
         if (string.IsNullOrWhiteSpace(animValue))
         {
           error = "Animation name is empty.";
           return false;
         }
 
-        animation = animValue;
+        animation = animation is null ? animValue : animation + ";" + animValue;
         continue;
       }
 
@@ -336,9 +365,15 @@ Examples:
       return false;
     }
 
-    if (verb != ExtractorVerb.Export && (asset is not null || format is not null || lodSet || animation is not null || rootMotionSet || includeClothSim || !unrealRootBone))
+    if (animationOnly && animation is null)
     {
-      error = "--asset, --format, --lod, --anim, --no-root-motion, and --include-cloth-sim are only valid with export.";
+      error = "--anim-only needs --anim.";
+      return false;
+    }
+
+    if (verb != ExtractorVerb.Export && (asset is not null || format is not null || lodSet || animation is not null || rootMotionSet || includeClothSim || !unrealRootBone || animationOnly || rebaseSet))
+    {
+      error = "--asset, --format, --lod, --anim, --anim-only, --anim-rebase, --no-root-motion, --fbx-armature-null, and --include-cloth-sim are only valid with export.";
       return false;
     }
 
@@ -391,6 +426,8 @@ Examples:
       Animation = animation,
       RootMotion = rootMotion,
       UnrealRootBone = unrealRootBone,
+      AnimationOnly = animationOnly,
+      RebaseFirstFrame = rebase,
       IncludeClothSim = includeClothSim,
     };
     return true;

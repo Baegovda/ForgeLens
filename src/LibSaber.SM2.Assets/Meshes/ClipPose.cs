@@ -14,6 +14,131 @@ internal static class ClipPose
 
   public static void Apply(IReadOnlyList<Bone> bones, AnimationClip clip, float time, Matrix4x4[] local)
   {
+    ApplyRaw(bones, clip, time, local);
+    if (!clip.RebaseFirstFrame)
+      return;
+    if (!ReferenceEquals(clip.RebaseKey, bones))
+    {
+      Rebase(bones, clip);
+      clip.RebaseKey = bones;
+    }
+
+    ApplyRebase(bones, clip, local);
+  }
+
+  private static void ApplyRebase(IReadOnlyList<Bone> bones, AnimationClip clip, Matrix4x4[] local)
+  {
+    if (!clip.RebaseFix.IsIdentity)
+      for (var i = 0; i < bones.Count; i++)
+        if (bones[i].Parent < 0)
+          local[i] *= clip.RebaseFix;
+
+    if (clip.RebaseBodyFix.IsIdentity)
+      return;
+    var under = clip.RebaseBodyUnder;
+    if (under < 0)
+    {
+      for (var i = 0; i < bones.Count; i++)
+        if (bones[i].Parent < 0)
+          local[i] *= clip.RebaseBodyFix;
+      return;
+    }
+
+    // world_child' = world_child * B  =>  local_child' = local_child * W_under * B * inv(W_under). ROOT itself stays put.
+    var w = World(bones, local, under);
+    Matrix4x4.Invert(w, out var wi);
+    var m = w * clip.RebaseBodyFix * wi;
+    for (var i = 0; i < bones.Count; i++)
+      if (bones[i].Parent == under)
+        local[i] *= m;
+  }
+
+  /// <summary>Pivot candidates: <c>ROOT</c> (0xF4 root motion lands here) and <c>CENTRE</c> (the pelvis, which carries the level-space translation in v1 cinematic shots).</summary>
+  internal static readonly string[] RebasePivots = { "ROOT", "CENTRE" };
+
+  /// <summary>A pelvis offset at frame 0 below this (source meters) is a pose, not a level placement.</summary>
+  internal const float PelvisRebaseMinimum = 2f;
+
+  /// <summary>
+  ///   Two stages, each C = T(-p0) * Yaw(-h) * T(pb) so the pivot's frame-0 world times C has its bind translation and heading:
+  ///   1. ROOT, when it is off its bind at frame 0: C on the right of every parentless local (row vectors).
+  ///   2. CENTRE, when after stage 1 it is still at least <see cref="PelvisRebaseMinimum"/> away (story_tower jetpack and
+  ///      pve_relay boss_intro keep ROOT at the origin and put the shot position on CENTRE): C is applied to ROOT's children
+  ///      in world space, so ROOT keeps its own (rebased) track instead of being thrown to minus the shot position.
+  ///   The reported offset/yaw belong to the stage that moved the body (CENTRE when stage 2 ran, else ROOT).
+  /// </summary>
+  internal static void Rebase(IReadOnlyList<Bone> bones, AnimationClip clip)
+  {
+    clip.RebaseFix = Matrix4x4.Identity;
+    clip.RebaseBodyFix = Matrix4x4.Identity;
+    clip.RebaseBodyUnder = -1;
+    clip.RebaseOffset = Vector3.Zero;
+    clip.RebaseYawDegrees = 0;
+    var bind = new Matrix4x4[bones.Count];
+    for (var i = 0; i < bones.Count; i++)
+      bind[i] = bones[i].Local;
+    var root = Find(bones, "ROOT");
+    var centre = Find(bones, "CENTRE");
+
+    var local = new Matrix4x4[bones.Count];
+    ApplyRaw(bones, clip, 0, local);
+    if (root >= 0 && Fix(bones, local, bind, root, out var c1, out var off1, out var yaw1) is var moved1 && (moved1 >= 1e-4f || MathF.Abs(yaw1) >= 1e-4f))
+    {
+      clip.RebaseFix = c1;
+      clip.RebaseOffset = off1;
+      clip.RebaseYawDegrees = yaw1 * 180 / MathF.PI;
+    }
+
+    if (centre < 0)
+      return;
+    ApplyRebase(bones, clip, local);
+    if (Fix(bones, local, bind, centre, out var c2, out var off2, out var yaw2) < PelvisRebaseMinimum)
+      return;
+    var under = -1;
+    for (var p = bones[centre].Parent; p >= 0; p = bones[p].Parent)
+      if (p == root)
+        under = root;
+    clip.RebaseBodyFix = c2;
+    clip.RebaseBodyUnder = under;
+    clip.RebaseOffset = off2 + clip.RebaseOffset;
+    clip.RebaseYawDegrees += yaw2 * 180 / MathF.PI;
+  }
+
+  private static int Find(IReadOnlyList<Bone> bones, string name)
+  {
+    for (var i = 0; i < bones.Count; i++)
+      if (string.Equals(bones[i].Name, name, StringComparison.OrdinalIgnoreCase))
+        return i;
+    return -1;
+  }
+
+  private static float Fix(IReadOnlyList<Bone> bones, Matrix4x4[] local, Matrix4x4[] bind, int pivot, out Matrix4x4 fix, out Vector3 offset, out float yaw)
+  {
+    var frame0 = World(bones, local, pivot);
+    var rest = World(bones, bind, pivot);
+    // Heading change about up: where world +Z goes under the world-space delta (rest * delta = frame0), projected on XZ.
+    Matrix4x4.Invert(rest, out var restInverse);
+    var delta = restInverse * frame0;
+    yaw = MathF.Atan2(delta.M31, delta.M33);
+    if (delta.M31 * delta.M31 + delta.M33 * delta.M33 < 0.25f)
+      yaw = MathF.Atan2(-delta.M13, delta.M11); // +Z near vertical: use +X instead
+    var p0 = frame0.Translation;
+    var pb = rest.Translation;
+    offset = p0 - pb;
+    fix = Matrix4x4.CreateTranslation(-p0) * Matrix4x4.CreateRotationY(-yaw) * Matrix4x4.CreateTranslation(pb);
+    return offset.Length();
+  }
+
+  private static Matrix4x4 World(IReadOnlyList<Bone> bones, Matrix4x4[] local, int index)
+  {
+    var world = local[index];
+    for (var parent = bones[index].Parent; parent >= 0; parent = bones[parent].Parent)
+      world *= local[parent];
+    return world;
+  }
+
+  private static void ApplyRaw(IReadOnlyList<Bone> bones, AnimationClip clip, float time, Matrix4x4[] local)
+  {
     for (var i = 0; i < bones.Count; i++)
       local[i] = bones[i].Local;
 

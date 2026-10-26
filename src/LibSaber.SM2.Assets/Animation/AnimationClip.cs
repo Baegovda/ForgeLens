@@ -63,6 +63,26 @@ public sealed class AnimationClip
   /// </summary>
   public bool RootMotion { get; set; } = true;
 
+  /// <summary>
+  ///   Cinematic rebase (<c>--anim-rebase first-frame</c>). Cinematic shots are authored in level space
+  ///   (story_tower jetpack: about (-4706, 420, -1662) m), while gameplay clips start at the entity origin.
+  ///   The loader FUN_14222fe40 already treats root motion as relative to frame 0 (it stores
+  ///   R0^-1 * (T_last - T0) and R0^-1 * R_last), so moving the first frame back to the bind position and heading
+  ///   matches how the game consumes a clip. Only the pivot (the <c>ROOT</c> bone, else the first parentless bone)
+  ///   is measured: its frame-0 world translation goes back to bind and its yaw about up (source Y) is removed.
+  ///   Pitch and roll stay. The same fix is applied to every parentless bone for every frame, so the motion
+  ///   inside the shot is unchanged. A no-op for clips that already start at the bind (locomotion, idles).
+  /// </summary>
+  public bool RebaseFirstFrame { get; set; }
+
+  /// <summary>Set by the exporter when <see cref="RebaseFirstFrame"/> moved the clip: source meters and degrees removed.</summary>
+  public Vector3 RebaseOffset { get; internal set; }
+  public float RebaseYawDegrees { get; internal set; }
+  internal object? RebaseKey;
+  internal Matrix4x4 RebaseFix = Matrix4x4.Identity;
+  internal Matrix4x4 RebaseBodyFix = Matrix4x4.Identity;
+  internal int RebaseBodyUnder = -1;
+
   public bool HasCurves => Tracks.Exists(track => track.Translation.Count + track.Rotation.Count + track.Scale.Count > 0);
 
   public static Vector3 Sample(IReadOnlyList<VectorKey> keys, Vector3 fallback, float time)

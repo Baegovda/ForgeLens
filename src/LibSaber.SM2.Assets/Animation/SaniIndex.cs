@@ -70,6 +70,17 @@ public static class SaniIndex
   public static List<Header> Match(IReadOnlyList<Header> headers, string token)
   {
     var needle = token.Replace('\\', '/').Trim();
+    if (needle.IndexOfAny(new[] { '*', '?' }) >= 0)
+    {
+      // Glob on the whole .sani path: * = any run (also across /), ? = one character.
+      var pattern = "^" + System.Text.RegularExpressions.Regex.Escape(needle).Replace("\\*", ".*").Replace("\\?", ".") + "$";
+      var regex = new System.Text.RegularExpressions.Regex(pattern, System.Text.RegularExpressions.RegexOptions.IgnoreCase);
+      return headers
+        .Where(header => regex.IsMatch(header.Path))
+        .OrderBy(header => header.Path, StringComparer.OrdinalIgnoreCase)
+        .ToList();
+    }
+
     return headers
       .Where(header => header.Path.Contains(needle, StringComparison.OrdinalIgnoreCase))
       .OrderBy(header => header.Path, StringComparer.OrdinalIgnoreCase)

@@ -191,14 +191,16 @@ public static class ModelExport
       WriteTga = true,
       WriteGltf = gltf,
       WriteFbx = fbx,
-      WriteMaterials = true,
-      WriteModelTextures = true,
       CopyOriginalBytes = false,
       Space = ExportSpace.Unreal,
       Lod = options.Lod,
       Clips = clips,
       RootMotion = options.RootMotion,
       UnrealRootBone = options.UnrealRootBone,
+      AnimationOnly = options.AnimationOnly,
+      RebaseFirstFrame = options.RebaseFirstFrame,
+      WriteMaterials = !options.AnimationOnly,
+      WriteModelTextures = !options.AnimationOnly,
       IncludeClothSim = options.IncludeClothSim,
     };
   }

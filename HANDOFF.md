@@ -442,3 +442,54 @@ Next: a GPU path would be the real fix for >60 fps with SSAA.
 - **Open:**
   - The MainWindow GPU toggle and fallback have not been driven by hand on the PC. The bench exercises the same control and renderer from the same exe.
   - Wireframe on LOD0 (300k tris) is a solid silhouette, as on the CPU.
+
+## Animation finishing (2026-10-26, anim_finish)
+
+Base 62d96e7. PC build: `C:\Users\Revaptor_FX\SM2Extractor6\LibSaber.SM2Extractor.exe` (previous builds `.exe.bak1`, `.exe.bak2`).
+
+New export flags
+- `--anim` is repeatable; one value may also hold `;`/`,`-separated tokens, `@list.txt` (one per line, `#` comments), and globs
+  (`*`, `?` over the whole .sani path, case-insensitive), e.g. `--anim "*jetpack_part_03_shot_03_char_titus*"`.
+- `--anim-only`: writes only `{model}__{clip}.fbx` against the model's skeleton (no bind mesh, materials, textures). Requires `--anim`.
+- `--anim-rebase first-frame|none` (default `first-frame`).
+
+Rebase rule (ClipPose.Rebase)
+- Stage 1, ROOT: if ROOT is off its bind (translation or heading) at frame 0, C = T(-p0)·RotY(-yaw)·T(pb) on every parentless local.
+- Stage 2, CENTRE: if, after stage 1, CENTRE (pelvis) is still ≥ 2 m from its bind, the same C is applied below ROOT
+  (to ROOT's children, in world space), so ROOT stays at its own track. v1 shots (c06 story_tower jetpack, c10 pve_relay boss_intro)
+  keep ROOT at bind and put the level position on CENTRE. A 0.5 m crouch is a pose, not rebased. Only heading is removed; pitch/roll stay.
+- Why default on: the game's loader `FUN_14222fe40` treats root motion relative to frame 0 (R0⁻¹(T_last−T0)); gameplay clips start
+  at bind so it is a no-op for them. The removed placement goes to `{fbx}.rebase.json` (`sourceMeters`, `sourceYawDegrees`,
+  `unrealLevelCm` = (x, z, y)·100, matches the survey's c06 CENTRE); place the actor there in Sequencer. `--anim-rebase none` keeps level space.
+- Measured: c06 removed (-4705.916, 419.689, -1661.708) m, -55.5°; c10 removed (-43.253, -24.967, -29.468) m, -91.4°.
+
+Timing (PC, anim-only, one run): titus 5 clips 8.3 s (~1.7 s/clip), vortex 2 clips 6.1 s; UE batch import 0.60–0.75 s/clip.
+Old flow (full export + import per clip) was ~45 s/clip.
+
+UE import (`tools/ue/ue_import_anim.py <fbx|folder> <mesh|skeleton> <dest> [yaw|auto] [rootmotion|noroot|autoroot]`)
+- Folder: every `*__*.fbx` under it (recursive), one `import_asset_tasks` batch.
+- Yaw auto: reads skeleton bone 0's reference yaw only and picks the 90° multiple that puts it at 180 (fresh ROOT-rooted and the
+  old Null skeleton → 0; old Original skeleton → 180). The earlier "measure t0 of the first clip" probe was fooled by
+  clips (vortex slam ROOT starts 90° off its bind; c10 after rebase) and is gone.
+- Root motion: on (lock ANIM_FIRST_FRAME) for gameplay clips; off (REF_POSE) for additive and cinematic clips
+  (cinematic = `.rebase.json` beside it, "cinematic" or `_shot_<n>` in the name) — those are for Sequencer.
+- `__ADD` clips: AdditiveAnimType AAT_LOCAL_SPACE_BASE, BasePose ABPT_LOCAL_ANIM_FRAME, ref frame 0.
+- Check: `tools/ue/ue_anim_finish_check.py [root]` (SEQ settings, ROOT/CENTRE/HEAD t0/end, ROOTTRACK, ADDMOVE).
+  Result `/Game/SM2_Work/Tests/anim_finish2` (skeletons from anim_survey/fix12):
+  c06 and c10: ROOT (0,0,0) yaw 180, CENTRE t0 at (0,-5,148) / (0,-52,280) cm; titus run root track 485.9 cm, melee 489.3, turn90 yaw 90;
+  vortex slam 488.2 cm with yaw 0 import; blink: only lid bones move (31 bones, max upperLid04_R 18.2°).
+  `/Game/SM2_Work/Tests/anim_finish` is the first (pre-fix) import, kept for comparison.
+
+Additive (REA, sm2_retail.exe; Morpheme task registrar `FUN_142c961b0`, rdx = task fn, r8 = name)
+- `TaskBlend2TransformBuffsAdditive` (string 0x143b7fee8, LEA 0x142c96b28) → `FUN_142cddd90`: T = T_base + w·T_add; rotation =
+  fast polynomial slerp identity→q_add by w (constants 0x143b83080..0x143b830bc), composed with the base rotation.
+- `TaskFeatherBlend2TransformBuffsAdditive` (0x143b7ff88, LEA 0x142c96ba4) → `FUN_142ce01c0` (per-bone weights).
+- `HasAdditive` string 0x1435ef808, used by the dumper `FUN_141060280` (0x1410602f6, 0x141060455).
+- Slot 1 (0xF3/0xF7, clip+0x68) is slot 0 relative to its own frame 0, so UE base = this clip's frame 0.
+  Exported as `{model}__{clip}__ADD.fbx`. Face clips: Apply Additive, or Layered Blend per Bone from HEAD for full-pose face clips
+  (lipsync c11 has no additive slot; treat it as a partial clip with a layered blend).
+
+Open
+- Multi-character shots: each actor is rebased on its own; restore relative placement from each `.rebase.json`.
+- Additive rotation compose order (q_base·q_add vs q_add·q_base) is not proven from the decomp.
+- c10 ROOT carries its own heading track (180 → 149°); harmless with root motion off.

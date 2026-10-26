@@ -40,6 +40,14 @@ public sealed class ExportSettings
   ///   <c>renderMeshes</c>) only skins the <c>*_REND</c> meshes from them and never draws them, so they are off by default.
   /// </summary>
   public bool IncludeClothSim { get; init; }
+  /// <summary>
+  ///   Move each clip's first frame back to the bind position and heading (see <see cref="AnimationClip.RebaseFirstFrame"/>).
+  ///   On by default: cinematic shots are in level space, everything else is unchanged. The removed offset is written to
+  ///   <c>{clip}.rebase.json</c> so a Sequencer shot can place the actor back. The extractor's <c>--anim-rebase none</c> keeps level space.
+  /// </summary>
+  public bool RebaseFirstFrame { get; init; } = true;
+  /// <summary>Write the clip files only (no bind mesh, materials, or textures). For importing onto a skeleton already in the project.</summary>
+  public bool AnimationOnly { get; init; }
 }
 
 public sealed class ExportReport
@@ -202,7 +210,8 @@ public static class AssetExporter
     if (!settings.IncludeClothSim)
       HideClothSim(mesh);
     var exportMesh = SelectExportGeometry(mesh, settings.Lod);
-    AttachResolvedNormals(catalog, index, exportMesh);
+    if (!settings.AnimationOnly)
+      AttachResolvedNormals(catalog, index, exportMesh);
 
     if (!exportMesh.HasTriangles && exportMesh.Bones.Count == 0)
     {
@@ -214,13 +223,13 @@ public static class AssetExporter
 
     exportMesh.Clip = null;
     IReadOnlyDictionary<string, string>? textureFiles = null;
-    if (settings.WriteGltf)
+    if (settings.WriteGltf && !settings.AnimationOnly)
     {
       GltfWriter.Write(Destination(outputDirectory, file.Path, ".glb", batch), exportMesh, settings.Space);
       report.Written++;
     }
 
-    if (settings.WriteFbx && exportMesh.HasTriangles)
+    if (settings.WriteFbx && exportMesh.HasTriangles && !settings.AnimationOnly)
     {
       var fbxPath = Destination(outputDirectory, file.Path, ".fbx", batch);
       textureFiles = TextureFiles(catalog, store, index, exportMesh, fbxPath, outputDirectory, settings, report, batch);
@@ -237,9 +246,12 @@ public static class AssetExporter
     foreach (var clip in settings.Clips)
     {
       clip.RootMotion = settings.RootMotion;
+      clip.RebaseFirstFrame = settings.RebaseFirstFrame;
       if (!clip.HasCurves || exportMesh.Bones.Count == 0)
         continue;
-      var token = ClipToken(clip.Name);
+      // __ADD marks a clip with the 0xF3/0xF7 additive slot (clip+0x68). ue_import_anim.py makes it a
+      // local-space additive against its own frame 0, which is what that slot stores.
+      var token = ClipToken(clip.Name) + (clip.HasAdditive ? AdditiveSuffix : "");
       var unique = token;
       var suffix = 2;
       while (!usedClips.Add(unique))
@@ -262,7 +274,14 @@ public static class AssetExporter
         var animScript = Path.Combine(Path.GetDirectoryName(fbxPath)!, "ue_import_anim.py");
         if (!File.Exists(animScript) || usedClips.Count == 1)
           WriteUnrealScript(animScript, report);
+        if (clip.RebaseFirstFrame && (clip.RebaseOffset != System.Numerics.Vector3.Zero || clip.RebaseYawDegrees != 0))
+          WriteRebaseSidecar(Path.ChangeExtension(fbxPath, ".rebase.json"), clip, report);
       }
+
+      if (clip.RebaseFirstFrame && (clip.RebaseOffset != System.Numerics.Vector3.Zero || clip.RebaseYawDegrees != 0))
+        report.Messages.Add($"{clip.Name}: rebased to the bind pose: removed {clip.RebaseOffset.X:0.###}, {clip.RebaseOffset.Y:0.###}, {clip.RebaseOffset.Z:0.###} m (source Y-up) and {clip.RebaseYawDegrees:0.#} deg yaw. --anim-rebase none keeps level space.");
+      if (clip.HasAdditive)
+        report.Messages.Add($"{clip.Name}: additive slot (0xF3/0xF7) present, written as {unique}. Import as a local-space additive with base = its frame 0.");
 
       var bound = ClipBinding.Resolve(exportMesh.Bones, clip).Count(index => index >= 0);
       var by = ClipBinding.UsesAnimIndex(exportMesh.Bones, clip) ? " (by template animNmb)" : "";
@@ -276,6 +295,8 @@ public static class AssetExporter
 
     exportMesh.Clip = null;
 
+    if (settings.AnimationOnly)
+      return;
     WriteMaterial(outputDirectory, file.Path, exportMesh.Material, settings, report, batch);
     if (settings.WriteModelTextures)
       ExportModelTextures(catalog, store, index, exportMesh, outputDirectory, settings, report, batch);
@@ -595,6 +616,28 @@ public static class AssetExporter
     }
 
     return mesh;
+  }
+
+  /// <summary>File-name marker for clips with the additive slot (<see cref="AnimationClip.HasAdditive"/>).</summary>
+  public const string AdditiveSuffix = "__ADD";
+
+  private static void WriteRebaseSidecar(string path, AnimationClip clip, ExportReport report)
+  {
+    // Unreal level space of a ROOT-rooted import at yaw 0 (bone 0 ref yaw 180 cancels the (-x, -z) of
+    // AxisConvert.Basis plus the importer's Y flip): (x, y, z) m -> (x, z, y) * 100 cm. Matches the survey's
+    // c06 CENTRE (-470621, -166166, 42000) cm.
+    var o = clip.RebaseOffset;
+    var ue = new System.Numerics.Vector3(o.X * 100, o.Z * 100, o.Y * 100);
+    var json = JsonSerializer.Serialize(new
+    {
+      clip = clip.Name,
+      note = "Removed by --anim-rebase first-frame. Place the actor at this transform (then play the clip) to get the level-space shot back.",
+      sourceMeters = new[] { o.X, o.Y, o.Z },
+      sourceYawDegrees = clip.RebaseYawDegrees,
+      unrealLevelCm = new[] { ue.X, ue.Y, ue.Z },
+    }, JsonOptions);
+    File.WriteAllText(path, json);
+    report.Written++;
   }
 
   private static string AnimationRelative(string modelPath, string token)
