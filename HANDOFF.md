@@ -402,3 +402,43 @@ bone = topmost bone displaced >= 50% of the max at t=0; cached per clip); Bind p
 slider; playback is real-time; mouse wheel no longer changes AnimBox/LodBox/PartBox selection when closed; Meshes list is a
 TreeView with _LODn variants nested (collapsed) under their base row (lowest LOD promoted if no base).
 Next: a GPU path would be the real fix for >60 fps with SSAA.
+
+## SM2Browser v3: GPU preview (2026-10-26, browser_v3)
+- **Path:** `Gpu/GpuPreviewControl.cs` (Avalonia `OpenGlControlBase`) + `Gpu/GlPreview.cs` (Silk.NET.OpenGL 2.22).
+  - Windows uses ANGLE (OpenGL ES 3 on Direct3D 11), Avalonia's default and the most robust driver path. Program.cs order: AngleEgl, Wgl, Software.
+  - Shaders carry a runtime header: `#version 300 es` on ANGLE, `330 core` on desktop GL. The box runs desktop GL through Mesa llvmpipe; X11 options clear Avalonia's llvmpipe blacklist.
+- **Scene:** `MeshPreview.BuildScene` (`MeshPreviewScene.cs`) shares slice, visibility, material, camera, light, In-place and skeleton logic with the CPU `Render`. The GPU draws exactly what the CPU would.
+- **Buffers and skinning:**
+  - Static interleaved VBO/IBO per batch (LOD/slice), uploaded once and cached by reference.
+  - Skinning in the vertex shader: 4 weights; the bone palette is an RGBA32F texture (4×N, `texelFetch`), so there is no bone-count limit.
+- **Materials:**
+  - Per-pixel cotangent-frame normal mapping; spec map metal=r, rough=a|g, ao=b.
+  - Toksvig gloss. Same light rig in linear light; sRGB encoded in the shader.
+  - Albedo textures are `SRGB8_ALPHA8`, others RGBA8. Full mip chains, trilinear filtering, up to 16x aniso.
+  - Uploads are budgeted to 120 ms per frame and continue on the next frame.
+- **Frame:**
+  - MSAA 8x (4x if the driver caps lower), resolved to an RGBA8 FBO and then blitted to Avalonia's framebuffer.
+  - Wireframe draws a GL_LINES index buffer built lazily. Skeleton overlay has no depth test.
+  - Renders on demand. During Play it renders on every compositor frame (vsync), sampling the clip at that frame's time.
+- **UI:**
+  - Toolbar `GPU` toggle (on by default). AA is disabled in GPU mode because MSAA is always on.
+  - Stats read `GPU WxH MSAA nx · cpu ms · fps`; the tooltip gives the GL renderer/version.
+  - Automatic CPU fallback when GL init fails, a frame throws, or no frame arrives within 2.5 s of showing the view. Avalonia never calls GL callbacks under software compositing; PreviewNote says why.
+- **Bench:**
+  - Run `LibSaber.SM2Browser.exe --glbench <game folder|synthetic> <model> <out> [frames]`. It writes glbench.txt and PNGs.
+  - It measures uncapped (vsync-off) ms/frame at 1100×1000, 1600×1200, 1920×1080 and 2560×1440, for a static orbit and for clip playback, plus presented (vsync-on) fps.
+  - On the PC: `Desktop\SM2_Work\run_glbench_v3.ps1`. Run it only when no game is running.
+- **Box check (synthetic sphere, llvmpipe):**
+  - The image matches the CPU renderer in orientation, colour and lighting, and skinning moves the mesh. Results are in `/workspace/browser_run_shots/v3/box_synthetic/`.
+  - Box GPU numbers are software GL only: 14 ms at 1100×1000.
+- **Install:** `C:\Users\Revaptor_FX\SM2Browser_v3\LibSaber.SM2Browser.exe` (MD5 2123211DEBDC00C2E902F78553B9D4A4). The first v3 build is kept as `.bak1`.
+- **PC numbers (RTX 4090, ANGLE D3D11, MSAA 8x, aniso 16x; Titus LOD0, 300k tris, 525 bones):**
+  - First frame including the texture upload: 374 ms.
+  - Vsync off, static: 0.17 ms (1100×1000) to 0.26 ms (2560×1440).
+  - Vsync off, playback: 0.3–1.2 ms. Playback cost is mostly CPU clip sampling plus the palette.
+  - Vsync on at 1600×1001: 120 fps static and 120 fps playing (monitor refresh).
+  - For comparison, CPU v2 ran 21–26 ms (38–47 fps).
+  - Captures: `Desktop\SM2_Work\Captures\v3_gpubench` and `/workspace/browser_run_shots/v3/pc/`.
+- **Open:**
+  - The MainWindow GPU toggle and fallback have not been driven by hand on the PC. The bench exercises the same control and renderer from the same exe.
+  - Wireframe on LOD0 (300k tris) is a solid silhouette, as on the CPU.

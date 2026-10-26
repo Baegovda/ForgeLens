@@ -2,6 +2,7 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:tdg="using:Avalonia.Controls"
         xmlns:local="using:LibSaber.SM2Browser"
+        xmlns:gpu="using:LibSaber.SM2Browser.Gpu"
         x:Class="LibSaber.SM2Browser.MainWindow"
         Title="Space Marine 2 assets"
         Width="1440"
@@ -91,6 +92,8 @@
           <ToggleButton x:Name="SkeletonToggle" Content="Skeleton" IsChecked="False" IsVisible="False" Click="ViewChanged" />
           <ToggleButton x:Name="SmoothToggle" Content="AA" IsChecked="True" IsVisible="False" Click="ViewChanged"
                         ToolTip.Tip="2x2 supersampling on still frames (drag and playback render 1x)" />
+          <ToggleButton x:Name="GpuToggle" Content="GPU" IsChecked="True" IsVisible="False" Click="GpuToggled"
+                        ToolTip.Tip="GPU preview (OpenGL ES via ANGLE/Direct3D 11, 8x MSAA, GPU skinning). Off = CPU renderer, which also takes over by itself if the GPU path fails." />
           <Button x:Name="PlayButton" Content="Play" IsVisible="False" Click="PlayClicked" />
           <TextBlock x:Name="RenderStats" VerticalAlignment="Center" Opacity="0.7" FontSize="11" />
         </WrapPanel>
@@ -113,6 +116,7 @@
         <Border x:Name="ViewBorder" Background="#121418" ClipToBounds="True"
                 PointerPressed="ViewPressed" PointerMoved="ViewMoved" PointerReleased="ViewReleased" PointerWheelChanged="ViewWheel">
           <Grid>
+            <gpu:GpuPreviewControl x:Name="GpuView" IsVisible="False" />
             <Image x:Name="PreviewImage" Stretch="Uniform" />
             <TextBox x:Name="PreviewText" IsReadOnly="True" AcceptsReturn="True" TextWrapping="NoWrap"
                      FontFamily="Consolas,Courier New,monospace" FontSize="12" Background="Transparent" BorderThickness="0" />

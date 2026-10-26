@@ -48,7 +48,7 @@ public sealed record PreviewSettings
 ///   bilinear sampling from a cached box-filtered mip chain chosen per triangle, Toksvig specular AA from the
 ///   normal-map mip length, and optional supersampling that is box-filtered down.
 /// </summary>
-public static class MeshPreview
+public static partial class MeshPreview
 {
   public static double LastRenderMs { get; private set; }
 

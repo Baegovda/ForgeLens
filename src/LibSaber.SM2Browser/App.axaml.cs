@@ -6,6 +6,8 @@ namespace LibSaber.SM2Browser;
 
 public class App : Application
 {
+  /// <summary>Bench mode replaces the main window.</summary>
+  internal static Func<Avalonia.Controls.Window>? WindowFactory { get; set; }
 
   public override void Initialize()
     => AvaloniaXamlLoader.Load(this);
@@ -13,7 +15,7 @@ public class App : Application
   public override void OnFrameworkInitializationCompleted()
   {
     if (ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktop)
-      desktop.MainWindow = new MainWindow();
+      desktop.MainWindow = WindowFactory?.Invoke() ?? new MainWindow();
 
     base.OnFrameworkInitializationCompleted();
   }

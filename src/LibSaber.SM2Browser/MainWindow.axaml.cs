@@ -1,3 +1,4 @@
+using LibSaber.SM2Browser.Gpu;
 using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Media;
@@ -307,6 +308,9 @@ public partial class MainWindow : Window
     _normals = null;
     _specular = null;
     PreviewImage.IsVisible = false;
+    GpuView.IsVisible = false;
+    GpuView.Continuous = false;
+    GpuToggle.IsVisible = false;
     PreviewText.IsVisible = true;
     PreviewText.Text = "Reading " + file.Path + "…";
     PreviewNote.Text = "";
@@ -350,6 +354,7 @@ public partial class MainWindow : Window
         SkeletonToggle.IsVisible = mesh.Bones.Count > 0;
         SkeletonToggle.IsChecked = false;
         WireToggle.IsVisible = mesh.HasTriangles;
+        GpuToggle.IsVisible = true;
         PreviewNote.Text = mesh.Message;
         if (mesh.Bones.Count > 0)
           _ = ListAnimationsAsync(++_animGeneration);
@@ -421,6 +426,7 @@ public partial class MainWindow : Window
         return;
       PreviewText.IsVisible = true;
       PreviewImage.IsVisible = false;
+      GpuView.IsVisible = false;
       PreviewText.Text = ex.Message;
       HideLoading(generation);
     }
@@ -568,6 +574,12 @@ public partial class MainWindow : Window
   {
     if (_mesh is null)
       return;
+    if (UseGpu())
+    {
+      DrawGpu(fast);
+      return;
+    }
+
     _drawFast = fast;
     _drawAgain = true;
     if (_drawBusy)
@@ -634,6 +646,12 @@ public partial class MainWindow : Window
         if (generation == _drawGeneration && task.Status == TaskStatus.RanToCompletion)
         {
           ShowPixels(task.Result.pixels, task.Result.width, task.Result.height);
+          if (_texture is null && !UseGpu())
+          {
+            GpuView.IsVisible = false;
+            PreviewImage.IsVisible = true;
+          }
+
           UpdateStats(task.Result.Item5, task.Result.width, task.Result.height, task.Result.supersample);
           if (!string.IsNullOrEmpty(task.Result.note))
             PreviewNote.Text = task.Result.note;
@@ -751,6 +769,116 @@ public partial class MainWindow : Window
     PreviewImage.InvalidateVisual();
   }
 
+  // ---- GPU preview -------------------------------------------------------------------------------------------
+
+  private bool _gpuHooked;
+  private DispatcherTimer? _gpuWatchdog;
+
+  private bool UseGpu()
+    => GpuToggle.IsChecked == true && !GpuView.HasFailed && _texture is null;
+
+  private void DrawGpu(bool fast)
+  {
+    if (_mesh is null)
+      return;
+    if (!_gpuHooked)
+    {
+      _gpuHooked = true;
+      GpuView.Failed += reason => FallBackToCpu(reason);
+      GpuView.Rendered += stats =>
+      {
+        HideLoading(_previewGeneration);
+        _gpuWatchdog?.Stop();
+        var fps = GpuView.Continuous || _dragging ? $" · {stats.Fps:0} fps" : "";
+        var upload = stats.UploadMs > 1 ? $" · upload {stats.UploadMs:0} ms" : "";
+        RenderStats.Text = $"GPU {stats.Width}x{stats.Height} MSAA {stats.Samples}x · {stats.CpuMs:0.0} ms{fps}{upload}";
+        ToolTip.SetTip(RenderStats, stats.Info);
+      };
+    }
+
+    var playing = _playTimer.IsEnabled && _clip is not null;
+    var clip = _clip;
+    var request = new GpuFrameRequest(
+      _mesh,
+      new OrbitCamera { Yaw = _yaw, Pitch = _pitch, Distance = _distance },
+      SkeletonToggle.IsChecked == true,
+      WireToggle.IsChecked == true,
+      _time,
+      new PreviewSettings
+      {
+        Lod = LodBox.SelectedIndex < 0 ? 0 : LodBox.SelectedIndex,
+        Part = PartBox.SelectedIndex <= 0 ? -1 : PartBox.SelectedIndex - 1,
+        Wireframe = WireToggle.IsChecked == true,
+        Albedo = _albedo, Normals = _normals, Specular = _specular,
+        MaxEdge = 4096, Supersample = 1, InPlace = InPlaceToggle.IsChecked == true,
+      },
+      // While playing, each presented frame samples the clip at its own time (not at the 16 ms timer's).
+      playing ? () =>
+      {
+        var t = _time + (float)Math.Clamp(_playClock.Elapsed.TotalSeconds - _playLast, 0, 0.1);
+        return clip!.Duration > 0 && t > clip.Duration ? 0 : t;
+      } : null);
+    GpuView.Continuous = playing;
+    PreviewImage.IsVisible = false;
+    GpuView.IsVisible = true;
+    SmoothToggle.IsEnabled = false;
+    GpuView.Show(request);
+    if (GpuView.FramesRendered == 0)
+    {
+      // No GL context (software compositor, blocked driver): Avalonia then never calls the GL callbacks.
+      _gpuWatchdog ??= new DispatcherTimer { Interval = TimeSpan.FromSeconds(2.5) };
+      _gpuWatchdog.Tick -= GpuWatchdogTick;
+      _gpuWatchdog.Tick += GpuWatchdogTick;
+      if (!_gpuWatchdog.IsEnabled)
+        _gpuWatchdog.Start();
+    }
+  }
+
+  private void GpuWatchdogTick(object? sender, EventArgs e)
+  {
+    _gpuWatchdog?.Stop();
+    if (GpuView.FramesRendered == 0 && GpuView.IsVisible && UseGpu())
+      FallBackToCpu(GpuView.InitAttempted
+        ? "GPU preview produced no frame."
+        : "No OpenGL context (software rendering).");
+  }
+
+  private void FallBackToCpu(string reason)
+  {
+    _gpuWatchdog?.Stop();
+    GpuToggle.IsChecked = false;
+    GpuView.Continuous = false;
+    GpuView.IsVisible = false;
+    SmoothToggle.IsEnabled = true;
+    PreviewNote.Text = reason + " Switched to the CPU preview.";
+    if (_mesh is not null && _texture is null)
+    {
+      PreviewImage.IsVisible = true;
+      DrawMesh(false);
+    }
+  }
+
+  private void GpuToggled(object? sender, RoutedEventArgs e)
+  {
+    if (GpuToggle.IsChecked == true && GpuView.HasFailed)
+    {
+      GpuToggle.IsChecked = false;
+      PreviewNote.Text = "GPU preview is unavailable: " + GpuView.FailReason;
+      return;
+    }
+
+    if (GpuToggle.IsChecked != true)
+    {
+      GpuView.Continuous = false;
+      GpuView.IsVisible = false;
+      SmoothToggle.IsEnabled = true;
+      if (_mesh is not null && _texture is null)
+        PreviewImage.IsVisible = true;
+    }
+
+    DrawMesh(false);
+  }
+
   private void UpdateStats(double renderMs, int width, int height, int supersample)
   {
     _fpsFrames++;
@@ -792,6 +920,7 @@ public partial class MainWindow : Window
     {
       _playTimer.Stop();
       PlayButton.Content = "Play";
+      DrawMesh();
       return;
     }
 

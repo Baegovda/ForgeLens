@@ -226,7 +226,7 @@ internal static class PreviewBench
       line($"  tess-scan example td with 'tessellation': {example}");
   }
 
-  private static bool PartCenter(ExportedMesh mesh, out System.Numerics.Vector3 center, out string name)
+  internal static bool PartCenter(ExportedMesh mesh, out System.Numerics.Vector3 center, out string name)
   {
     center = default;
     name = "";
@@ -263,7 +263,7 @@ internal static class PreviewBench
     }
   }
 
-  private static void Png(string path, byte[] bgra, int width, int height)
+  internal static void Png(string path, byte[] bgra, int width, int height)
   {
     using var raw = new MemoryStream();
     for (var y = 0; y < height; y++)

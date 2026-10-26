@@ -1,0 +1,207 @@
+using System.Numerics;
+
+namespace LibSaber.SM2.Assets.Meshes;
+
+/// <summary>One drawable part range of a <see cref="PreviewBatch"/> with its resolved preview material.</summary>
+public sealed class PreviewPartDraw
+{
+  public int IndexStart { get; init; }
+  public int IndexCount { get; init; }
+  public bool Draw { get; init; }
+  public PreviewImage? Albedo { get; init; }
+  public PreviewImage? Normal { get; init; }
+  public PreviewImage? Specular { get; init; }
+  public bool RoughInAlpha { get; init; }
+  public bool AoInBlue { get; init; }
+  /// <summary>Lit solid colour (sRGB 0..1) for parts without an albedo map, same tint as the CPU renderer.</summary>
+  public Vector3 Solid { get; init; }
+}
+
+/// <summary>
+///   One vertex pool (LOD buffer) as flat arrays. <see cref="Key"/> is stable for the life of the mesh, so a
+///   GPU renderer can upload the buffers once and reuse them every frame.
+/// </summary>
+public sealed class PreviewBatch
+{
+  public required object Key { get; init; }
+  public required Vector3[] Positions { get; init; }
+  public required Vector3[] Normals { get; init; }
+  public required Vector2[] Uvs { get; init; }
+  public required int[] Indices { get; init; }
+  public SkinWeights[]? Skin { get; init; }
+  public required IReadOnlyList<PreviewPartDraw> Parts { get; init; }
+}
+
+/// <summary>Everything a renderer needs for one frame: geometry handles, camera, lights, skin palette, bone lines.</summary>
+public sealed class PreviewScene
+{
+  public required IReadOnlyList<PreviewBatch> Batches { get; init; }
+  /// <summary>Row-vector (System.Numerics) view and projection; projection depth is 0..1.</summary>
+  public Matrix4x4 View { get; init; }
+  public Matrix4x4 Projection { get; init; }
+  public Vector3 Eye { get; init; }
+  public Vector3 Center { get; init; }
+  public Vector3 KeyLight { get; init; }
+  public Vector3 FillLight { get; init; }
+  /// <summary>InverseBind * world per bone while a clip plays; null draws the bind pose.</summary>
+  public Matrix4x4[]? SkinMatrices { get; init; }
+  public IReadOnlyList<(Vector3 From, Vector3 To)> BoneLines { get; init; } = Array.Empty<(Vector3, Vector3)>();
+  public string Note { get; init; } = "";
+}
+
+public static partial class MeshPreview
+{
+  private static readonly System.Runtime.CompilerServices.ConditionalWeakTable<object, Dictionary<string, (Vector3 Center, Vector3 Extent, bool Ok)>> BoundsCache = new();
+
+  /// <summary>
+  ///   Same camera, lights, part selection, materials, in-place rebase and skin palette as <see cref="Render"/>,
+  ///   without rasterising. Used by the GPU preview.
+  /// </summary>
+  public static PreviewScene BuildScene(ExportedMesh mesh, int width, int height, OrbitCamera camera, bool showSkeleton, float timeSeconds, PreviewSettings? settings = null)
+  {
+    width = Math.Max(1, width);
+    height = Math.Max(1, height);
+    var lod = Math.Max(0, settings?.Lod ?? 0);
+    var partFilter = settings?.Part ?? -1;
+    var honorVisibility = partFilter < 0 && lod <= 0;
+    var slices = CollectSlices(mesh, lod, partFilter, honorVisibility);
+    var clipActive = mesh.Bones.Count > 0 && mesh.Clip is { HasCurves: true };
+    Matrix4x4[]? worlds = clipActive || showSkeleton ? BoneWorlds(mesh, timeSeconds) : null;
+    if (clipActive && settings?.InPlace == true)
+    {
+      var rebase = InPlaceRebase(mesh);
+      for (var i = 0; i < worlds!.Length; i++)
+        worlds[i] *= rebase;
+    }
+
+    var batches = new List<PreviewBatch>(slices.Count);
+    var visibilityKey = new System.Text.StringBuilder();
+    visibilityKey.Append(partFilter).Append('|').Append(honorVisibility ? 1 : 0).Append('|');
+    foreach (var slice in slices)
+    {
+      var prepared = Prepare(slice);
+      var parts = new List<PreviewPartDraw>();
+      if (slice.Parts.Count == 0)
+        parts.Add(new PreviewPartDraw { IndexStart = 0, IndexCount = prepared.Indices.Length, Draw = true, Solid = new Vector3(156, 118, 96) / 255f });
+      for (var p = 0; p < slice.Parts.Count; p++)
+      {
+        var part = slice.Parts[p];
+        var draw = (partFilter < 0 || p == partFilter) && (!honorVisibility || part.Visible);
+        visibilityKey.Append(draw ? '1' : '0');
+        var shift = p * 17 % 36 - 12;
+        var channels = settings?.Specular is not null && part.Specular is not null && settings.Specular.TryGetValue(part.Specular, out var specImage) ? specImage.Channels : "";
+        var start = Math.Clamp(part.IndexStart - part.IndexStart % 3, 0, prepared.Indices.Length);
+        var end = Math.Clamp(part.IndexStart + part.IndexCount, start, prepared.Indices.Length);
+        parts.Add(new PreviewPartDraw
+        {
+          IndexStart = start,
+          IndexCount = (end - start) / 3 * 3,
+          Draw = draw,
+          Albedo = Lookup(settings?.Albedo, part.Texture),
+          Normal = Lookup(settings?.Normals, part.Normal),
+          Specular = Lookup(settings?.Specular, part.Specular),
+          RoughInAlpha = channels.Contains("Roughness(a)", StringComparison.OrdinalIgnoreCase),
+          AoInBlue = channels.Contains("AO(b)", StringComparison.OrdinalIgnoreCase) || channels.Length == 0,
+          Solid = new Vector3(Math.Clamp(156 + shift, 48, 230), Math.Clamp(118 + shift / 2, 48, 210), Math.Clamp(96 + shift / 3, 48, 200)) / 255f,
+        });
+      }
+
+      visibilityKey.Append(';');
+      batches.Add(new PreviewBatch
+      {
+        Key = prepared,
+        Positions = prepared.Positions,
+        Normals = prepared.Normals,
+        Uvs = prepared.Uvs,
+        Indices = prepared.Indices,
+        Skin = prepared.Skin,
+        Parts = parts,
+      });
+    }
+
+    // Bind-pose bounds of the drawn parts, cached per mesh and visibility so a frame costs no vertex walk.
+    var cacheKey = visibilityKey.ToString() + lod;
+    var cache = BoundsCache.GetOrCreateValue(mesh);
+    (Vector3 Center, Vector3 Extent, bool Ok) bounds;
+    lock (cache)
+    {
+      if (!cache.TryGetValue(cacheKey, out bounds))
+      {
+        var ok = FastBounds(slices, partFilter, honorVisibility, out var c, out var e);
+        bounds = (c, e, ok);
+        cache[cacheKey] = bounds;
+      }
+    }
+
+    var center = bounds.Center;
+    var extent = bounds.Extent;
+    if (!bounds.Ok && mesh.Bones.Count > 0)
+    {
+      var min = new Vector3(float.MaxValue);
+      var max = new Vector3(float.MinValue);
+      foreach (var world in worlds ?? BoneWorlds(mesh, timeSeconds))
+      {
+        min = Vector3.Min(min, Translation(world));
+        max = Vector3.Max(max, Translation(world));
+      }
+
+      center = (min + max) * 0.5f;
+      extent = Vector3.Max(max - min, new Vector3(0.05f));
+    }
+
+    if (camera.Target is { } pivot)
+      center = pivot;
+    var distance = camera.Distance > 0 ? camera.Distance : FitDistance(extent, width / (float)height);
+    var pitch = Math.Clamp(camera.Pitch, -1.2f, 1.2f);
+    var planar = MathF.Cos(pitch);
+    var eye = center + new Vector3(planar * MathF.Sin(camera.Yaw), MathF.Sin(pitch), planar * MathF.Cos(camera.Yaw)) * distance;
+    var view = Matrix4x4.CreateLookAt(eye, center, Vector3.UnitY);
+    var projection = Matrix4x4.CreatePerspectiveFieldOfView(MathF.PI / 4f, width / (float)height, Math.Max(0.01f, distance * 0.01f), distance * 40f);
+
+    Matrix4x4[]? skinMatrices = null;
+    if (clipActive)
+    {
+      skinMatrices = new Matrix4x4[mesh.Bones.Count];
+      for (var i = 0; i < skinMatrices.Length; i++)
+        skinMatrices[i] = mesh.Bones[i].InverseBind * worlds![i];
+    }
+
+    var lines = new List<(Vector3, Vector3)>();
+    if (showSkeleton && mesh.Bones.Count > 0 && worlds is not null)
+    {
+      var deformOnly = false;
+      var fileOnly = false;
+      for (var i = 0; i < mesh.Bones.Count; i++)
+      {
+        deformOnly |= mesh.Bones[i].Influences;
+        fileOnly |= mesh.Bones[i].FileBind;
+      }
+
+      for (var i = 0; i < mesh.Bones.Count; i++)
+      {
+        if (deformOnly && !mesh.Bones[i].Influences)
+          continue;
+        if (!deformOnly && fileOnly && !mesh.Bones[i].FileBind)
+          continue;
+        var parent = mesh.Bones[i].Parent;
+        if (parent < 0 || parent >= mesh.Bones.Count)
+          continue;
+        lines.Add((Translation(worlds[parent]), Translation(worlds[i])));
+      }
+    }
+
+    return new PreviewScene
+    {
+      Batches = batches,
+      View = view,
+      Projection = projection,
+      Eye = eye,
+      Center = center,
+      KeyLight = Vector3.Normalize((eye - center) + Vector3.UnitY * distance * 0.45f),
+      FillLight = Vector3.Normalize(Vector3.Cross(Vector3.UnitY, eye - center) + Vector3.UnitY * 0.25f),
+      SkinMatrices = skinMatrices,
+      BoneLines = lines,
+      Note = slices.Count == 0 && mesh.Bones.Count == 0 ? (string.IsNullOrEmpty(mesh.Message) ? "Nothing to draw." : mesh.Message) : mesh.Message,
+    };
+  }
+}
