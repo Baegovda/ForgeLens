@@ -11,6 +11,9 @@ namespace LibSaber.SM2.Assets.Meshes;
 ///   roughness.scale/bias +0x1c/+0x20. The permutation define GLT_USE_SECOND_SPEC (0x1437f89c0) is set by
 ///   FUN_1423b7640 at 0x1423b819a when enabled is true and no layer blend is active.
 ///   Defaults are the engine's full-dump values (373 disabled blocks in the retail .td set).
+///   Shading (PS 03840_0 / 00004_1, per-layer cb6 rows 18/19): m2 = saturate(row18.w * packedMetal + row7.w),
+///   F0_2 = lerp(0.04, tint.rgb * albedo, m2) (tint alpha unused), r2 = max(saturate(row19.x * packedRough + row19.y), 0.02).
+///   The lobe is added to the base specular at weight 1 (direct lights only, no IBL); there is no blend weight.
 /// </summary>
 public sealed class SecondSpec
 {
@@ -28,6 +31,11 @@ public sealed class SecondSpec
 ///   extra { anisotropy, intensity, shift } +0x20. FUN_1423b7640 at 0x1423b801f enables the aniso permutation when
 ///   enabled and anisotropy &gt; 0.01 (constant 0x143c843ac), and the dir-map permutation when dirMap is also bound
 ///   (glt+0x110 non-null). Defaults are the engine's full-dump values (362 disabled blocks).
+///   CB_STATIC_GLT packer FUN_1423ba150: row5 = (cos, sin, -sin, cos) of clamp(angle, 0, 180) in radians;
+///   row6 = (intensity, extra.intensity, 1 - clamp(anisotropy, 0, 0.95), 1 - clamp(extra.anisotropy, 0, 0.95))
+///   at 0x1423ba35c..0x1423ba3ec; row4.y = extra.shift (0x1423ba3f4). In the shader alphaT = (r * k)^2, alphaB = r^2,
+///   D scaled by intensity. extra{} is the shifted second lobe (tangent normalize(T + shift * N)) and only exists
+///   when GLT_USE_SECOND_SPEC is also set.
 /// </summary>
 public sealed class AnisoSpec
 {

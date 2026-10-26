@@ -293,3 +293,23 @@ Everything our work created lives in `/Game/SM2_Work`. An inventory of /Game (25
   - ue_cap*.py → Materials/M_Hide.
   - ue_import_anim.py / ue_bulk_anim.py take the destination as an argument: pass Animations/<asset>/<set>.
   - The product default in import_sm2_materials.py stays /Game/SM2/<mesh> for end users, and our tools pass the folder explicitly.
+
+## Material finishing (2026-10-26, SM2 only, Substrate)
+Evidence (sm2_retail.exe + decoded PS bytecode; shaders in box `/workspace/mat/glsl/`):
+- 1a Defines: GLT_USE_ANISO_SPEC / _DIR_MAP / GLT_USE_SECOND_SPEC = permutation bits 30 / 31 / 41 (FUN_1423b6260); gates in FUN_1423b7640 (aniso > 0.01, dirMap bound, second_spec enabled and no layer blend). SpecLayers.cs matches; the exporter does not check "no layer blend" (no effect on characters).
+- 1b Second spec (PS 03840_0 non-aniso, 00004_1 aniso; cb6 OBJ_MTLBLEND_LAYER_CONST layer0 rows 6..21): m2 = saturate(row18.w*packedMetal + row7.w); tint = row18.xyz (alpha unused); F0_2 = flag32 (row21.x) ? tint*specRGB*m2 : lerp(0.04, tint*albedoLinear, m2); r2 = max(saturate(row19.x*packedRough + row19.y), 0.02); F = (1-Fc)*F0_2 + saturate(50*F0_2.g)*Fc. Added to base spec at weight 1, direct lights only. Non-aniso second lobe has no visibility term (D*F*NdotL, ~4x a standard lobe); the aniso one keeps 1/(4pi) (standard level).
+- Aniso: packer FUN_1423ba150 (CB_STATIC_GLT): row5 = (cos, sin, -sin, cos) of clamp(angle,0,180)*deg2rad; row6 = (intensity, extra.intensity, k, k_extra) with k = 1 - clamp(a, 0, 0.95) (0x1423ba35c..3ec); row4.y = extra.shift (0x1423ba3f4). Shader: alphaT = (r*k)^2, alphaB = r^2, D = min(.., 128) * intensity. In aniso+second shaders the second lobe IS extra{} (tangent normalize(T + shift*N), k_extra, extra.intensity); without second spec extra{} is unused.
+- 3 SecondSpecWeight does not exist in the game; removed. Gain fixed from the visibility difference: SecondSpecGain 4 (non-aniso) / 1 (aniso). Aniso intensity = raw glt value.
+- Base F0 in game: lerp(0.16*reflectance^2, albedo, metal), reflectance = row8.w (source not traced; UE keeps 0.04).
+- Unresolved: GBuffer PS 00165_2 reads rows 18/19 as a fresnel tint (layout may be per permutation); whether the deferred path carries the second lobe.
+import_sm2_materials.py (graph, M_SM2 and M_SM2_Translucent):
+- Base = SubstrateSlabBSDF: DiffuseAlbedo = albedo*(1-metal), F0 = lerp(0.04, albedo, metal) (x AnisoIntensity, saturated, when aniso), F90 1. Aniso remap A = (k^2-1)/(k^2+1), roughness' = r*sqrt((k^2+1)/2) (matches both game axes exactly with Substrate alphaT = a(1+A), alphaB = a(1-A)). Tangent = (cos, sin) of AnisoAngle or AnisoDir (UseAnisoDirMap).
+- Second = Slab with albedo 0, F0 = saturate(F0_2 * SecondSpecGain * AnisoExtraIntensity), F90 = saturate(50*F0_2.g)*gain, r2 remapped by AnisoExtraAnisotropy, frame rotated by AnisoExtraShift (T2 = normalize(T + s*N), N2 = normalize(N - s*T)). SubstrateAdd(base, second) behind static switch UseSecondSpec -> Front Material. Translucent: SubstrateWeight(front, opacity). AO / WPO stay on root pins; legacy BaseColor/Metallic/... pins no longer linked.
+- Params: AnisoAngle/Intensity/Anisotropy, AnisoExtraAnisotropy (0.5) / ExtraIntensity (1) / ExtraShift (0.2), SecondSpecGain, SecondSpecTint (linear), SecondMetalness/RoughnessScale/Bias. apply_spec_layers no longer clamps anisotropy.
+UE verify (`tools/ue/ue_mat_apply.py <asset> apply|verify`, PC `Desktop\SM2_Work\Scripts`, into `/Game/SM2_Work/Characters/<asset>`):
+- hormagaunt 26/26 (secondSpec 8), calgar 44/44 (7), titus 41/41 (2); switches/params/tint match the sidecar, MISMATCH [] on all. No Error lines in the log. Stats: M_SM2 vs 179 / ps 273 / 5 samplers (was 161); Translucent vs 398 / ps 1150 / 9.
+- Backup before apply: `Desktop\SM2_Work\Backup\Characters_mat.bak1\` (robocopy of the three Characters folders).
+- Captures (ue_cap_lit.py intensity=80): PC `Desktop\SM2_Work\Captures\Mat\{before,after}\<asset>_{body|head}\`; box `/workspace/mat/captures/compare_*.jpg` (top before, bottom after). Mean |diff| 0..255 front/side/back: hormagaunt body 8.2/2.1/7.5, calgar body 4.8/8.7/4.1, calgar head 4.3/6.5/3.6, titus body 2.9/1.8/2.2, titus head 1.8/3.8/2.3. The first after set was captured mid shader compile (grey checker); retaken after compile.
+Caveats / next:
+- Calgar hair (extra.intensity 20, saturated F0 -> 1) looks blotchy and too bright: UE also lights the second slab with IBL (game: direct only), and intensity can only go through F0 <= 1. Candidate fix: scale the second slab by a Substrate coverage or drop its IBL via a specular-only light-function trick; needs an in-game reference.
+- Shift is a frame rotation approximation; DIR_MAP decode (RG*2-1) not verified against the shader.
