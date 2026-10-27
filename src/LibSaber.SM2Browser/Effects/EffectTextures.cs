@@ -86,12 +86,17 @@ internal readonly record struct EffectCamera(Vector3 Center, float Yaw, float Pi
     var sizes = new List<float>();
     for (var i = 1; i <= 24; i++)
     {
-      instance.Seek(seconds * 0.6f * i / 24f);
+      // Whole capture window (frames sample up to 15/16 of it). Sprites only: mesh debris (hierophant stone02_big, 180
+      // chunks) flies ~35 m in 3 s and would pull the frame off the core.
+      instance.Seek(seconds * i / 24f);
       foreach (var e in instance.Emitters)
       {
         if (!e.Def.IsSprite) continue;
         foreach (var p in e.Particles)
         {
+          // The bench has no floor: gravity debris falls for metres below the origin. In game it lands on the ground
+          // (y ≈ 0 at the spawn point), so it does not set the frame (HEURISTIC).
+          if (p.Position.Y < -0.5f) continue;
           xs.Add(p.Position.X); ys.Add(p.Position.Y); zs.Add(p.Position.Z);
           sizes.Add(e.Def.Size.Sample(Math.Clamp(p.Age / p.Life, 0, 1), 0.5f) * e.Def.Scale);
         }
@@ -105,13 +110,26 @@ internal readonly record struct EffectCamera(Vector3 Center, float Yaw, float Pi
         }
     }
 
+    if (Environment.GetEnvironmentVariable("SM2_VFX_FITDBG") == "1")
+      foreach (var e in instance.Emitters)
+        if (e.Particles.Any())
+          Console.Error.WriteLine($"  em {e.Def.Name} n {e.Particles.Count()} mean {new Vector3(e.Particles.Average(p => p.Position.X), e.Particles.Average(p => p.Position.Y), e.Particles.Average(p => p.Position.Z))}");
     instance.Reset();
     if (xs.Count == 0) return new EffectCamera(new Vector3(0, 0.5f, 0), 0.6f, 0.25f, 4f);
     float P(List<float> v, float q) { v.Sort(); return v[(int)Math.Clamp(q * (v.Count - 1), 0, v.Count - 1)]; }
-    var min = new Vector3(P(xs, 0.1f), P(ys, 0.1f), P(zs, 0.1f));
-    var max = new Vector3(P(xs, 0.9f), P(ys, 0.9f), P(zs, 0.9f));
+    // Centre on the median and size on the 25..75 % box ×1.6 (was 10..90 %): long-flying debris/sparks no longer pull the
+    // camera away from the dense core (hierophant bomb: 10..90 % box spanned 32 m, the core is ~3 m). HEURISTIC.
+    var lo = new Vector3(P(xs, 0.25f), P(ys, 0.25f), P(zs, 0.25f));
+    var hi = new Vector3(P(xs, 0.75f), P(ys, 0.75f), P(zs, 0.75f));
+    var med = new Vector3(P(xs, 0.5f), P(ys, 0.5f), P(zs, 0.5f));
+    var min = med - (med - lo) * 1.6f;
+    var max = med + (hi - med) * 1.6f;
     var center = (min + max) * 0.5f;
-    var extent = (max - min).Length() * 0.5f + Math.Min(P(sizes, 0.75f), 3f);
-    return new EffectCamera(center, 0.6f, 0.22f, Math.Clamp(extent / MathF.Tan(MathF.PI / 8f) * 1.15f, 0.4f, 80f));
+    if (Environment.GetEnvironmentVariable("SM2_VFX_FITDBG") == "1")
+      Console.Error.WriteLine($"fit: n {xs.Count} p0 ({xs[0]:0.00},{ys[0]:0.00},{zs[0]:0.00}) p100 ({xs[^1]:0.00},{ys[^1]:0.00},{zs[^1]:0.00}) min {min} max {max} size75 {P(sizes, 0.75f):0.000}");
+    // Small effects (muzzle, blood, candle): the particle spread can be near zero, so the sprite size sets the frame
+    // and the minimum distance is 0.15 (was 0.4) so a 5 cm puff still fills a useful part of the view.
+    var extent = Math.Max((max - min).Length() * 0.5f + Math.Min(P(sizes, 0.75f), 3f), Math.Min(P(sizes, 0.9f), 3f) * 0.75f);
+    return new EffectCamera(center, 0.6f, 0.22f, Math.Clamp(extent / MathF.Tan(MathF.PI / 8f) * 1.15f, 0.15f, 80f));
   }
 }

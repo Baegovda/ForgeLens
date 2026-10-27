@@ -192,3 +192,4 @@ Disassembly: /workspace/vfxsh_dis/{pc,pg,dx_pc_dx12_sfx,dx_pc_dx12_distort}, GLS
 - vfx3o: curve slots = texture bindings; r0.y = 1/softDepth (not exposure); r4.y/z/w + r0.w decoded; colour-gradient LUT proven (unused in data). distortion.power and trail DEGR unresolved. VFX ≈73%.
 - vfx3p/q: distortion.power and trail DEGR unresolved after 2 no-progress chunks → stopped. VFX ≈73%.
 - vfx3r: in-game comparison prep — bench sheets in Captures\ingame_cmp, user refs go to Captures\ingame_ref.
+- vfx3s: textures added (tex9), Fit reframed (hierophant renders, VAT d=0.48); Retail.exe direct launch relaunches via start_protected_game + EAC → no capture (route disproved); steam_appid.txt.check incident (created/deleted in game root, verified gone). Open: muzzle/candle 0 quads, chainsaw blood 0 particles.

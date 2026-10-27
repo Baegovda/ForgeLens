@@ -1354,3 +1354,28 @@ Disassembly: /workspace/vfxsh_dis/{pc,pg,dx_pc_dx12_sfx,dx_pc_dx12_distort}, GLS
   `client_pc\root\bin\pc\Warhammer 40000 Space Marine 2 - Retail.exe` directly (what the Nexus Vortex extension's
   "launch without EAC — offline only" tool does) via RenderDoc 1.46 portable (`Desktop\SM2_Work\Tools\RenderDoc_1.46_64`,
   signature Valid). Not launched by the agent.
+
+## vfx3s (2026-10-27 15:40 KST) — bench fixes + GPU-capture attempt result
+- **GPU capture attempt FAILED (EAC relaunch), 15:33 KST.** `renderdoccmd capture` on
+  `client_pc\root\bin\pc\Warhammer 40000 Space Marine 2 - Retail.exe` (Steam running): the injected process (PID 38920) exits
+  immediately and the game relaunches itself via `start_protected_game.exe` (PID 91044) → new Retail.exe child (PID 59596)
+  + `EasyAntiCheat_EOS.exe` (PID 96252, 15:33:36). RenderDoc never attaches to the real process; no `.rdc`, trigger log empty.
+  The "run Retail.exe directly = offline no-EAC" route from vfx3r is **disproved** for this build. Game closed, no bypass tried.
+  Remaining options are user-side screenshots (F12) into `Captures\ingame_ref\`.
+- **Incident:** the launch command created and immediately deleted an empty `steam_appid.txt.check` in the game root
+  (`D:\Steam\steamapps\common\Space Marine 2\`). Verified absent afterwards; no game file was modified. Agents must not
+  write probe files into the game folder.
+- Textures: `part_splash_drops_01`, `part_splash_central_01`, `part_rs_glow_01` (PC `Raw\vfx\tex3\pct`) and new
+  `flame_sml_16x8`, `part_splash_mid_03`, `part_seq_plasma_expl_01` (+ `_vectors`/`_am`/`_nm`; extracted read-only from the
+  paks with `SM2Extractor_e4ceb7d extract -f`) → PC `Raw\vfx\tex9\`, box `/workspace/vfx3_raw/tex9/pct/` (with the tex3 mips).
+  Only `gpu_emitter_texture` (GPU emitter placeholder) and mesh `sfx_geom_debr_expl_stones_small` are still missing.
+- `EffectCamera.Fit` (EffectTextures.cs): samples the whole capture window, ignores particles below y = −0.5 (no floor in the
+  bench; HEURISTIC), centres on the median with the 25..75 % box ×1.6, min distance 0.15. Hierophant bomb was empty because
+  falling debris (CPU_EMITTER_9, y ≈ −280 m) and stone02_big mesh chunks (x ≈ +33 m) set the frame; now the core renders and
+  VAT shows d = 0.48 (was 0). `SM2_VFX_FITDBG=1` prints the fit + per-emitter means.
+- Bench needs `SM2_VFX_MESHES=/workspace/vfx3_raw/mesh1` (the vfx3r run missed splashes_vtxa_lwi etc.). Script:
+  `tools/vfxbench/ingame_cmp.sh`. Re-rendered `/workspace/browser_run_shots/ingame_cmp/` (old run kept as `ingame_cmp.bak1`),
+  PC `Captures\ingame_cmp\` (old → `ingame_cmp.bak1`).
+- Still open (not framing): fx_bolter_muzzle_client and part_mg_candle_smoke_hub build **0 quads** (3/9 particles alive, all
+  filtered in EffectSprites.Build); part_mag_chainsaw_blood_splash_red_01 spawns **0 particles** in 0.5 s (covering-triggered?).
+  Those three rows of the contact sheet are empty and not comparable yet.
