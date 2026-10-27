@@ -1499,3 +1499,7 @@ Disassembly: /workspace/vfxsh_dis/{pc,pg,dx_pc_dx12_sfx,dx_pc_dx12_distort}, GLS
 - Verified: all 20 textures + 2 meshes render textured (`Desktop\SM2_Work\Captures\ue_export\ue_export_board.png`; first dark try
   kept as `.png.bak1`, fix = manual exposure). Blood mesh uses its FBX lit materials (red). Backdrop BlackUnlitMaterial did not load →
   grey sky background (cosmetic). Capture actors are SM2Cap-tagged and removed by `export`; the editor level was not saved.
+
+## vfx4-3 — browser polish (done)
+- MainWindow.axaml(.cs): search shortcuts, a clear button, the export button now follows the selection, and Ctrl+E exports. GameCatalog.Query matches all words.
+- Tests: Assets 142 (SearchWordsTests added), Extractor 42, LibSaber 5. The GUI has not been run on the PC (build only).

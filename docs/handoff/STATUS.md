@@ -214,3 +214,7 @@ Mesh UV scroll (overrideAffixScroll, FUN_1425fd580) on; opt-in bench bloom from 
 Bloom includes sprites + bloom point (heuristic value, threshold design from Bloom.BloomPoint); finisher blood darker (combine_material deferred, SurfLight 60 heuristic); LitScale 400 (runtime light, heuristic value); distortion buffer math from particles.sdc 00005_1 (power mapping heuristic); trail DEGR still heuristic (0 refs). VFX ≈ 79%. See HANDOFF.md.
 
 _Niagara conversion: off the roadmap (2026-10-27), listed under ROADMAP → Possible future development._
+
+## vfx4-3 (2026-10-27 KST) — browser polish
+- Search: several words must all match (`GameCatalog.MatchesAll`, tested). Ctrl+F focuses the box, Enter previews the first hit, Down moves into the list, Esc or ✕ clears. When nothing matches, the status bar says so.
+- Export: enabled only when something is selected. Label shows "Export N files…" and changes to "Exporting…" while it runs. Ctrl+E starts it.

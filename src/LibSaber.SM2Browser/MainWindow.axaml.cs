@@ -102,6 +102,7 @@ public partial class MainWindow : Window
     };
     // Space = Play/Pause anywhere in the window, except while typing (search, anim filter) or in an open dropdown.
     AddHandler(KeyDownEvent, SpaceKeyDown, RoutingStrategies.Tunnel);
+    AddHandler(KeyDownEvent, ShortcutKeyDown, RoutingStrategies.Tunnel);
     Opened += async (_, _) =>
     {
       if (!string.IsNullOrWhiteSpace(_settings.LastFolder) && Directory.Exists(_settings.LastFolder))
@@ -157,7 +158,7 @@ public partial class MainWindow : Window
       _settings.LastFolder = path;
       _settings.Save();
       BindTree(catalog);
-      ExportButton.IsEnabled = catalog.FileCount > 0;
+      UpdateExportButton();
     }
     catch (OperationCanceledException)
     {
@@ -204,10 +205,70 @@ public partial class MainWindow : Window
 
   private void SearchChanged(object? sender, TextChangedEventArgs e)
   {
+    SearchClear.IsVisible = !string.IsNullOrEmpty(SearchBox.Text);
     if (_suppressSearch)
       return;
     _searchTimer.Stop();
     _searchTimer.Start();
+  }
+
+  // vfx4-3 usability: Enter = run the search now and preview the first hit, Down = move into the list, Esc = clear.
+  private void SearchKeyDown(object? sender, KeyEventArgs e)
+  {
+    switch (e.Key)
+    {
+      case Key.Escape when !string.IsNullOrEmpty(SearchBox.Text):
+        SearchBox.Text = "";
+        e.Handled = true;
+        break;
+      case Key.Enter:
+        _searchTimer.Stop();
+        _selectFirstAfterRefresh = true;
+        RefreshFiles();
+        e.Handled = true;
+        break;
+      case Key.Down when FileList.ItemCount > 0:
+        if (FileList.SelectedIndex < 0)
+          FileList.SelectedIndex = 0;
+        FileList.Focus();
+        e.Handled = true;
+        break;
+    }
+  }
+
+  private void SearchClearClicked(object? sender, RoutedEventArgs e)
+  {
+    SearchBox.Text = "";
+    SearchBox.Focus();
+  }
+
+  private bool _selectFirstAfterRefresh;
+  private bool _exporting;
+
+  /// <summary>Ctrl+F focuses the search box, Ctrl+E opens export for the selection.</summary>
+  private void ShortcutKeyDown(object? sender, KeyEventArgs e)
+  {
+    if (e.KeyModifiers != KeyModifiers.Control)
+      return;
+    if (e.Key == Key.F)
+    {
+      SearchBox.Focus();
+      SearchBox.SelectAll();
+      e.Handled = true;
+    }
+    else if (e.Key == Key.E && ExportButton.IsEnabled)
+    {
+      e.Handled = true;
+      ExportClicked(ExportButton, new RoutedEventArgs());
+    }
+  }
+
+  /// <summary>Export is only offered when something is selected; the label says how many.</summary>
+  private void UpdateExportButton()
+  {
+    var n = FileList.SelectedItems?.Count ?? 0;
+    ExportButton.IsEnabled = !_exporting && _catalog is not null && n > 0;
+    ExportButton.Content = _exporting ? "Exporting…" : n switch { 0 => "Export…", 1 => "Export 1 file…", _ => $"Export {n} files…" };
   }
 
   private void FilterChanged(object? sender, SelectionChangedEventArgs e)
@@ -260,6 +321,10 @@ public partial class MainWindow : Window
       return;
 
     FileList.ItemsSource = new FileRowList(catalog, query);
+    if (_selectFirstAfterRefresh && query.Length > 0)
+      FileList.SelectedIndex = 0;
+    _selectFirstAfterRefresh = false;
+    UpdateExportButton();
     var scope = scoped is null
       ? "search"
       : includeSubfolders ? directory.Name + " and subfolders" : directory.Name;
@@ -267,12 +332,21 @@ public partial class MainWindow : Window
       ? ""
       : $" {catalog.DuplicatesCollapsed:N0} duplicate paths hidden; the later archive is shown.";
     var skipped = catalog.ArchivesSkipped == 0 ? "" : $" {catalog.ArchivesSkipped} caches skipped.";
+    if (query.Length == 0 && !string.IsNullOrWhiteSpace(search))
+    {
+      StatusText.Text = $"Nothing matches '{search.Trim()}'. Try fewer words, or set the type filter to All types.";
+      ApplyPendingFile();
+      return;
+    }
     StatusText.Text = $"{query.Length:N0} shown in {scope}. {directory.Children.Length:N0} subfolders here. {catalog.FileCount:N0} files in {catalog.Archives.Count} archives.{hidden}{skipped}";
     ApplyPendingFile();
   }
 
   private async void FileSelectionChanged(object? sender, SelectionChangedEventArgs e)
-    => await PreviewSelectionAsync();
+  {
+    UpdateExportButton();
+    await PreviewSelectionAsync();
+  }
 
   private async void MipChanged(object? sender, SelectionChangedEventArgs e)
   {
@@ -1407,7 +1481,8 @@ public partial class MainWindow : Window
     if (_mesh is not null && _previewFileIndex >= 0 && indices.Contains(_previewFileIndex))
       choice.Settings.PartVisibility = new Dictionary<int, MeshVisibility> { [_previewFileIndex] = MeshVisibility.Capture(_mesh) };
 
-    ExportButton.IsEnabled = false;
+    _exporting = true;
+    UpdateExportButton();
     try
     {
       var progress = new Progress<string>(path => StatusText.Text = "Exporting " + path);
@@ -1429,7 +1504,8 @@ public partial class MainWindow : Window
     }
     finally
     {
-      ExportButton.IsEnabled = true;
+      _exporting = false;
+      UpdateExportButton();
     }
   }
 

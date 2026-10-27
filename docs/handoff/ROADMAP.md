@@ -12,7 +12,7 @@
 7. Browser VFX (the user said go at 02:32 KST, "일단 냅두고 그담거해봐"): **in progress, ~85 %**
 8. In-game side-by-side comparison (VFX, physics, materials): **todo**. It needs the PC free and in-game captures.
 9. Unreal export test without Niagara (meshes/textures/materials of the compared effects → `/Game/SM2_Work/VfxExport`): **done** (2026-10-27, vfx4-2).
-10. Browser viewer polish (asset search, preview, export button): **todo**.
+10. Browser viewer polish (asset search, preview, export button): **done (vfx4-3)**.
 
 ## Next: VFX3 remaining (do in this order unless the user says otherwise)
 Pushed so far: sockets/bone attach, anim-event cues and stop cues, distortion, degNear on sprites, missing-texture skip, bolter proxies, in-place fix, coverings, textureTintControl (grenade smoke). The remaining items:

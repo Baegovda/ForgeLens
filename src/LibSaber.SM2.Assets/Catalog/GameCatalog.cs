@@ -109,6 +109,8 @@ public sealed class GameCatalog
   public FileQuery Query(CatalogDirectory? directory, string? nameContains, AssetFilter filter, bool includeSubfolders = false)
   {
     var text = string.IsNullOrWhiteSpace(nameContains) ? null : nameContains.Trim();
+    // vfx4-3: several words (space separated) must all occur in the path, in any order ("bolter muzzle").
+    var words = text?.Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries) ?? Array.Empty<string>();
     var global = text is not null;
     var span = directory is null
       ? 0
@@ -132,13 +134,22 @@ public sealed class GameCatalog
       {
         if (!AssetClassification.Matches(filter, KindOf(i)))
           continue;
-        if (text is not null && _paths[_files[i].PathId].IndexOf(text, StringComparison.OrdinalIgnoreCase) < 0)
+        if (text is not null && !MatchesAll(_paths[_files[i].PathId], words))
           continue;
         matches.Add(i);
       }
     }
 
     return new FileQuery(0, matches.Count, matches.ToArray());
+  }
+
+  /// <summary>True when every word occurs in <paramref name="path"/> (case-insensitive).</summary>
+  public static bool MatchesAll(string path, IReadOnlyList<string> words)
+  {
+    foreach (var w in words)
+      if (path.IndexOf(w, StringComparison.OrdinalIgnoreCase) < 0)
+        return false;
+    return true;
   }
 
   public bool TryGetByPath(string path, out int index)

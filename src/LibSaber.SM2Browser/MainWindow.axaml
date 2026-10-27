@@ -14,7 +14,11 @@
       <Grid ColumnDefinitions="Auto,*,Auto,220,140,Auto">
         <Button x:Name="OpenButton" Content="Open game folder" Click="OpenClicked" Margin="0,0,8,0" ToolTip.Tip="The game root or client_pc. Caches are found in subfolders." />
         <TextBlock x:Name="FolderText" Grid.Column="1" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" Margin="0,0,8,0" />
-        <TextBox x:Name="SearchBox" Grid.Column="2" Watermark="Search path" Width="220" TextChanged="SearchChanged" Margin="0,0,8,0" />
+        <StackPanel Grid.Column="2" Orientation="Horizontal" Margin="0,0,8,0">
+          <TextBox x:Name="SearchBox" Watermark="Search (Ctrl+F), e.g. bolter muzzle" Width="240" TextChanged="SearchChanged" KeyDown="SearchKeyDown"
+                   ToolTip.Tip="Words separated by spaces must all match the path. Enter previews the first result, Down moves into the list, Esc clears." />
+          <Button x:Name="SearchClear" Content="✕" Click="SearchClearClicked" IsVisible="False" Padding="6,2" Margin="2,0,0,0" ToolTip.Tip="Clear search (Esc)" />
+        </StackPanel>
         <ComboBox x:Name="FilterBox" Grid.Column="3" SelectedIndex="0" SelectionChanged="FilterChanged">
           <ComboBoxItem Content="All types" />
           <ComboBoxItem Content="Textures" />
@@ -23,7 +27,8 @@
           <ComboBoxItem Content="Effects" />
           <ComboBoxItem Content="Text / YAML" />
         </ComboBox>
-        <Button x:Name="ExportButton" Grid.Column="4" Content="Export selected" Click="ExportClicked" IsEnabled="False" />
+        <Button x:Name="ExportButton" Grid.Column="4" Content="Export…" Click="ExportClicked" IsEnabled="False" Margin="8,0,0,0"
+                ToolTip.Tip="Select files in the list first (Ctrl/Shift for several). Ctrl+E" />
       </Grid>
     </Border>
     <Border DockPanel.Dock="Bottom" Padding="8,4" Background="#16181C">
