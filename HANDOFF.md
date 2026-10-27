@@ -1719,3 +1719,8 @@ Disassembly: /workspace/vfxsh_dis/{pc,pg,dx_pc_dx12_sfx,dx_pc_dx12_distort}, GLS
 | titus | 8–14 | 7.9–8.0 | no |
 
 - New UFUNCTIONs: `TuneConstraintDrive`, `DescribeBody`, `SetSimGravity` (diagnostics).
+- **mtl1-11 cloth compare:** PhysTestMap, chars_cloth, after re-running setup for the bone method.
+  - PNGs: box `/workspace/mtl_fix/cloth_cmp_{calgar,tech_priest,sorcerer_exalted}.png` (top = bone, bottom = Chaos).
+  - Bone mean cm: calgar 10.7–12.3, tech_priest 9.7–9.8 (h0 z 40–41 vs 49–50 anim), sorcerer 18–31.
+  - Chaos: every cloth is converted, so the helper-bone deviation is 0 by construction and the check is visual only. The cloak trails behind on calgar's run in both modes.
+  - The Chaos captures frame smaller (camera placed from the actor bounds; cloth bounds are larger). This is cosmetic. No NaN in any run.
