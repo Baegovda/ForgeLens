@@ -83,6 +83,11 @@ internal sealed unsafe class EffectRenderer : IDisposable
   ///   HEURISTIC. SM2_VFX_SURF_LIGHT overrides.
   /// </summary>
   public static float SurfLight { get; set; } = float.TryParse(Environment.GetEnvironmentVariable("SM2_VFX_SURF_LIGHT"), System.Globalization.CultureInfo.InvariantCulture, out var sl) ? sl : 60f;
+  /// <summary>SELF_DISTORTION sdr warps the sprite's own UVs (HEURISTIC, power at mid-life; SM2_VFX_SELF_DISTORT=0 disables).</summary>
+  public static bool SelfDistortion { get; set; } = Environment.GetEnvironmentVariable("SM2_VFX_SELF_DISTORT") != "0";
+  /// <summary>Quad-UV offset at self-distortion power 1 (HEURISTIC, SM2_VFX_SELF_DISTORT_K, default 0.04 like the refraction scale).</summary>
+  public static float SelfDistortK { get; set; } =
+    float.TryParse(Environment.GetEnvironmentVariable("SM2_VFX_SELF_DISTORT_K"), System.Globalization.CultureInfo.InvariantCulture, out var sk) ? sk : 0.04f;
   public static float BloomGain { get; set; } = float.TryParse(Environment.GetEnvironmentVariable("SM2_VFX_BLOOM_GAIN"), System.Globalization.CultureInfo.InvariantCulture, out var bg) ? bg : 0.01f;
   public static bool ContrastEnabled { get; set; } = Environment.GetEnvironmentVariable("SM2_VFX_CONTRAST") == "1";
   private readonly Dictionary<string, (uint Vao, uint Vbo, uint Ibo)?> _meshes = new(StringComparer.OrdinalIgnoreCase);
@@ -287,6 +292,10 @@ internal sealed unsafe class EffectRenderer : IDisposable
     var tintLoc = _gl.GetUniformLocation(_sprite, "uTint");
     var keyLoc = _gl.GetUniformLocation(_sprite, "uKey");
     var contrastLoc = _gl.GetUniformLocation(_sprite, "uContrast");
+    var selfLoc = _gl.GetUniformLocation(_sprite, "uHasSelf");
+    var selfPowLoc = _gl.GetUniformLocation(_sprite, "uSelfPow");
+    var selfScrollLoc = _gl.GetUniformLocation(_sprite, "uSelfScroll");
+    _gl.Uniform1(_gl.GetUniformLocation(_sprite, "uSelfTex"), 3);
     _gl.Uniform1(_gl.GetUniformLocation(_sprite, "uTintExact"), TintExact ? 1 : 0);
     _gl.Enable(EnableCap.DepthTest);
     _gl.DepthMask(false);
@@ -301,11 +310,23 @@ internal sealed unsafe class EffectRenderer : IDisposable
       if (tex == 0) continue;
       var mask = batch.Emitter.AlphaMask is { } mn ? Texture(layer, mn) : 0u;
       if (batch.Emitter.AlphaMask is { } m0 && mask == 0 && !MissingTextures.Contains(m0)) continue; // decoding; a missing mask draws unmasked
+      // Resolve before binding: a first-time upload binds the new texture on the active unit (0 = the sprite texture).
+      var self = SelfDistortion && batch.Emitter.SelfDistortTexture is { Length: > 0 } sn ? LinearTexture(layer, sn) : 0u;
       _gl.ActiveTexture(TextureUnit.Texture1);
       _gl.BindTexture(TextureTarget.Texture2D, mask);
       _gl.ActiveTexture(TextureUnit.Texture0);
       _gl.BindTexture(TextureTarget.Texture2D, tex);
       _gl.Uniform1(hasMaskLoc, mask != 0 ? 1 : 0);
+      _gl.ActiveTexture(TextureUnit.Texture3);
+      _gl.BindTexture(TextureTarget.Texture2D, self);
+      _gl.ActiveTexture(TextureUnit.Texture0);
+      _gl.Uniform1(selfLoc, self != 0 ? 1 : 0);
+      if (self != 0)
+      {
+        _gl.Uniform1(selfPowLoc, batch.Emitter.SelfDistortPower.Sample(0.5f, 0.5f) * SelfDistortK);
+        var scroll = batch.Emitter.SelfDistortSpeed * layer.Time;
+        _gl.Uniform2(selfScrollLoc, scroll.X - MathF.Floor(scroll.X), scroll.Y - MathF.Floor(scroll.Y));
+      }
       var rea = EffectBlendRea.Enabled;
       _gl.Uniform1(reaLoc, rea ? 1 : 0);
       _gl.Uniform1(_gl.GetUniformLocation(_sprite, "uHdrPremul"), HdrPremul ? 1 : 0);
@@ -578,11 +599,27 @@ internal sealed unsafe class EffectRenderer : IDisposable
     uniform int uTintExact;
     uniform int uGround;
     uniform float uGroundY;
+    uniform sampler2D uSelfTex;
+    uniform int uHasSelf;
+    uniform float uSelfPow;
+    uniform vec2 uSelfScroll;
     out vec4 outColor;
     vec3 toGamma(vec3 c) { return mix(c * 12.92, 1.055 * pow(c, vec3(1.0 / 2.4)) - 0.055, step(0.0031308, c)); }
+    vec2 SpriteUv()
+    {
+      if (uHasSelf == 0) return vUv;
+      // SELF_DISTORTION (HEURISTIC, the GPU shader is not REA'd): the sdr normal map, scrolled by its tcIn speed over the
+      // quad UV, offsets the sprite's own lookup by (RG*2-1)*power*SelfDistortK in quad units, converted to atlas-frame units
+      // (power is 0.5..1 in data, so the engine scale must be small; SelfDistortK like the refraction DistortionStrength).
+      vec2 n = texture(uSelfTex, vMask + uSelfScroll).rg * 2.0 - 1.0;
+      float k = clamp(length(dFdx(vUv)) / max(length(dFdx(vMask)), 1e-6), 0.0, 4.0);
+      return vUv + n * uSelfPow * k;
+    }
+
     void main()
     {
-      vec4 t = texture(uTex, vUv);
+      vec2 uv = SpriteUv();
+      vec4 t = texture(uTex, uv);
       if (uHasMask == 1) t.a *= texture(uMask, vMask).a;
       float clip = vParams.x;
       float a = clip > 0.0 ? clamp((t.a - clip) / (1.0 - clip), 0.0, 1.0) : t.a;
@@ -620,7 +657,7 @@ internal sealed unsafe class EffectRenderer : IDisposable
         // Vertex alpha is inside the clip, so low-alpha alphaClip-by-age sprites (flame_cross_4/6/8, va ~0.08) burn out.
         float va = clamp(vColor.a, 0.0, 1.0);
         float m = uHasMask == 1 ? texture(uMask, vMask).a : 1.0;
-        float ta = texture(uTex, vUv).a;
+        float ta = texture(uTex, uv).a;
         float ce = uAlphaMul == 1 ? clip : 0.0;
         float ac = clamp((ta * va - ce) / (1.0 - 0.5 * ce), 0.0, 1.0);
         float ga = uGround == 1 && vParams.y > 0.0 ? clamp((vWorld.y - uGroundY) / vParams.y, 0.0, 1.0) : 1.0;

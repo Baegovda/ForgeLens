@@ -16,18 +16,18 @@
 
 ## Next: VFX3 remaining (do in this order unless the user says otherwise)
 Pushed so far: sockets/bone attach, anim-event cues and stop cues, distortion, degNear on sprites, missing-texture skip, bolter proxies, in-place fix, coverings, textureTintControl (grenade smoke). The remaining items:
-1. **Smoke colour (follow-up):** the grenade smoke blue cast is fixed by `textureTintControl`. Check against an in-game capture. `additionalContrast` + `contrastColorKey` (hot-colour ramp, 2,969 non-zero uses) is not implemented: REA the GPU-side shader or approximate it, labelled as a heuristic.
-2. **Bolter smoke trail:** faint by data (see HANDOFF vfx3 part 3); not a bug. Optional: apply `tcIn` scale on trails; confirm visually in-game.
-3. **REA of the guessed values:**
+1. **[checked mtl1-19: keep TINT_EXACT/contrast opt-in; default grey matches in-game grey smoke]** **Smoke colour (follow-up):** the grenade smoke blue cast is fixed by `textureTintControl`. Check against an in-game capture. `additionalContrast` + `contrastColorKey` (hot-colour ramp, 2,969 non-zero uses) is not implemented: REA the GPU-side shader or approximate it, labelled as a heuristic.
+2. **[checked mtl1-19: opt-in SM2_VFX_TRAIL_TC=1; in-game shots also show no visible trail]** **Bolter smoke trail:** faint by data (see HANDOFF vfx3 part 3); not a bug. Optional: apply `tcIn` scale on trails; confirm visually in-game.
+3. **[skipped mtl1-19, time-box]** **REA of the guessed values:**
    - `ratioDependency` / `ratioXY`;
    - `blend_add` semantics (blendType parser 0x141751cd0 gives only the enum; find the blend-state setup);
    - exposure 1/250 and light ×100 scale;
    - size radius vs half-width on meshes/trails;
    - distortion strength.
-4. **genOnFly** exact emission (currently a burst for explosion targets, per-parent rate for flow targets). Trace the `attached` runtime near the genOnFly string @0x143644b38.
-5. **Flesh emitter:** `part_mag_ee_bolter_flesh` untyped entry. It is now known to be an `em_covering_*` surface painter (blood r0.4 on HEAD), shown as a note. Optional: draw a decal-like covering on the model.
-6. **VAT blood splashes** (`splash_5_v2_anim_data*`, `shader_blood_splash`): the layout is still unknown, see the findings in HANDOFF vfx3 part 3. The pct is downsampled (2400×471, 8 bands). REA the vertex shader / `combineMtlAnimControl.animStage`.
-7. **SELF_DISTORTION** render (only parsed now). degNear on trails and mesh particles: **done** (trails TRAIL_DEGR; mesh particles mtl1-17).
+4. **[REA'd mtl1-19: structure matches current model, see STATUS mtl1-19; time base of dynamic curve open]** **genOnFly** exact emission (currently a burst for explosion targets, per-parent rate for flow targets). Trace the `attached` runtime near the genOnFly string @0x143644b38.
+5. **[skipped mtl1-19, time-box]** **Flesh emitter:** `part_mag_ee_bolter_flesh` untyped entry. It is now known to be an `em_covering_*` surface painter (blood r0.4 on HEAD), shown as a note. Optional: draw a decal-like covering on the model.
+6. **[skipped mtl1-19, time-box]** **VAT blood splashes** (`splash_5_v2_anim_data*`, `shader_blood_splash`): the layout is still unknown, see the findings in HANDOFF vfx3 part 3. The pct is downsampled (2400×471, 8 bands). REA the vertex shader / `combineMtlAnimControl.animStage`.
+7. **SELF_DISTORTION** render: **done** (mtl1-19, heuristic scale K=0.04). degNear on trails and mesh particles: **done** (trails TRAIL_DEGR; mesh particles mtl1-17).
 8. Then report VFX done (with %).
 
 ## UE verification — results so far (details in STATUS.md / HANDOFF "UE verification")
