@@ -33,6 +33,21 @@ public sealed class TrailDef
   public float TimeLifeSeg { get; init; } = 0.5f;
   public Curve1 Width { get; init; } = new([0f, 0.1f]);
   public Vector2 TexSpeed { get; init; }
+  /// <summary>
+  ///   <c>visuals.texture.tcIn.transform.scale</c> {u,v}. The trail VS (trail.sdc 00001_1) builds UV as
+  ///   <c>uv = base + TRAIL_MAPPING.zw + rot(across, along) * TRAIL_MAPPING.xy</c> (CB_PASS_TRAIL offset 0), so the scale is
+  ///   applied per axis. Mapping of the sfx field into TRAIL_MAPPING is assumed (heuristic). Applied only with
+  ///   <c>SM2_VFX_TRAIL_TC=1</c>.
+  /// </summary>
+  public Vector2 TexScale { get; init; } = Vector2.One;
+  /// <summary>
+  ///   <c>optimization.degNear/degFar</c> on the trail. The trail VS applies two per-vertex camera-distance ramps
+  ///   <c>saturate((d - TRAIL_DEGR.y) * TRAIL_DEGR.x)</c> / <c>saturate((d - TRAIL_DEGR.z) * TRAIL_DEGR.w)</c> to width
+  ///   (TRAIL_MISC.y/z) and colour/alpha (TRAIL_MISC.w, TRAIL_OFFSET.z), i.e. the same linear radStart->radEnd ramp as sprites.
+  ///   Which DEGR/MISC slot holds which sfx scale is inferred (heuristic).
+  /// </summary>
+  public DistanceFade? DegNear { get; init; }
+  public DistanceFade? DegFar { get; init; }
   /// <summary>Render state shared with sprite batches (texture, blend, colour over the ribbon, HDR intensity).</summary>
   public required EmitterDef Render { get; init; }
 
@@ -81,7 +96,30 @@ public sealed class TrailDef
       Width = width.Length >= 2 ? new Curve1(width) : new Curve1([0f, 0.1f]),
       TexSpeed = transform.Str("wrapMode") == "Clamp" ? Vector2.Zero : SslRead.Range(transform?.Get("speed"), Vector2.Zero),
       Render = render,
+      TexScale = SslRead.Range(transform?.Get("scale"), Vector2.One),
+      DegNear = DistanceFade.Parse((node.Obj("optimization") ?? tp.Obj("optimization"))?.Obj("degNear")),
+      DegFar = DistanceFade.Parse((node.Obj("optimization") ?? tp.Obj("optimization"))?.Obj("degFar")),
     };
+  }
+
+  /// <summary><c>SM2_VFX_TRAIL_TC=1</c>: apply <see cref="TexScale"/> (off by default until checked in-game).</summary>
+  public static bool ApplyTexScale { get; set; } = Environment.GetEnvironmentVariable("SM2_VFX_TRAIL_TC") == "1";
+
+  /// <summary>Size / intensity / alpha factors at camera distance <paramref name="d"/> (1,1,1 without fades).</summary>
+  public (float Size, float Intens, float Alpha) Fade(float d)
+  {
+    float s = 1, i = 1, a = 1;
+    if (!EffectSprites.DistanceFades) return (s, i, a);
+    // Trail VS: near = lerp(scale, 1, saturate((d - start) * inv)) -> scale applies at/inside radStart;
+    // far = lerp(1, scale, saturate((d - start) * inv)) -> scale applies beyond radEnd.
+    for (var n = 0; n < 2; n++)
+    {
+      var f = n == 0 ? DegNear : DegFar;
+      if (f is null) continue;
+      var k = n == 0 ? 1 - f.Amount(d) : f.Amount(d);
+      s *= 1 + (f.Size - 1) * k; i *= 1 + (f.Intens - 1) * k; a *= 1 + (f.Alpha - 1) * k;
+    }
+    return (s, i, a);
   }
 }
 
@@ -166,16 +204,19 @@ public static class EffectTrailSprites
           var nb = dist[i + 1] / length;
           void Emit(Vector3 p, float n, float side, Vector3 sideDir)
           {
-            var w = 0.5f * def.Width.Evaluate(n) * def.Scale;
+            var fade = def.Fade(Vector3.Distance(p, eye)); // per vertex, as the trail VS (TRAIL_DEGR)
+            var w = 0.5f * def.Width.Evaluate(n) * def.Scale * fade.Size;
             var c = r.Color.Evaluate(n);
-            var rgb = new Vector3(c.X, c.Y, c.Z) * r.ColorIntensity.Sample(n, 0.5f);
+            var rgb = new Vector3(c.X, c.Y, c.Z) * r.ColorIntensity.Sample(n, 0.5f) * fade.Intens;
             if (r.Lighting is not ("None" or "")) rgb *= EffectSprites.LitScale * Math.Clamp(r.AmbientLight + 0.55f, 0f, 1f);
             var pos = p + sideDir * (w * side);
             var along = n - scroll;
             var across = side * 0.5f + 0.5f;
             verts.Add(pos.X); verts.Add(pos.Y); verts.Add(pos.Z);
-            if (def.Vertical) { verts.Add(across); verts.Add(along); } else { verts.Add(along); verts.Add(across); }
-            verts.Add(rgb.X); verts.Add(rgb.Y); verts.Add(rgb.Z); verts.Add(c.W * r.AlphaIntensity);
+            var (tu, tv) = def.Vertical ? (across, along) : (along, across);
+            if (TrailDef.ApplyTexScale) { tu *= def.TexScale.X; tv *= def.TexScale.Y; }
+            verts.Add(tu); verts.Add(tv);
+            verts.Add(rgb.X); verts.Add(rgb.Y); verts.Add(rgb.Z); verts.Add(c.W * r.AlphaIntensity * fade.Alpha);
             verts.Add(0f); verts.Add(r.SoftDepth); verts.Add(0.5f); verts.Add(0.5f);
           }
 

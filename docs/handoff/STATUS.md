@@ -97,3 +97,8 @@ Extractor build: PC `Desktop\SM2_Work\Bin\SM2Extractor_e4ceb7d`. Captures: PC `D
   - wind/water sim draws;
   - GPU-only features (vector fields, depth collision).
 - **UE:** `ue_cap_lit.py` should wait for texture compilation (grey captures otherwise).
+
+### 2026-10-27 (KST) vfx3d
+- Tests: SM2.Assets 118, Extractor 42, LibSaber.Tests 5 — all pass.
+- Trail degNear/degFar + texcoord scale done (TC behind SM2_VFX_TRAIL_TC=1). Tint exact formula behind SM2_VFX_TINT_EXACT=1.
+- VAT VS still unlocated. VFX estimate ≈ 80% (estimate).

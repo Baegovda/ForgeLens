@@ -95,3 +95,8 @@ All addresses are virtual addresses in `sm2_retail.exe` (retail Steam build, 81 
 - sfx_part typeParams serializer at 0x14178d437..0x14178d4df: additionalContrast = float at +0x12C (`FUN_142745110`), contrastColorKey = colour at +0x130 (`FUN_1427456a0`), then textureTintControl.
   Other references to the same strings: 0x14178e4cf, 0x14178ef11, 0x14178fc06 (sibling serializers/readers).
 - Shader use: particles.sdc PS, `PART_EMITTERS_SHARED_DATA[1]` (rgb = key, w = contrast); see HANDOFF vfx3 part 4.
+
+### Particle shared data packer (2026-10-27)
+- 0x140175820 init "part_cpu_data_shared"; 0x1417e1e50 packer; 0x1417e473e call; 0x141854209 upload (0x90000).
+- desc+0x4e8 → shared[0].z = textureTintControl; desc+0x4d4..0x4e0 → shared[1].
+- Trail VS DEGR/MISC/OFFSET math: see HANDOFF vfx3d.

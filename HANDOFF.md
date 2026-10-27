@@ -1132,10 +1132,30 @@ Notes only. No code changed this round.
 - **Still needed:** browser capture of the grenade with SM2_VFX_CONTRAST=1 vs off, and an in-game comparison, before turning it on by default.
 - Workflow notes: the user (2026-10-27) allows heavy PC work during gaming if it doesn't disrupt (hidden + idle). Push agent now `bc-65aed255-5102-5266-bcbd-f60b85b14984`.
 
-
 ## 2026-10-27 14:35 KST — REA tool = morluto/rea (install + tests)
 
 - User: the REA tool for SM2 is **https://github.com/morluto/rea** (rea-agents 6.8.0; CLI `rea`, stdio MCP `rea mcp`, 229 tools). The old `user-rea` plugin note is obsolete.
 - Installed on the box: clone `/home/box/tools/rea`, CLI `/home/box/tools/rea-cli/node_modules/.bin/rea`, private Node 24.22.1 `/home/box/tools/node24`, Ghidra **12.1.4** `/home/box/tools/ghidra_12.1.4_PUBLIC` (REA rejects 12.2). `/home/box/ghidra` 12.2 and `ghidra_proj2` untouched.
 - Tests: doctor healthy with 12.1.4 + JDK 25; `/bin/ls` decompile OK (~15 s); `sm2_retail.exe` via existing-project reuse → `provider_timeout` at 120 s (project not yet saved by the running 12.2 analysis).
 - Next: give REA a long `REA_GHIDRA_STARTUP_TIMEOUT_MS` (e.g. 6 h) or prepare a 12.1.4 project for reuse after the current 12.2 job ends. Details/MCP config: `docs/handoff/WORKFLOW.md`.
+
+## 2026-10-27 (KST) — vfx3d: trail shader, shared-data packer, VAT search
+
+**Trail VS (proven, `pc_dx12_trail.sdc` 00001_1, CB_PASS_TRAIL = cb4):**
+- d = |vertex − camera| (cb1[3]). near = saturate((d−DEGR.y)·DEGR.x), far = saturate((d−DEGR.z)·DEGR.w).
+- colour k = lerp(1, OFFSET.z, far)·lerp(MISC.w, 1, near); width = lerp(MISC.y,1,near)·w·lerp(1,MISC.z,far);
+  rgb *= saturate(d²/(MISC.x+1e-4)); alpha = a·k·(width/max(width,pixelMin)).
+- UV = perPointUV + MAPPING.zw + rot(...)·MAPPING.xy → texcoord scale DOES apply to trails.
+- Implemented: TrailDef.TexScale (`transform.scale`, behind `SM2_VFX_TRAIL_TC=1`), DegNear/DegFar per-vertex fade
+  (width/rgb/alpha; scale inside radStart for near, beyond radEnd for far), honours `EffectSprites.DistanceFades`.
+- HEURISTIC: mapping of sfx JSON fields onto DEGR/MISC/OFFSET slots (not traced on the CPU side).
+
+**PART_EMITTERS_SHARED_DATA packer (proven):**
+- Init 0x140175820 ("part_cpu_data_shared"), buffer 0x14400c7ec stride 0x60, counter 0x14409c7ec, CS 0x14409c7f0, dirty 0x14400c4e8.
+- Slot allocator 0x1417e4529..0x1417e47b3 calls packer FUN_1417e1e50 (call 0x1417e473e); upload memcpy 0x90000 @ 0x141854209.
+- Packer: [0].z ← desc+0x4e8 (0x1417e21d1/0x1417e21d7) = typeParams(+0x3a8)+0x140 = **textureTintControl**;
+  [1].xyz ← desc+0x4d8/4dc/4e0, [1].w ← desc+0x4d4 (0x1417e20d6..e6) = key/contrast.
+- Exact shader formula (t=tint): hdr = c0 + t·(t·vColor.rgb·tex.a − c0), c0 = tex.rgb·boost·vColor.rgb.
+  Behind `SM2_VFX_TINT_EXACT=1` because the gradient path is still missing.
+
+**VAT:** not in `pc_dx12_sfx.sdc` (574 VS scanned; TEXCOORD1 + 2-texture VS are wind/foliage). Likely another .sdc. Open.

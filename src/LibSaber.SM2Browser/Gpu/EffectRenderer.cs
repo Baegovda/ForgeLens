@@ -42,6 +42,12 @@ internal sealed unsafe class EffectRenderer : IDisposable
     float.TryParse(Environment.GetEnvironmentVariable("SM2_VFX_DISTORT"), System.Globalization.CultureInfo.InvariantCulture, out var d) ? d : 0.04f;
   public int DistortionQuads { get; private set; }
   /// <summary><c>SM2_VFX_CONTRAST=1</c> turns on the additionalContrast boost (formula from particles.sdc 00114_2; not yet compared in-game).</summary>
+  /// <summary>
+  ///   <c>SM2_VFX_TINT_EXACT=1</c>: the particles.sdc PS tint blend <c>rgb = c + t*(t*V.rgb*tex.a - c)</c> with
+  ///   t = shared[0].z, which the CPU packer FUN_1417e1e50 fills from emitter desc +0x4e8 (0x1417e21d1/0x1417e21d7) =
+  ///   typeParams+0x140 = textureTintControl. Off: the older luminance heuristic (texture as intensity at tint 0).
+  /// </summary>
+  public static bool TintExact { get; set; } = Environment.GetEnvironmentVariable("SM2_VFX_TINT_EXACT") == "1";
   public static bool ContrastEnabled { get; set; } = Environment.GetEnvironmentVariable("SM2_VFX_CONTRAST") == "1";
   private readonly Dictionary<string, (uint Vao, uint Vbo, uint Ibo)?> _meshes = new(StringComparer.OrdinalIgnoreCase);
   private readonly uint _vao, _vbo, _ibo, _groundVao, _groundVbo;
@@ -241,6 +247,7 @@ internal sealed unsafe class EffectRenderer : IDisposable
     var tintLoc = _gl.GetUniformLocation(_sprite, "uTint");
     var keyLoc = _gl.GetUniformLocation(_sprite, "uKey");
     var contrastLoc = _gl.GetUniformLocation(_sprite, "uContrast");
+    _gl.Uniform1(_gl.GetUniformLocation(_sprite, "uTintExact"), TintExact ? 1 : 0);
     _gl.Enable(EnableCap.DepthTest);
     _gl.DepthMask(false);
     _gl.Enable(EnableCap.Blend);
@@ -480,6 +487,7 @@ internal sealed unsafe class EffectRenderer : IDisposable
     uniform float uTint;
     uniform vec3 uKey;
     uniform float uContrast;
+    uniform int uTintExact;
     uniform int uGround;
     uniform float uGroundY;
     out vec4 outColor;
@@ -492,9 +500,19 @@ internal sealed unsafe class EffectRenderer : IDisposable
       float a = clip > 0.0 ? clamp((t.a - clip) / (1.0 - clip), 0.0, 1.0) : t.a;
       if (uGround == 1 && vParams.y > 0.0)
         a *= clamp((vWorld.y - uGroundY) / vParams.y, 0.0, 1.0);
-      vec3 tex = mix(vec3(dot(t.rgb, vec3(0.299, 0.587, 0.114))), t.rgb, uTint); // textureTintControl
-      tex *= 1.0 + uContrast * clamp(1.0 - length(uKey - tex), 0.0, 1.0); // additionalContrast (particles.sdc 00114_2)
-      vec3 hdr = vColor.rgb * tex;
+      vec3 hdr;
+      if (uTintExact == 1)
+      {
+        // particles.sdc PS: c = tex*V*boost; rgb = c + t*(t*V*tex.a - c), t = textureTintControl (FUN_1417e1e50 -> shared[0].z).
+        vec3 c0 = t.rgb * (1.0 + uContrast * clamp(1.0 - length(uKey - t.rgb), 0.0, 1.0)) * vColor.rgb;
+        hdr = c0 + uTint * (uTint * vColor.rgb * t.a - c0);
+      }
+      else
+      {
+        vec3 tex = mix(vec3(dot(t.rgb, vec3(0.299, 0.587, 0.114))), t.rgb, uTint); // textureTintControl
+        tex *= 1.0 + uContrast * clamp(1.0 - length(uKey - tex), 0.0, 1.0); // additionalContrast (particles.sdc 00114_2)
+        hdr = vColor.rgb * tex;
+      }
       vec3 c = toGamma(vec3(1.0) - exp(-hdr * uExposure));
       float alpha = clamp(vColor.a, 0.0, 1.0) * a;
       if (uMode == 1) outColor = vec4(c * alpha, 0.0);          // add
