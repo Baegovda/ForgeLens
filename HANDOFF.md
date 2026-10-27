@@ -1286,3 +1286,25 @@ Disassembly: /workspace/vfxsh_dis/{pc,pg,dx_pc_dx12_sfx,dx_pc_dx12_distort}, GLS
 - particles.sdc PS 00000_0: rgb *= vertexAlpha*(0x400 ? 1 : texAlpha'); outAlpha = 0x20 ? 0 : vertexAlpha*texAlpha'. blend_add has no bit (= blend).
 - Implemented `EffectBlendRea` + `visuals.isBlendAlphaMultiply` parse; opt-in `SM2_VFX_BLEND_REA=1` (PSO ONE/INV_SRC_ALPHA is HEURISTIC, implied by add alpha=0). Tests: BlendReaTests.
 - Open: other rows of the 0x60 record, distortion.power/ratioXY via GPU curve slots inst+0x200..0x250, trail DEGR CPU packing.
+
+## vfx3n (2026-10-27 KST) — bench check of SM2_VFX_BLEND_REA + 0x60 record field map
+- Bench (`--vfxbench`, llvmpipe, box): `/workspace/browser_run_shots/vfx3m_blend/{off,on}/`, `*_cmp.png` (OFF top / ON bottom).
+  frag grenade mean |Δ| 1.02/255 (max 186): sparks and smoke much brighter/greyer with ON (non-alphaMultiply emitters no
+  longer scale RGB by texture alpha). hierophant_bomb_ee: no change (mesh-dominated). Plausible per REA, but smoke looks
+  overbright → keep opt-in until an in-game reference. Data: isBlendAlphaMultiply True in 3,373 of 15,168 emitter entries.
+- Caveat: earlier HEURISTIC (vfx3l) that blend_add picks the SFX_BLEND_ADD_NO_ALPHA permutation (FUN_142450650) is NOT
+  modelled by EffectBlendRea (flags-only; blend_add = blend there).
+- Visuals parser FUN_14178ce70: visuals base = desc+0x3a8 (anchors: blendType +0xe4→0x48c, additionalContrast +0x12c→0x4d4).
+  Field offsets (desc): lighting 0x478, domainLightingTessDensity 0x47c, lightingTranslucency 0x480, lightsSensitivity 0x484,
+  ambientLight 0x488, blendType 0x48c, isBlendAlphaMultiply 0x490, usePixelFog 0x491, alphaIntensity 0x4d0, gloss 0x500,
+  angleAlpha.isEnabled 0x560 / alphaSpline 0x568, alphaMask 0x578, sdr 0x628, projection {isEnabled 0x6d0, attenuation 0x6d4,
+  fadeVerticalEdges 0x6d8, dist 0x6dc}, temporalAA 0x6e0.
+- 0x60 record (FUN_1417e1e50 0x1417e1e50.., PROVEN CPU side): r0.x alphaMask-derived (+0x620, if alphaMask on); r0.y 1/max(|x|,1e-6)
+  of desc+0x3a0 / +0x1b0; r0.z textureTintControl; r1.xyz contrastColorKey, r1.w additionalContrast; r2.x alphaMask-derived;
+  r2.y domainLightingTessDensity; r2.z k/projection.dist; r2.w projection.attenuation; r3.x flags (0x20 add, 0x400 !alphaMul,
+  plus lighting/gloss/sdr/alphaMask bits); r3.y flags2 (0x10 ← desc+0x8f); r3.z lightingTranslucency; r3.w fadeVerticalEdges
+  (clamped); r4.x lightsSensitivity; r5.xy temporalAA.
+- GPU side (pc 00000_0): reads r0.x (min with 1-texA, alpha-mask softness), r0.z, r1.xyzw, r2.x, r3.x, r4.x, r4.y, r4.w.
+  r4.x multiplies the whole non-additive colour (line ~800) — semantics as "lightsSensitivity" HEURISTIC (could be a lit
+  permutation); not implemented. r4.y/r4.w are written outside the decompiled window (not yet attributed).
+- Not done this chunk: distortion.power/ratioXY via GPU curve slots, trail DEGR CPU packing.

@@ -188,3 +188,4 @@ Disassembly: /workspace/vfxsh_dis/{pc,pg,dx_pc_dx12_sfx,dx_pc_dx12_distort}, GLS
 - VFX estimate remains ≈ 72%.
 
 - vfx3m: blend flags 0x20/0x400 proven (FUN_1417e1e50 → t8 PART_EMITTERS_SHARED_DATA → particles.sdc 00000_0); opt-in SM2_VFX_BLEND_REA=1. VFX ≈73%.
+- vfx3n: blend-REA bench sanity (grenade brighter, kept opt-in); 0x60 record ↔ visuals field map (FUN_14178ce70). VFX ≈73%.
