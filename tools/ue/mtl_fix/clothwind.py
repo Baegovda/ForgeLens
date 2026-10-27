@@ -1,3 +1,4 @@
+# AirDensity is kg/cm^3 in Chaos (1.225e-6); 1.225 explodes cloth.
 # mtl1-13b cloth wind at runtime. modes (run while Simulate/PIE is active unless noted):
 #   wind <name> <set> [scale=1]  : per cloth ChaosClothingInteractor.set_wind(drag, lift, airDensity, velocity) from the sidecar
 #                                  (ue.chaosCloth.localWindCm/drag/lift; X-mirrored unless collision.space == "ueMesh").
@@ -8,7 +9,7 @@ mode = sys.argv[1]
 W = r"C:/Users/Revaptor_FX/Desktop/SM2_Work"
 ues = unreal.get_editor_subsystem(unreal.UnrealEditorSubsystem); eas = unreal.get_editor_subsystem(unreal.EditorActorSubsystem)
 if mode == "wind":
-    name, SET = sys.argv[2], sys.argv[3]; sc = float(sys.argv[4]) if len(sys.argv) > 4 else 1.0
+    name, SET = sys.argv[2], sys.argv[3]; sc = float(sys.argv[4]) if len(sys.argv) > 4 else 0.05  # sidecar localWindCm x1 explodes cloth; 0.05 verified stable (mtl1-14c)
     pj = json.load(open(W + "/Exports/%s/%s/tpl/%s.tpl/%s.physics.json" % (SET, name, name, name), encoding="utf-8-sig"))
     w = ues.get_game_world(); n = 0
     for a in unreal.GameplayStatics.get_all_actors_with_tag(w, "SM2Phys"):
@@ -16,16 +17,29 @@ if mode == "wind":
         comp = a.skeletal_mesh_component; si = comp.get_clothing_simulation_interactor()
         print("WIND interactor", type(si).__name__ if si else None)
         if not si: continue
+        try: names = [str(ca.get_name()) for ca in comp.get_skinned_asset().get_editor_property("mesh_clothing_assets")]
+        except Exception as e: names = []; print("WIND names err", e)
+        print("WIND clothing assets", names)
         for c in pj.get("cloths", []):
             cc = c.get("ue", {}).get("chaosCloth");
             if not cc: continue
             v = cc.get("localWindCm", [0, 0, 0]); mir = cc.get("collision", {}).get("space") != "ueMesh"
             vel = unreal.Vector((-v[0] if mir else v[0]) * sc, v[1] * sc, v[2] * sc)
-            ci = si.get_clothing_interactor(c["SimMeshName"]) if hasattr(si, "get_clothing_interactor") else None
+            ci = None
+            for nm in [c["SimMeshName"]] + names:
+                if not (c["SimMeshName"].lower() in nm.lower() or nm == c["SimMeshName"]): continue
+                x = si.get_clothing_interactor(nm)
+                if x is not None and hasattr(x, "set_wind"): ci = x; break
+            if ci is not None and not hasattr(ci, "set_wind"):
+                try: ci = unreal.ChaosClothingInteractor.cast(ci)
+                except Exception as e: print("WIND cast err", e)
             if ci is None or not hasattr(ci, "set_wind"):
                 print("WIND no interactor for", c["SimMeshName"], type(ci).__name__ if ci else None); continue
             drag = float(cc.get("drag", 0.035)); lift = float(cc.get("lift", 0.035))
-            ci.set_wind(drag, lift, 1.225, vel); n += 1
+            try: ci.set_wind(unreal.Vector2D(drag, drag), unreal.Vector2D(lift, lift), 1.225e-6, vel)
+            except Exception as e:
+                print("WIND v2 sig err", e); ci.set_wind(drag, lift, 1.225e-6, vel)
+            n += 1
             print("WIND set %s drag=%.3f lift=%.3f vel=(%.0f %.0f %.0f)" % (c["SimMeshName"], drag, lift, vel.x, vel.y, vel.z))
     print("WIND applied", n)
 elif mode == "src":
