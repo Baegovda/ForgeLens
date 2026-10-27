@@ -191,3 +191,4 @@ Disassembly: /workspace/vfxsh_dis/{pc,pg,dx_pc_dx12_sfx,dx_pc_dx12_distort}, GLS
 - vfx3n: blend-REA bench sanity (grenade brighter, kept opt-in); 0x60 record ↔ visuals field map (FUN_14178ce70). VFX ≈73%.
 - vfx3o: curve slots = texture bindings; r0.y = 1/softDepth (not exposure); r4.y/z/w + r0.w decoded; colour-gradient LUT proven (unused in data). distortion.power and trail DEGR unresolved. VFX ≈73%.
 - vfx3p/q: distortion.power and trail DEGR unresolved after 2 no-progress chunks → stopped. VFX ≈73%.
+- vfx3r: in-game comparison prep — bench sheets in Captures\ingame_cmp, user refs go to Captures\ingame_ref.

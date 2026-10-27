@@ -1339,3 +1339,13 @@ Disassembly: /workspace/vfxsh_dis/{pc,pg,dx_pc_dx12_sfx,dx_pc_dx12_distort}, GLS
   (1418beed0, 1418bf500, 1418c1940) update trail points (0x50-byte stride), not the CB. DispScan of 0x1418b0000–0x1418e0000
   for +0xf0/+0x100 stores (MISC_2@240) gave no CB_PASS_TRAIL writer. Constants are likely set by handle through a
   generic setter, so a capture is needed (not allowed: no game/EAC). DEGR slot mapping stays HEURISTIC.
+
+## vfx3r (2026-10-27 KST) — in-game side-by-side prep (no injection; user screenshots)
+- Bench captures: `/workspace/browser_run_shots/ingame_cmp/{off,blend,tint,vat,all}/<effect>_sheet.png`,
+  contact sheet `ingame_cmp_contact.png` (rows = effects, cols = off/BLEND_REA/TINT_EXACT/VAT/all+CONTRAST, d = mean |Δ| vs off).
+  PC copy: `Desktop\SM2_Work\Captures\ingame_cmp\`. User reference shots go to `Desktop\SM2_Work\Captures\ingame_ref\`.
+- Effects: part_mg_frag_grenade_expl, fx_bolter_muzzle_client, part_mag_chainsaw_blood_splash_red_01,
+  fx_mgs_hierophant_bomb_ee, trail_stalker_bolter_smoke, part_mg_candle_smoke_hub.
+- Bench caveats: muzzle/blood/candle are tiny at the fixed bench camera; chainsaw blood + candle miss textures
+  (part_splash_drops_01…, flame_sml_16x8); hierophant sheet renders empty in this run and VAT shows d=0 (needs the tex8/mesh set
+  used in vfx3g) — fix the bench framing before comparing those.
