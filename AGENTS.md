@@ -62,6 +62,6 @@
 |---|---|
 | User's PC | Windows "Revaptor-FX", ListMachines id `d3fb99ad-25ca-45c1-81af-41e5ca09104a` (at time of writing) |
 | Game | `D:\Steam\steamapps\common\Space Marine 2\client_pc` |
-| Unreal | 5.7.4, project `K:\Unreal Projects\UE_VFX_57`, work in `/Game/SM2_Work`, driven by UEMCP (`tools/ue/uemcp_call.py`) |
+| Unreal | 5.7.4, project `K:\Unreal Projects\UE_VFX_57`, work in `/Game/SM2_Work`, driven by **EngineWire / MCP Automation Bridge 0.5.30** (https://github.com/ChiR24/Unreal_mcp, native MCP HTTP `127.0.0.1:3000/mcp`, `tools/ue/enginewire_call.py` + `uerun.ps1`); UEMCP (`tools/ue/uemcp_call.py`) stays as fallback. See WORKFLOW.md §5 |
 | Work folder | `C:\Users\Revaptor_FX\Desktop\SM2_Work\{Scripts,Exports,Captures,Bin,Raw,Backup,...}` |
 | Box (bot's Linux machine) | repo `/workspace/LibSaber` (+ worktrees), exe `/workspace/rea/sm2_retail.exe`, Ghidra project `/workspace/rea/ghidra_proj2.gpr` (program `sm2_retail.exe`), push agent `bc-65aed255-5102-5266-bcbd-f60b85b14984`, patches `/workspace/patches/<stage>/` |

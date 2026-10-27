@@ -22,7 +22,7 @@ $p = Start-Process -FilePath $exe -ArgumentList $a -WindowStyle Hidden -PassThru
 ## 2. Paths
 ### PC (verified 2026-10-27 by read-only listing)
 - Home `C:\Users\Revaptor_FX`
-  - `uemcp_call.py`: the UEMCP client.
+  - `enginewire_call.py`: the EngineWire (MCP Automation Bridge) native-HTTP client (primary). `uemcp_call.py`: the UEMCP client (fallback).
   - `ls_push\`: clone used by the old bundle push.
   - `SM2Extractor*`, `SM2Browser_v2..v4`, `SM2Browser_e6cadfa`: older installed builds (`.bakN` kept).
 - Work folder `C:\Users\Revaptor_FX\Desktop\SM2_Work\`:
@@ -38,7 +38,7 @@ $p = Start-Process -FilePath $exe -ArgumentList $a -WindowStyle Hidden -PassThru
   - Log: `Saved\Logs\UE_VFX_57.log`. Crash reports: `Saved\Crashes\`.
   - Content `/Game/SM2_Work/{Animations, Characters, Materials, Original (read-only), Props, Tests/<stage>}`.
   - Tests folders now: `anim_finish(2)`, `anim_survey`, `bulk`, `bulk_fix`, `mat2_hair`, `physics`, `pre_step3`, `retarget`, `rhino_stacked`, `sani_before`, `step3_ab_off`, `v4`.
-- Tools on the PC: Python 3.10 (`pip install uemcp mcp`), git, gh (logged in as the repo owner).
+- Tools on the PC: Python 3.10 (`pip install uemcp mcp`; mcp ≥1.30 for streamable HTTP), Node 24 / npm 11, VS 2022 (Community + Build Tools 17.14), git, gh (logged in as the repo owner).
 - No Ghidra project on the PC; RE happens on the box.
 
 ### Box
@@ -106,10 +106,18 @@ The box has no GitHub write login. Pushes go through a Cursor cloud agent with r
 4. Verify with `git fetch` that the tip moved. Report the commit to the user with the PR link.
 - Fallback (older, PC-based): `git bundle create /workspace/sm2.bundle <lastpushed>..HEAD` → `CopyFromBox` to `C:\Users\Revaptor_FX\sm2.bundle` → in `C:\Users\Revaptor_FX\ls_push`: `git fetch ..\sm2.bundle HEAD; git merge --ff-only FETCH_HEAD; git push origin HEAD`.
 
-## 5. Unreal (UEMCP)
-- The editor must be open. UEMCP listens on 127.0.0.1 only.
-- Run a script: `Desktop\SM2_Work\Scripts\uerun.ps1 <script.py> <args...>`. It writes `ue_args.json` and calls `python C:\Users\Revaptor_FX\uemcp_call.py ue_python ue_args.json`.
-- Smoke test: `python uemcp_call.py` lists the tools.
+## 5. Unreal (EngineWire primary, UEMCP fallback)
+- **EngineWire / MCP Automation Bridge** (https://github.com/ChiR24/Unreal_mcp, MIT). Installed 2026-10-27: stable **v0.5.30** (the plugin is still named `McpAutomationBridge` in 0.5.x; the rename to `EngineWire` is only in the 0.6.0-beta line, not used).
+  - Plugin: `K:\Unreal Projects\UE_VFX_57\Plugins\McpAutomationBridge` (prebuilt Win64 binaries; the release ships source only, so it was built with `RunUAT BuildPlugin -TargetPlatforms=Win64` against UE 5.7 into `Desktop\SM2_Work\enginewire\built\`; log `enginewire\build.log`). The project is Blueprint-only, so never drop the source-only zip in directly — rebuild with BuildPlugin and copy `Binaries`, `Source`, `.uplugin`.
+  - Config: `Config\DefaultGame.ini` section `[/Script/McpAutomationBridge.McpAutomationBridgeSettings]`: `bEnableNativeMCP=True`, `NativeMCPPort=3000`, `bRequireCapabilityToken=True`, `CapabilityToken=…`, loopback only. Pre-install copy: `DefaultGame.ini.bak1`.
+  - Token: `C:\Users\Revaptor_FX\.enginewire_token` (same value as the ini; sent as `X-MCP-Capability-Token`; override with `$env:ENGINEWIRE_TOKEN`). **Never commit it.** Wrong token → HTTP 401.
+  - Endpoint: `http://127.0.0.1:3000/mcp` (Streamable HTTP, served by the editor itself; no Node needed). Status bar shows `● MCP :3000`. Log category `LogMcpNativeTransport`.
+  - Optional Node stdio server (not needed by our scripts): `Desktop\SM2_Work\enginewire\server` (`npm i unreal-engine-mcp-server@0.5.30`; it talks to the plugin's WebSocket port 8091).
+- Run a script: `Desktop\SM2_Work\Scripts\uerun.ps1 <script.py> <args...>` (repo copy `tools/ue/uerun.ps1`). It writes `ue_args.json`, then calls `python C:\Users\Revaptor_FX\enginewire_call.py ue_python ue_args.json` when port 3000 is listening, otherwise `uemcp_call.py` (force UEMCP with `$env:UE_MCP='uemcp'`). Old UEMCP-only runner: `Scripts\uerun_uemcp.ps1` / `uerun.ps1.bak1`.
+- `enginewire_call.py` usage: no args = list the 23 tools; `ue_python args.json` = uemcp-compatible (maps to `system_control` / `execute_python`, prints the captured stdout); `<tool> args.json` = raw tool call.
+- Speed: `ue_verify_layout.py` takes ~1.6 s via EngineWire vs ~42 s via UEMCP.
+- Fallback UEMCP (ATDev-Inc/uemcp, pip) is still installed; smoke test `python uemcp_call.py`.
+- Restart procedure: save all (`unreal.EditorLoadingAndSavingUtils.save_dirty_packages(True, True)`), `unreal.SystemLibrary.quit_editor()`, relaunch `UnrealEditor.exe "K:\Unreal Projects\UE_VFX_57\UE_VFX_57.uproject"` minimized; EngineWire is up when port 3000 listens.
 - Key scripts (`tools/ue/`, PC copies in `Scripts\`):
   - `ue_bulk.py import|check <asset> [set]`: import + checker into `/Game/SM2_Work/Tests/<set>/<asset>`.
   - `ue_import_anim.py`: anim-only FBX via the legacy importer (Interchange bug UE-307815). It does yaw auto, root-motion policy and 60 Hz for baked clips.

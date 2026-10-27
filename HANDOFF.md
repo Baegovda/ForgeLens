@@ -17,7 +17,7 @@ Check with GetMcpServerStatus / GetDynamicTools. Install missing ones with Searc
 | REA (reverse engineering) | namespace `user-rea` (plugin "REA"; Ghidra, JADX and similar) | the REA-first rule, mandatory | **Obsolete (2026-10-27):** the REA tool is now https://github.com/morluto/rea on the box — see `docs/handoff/WORKFLOW.md` → REA (morluto/rea) |
 | GitHub | `cursor-github` (read-only) | PR and commit reads | RequestScmConnect / InstallPlugin |
 | Owner's PC shell | ListMachines, then the machine named **Revaptor-FX** (id `d3fb99ad-25ca-45c1-81af-41e5ca09104a` at the time of writing) | PowerShell, Unreal control, push | the owner has to register the PC |
-| Unreal Editor | **UEMCP** on the PC (`pip install uemcp`, https://github.com/ATDev-Inc/uemcp), driven by `tools/ue/uemcp_call.py` | import, materials, captures | see step 2 |
+| Unreal Editor | **EngineWire / MCP Automation Bridge 0.5.30** plugin in the project (https://github.com/ChiR24/Unreal_mcp), driven by `tools/ue/enginewire_call.py` via `uerun.ps1`; fallback **UEMCP** (`pip install uemcp`, https://github.com/ATDev-Inc/uemcp, `tools/ue/uemcp_call.py`) | import, materials, captures | see step 2 and WORKFLOW.md §5 |
 
 ## 2. Tools: check they exist, install them if missing
 - **Box (shared Linux machine):**
@@ -30,9 +30,9 @@ Check with GetMcpServerStatus / GetDynamicTools. Install missing ones with Searc
   - If any of these are missing, reinstall them, or copy the exe from the PC (D:\Steam\steamapps\common\Space Marine 2). Copy it to C:\Users\Revaptor_FX first, because the D: path can be refused.
 - **PC:**
   - Python 3.10 with `pip install uemcp mcp`.
-  - Copy `tools/ue/uemcp_call.py` to `C:\Users\Revaptor_FX\`.
+  - Copy `tools/ue/enginewire_call.py` and `tools/ue/uemcp_call.py` to `C:\Users\Revaptor_FX\`, `tools/ue/uerun.ps1` to `Desktop\SM2_Work\Scripts\`.
   - Unreal 5.7.4 project at `K:\Unreal Projects\UE_VFX_57`. The editor must be open, and it listens on 127.0.0.1 only.
-- **Smoke test:** `python uemcp_call.py` should list the tools, including `ue_python`.
+- **Smoke test:** `python enginewire_call.py` lists 23 tools (`system_control`, `manage_asset`, …); fallback `python uemcp_call.py` lists `ue_python`.
 
 ## 3. How to push: the box has no GitHub login, the PC does (gh as Baegovda)
 1. Box: `git bundle create /workspace/sm2.bundle <last-pushed>..HEAD`
@@ -74,8 +74,8 @@ For any agent continuing this work: read this whole file before you do anything.
     - Paths on D: can be refused. If so, copy the file to `C:\Users\Revaptor_FX\` first.
   - Reference viewer: IndexV2 at `C:\Users\Revaptor_FX\IndexV2`. It has no .sani decoder.
 - **Unreal Engine 5.7.4** project at `K:\Unreal Projects\UE_VFX_57`. Log: `Saved\Logs\UE_VFX_57.log`.
-  - **UEMCP (editor control).** The editor listens on 127.0.0.1 only. Run on the PC in PowerShell:
-    `cd C:\Users\Revaptor_FX; $code=@' <python> '@; @{code=$code}|ConvertTo-Json|Set-Content -Encoding utf8 ue_args.json; & python uemcp_call.py ue_python ue_args.json`
+  - **Editor control: EngineWire (primary, `enginewire_call.py`, http://127.0.0.1:3000/mcp + token) or UEMCP (fallback, `uemcp_call.py`).** Both accept the same `ue_python ue_args.json`. Run on the PC in PowerShell:
+    `cd C:\Users\Revaptor_FX; $code=@' <python> '@; @{code=$code}|ConvertTo-Json|Set-Content -Encoding utf8 ue_args.json; & python enginewire_call.py ue_python ue_args.json` (fallback: `uemcp_call.py`)
   - **Screenshots** only work when the Level Editor viewport is visible. Moving the viewport camera from a script often does nothing.
   - **Importing animations.** Import animation-only FBX with the legacy importer:
     1. Run console command `Interchange.FeatureFlags.Import.FBX 0`.
@@ -1219,3 +1219,10 @@ Captures: `/workspace/browser_run_shots/vfx3_verify/` (PC copy `Desktop\SM2_Work
 - `SM2_VFX_TRAIL_TC=1` / tint on `trail_stalker_bolter_smoke` — **inconclusive**: the bench emitter is stationary, the trail
   builds 6–45 quads but renders ~invisible (max pixel Δ 5). Needs a moving-emitter capture (bench has no motion path).
 - `VfxBench` per-frame lines now print `vatDraws(cum)`; `GlPreview.VatDraws` exposes the counter.
+
+## 2026-10-27 14:55 KST update — Unreal MCP switched to EngineWire (Cursor Agent)
+- Installed **EngineWire / MCP Automation Bridge v0.5.30** (latest stable; https://github.com/ChiR24/Unreal_mcp, MIT). 0.6.0-beta-f (first release actually named EngineWire) is a prerelease and was skipped.
+- No prebuilt binaries are released; built with `RunUAT BuildPlugin` (UE 5.7.4, VS 2022 17.14, 3 min 36 s, success) in `Desktop\SM2_Work\enginewire\built`, installed to `K:\Unreal Projects\UE_VFX_57\Plugins\McpAutomationBridge`. `.uproject` unchanged (plugin is EnabledByDefault).
+- Native MCP HTTP on `127.0.0.1:3000/mcp` with capability token (`DefaultGame.ini`, backup `DefaultGame.ini.bak1`; token file `C:\Users\Revaptor_FX\.enginewire_token`, not in git).
+- Verified after editor restart: 23 tools listed, `execute_python` listed 5164 assets under `/Game/SM2_Work`, wrong token → 401, `uerun.ps1 ue_verify_layout.py` runs via EngineWire in 1.6 s (UEMCP: 42 s).
+- New `tools/ue/enginewire_call.py` and `tools/ue/uerun.ps1` (EngineWire first, UEMCP fallback). UEMCP stays installed; `Scripts\uerun_uemcp.ps1` / `uerun.ps1.bak1` keep the old runner. Node server 0.5.30 also installed in `enginewire\server` (optional).
