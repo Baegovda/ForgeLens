@@ -126,25 +126,32 @@ public static class EffectSprites
   private static readonly Dictionary<string, int> DbgSeen = new();
   private static void Reject(EmitterDef def, string why) { if (Debug) Console.Error.WriteLine($"  reject {def.Name}: {why}"); }
 
+  /// <summary>
+  ///   <c>optimization.degNear/degFar</c> factors (size, intensity, alpha, distortion) at camera distance
+  ///   <paramref name="dist"/>. Shared by sprites and lwiGeom mesh particles (same emitter optimization block).
+  /// </summary>
+  public static (float Size, float Intens, float Alpha, float Disp) DistanceFadeK(EmitterDef def, float dist)
+  {
+    float sizeK = 1, intensK = 1, alphaK = 1, dispK = 1;
+    if (!DistanceFades || (def.DegNear is null && def.DegFar is null)) return (sizeK, intensK, alphaK, dispK);
+    for (var fi = 0; fi < 2; fi++)
+    {
+      var fade = fi == 0 ? def.DegNear : def.DegFar;
+      if (fade is null) continue;
+      // HEURISTIC (SM2_VFX_DEGNEAR_FIX=1): use the trail-VS near semantics (scale inside radStart) for sprites too.
+      var k = fi == 0 && DegNearFix ? 1 - fade.Amount(dist) : fade.Amount(dist);
+      sizeK *= 1 + (fade.Size - 1) * k;
+      intensK *= 1 + (fade.Intens - 1) * k;
+      alphaK *= 1 + (fade.Alpha - 1) * k;
+      dispK *= 1 + (fade.Disp - 1) * k;
+    }
+    return (sizeK, intensK, alphaK, dispK);
+  }
+
   private static bool Quad(EmitterDef def, TextureFrames frames, in Particle p, Vector3 right, Vector3 up, Vector3 back, float[] v, int o, bool distort = false, Vector3? eye = null)
   {
     var n = Math.Clamp(p.Age / p.Life, 0f, 1f);
-    float sizeK = 1, intensK = 1, alphaK = 1, dispK = 1;
-    if (DistanceFades && eye is { } cam && (def.DegNear is not null || def.DegFar is not null))
-    {
-      var dist = Vector3.Distance(p.Position, cam);
-      for (var fi = 0; fi < 2; fi++)
-      {
-        var fade = fi == 0 ? def.DegNear : def.DegFar;
-        if (fade is null) continue;
-        // HEURISTIC (SM2_VFX_DEGNEAR_FIX=1): use the trail-VS near semantics (scale inside radStart) for sprites too.
-        var k = fi == 0 && DegNearFix ? 1 - fade.Amount(dist) : fade.Amount(dist);
-        sizeK *= 1 + (fade.Size - 1) * k;
-        intensK *= 1 + (fade.Intens - 1) * k;
-        alphaK *= 1 + (fade.Alpha - 1) * k;
-        dispK *= 1 + (fade.Disp - 1) * k;
-      }
-    }
+    var (sizeK, intensK, alphaK, dispK) = eye is { } cam ? DistanceFadeK(def, Vector3.Distance(p.Position, cam)) : (1f, 1f, 1f, 1f);
 
     var size = def.Size.Sample(n, p.RandSize) * def.Scale * sizeK;
     if (size <= 0) { Reject(def, $"size {size} n {n}"); return false; }

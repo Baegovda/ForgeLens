@@ -1798,3 +1798,5 @@ Disassembly: /workspace/vfxsh_dis/{pc,pg,dx_pc_dx12_sfx,dx_pc_dx12_distort}, GLS
 
 - mtl1-16b: plugin SetClothConfigProps and a CreateChaosCloth SubdivisionCount 2 default (sidecar solverSubsteps). Sorcerer penetration is about -25% (pen table in STATUS); calgar is still 0.
 - mtl1-16c: MRQ CLI render (hidden, -RenderOffscreen) of a Sequencer-keyed WindDirectionalSource drives Chaos cloth: calm frames change <200 px, windy frames 2.6-3.8k px. Tool: mrqwind.py. See STATUS.
+
+- 2026-10-28 KST mtl1-17: degNear/degFar applied to lwiGeom mesh particles via shared `EffectSprites.DistanceFadeK` (see STATUS "mtl1-17"); bench no-regression; ROADMAP VFX item 7 left: SELF_DISTORTION render.

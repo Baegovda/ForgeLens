@@ -149,4 +149,14 @@ public class DistortionTests
     Assert.Equal(0.25f, far.Amount(45f), 0.001f);
     Assert.Equal(1f, far.Amount(80f));
   }
+  [Fact]
+  public void DistanceFadeKSharedBySpritesAndMeshes()
+  {
+    var def = new EmitterDef { Name = "m", Path = "m", DegFar = new DistanceFade(40f, 60f, Size: 0.5f, Intens: 0f) };
+    var (s0, i0, a0, _) = EffectSprites.DistanceFadeK(def, 10f);
+    Assert.Equal((1f, 1f, 1f), (s0, i0, a0));
+    var (s1, i1, _, _) = EffectSprites.DistanceFadeK(def, 50f);
+    Assert.Equal(0.75f, s1, 0.001f);
+    Assert.Equal(0.5f, i1, 0.001f);
+  }
 }

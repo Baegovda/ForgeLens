@@ -106,7 +106,7 @@ internal static class VfxBench
             Batches = EffectSprites.Build(instance, aliases, view, Filter),
             Lights = instance.Lights().ToList(),
             Texture = textures.Get,
-            Meshes = EffectMeshParticles.Build(instance),
+            Meshes = EffectMeshParticles.Build(instance, view),
             Mesh = meshes.Get,
             Time = t,
           };

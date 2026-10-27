@@ -336,3 +336,9 @@ glt.chameleon REA'd (FUN_142576f30 + glt PS 03558_0) and implemented in sidecar 
   It finished in about 60 s with 150 frames in Desktop\SM2_Work\Captures\mrq16.
 - Frame-to-frame pixel change (>30/255): calm frames 20→21 and 30→31 changed 165 and 39 px; windy frames 100→101, 120→121 and 140→141 changed 3491, 3830 and 2600 px. The cloak streams sideways from about frame 60. So keyed wind drives Chaos cloth in an MRQ render. Box: /workspace/mtl_fix/mrq16_cmp.png (frames 10, 40, 60 / 80, 110, 145).
 - Known: the `{sequence_name}` token was empty in CLI mode, so files are named `.0000.png`. The framing is tight.
+
+## mtl1-17 / vfx 7 (2026-10-28 KST): degNear/degFar on mesh particles
+- `EffectSprites.DistanceFadeK(def, dist)` = shared size/intensity/alpha/disp factors; sprites refactored to use it (no behaviour change).
+- `EffectMeshParticles.Build(instance, view)`: lwiGeom instances now get the same degNear/degFar (size, colour+emissive intensity, alpha). Callers (bench, host, main window) pass the view. `SM2_VFX_DEG=0` turns all fades off.
+- Data: 195 of 1045 lwiGeom `.sfx` files carry degNear/degFar. Bench (muzzle@0.02, grenade@0.3, 480 Hz): DEG=0 vs 1 identical (those emitters are outside their fade ranges) → no regression. Trails already had it (TRAIL_DEGR). SELF_DISTORTION render still parsed only.
+- Tests 143/143 (new `DistanceFadeKSharedBySpritesAndMeshes`). Shots `/workspace/browser_run_shots/vfx17mesh/`.

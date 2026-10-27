@@ -88,9 +88,12 @@ public static class EffectMeshParticles
   ///   Instances per lwiGeom emitter. Scale is the particle size (template units, times <c>emitScale</c>); with
   ///   <c>isAlignSpeed</c> the template's +Z follows the velocity, after the random initial spin.
   /// </summary>
-  public static List<MeshBatch> Build(EffectInstance instance)
+  public static List<MeshBatch> Build(EffectInstance instance, Matrix4x4? view = null)
   {
     var batches = new List<MeshBatch>();
+    // degNear/degFar on mesh particles (vfx 7): same emitter optimization block and factors as sprites.
+    Vector3? eye = null;
+    if (view is { } vw && Matrix4x4.Invert(vw, out var inv)) eye = inv.Translation;
     foreach (var state in instance.Emitters)
     {
       var def = state.Def;
@@ -99,7 +102,8 @@ public static class EffectMeshParticles
       foreach (var p in state.Particles)
       {
         var n = Math.Clamp(p.Age / p.Life, 0f, 1f);
-        var size = def.Size.Sample(n, p.RandSize) * def.Scale;
+        var (sizeK, intensK, alphaK, _) = eye is { } cam ? EffectSprites.DistanceFadeK(def, Vector3.Distance(p.Position, cam)) : (1f, 1f, 1f, 1f);
+        var size = def.Size.Sample(n, p.RandSize) * def.Scale * sizeK;
         if (size <= 0) continue;
         var rot = Matrix4x4.CreateFromQuaternion(p.Orientation);
         if (def.AlignSpeed && p.Velocity.LengthSquared() > 1e-8f)
@@ -107,9 +111,9 @@ public static class EffectMeshParticles
         else if (geom.RotationFromEmitter)
           rot *= state.World with { M41 = 0, M42 = 0, M43 = 0, M44 = 1 };
         var c = geom.ColorAt(n);
-        var alpha = c.W * (geom.Transparency?.Evaluate(n) ?? 1f);
+        var alpha = c.W * (geom.Transparency?.Evaluate(n) ?? 1f) * alphaK;
         var world = Matrix4x4.CreateScale(size) * rot * Matrix4x4.CreateTranslation(p.Position);
-        batch.Instances.Add(new MeshInstance(world, new Vector4(c.X, c.Y, c.Z, alpha), geom.Emissive?.Evaluate(n) ?? 0f, p.Variant, n));
+        batch.Instances.Add(new MeshInstance(world, new Vector4(c.X * intensK, c.Y * intensK, c.Z * intensK, alpha), (geom.Emissive?.Evaluate(n) ?? 0f) * intensK, p.Variant, n));
       }
 
       if (batch.Instances.Count > 0) batches.Add(batch);

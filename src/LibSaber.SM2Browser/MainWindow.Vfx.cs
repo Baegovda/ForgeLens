@@ -211,7 +211,7 @@ public partial class MainWindow
         Lights = fx.Instance.Lights().ToList(),
         Texture = _vfxTextures.Get,
         Ground = VfxGroundIsOn,
-        Meshes = EffectMeshParticles.Build(fx.Instance),
+        Meshes = EffectMeshParticles.Build(fx.Instance, view),
         Mesh = _vfxMeshes.Get,
       };
       fx.Particles = fx.Instance.ParticleCount;

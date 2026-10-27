@@ -148,7 +148,7 @@ internal sealed class HostVfx
       foreach (var inst in instances)
       {
         batches.AddRange(EffectSprites.Build(inst, Aliases, scene.View));
-        meshes.AddRange(EffectMeshParticles.Build(inst));
+        meshes.AddRange(EffectMeshParticles.Build(inst, scene.View));
         lights.AddRange(inst.Lights());
       }
 
