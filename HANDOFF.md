@@ -1538,3 +1538,30 @@ Disassembly: /workspace/vfxsh_dis/{pc,pg,dx_pc_dx12_sfx,dx_pc_dx12_distort}, GLS
   t = pow(sat(N_mapped·V), r15.z), 3-step ramp, base *= lerp(c, 1, metal) — same as pc_dx12_glt.sdc PS 03558_0 and the UE master.
   HEURISTIC packing identical to import_sm2_materials.chameleon_ramp (thresholds 0, offset1, offset2). CPU renderer unchanged.
 - Check: `--glbench synthetic` now writes gpu_synthetic_chameleon.png (box: /workspace/browser_run_shots/cham/). Not yet installed on the PC.
+
+## mtl1-3: customization parts (armor + weapon) and the browser part picker
+- **Armor:** see "Constructor tpls" above (character_customization_library.sso, `--variant SECTION=uid`).
+- **Weapons (new, data + ssl evidence; none of these field names are plaintext in sm2_retail.exe, so the selection logic is ssl-only):**
+  - `ssl/weapons/creator/customization/firearm_skins_library.sso`: `skinsGroups[] = { firearmUid, skins{ skin_N = FirearmSkin{ geomCustomizerRegions[], material?, attachingActors{locator, actorName}?, overridedActorName? } } }`. 68 firearmUids. Accessors are in firearm_skin.sslbin: GetGeomCustomizerRegions, GetMaterial, GetAttachingActors, GetOverridedActorName.
+  - `ssl/geom_customizer/geom_customizer_preset_firearm.sso`: `regions{ name = GeomCustomizerRegion{ meshes[] } }`, 109 regions. The meshes are tpl object names; LOD copies (`base_01_LOD1`) are sibling nodes.
+  - prop_geom_customizer_equipment.sslbin: ShowActiveRegions = HideAll + Show(region). The region Show/Hide ends in the native Geom ShowObj/HideObj (0x14133fec0 / 0x14133eae0 → 0x14133e750).
+  - tpl → uid: `ssl/weapons/common/firearm/mgs/<uid>/<uid>_client.cls` geom.nameTpl. Several uids share a tpl (aux_melta_bolter also names wpn_bolt_rifle_01), so the uid with the most skins wins.
+- **Code:**
+  - `Customization/WeaponVariant.cs`: WeaponCustomization and WeaponVariant.Apply.
+  - `--variant skin=<key>[,regions=a|b|c][,+obj,-obj]`. Only for `wpn_*` tpls, and only when given; the default export is unchanged.
+  - `AssetExporter.DescribeVariant` builds the slots.
+  - ExportWindow part picker for the previewed model:
+    - Armor: preset combo plus one combo per body section.
+    - Weapon: skin combo plus one checkbox per region present in the tpl.
+    - It builds the `--variant` spec.
+- **HEURISTIC:** region `main` is always shown (equipment defaultRegion not decoded). Skin `material` and `attachingActors` are reported but not applied; this is mesh-only.
+- **Tests** (PC `Desktop\SM2_Work\Exports\cust_test\*`):
+  - wpn_bolt_rifle_01 → arifle_bolt_rifle (80 customizable objects):
+    - skin=01_red: 12 visible parts.
+    - skin=05_h: 10 visible parts.
+    - Custom regions (base_02_01|base_02_02|bolt_01|magazine_01|sight_telescopic_01|cartridge_01): 13 visible parts.
+  - cc_sm_constructor_tank:
+    - Default: 54 visible parts.
+    - HELMET=helmet_tank_relic_01, LEFT_PAULDRON=left_pauldron_tank_relic_01: 53 visible parts.
+- **Install:** the browser and CLI are installed in `C:\Users\Revaptor_FX\SM2Extractor` (backups `*.exe.bak2`). This build also brings in the mtl1-2 chameleon preview.
+- CopyFromBox fails for 72 MB files ("temporarily unreachable"). Split them into 20 MB chunks and concatenate on the PC.

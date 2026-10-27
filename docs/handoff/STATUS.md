@@ -224,3 +224,8 @@ glt.chameleon REA'd (FUN_142576f30 + glt PS 03558_0) and implemented in sidecar 
 - mtl1-A verified in UE: lictor + sorcerer simulate live (RigidBody post-process ABP); ue_bulk re-import-after-rename bug noted in HANDOFF.
 - mtl1-1: ue_bulk re-import backup = duplicate (not rename) + in-place reimport; fixes illegal private reference. PC Scripts/ue_bulk.py == repo (bak2 kept).
 - mtl1-2: chameleon ramp in GL preview (synthetic bench verified; PC install pending with mtl1-3).
+
+## mtl1-3 (2026-10-27 KST): customization parts
+- Weapon skins decoded: firearm_skins_library → geomCustomizerRegions → geom_customizer_preset_firearm meshes.
+- `--variant skin=` option, plus a browser ExportWindow part picker for armor and weapons. Tested on the bolt rifle and the tank marine.
+- HEURISTIC: `main` is always on; skin material and attachments are not applied.
