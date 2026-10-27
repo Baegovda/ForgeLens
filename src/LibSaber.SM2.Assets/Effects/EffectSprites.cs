@@ -83,7 +83,15 @@ public static class EffectSprites
 
   /// <summary>Scene light reaching lit (<c>lighting != None</c>) particles, in the same HDR units as <c>colorIntensity</c>.
   /// Corpus: unlit additive intensity median ~450, lit blend median ~10, so a lit sprite sees roughly 100x (tuned against unlit fire at exposure 1/250).</summary>
-  public static float LitScale { get; set; } = 100f;
+  /// <remarks>
+  ///   vfx3z: settled at 400. Lit particles (particles.sdc lit permutations) read only runtime scene light:
+  ///   COMMON_SUN_INTENSITY @0x1436e9ed0, COMMON_SKY_SH_HARMONICS @0x1436eb790 and the clustered light grid
+  ///   (COMMON_LIGHT_GRID_*), then scale by COMMON_HDR_EXPOSURE_DIV_AVG_LUM @0x1436e9ee8 (exposure / average luminance).
+  ///   No per-effect light constant exists, so only LitScale x Exposure matters: with auto-exposure a lit albedo ends
+  ///   near scene-average brightness, i.e. LitScale x (1/250) ~ 1..2 → 250..500. 400 matches the in-game grenade/muzzle
+  ///   smoke refs (154743, 154843) best. The number itself stays HEURISTIC (bench has no scene); SM2_VFX_LIT overrides.
+  /// </remarks>
+  public static float LitScale { get; set; } = 400f;
 
   public static float Frame(EmitterDef def, TextureFrames frames, in Particle p)
   {
