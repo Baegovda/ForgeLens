@@ -1523,3 +1523,12 @@ Disassembly: /workspace/vfxsh_dis/{pc,pg,dx_pc_dx12_sfx,dx_pc_dx12_distort}, GLS
 - Build: `RunUAT BuildPlugin -Plugin=…uplugin -Package=<tmp> -TargetPlatforms=Win64` (VS2022 BuildTools 14.44), copy the package (minus HostProject/Intermediate) to `<Project>/Plugins/`.
 - `tools/ue/ue_bulk.py import` calls it when `<name>.physics.json` exists and saves PA/ABP/mesh; warns and skips if the plugin isn't loaded.
 - STATUS: builds; installed in UE_VFX_57/Plugins; NOT yet verified in-editor (editor restart pending: dirty non-SM2 packages open).
+- mtl1-A VERIFIED (2026-10-27): editor restarted (21 dirty pkgs backed up as `.uasset.bak1`/`.umap.bak1`, then saved), plugin loads
+  (`unreal.SM2PhysicsSetupLibrary`). `ue_bulk.py import cc_lictor|cc_sorcerer mtl_phys` -> PA/ABP built and saved
+  (lictor: simulated=398 kinematic=42 constraints=440 missingBones=0). `tools/ue/ue_phys_verify.py spawn|sample|cap|export|clear`
+  compares twin actors (post-process ABP on/off) in the editor world: helper-bone deviation lictor 2–5 cm, sorcerer mean 7–11 / max 48 cm,
+  time-varying, no NaN. Frames: `Captures/mtl_fix/phys_<model>_t{1,2,3}_{physON,animOnly}_{front,side}.png`. No joint tuning needed yet (HEURISTIC limits).
+- KNOWN BUG (ue_bulk re-import): `rename_directory(folder -> _bakN)` on LOADED assets followed by importing into the same path yields a mesh
+  with private references into `_bakN` (InterchangeAssetImportData / SkeletalMeshDescriptionBulkData) -> "Illegal reference to private object",
+  the mesh can't be saved. Workaround used: import into a fresh set (`mtl_phys`, export folders copied). Fix TODO: duplicate_directory to _bakN + reimport in place, or restart between.
+- PC `Scripts/ue_bulk.py` had diverged from the repo copy; the physics block was patched in on the PC (backup `ue_bulk.py.bak1`).
