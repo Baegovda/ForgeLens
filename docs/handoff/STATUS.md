@@ -133,3 +133,12 @@ Captures: `/workspace/browser_run_shots/vfx3_verify/` (PC copy `Desktop\SM2_Work
 - `SM2_VFX_TRAIL_TC=1` / tint on `trail_stalker_bolter_smoke` — **inconclusive**: the bench emitter is stationary, the trail
   builds 6–45 quads but renders ~invisible (max pixel Δ 5). Needs a moving-emitter capture (bench has no motion path).
 - `VfxBench` per-frame lines now print `vatDraws(cum)`; `GlPreview.VatDraws` exposes the counter.
+
+## vfx3h (Ghidra REA, sm2_retail.exe, 2026-10-27)
+Evidence from decompiling ghidra_proj3 (scripts /workspace/rea/scripts/DecompAt.java, DispScan.java). Docs only, no code change.
+- genOnFly (PROVEN): emitter+0x9b0 is an array {ptr,count@+0x9b8} of 12-byte entries {key, emitterNameId@+4, numParts@+8} (parser FUN_1419b9a50 reads "numParts"). genOnCDT is +0x9c0 (16-byte entries), genOnDie is +0x9d0 (12-byte entries). Runtime: FUN_1417e4e10 (CPU) and FUN_1417e5060 (GPU) match each entry's nameId against child emitters (child+0x6bc CPU, +0x34 GPU) and attach the child to the parent. GPU attach is FUN_1417e5b70 with mode 0=fly/1=CDT/2=die, at most 3 slots at +600/+0x290, log "attached GPU emitter". CPU attach is FUN_1417e5a20, 12 slots at +200. So genOnFly is not a rate: it spawns child emitter `name` attached to each flying parent particle, numParts per parent (HEURISTIC that numParts is per-particle; not traced further).
+- ratioDependency (PARTIAL): at emitter-desc +0xc0 (FUN_141796980 → FUN_141786e20): dependencyType at +0 ("none"=0, "Velocity"=1, "Age"=2; FUN_141787230, strings at 143567450/1436443ec), ratioXY curve at +8 (FUN_1417867c0; constExpr/ageSpline). Runtime consumer not located.
+- blendType (PARTIAL): FUN_141751c70 gives blend=0, add=1, blend_add=2 (writer FUN_141752030 also has 3). The D3D12 blend-desc consumer was not located within the time box; the mapping in the existing code stays HEURISTIC.
+- animStage: serialised in FUN_14179fdd0 group (FUN_14179edc0/FUN_14179f290 at desc+0x20). Runtime setter not located, so VatDecode.StageFrame age/life remains HEURISTIC.
+- Exposure 1/250, light x100, distortion strength, and trail DEGR/MISC/OFFSET CPU mapping: NOT resolved (only shader define strings DISTORTION_* / EXPOSURE=%g found). These remain HEURISTIC.
+- VFX estimate corrected to ≈ 72% (honest; earlier 80–82% figures were optimistic).
