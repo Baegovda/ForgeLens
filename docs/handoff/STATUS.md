@@ -21,7 +21,8 @@ Percentages are the previous agent's estimates of how complete each track is aga
 | Bulk validation (37 assets) | done | 100 | PASS 31 / WARN 3 / FAIL 3 → constructors fixed afterwards |
 | UE verification of constructors + physics | done (first pass) | 100 / 85 | open issues below |
 | In-game side-by-side comparison | todo | 0 | needs the PC free + in-game captures |
-| Niagara export (`.sfx` → Niagara) | not started | 0 | LAST; ask the user first |
+| Unreal export test (no Niagara) | in progress | 0 | compared effects' meshes/textures/materials |
+| Browser viewer polish | todo | 0 | search, preview, export button |
 
 ## Commits this session (2026-10-27, oldest first)
 | Commit | What |
@@ -209,3 +210,5 @@ Mesh UV scroll (overrideAffixScroll, FUN_1425fd580) on; opt-in bench bloom from 
 
 ### vfx3z (2026-10-27)
 Bloom includes sprites + bloom point (heuristic value, threshold design from Bloom.BloomPoint); finisher blood darker (combine_material deferred, SurfLight 60 heuristic); LitScale 400 (runtime light, heuristic value); distortion buffer math from particles.sdc 00005_1 (power mapping heuristic); trail DEGR still heuristic (0 refs). VFX ≈ 79%. See HANDOFF.md.
+
+_Niagara conversion: off the roadmap (2026-10-27), listed under ROADMAP → Possible future development._

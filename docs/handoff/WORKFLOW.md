@@ -162,5 +162,5 @@ The user wants automatic interim reports. Create a recurring routine (see the bo
 - check running executors/subagents, the box worktrees (`git log -3`, `git status`), new files in `/workspace/patches/*` and `/workspace/browser_run_shots/*`, and, only if cheap, the PC capture folders;
 - write a 2–4 line Korean report: what finished, what is running, **progress %**, ETA (추정), blockers;
 - **stay quiet if nothing changed** since the last report. Never send a stale or duplicate report, and never say "nothing is running" while an executor is active;
-- when the VFX track completes, don't start Niagara: hand back to the main agent so it **asks the user** about Niagara.
+- Niagara is off the roadmap (possible future development only); never start it unprompted.
 Delete or pause the routine when the user says to stop, or when all approved work is done.

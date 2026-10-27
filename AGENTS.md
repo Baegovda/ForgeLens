@@ -39,7 +39,7 @@
    - **2026-10-27 update from the user:** heavy work during gaming is OK as long as it doesn't disrupt the game (keep it hidden + idle priority, no focus stealing).
    - The user says "게임끝" when the PC is free. If they say they're playing again, stop heavy PC work immediately and continue on the box.
 5. **Update HANDOFF.md at the end of every stage:** append a dated section with state, evidence, paths and commits. Also update `docs/handoff/STATUS.md`.
-6. **Niagara (`.sfx` → UE Niagara) is LAST,** and only after asking the user. Browser VFX must be finished first. Don't start Niagara on your own.
+6. **Niagara (`.sfx` → UE Niagara) is not on the roadmap** (user, 2026-10-27). It is only a possible future development; don't start it unless the user asks.
 7. **No secrets in the repo** (tokens, passwords, credentials).
 
 ## 4. Talking to the user (owner)

@@ -1473,3 +1473,7 @@ Disassembly: /workspace/vfxsh_dis/{pc,pg,dx_pc_dx12_sfx,dx_pc_dx12_distort}, GLS
 - z6 7 side-by-sides (side_by_side.py now also writes blood_vs_hierophant, bolter_smoke). Box old run →
   ingame_cmp.bak7; PC Captures\ingame_cmp old → next .bakN.
 - Patches /workspace/patches/vfx3z/. VFX ≈ 79%.
+
+## vfx4-0 (2026-10-27 17:30 KST) — roadmap change
+- User removed Niagara conversion from the roadmap; it is kept only under ROADMAP → "Possible future development". AGENTS.md rule 6, STATUS, WORKFLOW updated.
+- New order: vfx4-1 VFX heuristic reduction (finisher blood saturation, distortion power/0.04, trail DEGR), vfx4-2 UE export test (no Niagara) into /Game/SM2_Work, vfx4-3 browser viewer polish.

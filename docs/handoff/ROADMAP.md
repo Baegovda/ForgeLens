@@ -11,7 +11,8 @@
 6. Secondary physics (user request: purity seals and cloth should move as in-game in the browser and carry over to Unreal): **done + UE verified**
 7. Browser VFX (the user said go at 02:32 KST, "일단 냅두고 그담거해봐"): **in progress, ~85 %**
 8. In-game side-by-side comparison (VFX, physics, materials): **todo**. It needs the PC free and in-game captures.
-9. **Niagara (`.sfx` → UE Niagara): LAST.** When VFX is done, **ask the user** before starting. Don't start it automatically.
+9. Unreal export test without Niagara (meshes/textures/materials of the compared effects → `/Game/SM2_Work`): **in progress** (2026-10-27).
+10. Browser viewer polish (asset search, preview, export button): **todo**.
 
 ## Next: VFX3 remaining (do in this order unless the user says otherwise)
 Pushed so far: sockets/bone attach, anim-event cues and stop cues, distortion, degNear on sprites, missing-texture skip, bolter proxies, in-place fix, coverings, textureTintControl (grenade smoke). The remaining items:
@@ -27,7 +28,7 @@ Pushed so far: sockets/bone attach, anim-event cues and stop cues, distortion, d
 5. **Flesh emitter:** `part_mag_ee_bolter_flesh` untyped entry. It is now known to be an `em_covering_*` surface painter (blood r0.4 on HEAD), shown as a note. Optional: draw a decal-like covering on the model.
 6. **VAT blood splashes** (`splash_5_v2_anim_data*`, `shader_blood_splash`): the layout is still unknown, see the findings in HANDOFF vfx3 part 3. The pct is downsampled (2400×471, 8 bands). REA the vertex shader / `combineMtlAnimControl.animStage`.
 7. **SELF_DISTORTION** render (only parsed now); degNear on trails and mesh particles.
-8. Then report VFX done (with %), and **ask about Niagara**.
+8. Then report VFX done (with %).
 
 ## UE verification — results so far (details in STATUS.md / HANDOFF "UE verification")
 - Constructors PASS (`/Game/SM2_Work/Tests/bulk_fix`). Titus + Calgar physics bake PASS (`/Game/SM2_Work/Tests/physics`), with 60 Hz import fixed.
@@ -44,3 +45,6 @@ Pushed so far: sockets/bone attach, anim-event cues and stop cues, distortion, d
 - Retarget: Cadian index finger curl offset.
 - `ue_cap_lit.py`: wait for texture compilation before capturing.
 - CPU renderer: blend modes and physics (low priority; GPU is the default).
+
+## Possible future development (not on the roadmap)
+- Niagara conversion (`.sfx` → UE Niagara). Removed from the roadmap by the user (2026-10-27). Only start if the user asks for it again.
