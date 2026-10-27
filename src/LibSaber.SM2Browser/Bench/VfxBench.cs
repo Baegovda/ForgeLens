@@ -120,7 +120,7 @@ internal static class VfxBench
             Buffer.BlockCopy(pixels, y * Size * 4, sheet, ((oy + y) * Cols * Size + ox) * 4, Size * 4);
           if (Environment.GetEnvironmentVariable("SM2_VFX_FRAMES") == "1")
             PreviewBench.Png(Path.Combine(output, $"{name}_f{f}_{t:0.000}s.png"), pixels, Size, Size);
-          Line($"  t={t:0.000}s particles {instance.ParticleCount} quads {layer.Quads} meshes {layer.MeshInstances} batches {layer.Batches.Count} lights {layer.Lights.Count} distortion {gpu.DistortionQuads}");
+          Line($"  t={t:0.000}s particles {instance.ParticleCount} quads {layer.Quads} meshes {layer.MeshInstances} batches {layer.Batches.Count} lights {layer.Lights.Count} distortion {gpu.DistortionQuads} vatDraws(cum) {gpu.VatDraws}");
         }
 
         PreviewBench.Png(Path.Combine(output, name + "_sheet.png"), sheet, Cols * Size, Rows * Size);

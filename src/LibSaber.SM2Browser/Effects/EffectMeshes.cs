@@ -104,7 +104,8 @@ internal sealed class EffectMeshes
       {
         var tex = part.Texture ?? "";
         if (tex.StartsWith("__default", StringComparison.Ordinal) || part.IndexCount < 3) continue;
-        if (!materials.TryGetValue(tex, out var mat)) materials[tex] = mat = Material(tex, _td(tex));
+        var key = LibSaber.SM2.Assets.Effects.VatDecode.Enabled ? tex + "|" + part.Name : tex;
+        if (!materials.TryGetValue(key, out var mat)) materials[key] = mat = Material(tex, _td(tex), LibSaber.SM2.Assets.Effects.VatDecode.Enabled ? part.Name : null);
         list.Add((part.IndexStart, part.IndexCount, mat));
       }
 
@@ -116,11 +117,12 @@ internal sealed class EffectMeshes
 
   /// <summary><c>preset = "sfx"</c> materials are translucent (premultiplied) with <c>tint [A,R,G,B]</c> and <c>clipping.level</c>;
   /// everything else (combine_material, ...) draws opaque and lit.</summary>
-  public static EffectMeshMaterial Material(string texture, string? td)
+  public static EffectMeshMaterial Material(string texture, string? td, string? partName = null)
   {
     if (td is null) return new EffectMeshMaterial(texture, false, Vector4.One, 0f);
     var start = td.IndexOf("materials", StringComparison.Ordinal);
     var body = start >= 0 ? td[start..] : td;
+    if (LibSaber.SM2.Assets.Effects.VatDecode.MaterialBlockFor(td, partName) is { } own) body = own;
     var next = body.IndexOf("__type_id = \"material_templ\"", StringComparison.Ordinal);
     if (next > 0) body = body[..next];
     var sfx = Regex.IsMatch(body, "preset\\s*=\\s*\"sfx\"");

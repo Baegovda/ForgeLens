@@ -56,3 +56,25 @@ public class VatParseTests
     Assert.Null(VatDecode.Parse("shaderType = \"combine_material\""));
   }
 }
+
+public class VatMaterialBlockTests
+{
+  private const string Td = "materials = {\n   splash_05 = {\n      shaderType = \"shader_blood_splash\"\n      floatParam7 = 60.000000\n      albedo = \"splash_5_v2_anim_data\"\n      __type_id = \"material_templ\"\n   }\n   splash_07 = {\n      shaderType = \"shader_blood_splash\"\n      floatParam7 = 60.000000\n      albedo = \"splash7_v2_anim_data\"\n      __type_id = \"material_templ\"\n   }\n}";
+
+  [Fact]
+  public void PartPicksItsOwnMaterial()
+  {
+    var b = LibSaber.SM2.Assets.Effects.VatDecode.MaterialBlockFor(Td, "splashe07");
+    Assert.NotNull(b);
+    Assert.Equal("splash7_v2_anim_data", LibSaber.SM2.Assets.Effects.VatDecode.Parse(b)!.PositionTexture);
+    Assert.Equal("splash_5_v2_anim_data", LibSaber.SM2.Assets.Effects.VatDecode.Parse(LibSaber.SM2.Assets.Effects.VatDecode.MaterialBlockFor(Td, "splashe05"))!.PositionTexture);
+  }
+
+  [Fact]
+  public void UnknownPartFallsBack()
+  {
+    Assert.Null(LibSaber.SM2.Assets.Effects.VatDecode.MaterialBlockFor(Td, "splashe99"));
+    Assert.Null(LibSaber.SM2.Assets.Effects.VatDecode.MaterialBlockFor(Td, null));
+    Assert.Null(LibSaber.SM2.Assets.Effects.VatDecode.MaterialBlockFor(Td, "debris"));
+  }
+}

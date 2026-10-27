@@ -599,6 +599,15 @@ internal sealed unsafe class EffectRenderer : IDisposable
       float fr = fract(abs(q));
       return aTex1.y - (q >= 0.0 ? fr : -fr) / uVatAnim.z;
     }
+    // Texel-exact fetch (one column per vertex, so bilinear u would blend neighbours). The pct is ARGB8888 = DXGI 87
+    // B8G8R8A8 (TextureDecode.DxgiOf) and decodes to raw bytes, so the DX .rgb is our .bgr. v wraps (fract): the VS's
+    // uv1.y - frac(f/frames)/bands goes below 0 for band 0 (wrap sampler assumed - HEURISTIC, vfx3g).
+    vec3 vatFetch(sampler2D s, vec2 uv)
+    {
+      ivec2 sz = textureSize(s, 0);
+      ivec2 c = clamp(ivec2(int(uv.x * float(sz.x)), int(floor(fract(uv.y) * float(sz.y)))), ivec2(0), sz - 1);
+      return texelFetch(s, c, 0).bgr;
+    }
     void main()
     {
       vec3 p = aPos;
@@ -609,9 +618,9 @@ internal sealed unsafe class EffectRenderer : IDisposable
         float t = uVatAnim.x - f0;
         vec2 a = vec2(aTex1.x, vatRow(f0));
         vec2 b = vec2(aTex1.x, vatRow(f0 + 1.0));
-        p = uVatMin + mix(textureLod(uVatPos, a, 0.0).rgb, textureLod(uVatPos, b, 0.0).rgb, t) * 255.0 * uVatScale;
+        p = uVatMin + mix(vatFetch(uVatPos, a), vatFetch(uVatPos, b), t) * 255.0 * uVatScale;
         if (uVatHasNormal == 1)
-          nrm = mix(textureLod(uVatNrm, a, 0.0).rgb, textureLod(uVatNrm, b, 0.0).rgb, t) * 2.007874 - 1.007874;
+          nrm = mix(vatFetch(uVatNrm, a), vatFetch(uVatNrm, b), t) * 2.007874 - 1.007874;
       }
       vec4 w = uModel * vec4(p, 1.0);
       vWorld = w.xyz;

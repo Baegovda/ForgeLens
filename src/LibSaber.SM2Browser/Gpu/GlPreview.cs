@@ -216,6 +216,7 @@ internal sealed unsafe class GlPreview : IDisposable
   }
 
   public int DistortionQuads => _fx?.DistortionQuads ?? 0;
+  public int VatDraws => _fx?.VatDraws ?? 0;
 
   /// <summary>Drops every buffer and texture of the previous mesh when a different mesh is drawn.</summary>
   private void Own(object owner)

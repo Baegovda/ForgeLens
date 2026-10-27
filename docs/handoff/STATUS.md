@@ -112,3 +112,24 @@ Extractor build: PC `Desktop\SM2_Work\Bin\SM2Extractor_e4ceb7d`. Captures: PC `D
 - Tests: SM2.Assets 121, Extractor 42, LibSaber.Tests 5 — pass. VAT hooked into EffectRenderer behind SM2_VFX_VAT=1 (unverified on real assets).
 - Ghidra 12.1.4 light re-analysis running: /workspace/rea/ghidra_proj3 (log /workspace/rea/ghidra3.log).
 - VFX estimate ≈ 82% (estimate; VAT path unverified).
+
+## vfx3g — 2026-10-27 (KST): VFX flag verification (headless `--vfxbench`, llvmpipe, box)
+Captures: `/workspace/browser_run_shots/vfx3_verify/` (PC copy `Desktop\SM2_Work\Captures\vfx3_verify\`); OFF top / flag bottom.
+- `SM2_VFX_VAT=1` — **was broken at 9474df0** (`splash_vat_broken_9474df0_cmp.png`: long spikes/streaks), **fixed here**
+  (`splash_vat_fixed_cmp.png`: droplet spray that gathers into the splash shape; VatDraws(cum) = 59 on fx_mgs_hierophant_bomb_ee).
+  Bugs fixed (all still behind the flag):
+  1. Every part used the first td material (`splash_05`): solid_blood.td has one material per part (`splash_07` ↔ part
+     `splashe07`, …) with its own bounds/frames/texture (`splash7_v2_anim_data`, 9, 12, 17, 18, 19). New
+     `VatDecode.MaterialBlockFor(td, partName)` (HEURISTIC: name match only) + tests. Extra textures extracted to PC `Raw\vfx\tex8`.
+  2. Channel order: the pct is ARGB8888 = DXGI 87 B8G8R8A8 (`TextureDecode`) and decodes to raw bytes → sample `.bgr`.
+  3. Texel-exact `texelFetch` (1 column per vertex; bilinear u blended neighbours) and `fract(v)` wrap (band 0 goes below 0
+     in the VS formula; wrap sampler assumed — HEURISTIC).
+  Offline check (python, splashe05..18): decoded triangles stay coherent (edge p99 ≈ 1.2 cm vs rest 1.0 cm).
+  Still open: frame source (animStage = age/life, heuristic); rest-pose match is approximate (median ≈ 3 cm); node-transform
+  offset not observed at this camera.
+- `SM2_VFX_CONTRAST=1` — frag grenade: very subtle (mean |Δ| 0.07/255), slightly crisper core/sparks; plausible, low impact.
+- `SM2_VFX_TINT_EXACT=1` — frag grenade: visible change (mean |Δ| 0.46): first frames gain orange/blue tints in the fireball
+  and smoke. Plausible per the REA'd tint, but the blue cast on early smoke looks suspicious — needs an in-game reference.
+- `SM2_VFX_TRAIL_TC=1` / tint on `trail_stalker_bolter_smoke` — **inconclusive**: the bench emitter is stationary, the trail
+  builds 6–45 quads but renders ~invisible (max pixel Δ 5). Needs a moving-emitter capture (bench has no motion path).
+- `VfxBench` per-frame lines now print `vatDraws(cum)`; `GlPreview.VatDraws` exposes the counter.

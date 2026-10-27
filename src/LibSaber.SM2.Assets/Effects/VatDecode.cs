@@ -54,6 +54,29 @@ public static class VatDecode
   /// matched loosely (position = first quoted name containing "anim_data" without an _n/_d suffix, normal = the "_n" one);
   /// bands default to 8 (the band count seen in splashe05 UV1) when floatParam10 is absent.
   /// </summary>
+  /// <summary>
+  ///   The td material block whose key names this mesh part (solid_blood.td: part <c>splashe07</c> -> material
+  ///   <c>splash_07</c>, each with its own VAT bounds/frames/texture). Match: same trailing number and the key's letters
+  ///   are a prefix of the part's. HEURISTIC (vfx3g): inferred from the key/part naming, not from exe code.
+  /// </summary>
+  public static string? MaterialBlockFor(string td, string? partName)
+  {
+    if (string.IsNullOrEmpty(partName)) return null;
+    var pm = Regex.Match(partName, @"^([A-Za-z_]*?)_?0*(\d+)$");
+    if (!pm.Success) return null;
+    foreach (Match m in Regex.Matches(td, @"(?m)^\s*([A-Za-z_]+?)_?0*(\d+)\s*=\s*\{"))
+    {
+      if (m.Groups[2].Value != pm.Groups[2].Value) continue;
+      var kl = m.Groups[1].Value.Replace("_", "");
+      if (!pm.Groups[1].Value.Replace("_", "").StartsWith(kl, StringComparison.OrdinalIgnoreCase) || kl.Length < 3) continue;
+      var body = td[m.Index..];
+      var end = body.IndexOf("__type_id = \"material_templ\"", StringComparison.Ordinal);
+      return end > 0 ? body[..end] : body;
+    }
+    return null;
+  }
+
+
   public static VatParams? Parse(string? td)
   {
     if (td is null || !Regex.IsMatch(td, "shaderType\\s*=\\s*\"shader_blood_splash\"")) return null;
