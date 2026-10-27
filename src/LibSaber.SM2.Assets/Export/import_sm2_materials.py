@@ -329,39 +329,44 @@ def spec_layers(material, albedo, metal, rough, normal, emissive, albedo_raw=Non
     return switch(material, "UseSecondSpec", base, both, x + 1900, y - 300)
 
 
-CHAMELEON_HLSL = """float t = pow(saturate(NV), R1.z);
-float3 c = lerp(C0.rgb, C1.rgb, saturate((t - R0.x) * R0.y));
-c = lerp(c, C2.rgb, saturate((t - R0.z) * R0.w));
-c = lerp(c, C3.rgb, saturate((t - R1.x) * R1.y));
-return lerp(c, float3(1, 1, 1), saturate(M));"""
 
 
-def chameleon(material, albedo, metal, x, y):
+
+def chameleon(material, albedo, metal, normal_ts, x, y):
     # glt.chameleon (UseChameleon): the glt PS (pc_dx12_glt.sdc, e.g. record 03558_0, CB_STATIC_GLT rows 10..15 =
     # PS_REG_GLT_CHAMELEON_COLORS[4] / _OFFSETS[2]) does t = pow(saturate(N.V), r15.z), a 4-colour ramp with three
     # thresholds/scales (r14.xy, r14.zw, r15.xy), then albedo *= lerp(ramp, 1, metalness).
     # HEURISTIC: offset1/offset2 -> thresholds (0, offset1, offset2) in chameleon_ramp(); CPU packer not traced.
     mel = unreal.MaterialEditingLibrary
+    # N.V in tangent space like the PS (normal map normal . tangent-space view vector). PixelNormalWS cannot be
+    # used here: it feeds the Substrate front material, which owns the normal (circular -> default grey material).
     nv = expr(material, unreal.MaterialExpressionDotProduct, x - 700, y)
-    link(expr(material, unreal.MaterialExpressionPixelNormalWS, x - 900, y), "", nv, "A")
-    link(expr(material, unreal.MaterialExpressionCameraVectorWS, x - 900, y + 80), "", nv, "B")
-    node = expr(material, unreal.MaterialExpressionCustom, x - 300, y)
-    node.set_editor_property("code", CHAMELEON_HLSL)
-    node.set_editor_property("output_type", unreal.CustomMaterialOutputType.CMOT_FLOAT3)
-    names = ["NV", "M", "C0", "C1", "C2", "C3", "R0", "R1"]
-    pins = []
-    for n in names:
-        pin = unreal.CustomInput()
-        pin.set_editor_property("input_name", n)
-        pins.append(pin)
-    node.set_editor_property("inputs", pins)
-    link(nv, "", node, "NV")
-    link(metal, "", node, "M")
-    for i, n in enumerate(names[2:]):
-        p = expr(material, unreal.MaterialExpressionVectorParameter, x - 600, y + 120 + i * 90)
+    view_ts = expr(material, unreal.MaterialExpressionTransform, x - 850, y + 80)
+    view_ts.set_editor_property("transform_source_type", unreal.MaterialVectorCoordTransformSource.TRANSFORMSOURCE_WORLD)
+    view_ts.set_editor_property("transform_type", unreal.MaterialVectorCoordTransform.TRANSFORM_TANGENT)
+    link(expr(material, unreal.MaterialExpressionCameraVectorWS, x - 1000, y + 80), "", view_ts, "")
+    link(normal_ts, "", nv, "A")
+    link(view_ts, "", nv, "B")
+    # Built from plain nodes (the first version used a Custom node whose pins likely did not bind from Python: the paint went grey).
+    par = {}
+    for i, n in enumerate(["C0", "C1", "C2", "C3", "R0", "R1"]):
+        p = expr(material, unreal.MaterialExpressionVectorParameter, x - 1400, y + 120 + i * 90)
         p.set_editor_property("parameter_name", "Chameleon" + n)
         p.set_editor_property("default_value", unreal.LinearColor(1.0, 1.0, 1.0, 1.0) if n.startswith("C") else unreal.LinearColor(0.0, 1.0, 0.0, 1.0))
-        link(p, "", node, n)
+        par[n] = p
+    t = expr(material, unreal.MaterialExpressionPower, x - 1000, y)
+    link(unary(material, unreal.MaterialExpressionSaturate, nv, x - 1100, y), "", t, "Base")
+    link(mask(material, par["R1"], "b", x - 1100, y + 60), "", t, "Exponent")
+
+    def step(c, cn, thr, scl, yy):
+        a_ = unary(material, unreal.MaterialExpressionSaturate,
+                   mul(material, op(material, unreal.MaterialExpressionSubtract, t, thr, x - 900, yy), scl, x - 800, yy), x - 700, yy)
+        return lerp(material, c, mask(material, par[cn], "rgb", x - 700, yy + 60), a_, x - 600, yy)
+
+    c = step(mask(material, par["C0"], "rgb", x - 700, y - 60), "C1", mask(material, par["R0"], "r", x - 1000, y + 200), mask(material, par["R0"], "g", x - 1000, y + 260), y + 200)
+    c = step(c, "C2", mask(material, par["R0"], "b", x - 1000, y + 400), mask(material, par["R0"], "r", x - 1000, y + 460, "A"), y + 400)
+    c = step(c, "C3", mask(material, par["R1"], "r", x - 1000, y + 600), mask(material, par["R1"], "g", x - 1000, y + 660), y + 600)
+    node = lerp(material, c, vec3(material, (1.0, 1.0, 1.0), x - 400, y + 700), unary(material, unreal.MaterialExpressionSaturate, metal, x - 400, y + 780), x - 300, y)
     tinted = mul(material, albedo, node, x, y)
     return switch(material, "UseChameleon", albedo, tinted, x + 160, y)
 
@@ -522,7 +527,7 @@ def make_master(folder, asset_name="M_SM2", translucent=False):
     tint_mix = lerp(material, mask(material, tint, "rgb", -360, -320), mask(material, metal_tint, "rgb", -360, -500), metal_b, -200, -400)
     albedo_rgb = mask(material, diffuse, "rgb", -360, -200, "RGB")
     tinted = mul(material, albedo_rgb, tint_mix, -200, -260)
-    tinted = chameleon(material, tinted, metal_b, -200, -900)
+    tinted = chameleon(material, tinted, metal_b, detail_switch, -200, -900)
     front = spec_layers(material, tinted, metal_b, rough_b, detail_switch, emit_mul, albedo_rgb, metal, rough_switch, ao_source)
     if translucent:
         # Substrate translucency: coverage = diffuse alpha.
