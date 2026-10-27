@@ -152,3 +152,11 @@ Scripts: /workspace/rea/scripts/Callers.java (new), DispScan.java. Outputs: /wor
 - animStage: in the lwiGeom payload, FUN_14179fdd0 at payload+0x178 = emitter+0x328 (+0x20 inside). FUN_1417e9480 writes inst+0x328 = 0 (an instance field, not proven to be animStage). The runtime setter is still unproven, so age/life remains HEURISTIC.
 - Exposure 1/250, light ×100, trail DEGR/MISC/OFFSET: still NOT resolved. FUN_1417e1e50 writes 1/max(|x|,1e-6) of emitter+0x3a0 (default) or +0x1b0 into GPU constants (+4). That is a reciprocal, but its link to exposure is UNPROVEN.
 - VFX estimate stays ≈ 72%; the genOnFly/ratio/blend layout knowledge does not yet change rendering.
+
+## vfx3j (Ghidra REA follow-up, 2026-10-27)
+Outputs: /workspace/rea/vfxj_1.c, vfxj_3.c. Docs only. Nothing new reached "proven + implementable", so this round has no code, env flag or tests.
+- FUN_1417daac0 was a FALSE POSITIVE: its +0x248/+0x1a8 hits are RBP stack-frame slots (1417db5fa, 1417db3ed), not emitter fields.
+- distortion.power has no CPU reader. FUN_1417e29b0 binds the whole typeParams payload to the GPU: for type 1 (distortion), slot inst+0x200 ← desc+0x1b8. For type 0, inst+0x200 ← desc+0x3a8 (visuals) and inst+0x220 ← desc+0x630. Plus inst+0x250 ← desc+0x310 (default only). So power, like ratioXY, is evaluated on the GPU from the uploaded curve block. The scalar meaning is still HEURISTIC.
+- Blend: the particle shader permutation table FUN_142450650 defines SFX_ALPHA_BLEND (perm word +0x205 bit0) and SFX_BLEND_ADD_NO_ALPHA (bit1). Trails have the matching TRAIL_BLEND_ADD_NO_ALPHA (FUN_1424e32c0). HEURISTIC, link not traced: blend_add selects the "add, no alpha" variant (ONE/ONE ignoring src alpha) and blend selects ALPHA_BLEND. I still have not found the D3D12_BLEND_DESC builder. The full-binary +0x48c scan was skipped as too noisy; the only real reader is FUN_1417e1e50 (vfx3i).
+- Trails (PROVEN wiring only): emitter+0x9e0/+0x9e8 is a list of 24-byte trail-name strings. At runtime FUN_1418bfcc0 matches a trail object's name (trail+0x10) and registers trail+0x178 into the emitter instance list inst+0x3d0. TRAIL_MISC/TRAIL_DEGR/TRAIL_OFFSET/TRAIL_MISC_2 are only shader-constant name registrations in FUN_1421ca290 (globals 145025180/1450251a8/145025220/1450252c0). The CPU packing of these constants was not reached.
+- VFX estimate remains ≈ 72%.
