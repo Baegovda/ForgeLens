@@ -1597,3 +1597,22 @@ Disassembly: /workspace/vfxsh_dis/{pc,pg,dx_pc_dx12_sfx,dx_pc_dx12_distort}, GLS
 - Install: `C:\Users\Revaptor_FX\SM2Extractor\ForgeLens.exe` (MD5 AE60BB09C98C1F1A5D797FADF5E57424). The old `LibSaber.SM2Browser.exe` is kept, with a copy at `.bak3`. When the user says "실행해줘" ("run it"), launch ForgeLens.exe.
 - Theme (App.axaml only; no behaviour changes): Fluent Dark palette, greys #1E1F22/#252629/#2B2C30, one accent #E8892B. Buttons and inputs are 28 px with radius 3, toolbar and status bar have borders, column headers use the `header` class, and the Export button uses the `accent` class.
 - Screenshots: `Captures\mtl_fix\ui_before.png` and `ui_after.png`, also on the box at /workspace/mtl_fix/. Captured with `Scripts\mtl_fix\wincap.ps1` (PrintWindow, off-screen, no focus; run it under powershell.exe 5.1).
+
+## mtl1-7: SM2PhysicsSetup v2 installed + live sim check with clips (2026-10-27)
+- **Plugin:** the new build (cloth swing = clamp(atan(maxDistCm/segment),5,60)°, DERIVED, with the clamp a HEURISTIC; twist = swing/2) is installed in `UE_VFX_57\Plugins\SM2PhysicsSetup`. The old copy moved to `Desktop\SM2_Work\Build\sm2phys\installed_SM2PhysicsSetup.bak1`; it sits outside Plugins so UE doesn't load a duplicate. `plug.py` → PLUG True.
+- **Re-run:** done for the 6 chars_phys characters plus mtl_phys/cc_lictor and mtl_phys/cc_sorcerer with 0 errors. ue_bulk backed up the previous imports as `_bakN` (calgar `_bak1` + `_bak2`, lictor `_bak2`, the rest `_bak1`). The plugin does not overwrite, so new assets are named `PA_/ABP_<mesh>_SM2Phys_2`, and the mesh's PhysicsAsset/PostProcess ABP point to these new ones.
+- **Clips (re-export with `--anim`; old export folders kept as `<name>.bak1`):** calgar `calgar_run_fwd`, chaplain `chaplain_idle_v01`, commissar `captain_idle_1_commissar`, tech_priest `tech_priest_censer_walk_loop`, sorcerer_exalted `exalted_sorcerer_dash_fwd`, titus_assault `tacticus_run_fwd_sound_intercessor`. All have nan=0.
+- **Live sim (`tools/ue/ue_physlive.py`, Simulate-In-Editor):** the editor world doesn't tick in a hidden editor, so I use SIE. Sequence: `ue_phys_verify spawn` → `physlive cams` → `start` → `play` (re-plays the clip on the PIE copies, re-inits the off twin without the PP ABP, sets AlwaysTickPoseAndRefreshBones) → `sample` / `cap` → `stop` / `camclear`. Mean/max deviation in cm of all helper bones, physON vs animOnly:
+
+| char | bones | mean | max | NaN |
+|---|---|---|---|---|
+| calgar (run) | 917 | 11–17 | 80–132 | no |
+| chaplain (idle) | 732 | 8.8–9.0 | 46–50 | no |
+| commissar (idle) | 921 | 2.8–3.6 | 28–53 | no |
+| tech_priest (walk) | 1818 | 56–59 | 164–177 | no; **FLAG:** the robe drops about 1.4 m (helper z −88 vs +51) |
+| sorcerer_exalted (dash 13 m/s) | 2406 | 69–137 | 208–467 | no; **FLAG:** world-space lag / drop on the root-motion dash |
+| titus_assault (run) | 782 | 9–17 | 43–75 | no |
+
+- PNGs: `Captures\mtl_fix\phys_<name>_live_{physON,animOnly}_{front,side}.png`. Side-by-side copies are on the box at `/workspace/mtl_fix/phys_live_<name>_cmp.png`.
+- **Next:** for tech_priest and sorcerer_exalted, check that the top cloth bodies are kinematic and constrained to the parent, and add linear limits. Python can't edit constraints, so this has to go in the plugin cpp.
+- The editor map in use, `/Game/Work/02/Lightning_01` (not ours), was dirtied by the temporary actors (all cleared). **Do not save it.**
