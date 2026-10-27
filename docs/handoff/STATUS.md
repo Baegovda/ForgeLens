@@ -223,3 +223,4 @@ glt.chameleon REA'd (FUN_142576f30 + glt PS 03558_0) and implemented in sidecar 
 - mtl1-A: SM2PhysicsSetup UE editor plugin (tools/ue/SM2PhysicsSetup) builds + installed; wired in ue_bulk import; in-editor realtime verify pending editor restart.
 - mtl1-A verified in UE: lictor + sorcerer simulate live (RigidBody post-process ABP); ue_bulk re-import-after-rename bug noted in HANDOFF.
 - mtl1-1: ue_bulk re-import backup = duplicate (not rename) + in-place reimport; fixes illegal private reference. PC Scripts/ue_bulk.py == repo (bak2 kept).
+- mtl1-2: chameleon ramp in GL preview (synthetic bench verified; PC install pending with mtl1-3).

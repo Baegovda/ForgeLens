@@ -196,6 +196,16 @@ internal static class GpuBench
           PreviewBench.Png(Path.Combine(output, "gpu_synthetic_skinned_shift.png"), gpu.ReadPixels(), 400, 400);
           gpu.Render(mesh, scene, 400, 400, false, fb);
           PreviewBench.Png(Path.Combine(output, "gpu_synthetic_bind.png"), gpu.ReadPixels(), 400, 400);
+          // glt.chameleon check: test ramp on the sphere (rim t~0 = C0 teal ... facing centre t~1 = C3 magenta).
+          mesh.Parts[0].Chameleon = new ChameleonSpec
+          {
+            Colors = new[] { new[] { 0.1f, 0.8f, 0.7f, 1f }, new[] { 0.2f, 0.5f, 0.9f, 1f }, new[] { 0.6f, 0.3f, 0.9f, 1f }, new[] { 0.9f, 0.2f, 0.6f, 1f } },
+            Offset1 = 0.35f, Offset2 = 0.7f, FresnelPower = 1f,
+          };
+          var chamScene = MeshPreview.BuildScene(mesh, 400, 400, new OrbitCamera { Yaw = 0, Pitch = 0, Distance = 6 }, false, 0, settings);
+          gpu.Render(mesh, chamScene, 400, 400, false, fb);
+          PreviewBench.Png(Path.Combine(output, "gpu_synthetic_chameleon.png"), gpu.ReadPixels(), 400, 400);
+          mesh.Parts[0].Chameleon = null;
           var cpu = MeshPreview.Render(mesh, 400, 400, new OrbitCamera { Yaw = 0, Pitch = 0, Distance = 6 }, false, 0, out _, settings with { Supersample = 2 });
           PreviewBench.Png(Path.Combine(output, "cpu_synthetic_bind.png"), cpu, 400, 400);
         }

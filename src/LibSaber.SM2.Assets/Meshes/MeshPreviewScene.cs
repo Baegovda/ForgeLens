@@ -25,6 +25,8 @@ public sealed class PreviewPartDraw
   /// <summary><c>glt.anisotropic_spec</c> (hair): strand highlight along the tangent-space angle.</summary>
   public AnisoSpec? Aniso { get; init; }
   public bool SecondSpec { get; init; }
+  /// <summary><c>glt.chameleon</c> view-dependent albedo ramp (null when disabled); see <see cref="ChameleonSpec"/>.</summary>
+  public ChameleonSpec? Chameleon { get; init; }
   /// <summary>Bind-pose centre of the part's triangles, for back-to-front sorting of translucent parts.</summary>
   public Vector3 Center { get; init; }
   public int IndexStart { get; init; }
@@ -144,6 +146,7 @@ public static partial class MeshPreview
           Tint = part.AlbedoTint is { Length: >= 3 } t ? new Vector3(t[0], t[1], t[2]) : Vector3.One,
           Aniso = part.AnisoSpec,
           SecondSpec = part.SecondSpec is not null,
+          Chameleon = part.Chameleon,
           Center = PartCenter(prepared, start, end),
         });
       }

@@ -1532,3 +1532,9 @@ Disassembly: /workspace/vfxsh_dis/{pc,pg,dx_pc_dx12_sfx,dx_pc_dx12_distort}, GLS
   with private references into `_bakN` (InterchangeAssetImportData / SkeletalMeshDescriptionBulkData) -> "Illegal reference to private object",
   the mesh can't be saved. Workaround used: import into a fresh set (`mtl_phys`, export folders copied). FIXED (mtl1-1): ue_bulk now duplicate_directory -> _bakN (saved), then reimports in place; mesh save is checked (error if it fails). Verified on mtl_phys/cc_lictor.
 - PC `Scripts/ue_bulk.py` had diverged from the repo copy; the physics block was patched in on the PC (backup `ue_bulk.py.bak1`).
+
+## mtl1-2: chameleon in the browser GL preview
+- `PreviewPartDraw.Chameleon` (from MeshPart.Chameleon) -> GlPreview `SetChameleon` uniforms uCham/uChamC[4]/uChamR0/uChamR1; fragment:
+  t = pow(sat(N_mapped·V), r15.z), 3-step ramp, base *= lerp(c, 1, metal) — same as pc_dx12_glt.sdc PS 03558_0 and the UE master.
+  HEURISTIC packing identical to import_sm2_materials.chameleon_ramp (thresholds 0, offset1, offset2). CPU renderer unchanged.
+- Check: `--glbench synthetic` now writes gpu_synthetic_chameleon.png (box: /workspace/browser_run_shots/cham/). Not yet installed on the PC.

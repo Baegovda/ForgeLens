@@ -720,11 +720,34 @@ internal sealed unsafe class GlPreview : IDisposable
         _gl.Uniform4(U("uAnisoParams"), aniso.Intensity, aniso.Anisotropy, part.SecondSpec ? aniso.ExtraIntensity : 0f, aniso.ExtraShift);
       }
 
+      SetChameleon(LegacyOpaque ? null : part.Chameleon);
+
       _gl.DepthFunc(pass == PreviewBlend.Translucent ? DepthFunction.Less : DepthFunction.Lequal);
       _gl.DrawElements(PrimitiveType.Triangles, (uint)part.IndexCount, DrawElementsType.UnsignedInt, (void*)(part.IndexStart * 4L));
     }
 
     _gl.DepthFunc(DepthFunction.Less);
+  }
+
+  /// <summary>
+  ///   glt.chameleon uniforms (same ramp as the UE master, tools/ue import_sm2_materials.py chameleon_ramp):
+  ///   colours sRGB -> linear; HEURISTIC thresholds (0, offset1, offset2), each scale spanning to the next threshold.
+  /// </summary>
+  private void SetChameleon(ChameleonSpec? cham)
+  {
+    _gl.Uniform1(U("uCham"), cham is null ? 0 : 1);
+    if (cham is null)
+      return;
+    static float Lin(float c) => c <= 0.04045f ? c / 12.92f : MathF.Pow((c + 0.055f) / 1.055f, 2.4f);
+    static float Inv(float w) => 1f / MathF.Max(w, 1e-4f);
+    for (var i = 0; i < 4; i++)
+    {
+      var c = i < cham.Colors.Length && cham.Colors[i] is { Length: >= 3 } v ? v : new[] { 1f, 1f, 1f };
+      _gl.Uniform3(U("uChamC[" + i + "]"), Lin(c[0]), Lin(c[1]), Lin(c[2]));
+    }
+    float o1 = cham.Offset1, o2 = cham.Offset2;
+    _gl.Uniform4(U("uChamR0"), 0f, Inv(o1), o1, Inv(o2 - o1));
+    _gl.Uniform4(U("uChamR1"), o2, Inv(1f - o2), cham.FresnelPower, 0f);
   }
 
   /// <summary>Last resolved frame as top-down BGRA.</summary>
@@ -866,6 +889,10 @@ internal sealed unsafe class GlPreview : IDisposable
     uniform int uAniso;
     uniform vec2 uAnisoDir;
     uniform vec4 uAnisoParams;
+    uniform int uCham;
+    uniform vec3 uChamC[4];
+    uniform vec4 uChamR0;
+    uniform vec4 uChamR1;
     out vec4 oColor;
     // Kajiya-Kay strand lobe: highlight where the half vector is perpendicular to the strand.
     float strand(vec3 T, vec3 H, float e)
@@ -942,6 +969,15 @@ internal sealed unsafe class GlPreview : IDisposable
         metal = s.r;
         rough = uRoughA == 1 ? s.a : s.g;
         ao = uAoB == 1 ? s.b : 1.0;
+      }
+      if (uCham == 1)
+      {
+        // glt.chameleon (pc_dx12_glt.sdc PS 03558_0): t = pow(sat(N.V), r15.z); 3-step ramp C0..C3; albedo *= lerp(c, 1, metal).
+        float t = pow(clamp(dot(L, V), 0.0, 1.0), uChamR1.z);
+        vec3 c = mix(uChamC[0], uChamC[1], clamp((t - uChamR0.x) * uChamR0.y, 0.0, 1.0));
+        c = mix(c, uChamC[2], clamp((t - uChamR0.z) * uChamR0.w, 0.0, 1.0));
+        c = mix(c, uChamC[3], clamp((t - uChamR1.x) * uChamR1.y, 0.0, 1.0));
+        base *= mix(c, vec3(1.0), metal);
       }
       if (uAniso == 1 && uHasNormal == 0)
       {
