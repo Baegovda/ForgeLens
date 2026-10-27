@@ -142,6 +142,26 @@ public sealed class EmitterDef
   ///   Absent means 1 (texture colour as authored), which keeps every emitter that never sets it unchanged.
   /// </summary>
   public float TextureTint { get; init; } = 1f;
+  /// <summary>
+  ///   <c>visuals.additionalContrast</c> (string @0x143645248, float at typeParams+0x12C, serialized at 0x14178d437):
+  ///   extra brightness on texels close to <see cref="ContrastColorKey"/>. The particle PS (particles.sdc 00114_2) does
+  ///   <c>boost = 1 + additionalContrast * saturate(1 - length(key/255 - tex.rgb))</c>. 0 = off (absent).
+  /// </summary>
+  public float AdditionalContrast { get; init; }
+  /// <summary>
+  ///   <c>visuals.contrastColorKey</c> [A,R,G,B] (string @0x143645260, colour at typeParams+0x130, serializer 0x1427456a0
+  ///   called at 0x14178d4da): key colour as raw 0..255 RGB (alpha dropped; the shader reads shared[1].rgb only).
+  /// </summary>
+  public Vector3 ContrastColorKey { get; init; }
+
+  /// <summary>[A,R,G,B] (or a constExpr/value union of it) to raw RGB 0..255; anything else is black.</summary>
+  public static Vector3 ContrastKey(System.Text.Json.Nodes.JsonNode? node)
+  {
+    if (node is null) return Vector3.Zero;
+    var body = SslRead.UnionKind(node) is { } k ? node.Get(k) : node;
+    var f = SslRead.Floats(body);
+    return f.Length >= 4 ? new Vector3(f[1], f[2], f[3]) : f.Length == 3 ? new Vector3(f[0], f[1], f[2]) : Vector3.Zero;
+  }
   public ScalarParam AlphaClip { get; init; } = ScalarParam.Constant(0);
   public float SoftDepth { get; init; }
   /// <summary><c>visuals.alphaMask</c> (enabled): second texture whose alpha multiplies the sprite, sampled over the whole quad
@@ -435,6 +455,8 @@ public sealed class EffectDefinition
       ColorIntensity = SslRead.Scalar(visuals.Get("colorIntensity"), 1f),
       AlphaIntensity = SslRead.Scalar(visuals.Get("alphaIntensity"), 1f).Sample(0, 0.5f),
       TextureTint = Math.Clamp(visuals.Float("textureTintControl", 1f), 0f, 1f),
+      AdditionalContrast = Math.Max(0f, visuals.Float("additionalContrast", 0f)),
+      ContrastColorKey = EmitterDef.ContrastKey(visuals.Get("contrastColorKey")),
       AlphaClip = SslRead.Scalar(visuals.Get("alphaClip"), 0f),
       SpeedInherit = SslRead.Range(particle.Obj("inherit")?.Get("speedInherit"), Vector2.Zero),
       SoftDepth = softDepth,

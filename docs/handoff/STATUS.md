@@ -48,6 +48,7 @@ HANDOFF's "vfx3 part 2/3" sections cite **local** hashes (d6b28f4, e5628ce, 1f9f
 
 ## Tests
 - At e4ceb7d (run by the cloud agent): **SM2.Assets 111, SM2Extractor 42, LibSaber.Tests 5, all pass.**
+- vfx3c (box, 2026-10-27, not pushed yet): **SM2.Assets 116, SM2Extractor 42, LibSaber.Tests 5, all pass.**
 - History: 101 at 00d32bd, 104 at 5d55daa, 107 at b31bd95.
 - HaloCEA tests fail and are **out of scope**.
 - Retail-data tests read env vars (`LIBSABER_SM2_SAMPLE`, `LIBSABER_SM2_TITUS`, `LIBSABER_SM2_PICK`). When unset they return early, so they pass without game files.
@@ -91,7 +92,7 @@ Extractor build: PC `Desktop\SM2_Work\Bin\SM2Extractor_e4ceb7d`. Captures: PC `D
   - VAT blood-splash animation (layout unknown, see HANDOFF vfx3 part 3);
   - SELF_DISTORTION render;
   - degNear on trails/meshes;
-  - `additionalContrast` / `applyColorGradients` (GPU-side);
+  - `applyColorGradients` (GPU-side; `additionalContrast` is now parsed and rendered behind `SM2_VFX_CONTRAST=1`, see HANDOFF vfx3c);
   - tcIn scale on trails;
   - wind/water sim draws;
   - GPU-only features (vector fields, depth collision).

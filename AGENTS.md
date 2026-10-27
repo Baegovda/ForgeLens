@@ -36,6 +36,7 @@
    - don't steal focus (start processes with `-WindowStyle Hidden`, priority Idle);
    - don't run heavy GPU, Unreal or export work.
    Check first with `Get-Process | ? MainWindowTitle` and see WORKFLOW.md.
+   - **2026-10-27 update from the user:** heavy work during gaming is OK as long as it doesn't disrupt the game (keep it hidden + idle priority, no focus stealing).
    - The user says "게임끝" when the PC is free. If they say they're playing again, stop heavy PC work immediately and continue on the box.
 5. **Update HANDOFF.md at the end of every stage:** append a dated section with state, evidence, paths and commits. Also update `docs/handoff/STATUS.md`.
 6. **Niagara (`.sfx` → UE Niagara) is LAST,** and only after asking the user. Browser VFX must be finished first. Don't start Niagara on your own.
@@ -63,4 +64,4 @@
 | Game | `D:\Steam\steamapps\common\Space Marine 2\client_pc` |
 | Unreal | 5.7.4, project `K:\Unreal Projects\UE_VFX_57`, work in `/Game/SM2_Work`, driven by UEMCP (`tools/ue/uemcp_call.py`) |
 | Work folder | `C:\Users\Revaptor_FX\Desktop\SM2_Work\{Scripts,Exports,Captures,Bin,Raw,Backup,...}` |
-| Box (bot's Linux machine) | repo `/workspace/LibSaber` (+ worktrees), exe `/workspace/rea/sm2_retail.exe`, Ghidra project `/workspace/rea/ghidra_proj2`, patches `/workspace/patches/<stage>/` |
+| Box (bot's Linux machine) | repo `/workspace/LibSaber` (+ worktrees), exe `/workspace/rea/sm2_retail.exe`, Ghidra project `/workspace/rea/ghidra_proj2.gpr` (program `sm2_retail.exe`), push agent `bc-65aed255-5102-5266-bcbd-f60b85b14984`, patches `/workspace/patches/<stage>/` |

@@ -13,6 +13,7 @@
 ```powershell
 (Get-Process | ? MainWindowTitle | Select -Expand ProcessName) -join ','   # look for a game (e.g. AgainstTheStorm), not just UnrealEditor
 ```
+**Update 2026-10-27 (user):** heavy PC work is allowed while the user games, as long as it does not disrupt the game: still start everything hidden and at idle priority, never steal focus. (Older rule below: light read-only steps only.)
 If a game is running, do only light read-only steps on the PC. Start PC processes hidden and at idle priority so they never take focus:
 ```powershell
 $p = Start-Process -FilePath $exe -ArgumentList $a -WindowStyle Hidden -PassThru; $p.PriorityClass = 'Idle'; $p.WaitForExit()
@@ -45,10 +46,11 @@ $p = Start-Process -FilePath $exe -ArgumentList $a -WindowStyle Hidden -PassThru
 - Patches: `/workspace/patches/<stage>/000N-*.patch`.
 - RE:
   - exe `/workspace/rea/sm2_retail.exe` (81 MB);
-  - Ghidra project `/workspace/rea/ghidra_proj2` (program `sm2`);
+  - Ghidra project `/workspace/rea/ghidra_proj2.gpr` (program **`sm2_retail.exe`** since the 2026-10-27 rebuild; use `analyzeHeadless /workspace/rea ghidra_proj2 -process sm2_retail.exe ...`; heap via `GHIDRA_HEADLESS_MAXMEM=10G`, `MAXMEM` is ignored);
   - decompiles `/workspace/rea/dec*/<addr>.c` (`dec_phys*`, `dec_cust`, `dec_deg`, `dec_tint`, `dec_sani`, ...);
   - Ghidra `/home/box/ghidra`, JDK `/home/box/tools/jdk25`, rizin `~/.local/bin/rizin`.
 - .NET 8 SDK: `/home/box/tools/dotnet` (8.0.427).
+- Shader tools: dxc `/home/box/tools/dxc` (v1.9.2609), dxil-spirv `/home/box/tools/dxil-spirv/build/dxil-spirv` (built with zig cc via `/home/box/tools/zigcc`, no system g++), `.sdc` unpacker `/workspace/mat/sdcx.py` (recreated 2026-10-27, outside the repo).
 - Raw game data pulled from the PC: `/workspace/vfx_raw`, `/workspace/vfx3_raw` (`ssl`, `td`, `tpl`, `pct`), `/workspace/phys_raw`.
 - Outputs:
   - captures `/workspace/browser_run_shots/<stage>/`;
@@ -84,7 +86,7 @@ dotnet test test/LibSaber.Tests                 -c Release -m:1
 The box has no GitHub write login. Pushes go through a Cursor cloud agent with repo access (the user enabled cloud agents and granted GitHub access to Baegovda/LibSaber).
 1. On the box, commit on top of the **latest remote tip** (`git fetch` first). Identity: `-c user.name="Cursor Agent" -c user.email=cursoragent@cursor.com`.
 2. `git format-patch origin/cursor/sm2-pck-extractor-4420..HEAD -o /workspace/patches/<stage>/`
-3. Send a follow-up to the cloud agent (CloudAgent reply, mode **queue**). At time of writing that agent is `bc-abf903a2-7eaf-532a-9a9c-bd757453bf47`. If it's gone, launch a new one on the repo/branch with the same instructions. Include the patch contents and these instructions:
+3. Send a follow-up to the cloud agent (CloudAgent reply, mode **queue**). Current agent (2026-10-27): `bc-65aed255-5102-5266-bcbd-f60b85b14984` (the older `bc-abf903a2-7eaf-532a-9a9c-bd757453bf47` is replaced). If it's gone, launch a new one on the repo/branch with the same instructions. Include the patch contents and these instructions:
    - check out `cursor/sm2-pck-extractor-4420` and pull;
    - `git am -3 <patches>`;
    - `dotnet build-server shutdown`, then build serially (`-m:1`; MSB3883 otherwise);

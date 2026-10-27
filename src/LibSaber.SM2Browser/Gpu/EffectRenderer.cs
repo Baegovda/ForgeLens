@@ -41,6 +41,8 @@ internal sealed unsafe class EffectRenderer : IDisposable
   public static float DistortionStrength { get; set; } =
     float.TryParse(Environment.GetEnvironmentVariable("SM2_VFX_DISTORT"), System.Globalization.CultureInfo.InvariantCulture, out var d) ? d : 0.04f;
   public int DistortionQuads { get; private set; }
+  /// <summary><c>SM2_VFX_CONTRAST=1</c> turns on the additionalContrast boost (formula from particles.sdc 00114_2; not yet compared in-game).</summary>
+  public static bool ContrastEnabled { get; set; } = Environment.GetEnvironmentVariable("SM2_VFX_CONTRAST") == "1";
   private readonly Dictionary<string, (uint Vao, uint Vbo, uint Ibo)?> _meshes = new(StringComparer.OrdinalIgnoreCase);
   private readonly uint _vao, _vbo, _ibo, _groundVao, _groundVbo;
   private readonly Dictionary<string, uint> _textures = new(StringComparer.OrdinalIgnoreCase);
@@ -237,6 +239,8 @@ internal sealed unsafe class EffectRenderer : IDisposable
     _gl.Uniform1(_gl.GetUniformLocation(_sprite, "uGroundY"), layer.GroundY);
     var modeLoc = _gl.GetUniformLocation(_sprite, "uMode");
     var tintLoc = _gl.GetUniformLocation(_sprite, "uTint");
+    var keyLoc = _gl.GetUniformLocation(_sprite, "uKey");
+    var contrastLoc = _gl.GetUniformLocation(_sprite, "uContrast");
     _gl.Enable(EnableCap.DepthTest);
     _gl.DepthMask(false);
     _gl.Enable(EnableCap.Blend);
@@ -267,6 +271,10 @@ internal sealed unsafe class EffectRenderer : IDisposable
 
       _gl.Uniform1(modeLoc, (int)batch.Emitter.Blend);
       _gl.Uniform1(tintLoc, batch.Emitter.TextureTint);
+      // additionalContrast / contrastColorKey (particles.sdc 00114_2, shared[1]); opt-in until checked against the grenade.
+      var key = batch.Emitter.ContrastColorKey / 255f;
+      _gl.Uniform3(keyLoc, key.X, key.Y, key.Z);
+      _gl.Uniform1(contrastLoc, ContrastEnabled ? batch.Emitter.AdditionalContrast : 0f);
       fixed (float* p = batch.Vertices)
         _gl.BufferData(BufferTargetARB.ArrayBuffer, (nuint)(batch.QuadCount * 4 * SpriteBatch.Stride * 4), p, BufferUsageARB.StreamDraw);
       _gl.DrawElements(PrimitiveType.Triangles, (uint)(batch.QuadCount * 6), DrawElementsType.UnsignedInt, (void*)0);
@@ -470,6 +478,8 @@ internal sealed unsafe class EffectRenderer : IDisposable
     uniform float uExposure;
     uniform int uMode;
     uniform float uTint;
+    uniform vec3 uKey;
+    uniform float uContrast;
     uniform int uGround;
     uniform float uGroundY;
     out vec4 outColor;
@@ -483,6 +493,7 @@ internal sealed unsafe class EffectRenderer : IDisposable
       if (uGround == 1 && vParams.y > 0.0)
         a *= clamp((vWorld.y - uGroundY) / vParams.y, 0.0, 1.0);
       vec3 tex = mix(vec3(dot(t.rgb, vec3(0.299, 0.587, 0.114))), t.rgb, uTint); // textureTintControl
+      tex *= 1.0 + uContrast * clamp(1.0 - length(uKey - tex), 0.0, 1.0); // additionalContrast (particles.sdc 00114_2)
       vec3 hdr = vColor.rgb * tex;
       vec3 c = toGamma(vec3(1.0) - exp(-hdr * uExposure));
       float alpha = clamp(vColor.a, 0.0, 1.0) * a;

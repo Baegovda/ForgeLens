@@ -1,11 +1,11 @@
 # RE_NOTES — sm2_retail.exe evidence index
 
-All addresses are virtual addresses in `sm2_retail.exe` (retail Steam build, 81 MB; box copy `/workspace/rea/sm2_retail.exe`, Ghidra project `/workspace/rea/ghidra_proj2`, program `sm2`).
+All addresses are virtual addresses in `sm2_retail.exe` (retail Steam build, 81 MB; box copy `/workspace/rea/sm2_retail.exe`, Ghidra project `/workspace/rea/ghidra_proj2.gpr`, program `sm2_retail.exe` since the 2026-10-27 box rebuild; older notes said `sm2`).
 - Conversions used: rdata VA = file offset + 0x140001200; .text VA = file offset + 0x140000a00; for `strings`-style offsets, VA = offset + 0x140000000.
 - `FUN_xxxxxxxx` = Ghidra function. `@0x...` = string address. Plain `0x...` = instruction, table or constant.
 - Decompile more with:
   ```
-  JAVA_HOME=/home/box/tools/jdk25 /home/box/ghidra/support/analyzeHeadless /workspace/rea/ghidra_proj2 sm2 -process sm2_retail.exe -noanalysis -readOnly -scriptPath /workspace/rea/ghidra_scripts -postScript Decomp.java /workspace/rea/dec <addrs>
+  JAVA_HOME=/home/box/tools/jdk25 /home/box/ghidra/support/analyzeHeadless /workspace/rea ghidra_proj2 -process sm2_retail.exe -noanalysis -readOnly -scriptPath /workspace/rea/ghidra_scripts -postScript Decomp.java /workspace/rea/dec <addrs>
   ```
 - The REA MCP times out on this exe, so use Ghidra headless or rizin directly.
 - **Status column:** **proven** = read from code/data; **data** = inferred from game data with the exe only giving the field names; **heuristic** = not proven.
@@ -89,3 +89,9 @@ All addresses are virtual addresses in `sm2_retail.exe` (retail Steam build, 81 
 - Trail runtime builder, genOnFly runtime, blend_add blend state, `additionalContrast` shader, VAT splash vertex layout.
 - Jiggle scalar defaults and teleport threshold.
 - rubric/sorcerer in-place loco clips.
+
+## VFX contrast fields (2026-10-27)
+- `"additionalContrast"` @0x143645248, `"contrastColorKey"` @0x143645260, `"textureTintControl"` @0x143645278 (file offset + 0x140001200).
+- sfx_part typeParams serializer at 0x14178d437..0x14178d4df: additionalContrast = float at +0x12C (`FUN_142745110`), contrastColorKey = colour at +0x130 (`FUN_1427456a0`), then textureTintControl.
+  Other references to the same strings: 0x14178e4cf, 0x14178ef11, 0x14178fc06 (sibling serializers/readers).
+- Shader use: particles.sdc PS, `PART_EMITTERS_SHARED_DATA[1]` (rgb = key, w = contrast); see HANDOFF vfx3 part 4.

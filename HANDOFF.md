@@ -1108,3 +1108,26 @@ Notes only. No code changed this round.
    - Read the tc-scale and degradation code there (`/workspace/vfxsh/gl_common_pc_dx12_trail`).
 4. VAT (`shader_blood_splash`): probably in `pc_dx12_sfx.sdc` (mesh particle VS with `CB_OBJ_MATERIAL_DATA`).
    - Find a VS that reads two textures with `floatParam6`/`floatParam7`-like frame counts (120 / 60). Still unsolved.
+
+## vfx3c: additionalContrast smoke boost (Grok Bot, 2026-10-27 14:00 KST)
+- Box rebuilt from scratch today: .NET 8.0.427, Temurin 25 `/home/box/tools/jdk25`, Ghidra 12.2 `/home/box/ghidra`, rizin 0.9.1 `~/.local/bin`,
+  dxc v1.9.2609 `/home/box/tools/dxc`, dxil-spirv built at `/home/box/tools/dxil-spirv/build`. Ghidra re-analysis of sm2_retail.exe running into
+  `/workspace/rea/ghidra_proj2.gpr`, **program name now `sm2_retail.exe`** (log `/workspace/rea/ghidra_analyze.log`).
+- **REA evidence:** strings `"additionalContrast"` @0x143645248, `"contrastColorKey"` @0x143645260 (next to `"textureTintControl"` @0x143645278).
+  sfx_part typeParams serializer (0x14178d437 / 0x14178d48b): additionalContrast = float +0x12C (`FUN_142745110`), contrastColorKey = colour
+  +0x130 (`FUN_1427456a0`). Same visuals block as textureTintControl, so read from `visuals.*`.
+- **Code:** `EmitterDef.AdditionalContrast` (default 0, clamped >= 0) and `EmitterDef.ContrastColorKey` (raw RGB 0..255 from [A,R,G,B]; alpha dropped
+  because the PS reads `PART_EMITTERS_SHARED_DATA[1].rgb` only). `EffectRenderer` SpriteFs: `uKey` (= key/255), `uContrast`,
+  `tex *= 1 + uContrast * saturate(1 - length(uKey - tex))` — the particles.sdc PS formula from vfx3 part 4.
+  Opt-in: `SM2_VFX_CONTRAST=1` (`EffectRenderer.ContrastEnabled`); off = unchanged output.
+- **Heuristics:** the boost is applied to the tint-mixed texture (after the textureTintControl luminance heuristic) and before vertex colour/exposure;
+  the gradient path (applyColorGradients) that precedes it in-game is still missing, so results on `_g` flipbooks are approximate.
+  Shared-slot mapping ([1].rgb key, [1].w contrast) is still inferred from value ranges (vfx3 part 4).
+- Tests: `ContrastTests` (3). SM2.Assets 116, SM2Extractor 42, LibSaber.Tests 5 — all pass.
+- **sdcx.py recreated** at `/workspace/mat/sdcx.py` (outside the repo): scans zlib records, carves DXBC containers by header size, writes
+  `NNNNN_k.dxbc`. The header/index is not decoded (heuristic); record numbers may differ from the lost original. It now also unpacks
+  `particles_gpu.sdc`. Box results: particles 140 rec/541 containers, particles_gpu 385/832, trail 311/949, distort 6/24, sfx 661/1943
+  in `/workspace/vfxsh/dx_*`; dxc -dumpbin and dxil-spirv read them (resource bindings show PART_EMITTERS_SHARED_DATA t8 and
+  PART_CPU_EMITTERS_COLOR_GRADIENTS t12, space2).
+- **Still needed:** browser capture of the grenade with SM2_VFX_CONTRAST=1 vs off, and an in-game comparison, before turning it on by default.
+- Workflow notes: the user (2026-10-27) allows heavy PC work during gaming if it doesn't disrupt (hidden + idle). Push agent now `bc-65aed255-5102-5266-bcbd-f60b85b14984`.
