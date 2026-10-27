@@ -1308,3 +1308,23 @@ Disassembly: /workspace/vfxsh_dis/{pc,pg,dx_pc_dx12_sfx,dx_pc_dx12_distort}, GLS
   r4.x multiplies the whole non-additive colour (line ~800) — semantics as "lightsSensitivity" HEURISTIC (could be a lit
   permutation); not implemented. r4.y/r4.w are written outside the decompiled window (not yet attributed).
 - Not done this chunk: distortion.power/ratioXY via GPU curve slots, trail DEGR CPU packing.
+
+## vfx3o (2026-10-27 KST) — curve slots, row 4 writers, softDepth reciprocal
+- FUN_1417e29b0 (0x1417e29b0..0x1417e2b4f) "curve slots" are tagged resource pointers (ptr | kind<<48), i.e. texture
+  bindings, not curves. default: inst+0x200 ← desc+0x3a8 (visuals.texture; kind 1 iff payload+0x1fa set), +0x210 ← 0x580
+  (alphaMask tex, kind 3), +0x220 ← 0x630 (sdr), +0x230 ← 0x508 (gloss), +0x240 ← 0x270, +0x250 ← 0x310.
+  distortion (type 1): only +0x240 ← desc+0x1b8 (distortion visuals.texture, payload+8). So distortion.power is NOT here.
+- Correction to vfx3n: r0.y = 1/max(|softDepth|,1e-6) and flag 0x200 = softDepth<0 (distortion: payload+0 = softDepth, parser
+  in vfxh_1.c ~2190; default +0x3a0 is the same field by analogy — HEURISTIC). The reciprocal is NOT exposure. Already
+  implemented as soft particles (EmitterDef.SoftDepth).
+- r0.w (+0xc) = count from desc+0x29c (distortion) / +0x738 (default, enabled by +0x734); r4.z (+0x48) = half2 of the
+  normalised direction (+0x73c/+0x744 or default DAT_143638ad8) when count ≤ 1.
+- r4.y (+0x44) = lookup(desc+0x318 name)+0x34 (fallback +0x1c) × desc+0x398, only if desc+0x308 (FUN_1417e1e50 ~0x1417e2333).
+- r4.w (+0x4c) = colour-gradient LUT row (desc+0xa04 & 0xfffff) if visuals.applyColorGradients (desc+0x430), else -1.
+  PS 00000_0 ~438–450: lum = dot(texRGB, Rec709)·texA; colour = gradLUT(u=lum, row)·lum. PROVEN, but
+  applyColorGradients is False in all 61 occurrences in our sfx dump → not implemented (zero impact).
+- distortion.power (payload+0x98 = desc+0x248, FUN_14177c520 parser): DispScan +0x248 in 0x1417b0000–0x141a00000 found a
+  0/1-tagged scalar at desc+0x240/0x248 sampled from a 64-entry LUT in FUN_1417f0c60 → particle+0xe4, but the tag at 0x240
+  overlaps distortion localOffsetX (payload+0x90), so it belongs to another typeParams member. Unresolved.
+- Trail DEGR: the name handles 0x145025180/1a8/220/2c0 have only the registration WRITEs in FUN_1421ca290 (DataRefs);
+  the packer reads them indirectly. Dead end statically.

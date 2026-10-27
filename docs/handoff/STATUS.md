@@ -189,3 +189,4 @@ Disassembly: /workspace/vfxsh_dis/{pc,pg,dx_pc_dx12_sfx,dx_pc_dx12_distort}, GLS
 
 - vfx3m: blend flags 0x20/0x400 proven (FUN_1417e1e50 → t8 PART_EMITTERS_SHARED_DATA → particles.sdc 00000_0); opt-in SM2_VFX_BLEND_REA=1. VFX ≈73%.
 - vfx3n: blend-REA bench sanity (grenade brighter, kept opt-in); 0x60 record ↔ visuals field map (FUN_14178ce70). VFX ≈73%.
+- vfx3o: curve slots = texture bindings; r0.y = 1/softDepth (not exposure); r4.y/z/w + r0.w decoded; colour-gradient LUT proven (unused in data). distortion.power and trail DEGR unresolved. VFX ≈73%.
