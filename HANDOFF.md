@@ -1777,3 +1777,5 @@ Disassembly: /workspace/vfxsh_dis/{pc,pg,dx_pc_dx12_sfx,dx_pc_dx12_distort}, GLS
 
   - There is no collision-off baseline yet, so this is not yet proof that cloth stays outside the body.
 - **Capture framing:** `ue_physlive.py cams` now fits FOV 30 to the bounds height, so the character fills the frame. Box `/workspace/mtl_fix/cloth_cmp_*.png`: top row is the mtl1-12 bone captures (old framing), bottom row is Chaos with collision (new framing). The old files are kept as `cloth_cmp_*_bak1.png`.
+
+- 2026-10-28 mtl1-14 Manny axis fix: Mirror (S R S) flipped bone-local axes -> imported pelvis X pointed down (pitch -73 vs Manny +84), so Persona (skeleton translation retarget) twisted/floated. MannequinRetarget.BoneAxisFix (env SM2_MANNY_AXISFIX=0 to disable) pre-multiplies non-root frames by local Rz(180). Verified AnimPose: pelvis pitch +73/+84, root identity, run root along +Y. Persona capture blocked (editor in PIE, window stale).

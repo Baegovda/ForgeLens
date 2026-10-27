@@ -70,6 +70,10 @@ public sealed class MannequinReference
 public static class MannequinRetarget
 {
   public const string Suffix = "_Manny";
+  // Mirror() (S R S) flips bone-local axes; importer maps world q -> (-y,-x,w,z). Pre-multiplying non-root bone frames by local Rz(180)
+  // makes imported bone-space rotations match SK_Mannequin ref convention (pelvis X up). Positions unchanged.
+  public static bool BoneAxisFix = Environment.GetEnvironmentVariable("SM2_MANNY_AXISFIX") != "0";
+  private static Matrix4x4 AxisFix(Matrix4x4 m, int i) => BoneAxisFix && i > 0 ? Matrix4x4.CreateRotationZ(MathF.PI) * m : m;
   public static bool RootImportYawFix = Environment.GetEnvironmentVariable("SM2_MANNY_ROOTFIX") != "0";
 
   /// <summary>SM2 bone for a Mannequin bone, or null. Several candidates: the first present wins (gauntlet hands lack fingers 3-5).</summary>
@@ -253,7 +257,7 @@ public static class MannequinRetarget
 
     var mesh = new ExportedMesh { Name = sm2.Name + Suffix };
     var mIndex = new Dictionary<string, int>(StringComparer.Ordinal);
-    var mRefSrc = mb.Select(b => ToSource(b.World)).ToArray();
+    var mRefSrc = mb.Select((b, i) => ToSource(AxisFix(b.World, i))).ToArray();
     for (var i = 0; i < mb.Count; i++)
     {
       mIndex[mb[i].Name] = i;
@@ -309,12 +313,12 @@ public static class MannequinRetarget
       if (f == 0 && Environment.GetEnvironmentVariable("SM2_MANNY_DEBUG") == "1")
         for (var i = 0; i < mb.Count; i++)
           if (map[i] >= 0)
-            messages.Add($"DBG {mb[i].Name} m={world[i].Translation} s={sw[map[i]].Translation * scale} sref={sRef[map[i]].Translation} mref={mb[i].World.Translation}");
+            messages.Add($"DBG {mb[i].Name} m={world[i].Translation} q={Quaternion.CreateFromRotationMatrix(Rot(world[i]))} qref={Quaternion.CreateFromRotationMatrix(Rot(mb[i].World))} s={sw[map[i]].Translation * scale} sref={sRef[map[i]].Translation} mref={mb[i].World.Translation}");
       for (var i = 0; i < mb.Count; i++)
       {
         var p = mb[i].Parent;
-        var ws = ToSource(world[i]);
-        frames[i][f] = p >= 0 ? ws * Inv(ToSource(world[p])) : ws;
+        var ws = ToSource(AxisFix(world[i], i));
+        frames[i][f] = p >= 0 ? ws * Inv(ToSource(AxisFix(world[p], p))) : ws;
       }
     }
 

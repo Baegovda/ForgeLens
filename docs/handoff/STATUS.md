@@ -244,3 +244,5 @@ glt.chameleon REA'd (FUN_142576f30 + glt PS 03558_0) and implemented in sidecar 
 - mtl1-10 Chaos Cloth (opt-in): 6 SIM sections converted on 3 characters. tech_priest robe sag fixed with Chaos. Other sections fall back to bones (FLAG: sim/section mismatch). ~92%.
 - mtl1-11: SIM sections were X-mirrored; fixed in the exporter and the plugin, so Chaos now converts 16/16 cloths on 3 characters. Bone-mode chain-depth cap brings the tech_priest sag from 64 cm to about 10 cm. ~95%.
 - mtl1-12: chaplain fixed (5.7 cm), Chaos framing unified, sidecar wind/collision offsets X-mirror fixed, gravity restored on the diag PAs. ~97%.
+
+- 2026-10-28 mtl1-14 Manny axis fix: Mirror (S R S) flipped bone-local axes -> imported pelvis X pointed down (pitch -73 vs Manny +84), so Persona (skeleton translation retarget) twisted/floated. MannequinRetarget.BoneAxisFix (env SM2_MANNY_AXISFIX=0 to disable) pre-multiplies non-root frames by local Rz(180). Verified AnimPose: pelvis pitch +73/+84, root identity, run root along +Y. Persona capture blocked (editor in PIE, window stale).
