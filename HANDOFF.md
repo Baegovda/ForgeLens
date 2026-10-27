@@ -14,7 +14,7 @@ Check with GetMcpServerStatus / GetDynamicTools. Install missing ones with Searc
 
 | What | Name | Used for | If missing |
 |---|---|---|---|
-| REA (reverse engineering) | namespace `user-rea` (plugin "REA"; Ghidra, JADX and similar) | the REA-first rule, mandatory | SearchPlugins "REA", then install. Its MCP times out on the 81 MB exe, so run Ghidra headless or rizin on the box directly |
+| REA (reverse engineering) | namespace `user-rea` (plugin "REA"; Ghidra, JADX and similar) | the REA-first rule, mandatory | **Obsolete (2026-10-27):** the REA tool is now https://github.com/morluto/rea on the box — see `docs/handoff/WORKFLOW.md` → REA (morluto/rea) |
 | GitHub | `cursor-github` (read-only) | PR and commit reads | RequestScmConnect / InstallPlugin |
 | Owner's PC shell | ListMachines, then the machine named **Revaptor-FX** (id `d3fb99ad-25ca-45c1-81af-41e5ca09104a` at the time of writing) | PowerShell, Unreal control, push | the owner has to register the PC |
 | Unreal Editor | **UEMCP** on the PC (`pip install uemcp`, https://github.com/ATDev-Inc/uemcp), driven by `tools/ue/uemcp_call.py` | import, materials, captures | see step 2 |
@@ -1131,3 +1131,11 @@ Notes only. No code changed this round.
   PART_CPU_EMITTERS_COLOR_GRADIENTS t12, space2).
 - **Still needed:** browser capture of the grenade with SM2_VFX_CONTRAST=1 vs off, and an in-game comparison, before turning it on by default.
 - Workflow notes: the user (2026-10-27) allows heavy PC work during gaming if it doesn't disrupt (hidden + idle). Push agent now `bc-65aed255-5102-5266-bcbd-f60b85b14984`.
+
+
+## 2026-10-27 14:35 KST — REA tool = morluto/rea (install + tests)
+
+- User: the REA tool for SM2 is **https://github.com/morluto/rea** (rea-agents 6.8.0; CLI `rea`, stdio MCP `rea mcp`, 229 tools). The old `user-rea` plugin note is obsolete.
+- Installed on the box: clone `/home/box/tools/rea`, CLI `/home/box/tools/rea-cli/node_modules/.bin/rea`, private Node 24.22.1 `/home/box/tools/node24`, Ghidra **12.1.4** `/home/box/tools/ghidra_12.1.4_PUBLIC` (REA rejects 12.2). `/home/box/ghidra` 12.2 and `ghidra_proj2` untouched.
+- Tests: doctor healthy with 12.1.4 + JDK 25; `/bin/ls` decompile OK (~15 s); `sm2_retail.exe` via existing-project reuse → `provider_timeout` at 120 s (project not yet saved by the running 12.2 analysis).
+- Next: give REA a long `REA_GHIDRA_STARTUP_TIMEOUT_MS` (e.g. 6 h) or prepare a 12.1.4 project for reuse after the current 12.2 job ends. Details/MCP config: `docs/handoff/WORKFLOW.md`.
