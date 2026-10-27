@@ -247,6 +247,8 @@ internal sealed unsafe class EffectRenderer : IDisposable
     _gl.Uniform1(_gl.GetUniformLocation(_sprite, "uGround"), layer.Ground ? 1 : 0);
     _gl.Uniform1(_gl.GetUniformLocation(_sprite, "uGroundY"), layer.GroundY);
     var modeLoc = _gl.GetUniformLocation(_sprite, "uMode");
+    var reaLoc = _gl.GetUniformLocation(_sprite, "uBlendRea");
+    var alphaMulLoc = _gl.GetUniformLocation(_sprite, "uAlphaMul");
     var tintLoc = _gl.GetUniformLocation(_sprite, "uTint");
     var keyLoc = _gl.GetUniformLocation(_sprite, "uKey");
     var contrastLoc = _gl.GetUniformLocation(_sprite, "uContrast");
@@ -269,7 +271,12 @@ internal sealed unsafe class EffectRenderer : IDisposable
       _gl.ActiveTexture(TextureUnit.Texture0);
       _gl.BindTexture(TextureTarget.Texture2D, tex);
       _gl.Uniform1(hasMaskLoc, mask != 0 ? 1 : 0);
-      switch (batch.Emitter.Blend)
+      var rea = EffectBlendRea.Enabled;
+      _gl.Uniform1(reaLoc, rea ? 1 : 0);
+      _gl.Uniform1(alphaMulLoc, (EffectBlendRea.Flags(batch.Emitter.Blend, batch.Emitter.BlendAlphaMultiply) & 0x400u) == 0 ? 1 : 0);
+      if (rea)
+        _gl.BlendFuncSeparate(BlendingFactor.One, BlendingFactor.OneMinusSrcAlpha, BlendingFactor.One, BlendingFactor.OneMinusSrcAlpha);
+      else switch (batch.Emitter.Blend)
       {
         case EffectBlend.Add:
           _gl.BlendFuncSeparate(BlendingFactor.One, BlendingFactor.One, BlendingFactor.Zero, BlendingFactor.One);
@@ -514,6 +521,8 @@ internal sealed unsafe class EffectRenderer : IDisposable
     uniform int uHasMask;
     uniform float uExposure;
     uniform int uMode;
+    uniform int uBlendRea;
+    uniform int uAlphaMul;
     uniform float uTint;
     uniform vec3 uKey;
     uniform float uContrast;
@@ -545,7 +554,13 @@ internal sealed unsafe class EffectRenderer : IDisposable
       }
       vec3 c = toGamma(vec3(1.0) - exp(-hdr * uExposure));
       float alpha = clamp(vColor.a, 0.0, 1.0) * a;
-      if (uMode == 1) outColor = vec4(c * alpha, 0.0);          // add
+      if (uBlendRea == 1)
+      {
+        // vfx3m: particles.sdc 00000_0 flag bits 0x20/0x400 (EffectBlendRea), premultiplied ONE/INV_SRC_ALPHA.
+        float va = clamp(vColor.a, 0.0, 1.0);
+        outColor = vec4(c * va * (uAlphaMul == 1 ? a : 1.0), uMode == 1 ? 0.0 : va * a);
+      }
+      else if (uMode == 1) outColor = vec4(c * alpha, 0.0);          // add
       else if (uMode == 2) outColor = vec4(c * a, alpha);        // blend_add
       else outColor = vec4(c * alpha, alpha);                    // blend
     }

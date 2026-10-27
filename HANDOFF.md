@@ -1279,3 +1279,10 @@ Disassembly: /workspace/vfxsh_dis/{pc,pg,dx_pc_dx12_sfx,dx_pc_dx12_distort}, GLS
 - Exposure: particles read the global COMMON_HDR_EXPOSURE_DIV_AVG_LUM (CB_COMMON @336). So exposure is a runtime camera value, not a per-effect constant. The fixed 1/250 stays HEURISTIC.
 - Trail packing: readers of render-side +0x1f8..+0x218 in 0x141800000–0x142400000 are FUN_14187e8b0 (lerp of degNear/degFar fields vs +0xec.., i.e. LOD/state blend) and FUN_14189db00 (defaults: +0x1fc=255.0, +0x20c=0.5), plus unrelated hits at 141a1/141ef/141f2. The CB_PASS_TRAIL pack was NOT found. The DEGR slot mapping stays HEURISTIC.
 - VFX estimate remains ≈ 72%.
+
+## vfx3m (2026-10-27 KST) — particle blend flags 0x20/0x400 (PROVEN)
+- Chain: FUN_1417e1e50 builds 0x60 B/emitter record → FUN_1417e4420 copies to 0x14400c7ec+id*0x60 (dirty _DAT_14400c4e8|=1) → FUN_1418541b0 uploads 0x90000 B as t8,space2 PART_EMITTERS_SHARED_DATA (pc shaders index id*6+row). Row3.x = flags.
+- bit 0x20 = blendType(+0x48c)==add; bit 0x400 = !(isBlendAlphaMultiply(+0x490) && blendType!=add).
+- particles.sdc PS 00000_0: rgb *= vertexAlpha*(0x400 ? 1 : texAlpha'); outAlpha = 0x20 ? 0 : vertexAlpha*texAlpha'. blend_add has no bit (= blend).
+- Implemented `EffectBlendRea` + `visuals.isBlendAlphaMultiply` parse; opt-in `SM2_VFX_BLEND_REA=1` (PSO ONE/INV_SRC_ALPHA is HEURISTIC, implied by add alpha=0). Tests: BlendReaTests.
+- Open: other rows of the 0x60 record, distortion.power/ratioXY via GPU curve slots inst+0x200..0x250, trail DEGR CPU packing.

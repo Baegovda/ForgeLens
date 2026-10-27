@@ -6,6 +6,27 @@ namespace LibSaber.SM2.Assets.Effects;
 /// <summary><c>blendType</c>: parsed by 0x141751cd0 / written by 0x141751dd0 as blend=0, add=1, blend_add=2.</summary>
 public enum EffectBlend { Blend = 0, Add = 1, BlendAdd = 2 }
 
+/// <summary>
+///   Particle blend as REA'd (vfx3m). FUN_1417e1e50 packs per-emitter flags into PART_EMITTERS_SHARED_DATA row 3.x
+///   (CPU table 0x14400c7ec, 0x60 B per emitter, uploaded by FUN_1418541b0 to t8,space2):
+///   bit 0x20 = blendType==add (emitter+0x48c), bit 0x400 = !(isBlendAlphaMultiply (+0x490) &amp;&amp; blendType!=add).
+///   particles.sdc PS 00000_0: rgb = col*vertexAlpha*(bit0x400 ? 1 : texAlpha'), outAlpha = bit0x20 ? 0 : vertexAlpha*texAlpha'.
+///   Output alpha 0 for add implies a premultiplied ONE/INV_SRC_ALPHA PSO (heuristic: the PSO itself was not traced).
+///   blend_add has no bit of its own, so it renders exactly like blend. Opt-in: <c>SM2_VFX_BLEND_REA=1</c>.
+/// </summary>
+public static class EffectBlendRea
+{
+  public static bool Enabled { get; set; } = Environment.GetEnvironmentVariable("SM2_VFX_BLEND_REA") == "1";
+
+  /// <summary>Flag word bits as written by FUN_1417e1e50 (only the two blend bits).</summary>
+  public static uint Flags(EffectBlend blend, bool alphaMultiply)
+    => (blend == EffectBlend.Add ? 0x20u : 0u) | (alphaMultiply && blend != EffectBlend.Add ? 0u : 0x400u);
+
+  /// <summary>Premultiplied output (rgb factor on colour, output alpha) for vertex alpha <paramref name="va"/> and texture alpha <paramref name="ta"/>.</summary>
+  public static (float Rgb, float Alpha) Output(uint flags, float va, float ta)
+    => (va * ((flags & 0x400u) != 0 ? 1f : ta), (flags & 0x20u) != 0 ? 0f : va * ta);
+}
+
 /// <summary><c>sorting</c> @0x143645dd8: parsed by 0x1417534f0 as Camera Distance=0, Spawn Order=1, Spawn Order Reversed=2.</summary>
 public enum EffectSorting { CameraDistance = 0, SpawnOrder = 1, SpawnOrderReversed = 2 }
 
@@ -132,6 +153,8 @@ public sealed class EmitterDef
 
   public string? Texture { get; init; }
   public EffectBlend Blend { get; init; }
+  /// <summary><c>visuals.isBlendAlphaMultiply</c> (emitter desc +0x490, read by FUN_1417e1e50).</summary>
+  public bool BlendAlphaMultiply { get; init; }
   public ColorCurve Color { get; init; } = ColorCurve.White;
   public ScalarParam ColorIntensity { get; init; } = ScalarParam.Constant(1);
   public float AlphaIntensity { get; init; } = 1f;
@@ -451,6 +474,7 @@ public sealed class EffectDefinition
       StreakRatio = transforms.Obj("streaks") is { } st && st.Bool("isEnabled", false) ? st.Float("ratio", 0f) : 0f,
       Texture = texture.Str("nameTex"),
       Blend = blend,
+      BlendAlphaMultiply = visuals.Bool("isBlendAlphaMultiply", false),
       Color = SslRead.Color(visuals.Get("color")),
       ColorIntensity = SslRead.Scalar(visuals.Get("colorIntensity"), 1f),
       AlphaIntensity = SslRead.Scalar(visuals.Get("alphaIntensity"), 1f).Sample(0, 0.5f),
