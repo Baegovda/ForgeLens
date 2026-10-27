@@ -1159,3 +1159,31 @@ Notes only. No code changed this round.
   Behind `SM2_VFX_TINT_EXACT=1` because the gradient path is still missing.
 
 **VAT:** not in `pc_dx12_sfx.sdc` (574 VS scanned; TEXCOORD1 + 2-texture VS are wind/foliage). Likely another .sdc. Open.
+
+## 2026-10-27 (KST) — vfx3e: VAT blood-splash VS found, sprite corner math, leads
+
+**VAT VS (proven):** in `pc_dx12_combine_material.sdc` (box unpack `/workspace/vfxsh/dx_pc_dx12_combine_material/`),
+records 00000_0/00000_1/00001_1/00001_2 (VS; inputs V_POSITION int4, V_TEXCOORD0, V_TEXCOORD1, SV_InstanceID).
+Exe permutation string `COMBINE_MATERIAL_SHADER0_BLOOD_SPLASH`. Not in pc_dx12_sfx.sdc (prior guess wrong).
+- uv1 *= cb7[1].w; frame: flags&25==25 -> animStage·(frames−1) (combineMtlAnimControl); else per-object anim
+  (start/len/rate, clamp or fract, optional reverse) or free-running frames·frac(seed/frames) + fp6·time (cb0[23].y).
+- f0=floor(f), t=frac; v(f) = bands<2 ? −f/frames : uv1.y − frac(f/frames)/bands; samples rows f0 and f0+1, lerp t.
+- pos = fp0..2 + rgb·255·fp3..5 (8-bit only; the `_d` texture is NOT read by the VS); normal = rgb·2.007874−1.007874.
+- Then instance 3x4 transform. cb3 rows: [6].xyz min, [6].w/[7].xy scale, [7].z rate (fp6=120), [7].w frames (fp7),
+  [8].z bands, [18].x pos tex, [19].y normal tex. HEURISTIC: row 6 = floatParam0 (inferred from matching values).
+- Why earlier decode failed: rows are per-frame (1 texel row = 1/(frames·bands)), counted *downward from uv1.y*,
+  and the shipped pct is downsampled (471 vs ~952 rows), so frames must be sampled with bilinear v, not band rows.
+- Code: `Effects/VatDecode.cs` (pure helpers + tests). Not yet wired into the renderer.
+
+**Sprite quad (proven shader-side, common_pc_dx12_particles 00024_0):** corners are ±1 (const arrays −1,−1,1,1 / −1,1,1,−1)
+times per-vertex sizes V_TEXCOORD.y (x) and |V_TEXCOORD.z| (y), plus pivot offset 0.99608−2·colorAlpha.
+So the size the CPU writes is a half-extent; whether CPU writes size or size/2 is NOT traced (open).
+
+**degNear on sprites:** sprites are CPU-expanded; no shader proof. Data (degNear scaleAlpha 0, 2→20) only makes sense
+with the trail-VS semantics, so the fix is behind `SM2_VFX_DEGNEAR_FIX=1` (HEURISTIC).
+
+**Leads (not resolved, Ghidra headless died OOM before save — log line 326 — so rizin only):**
+- Field-name string xrefs (all are JSON (de)serialisers, not runtime use): ratioDependency 0x143645320 (refs 0x141790409…),
+  ratioXY 0x143644f28 (0x141786eb1…), blend_add 0x14363ab78 (0x141751d81, 0x14178e041…), genOnFly 0x143645d38 (0x1417acdc6,
+  0x1417ae934 writes to [rsi+0x9b0]…). Next: follow these desc offsets into the runtime like the shared-data packer.
+- exposure 1/250, light ×100, distortion strength: not traced this pass.

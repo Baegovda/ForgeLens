@@ -105,6 +105,9 @@ public static class EffectSprites
   /// <summary>When false, <see cref="EmitterDef.DegNear"/>/<see cref="EmitterDef.DegFar"/> are ignored (debug).</summary>
   public static bool DistanceFades { get; set; } = Environment.GetEnvironmentVariable("SM2_VFX_DEG") != "0";
 
+  /// <summary>SM2_VFX_DEGNEAR_FIX=1: degNear scale applies near the camera (as proven for trails), not beyond radEnd.</summary>
+  public static bool DegNearFix { get; set; } = Environment.GetEnvironmentVariable("SM2_VFX_DEGNEAR_FIX") == "1";
+
   private static bool Quad(EmitterDef def, TextureFrames frames, in Particle p, Vector3 right, Vector3 up, Vector3 back, float[] v, int o, bool distort = false, Vector3? eye = null)
   {
     var n = Math.Clamp(p.Age / p.Life, 0f, 1f);
@@ -112,10 +115,12 @@ public static class EffectSprites
     if (DistanceFades && eye is { } cam && (def.DegNear is not null || def.DegFar is not null))
     {
       var dist = Vector3.Distance(p.Position, cam);
-      foreach (var fade in (ReadOnlySpan<DistanceFade?>)[def.DegNear, def.DegFar])
+      for (var fi = 0; fi < 2; fi++)
       {
+        var fade = fi == 0 ? def.DegNear : def.DegFar;
         if (fade is null) continue;
-        var k = fade.Amount(dist);
+        // HEURISTIC (SM2_VFX_DEGNEAR_FIX=1): use the trail-VS near semantics (scale inside radStart) for sprites too.
+        var k = fi == 0 && DegNearFix ? 1 - fade.Amount(dist) : fade.Amount(dist);
         sizeK *= 1 + (fade.Size - 1) * k;
         intensK *= 1 + (fade.Intens - 1) * k;
         alphaK *= 1 + (fade.Alpha - 1) * k;

@@ -100,3 +100,7 @@ All addresses are virtual addresses in `sm2_retail.exe` (retail Steam build, 81 
 - 0x140175820 init "part_cpu_data_shared"; 0x1417e1e50 packer; 0x1417e473e call; 0x141854209 upload (0x90000).
 - desc+0x4e8 → shared[0].z = textureTintControl; desc+0x4d4..0x4e0 → shared[1].
 - Trail VS DEGR/MISC/OFFSET math: see HANDOFF vfx3d.
+
+### vfx3e (2026-10-27)
+- Blood-splash VAT VS: pc_dx12_combine_material.sdc 00000_0 (string COMBINE_MATERIAL_SHADER0_BLOOD_SPLASH). See HANDOFF vfx3e.
+- Serialiser xrefs: ratioDependency 0x141790409, ratioXY 0x141786eb1, blend_add 0x141751d81/0x14178e041, genOnFly 0x1417acdc6/0x1417ae934.
