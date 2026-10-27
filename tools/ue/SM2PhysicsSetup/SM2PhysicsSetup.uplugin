@@ -1,0 +1,12 @@
+{
+  "FileVersion": 3,
+  "Version": 1,
+  "VersionName": "0.1",
+  "FriendlyName": "SM2 Physics Setup",
+  "Description": "Builds a PhysicsAsset + post-process RigidBody AnimBP from an SM2 {model}.physics.json (LibSaber export). Python: unreal.SM2PhysicsSetupLibrary.setup_from_json",
+  "Category": "Editor",
+  "CreatedBy": "LibSaber",
+  "EnabledByDefault": true,
+  "CanContainContent": false,
+  "Modules": [ { "Name": "SM2PhysicsSetup", "Type": "Editor", "LoadingPhase": "Default" } ]
+}

@@ -1514,3 +1514,12 @@ Disassembly: /workspace/vfxsh_dis/{pc,pg,dx_pc_dx12_sfx,dx_pc_dx12_distort}, GLS
 - Cause 1: the chameleon Custom HLSL node's pins likely did not bind from Python, so the paint went grey. Cause 2: PixelNormalWS in the Substrate front graph. Bulk and mtl_cham use the same variants and textures (hash-identical armor_01). Toggling UseChameleon off restored the bulk look, which isolated the problem to the chameleon graph.
 - Fix: the ramp is now built from plain nodes. N·V uses the tangent-space normal (detail_switch) · CameraVector transformed to tangent space, matching the glt PS. R0.w is read from the vector param's "A" pin (the RGB pin has 3 components and gave a "Not enough components" compile error).
 - Result: Captures\mtl_fix\after_cham2_cc_{hellbrute,sorcerer}_front.png. Front-facing paint gets color3 (dark teal) and grazing angles get the cyan C1/C2 ramp. No in-game hellbrute reference exists (Captures\ingame_ref has only marine shots). The threshold mapping and color0 = white remain heuristic.
+
+## mtl1-A: SM2PhysicsSetup editor plugin (live physics on import)
+- `tools/ue/SM2PhysicsSetup/` — UE 5.7 Editor C++ plugin. `unreal.SM2PhysicsSetupLibrary.setup_from_json(mesh, physics_json, dest)`
+  builds `PA_<mesh>_SM2` (sphere body per cloth helper bone; pinned particles maxDistance==0 + anchor parent kinematic; ball joints
+  swing 25°/twist 12.5° to nearest closer helper; jiggles jointed to skeleton parent) and a post-process AnimBP `ABP_<mesh>_SM2Phys`
+  (LocalToComponent → RigidBody(PA, WorldSpace) → ComponentToLocal), then assigns both to the mesh. Constraint limits/body radii are HEURISTIC.
+- Build: `RunUAT BuildPlugin -Plugin=…uplugin -Package=<tmp> -TargetPlatforms=Win64` (VS2022 BuildTools 14.44), copy the package (minus HostProject/Intermediate) to `<Project>/Plugins/`.
+- `tools/ue/ue_bulk.py import` calls it when `<name>.physics.json` exists and saves PA/ABP/mesh; warns and skips if the plugin isn't loaded.
+- STATUS: builds; installed in UE_VFX_57/Plugins; NOT yet verified in-editor (editor restart pending: dirty non-SM2 packages open).

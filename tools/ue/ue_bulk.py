@@ -45,6 +45,23 @@ if mode == "import":
         except Exception as e: res["errors"].append("anim import: %r" % e)
         res["animImportS"] = round(time.time() - t2, 1)
     res["clipFiles"] = len(clips)
+    # Live physics (SM2PhysicsSetup editor plugin, tools/ue/SM2PhysicsSetup): PhysicsAsset + post-process RigidBody AnimBP
+    # from {model}.physics.json. Skipped (warning) when the plugin is not loaded or the json has no cloth/jiggle.
+    pj = root + name + ".physics.json"
+    if os.path.exists(pj) and isinstance(mesh, unreal.SkeletalMesh):
+        lib = getattr(unreal, "SM2PhysicsSetupLibrary", None)
+        if lib is None:
+            res["warnings"].append("SM2PhysicsSetup plugin not loaded: no live physics")
+        else:
+            try:
+                r = lib.setup_from_json(mesh, pj, folder)
+                ok, rep = (r if isinstance(r, tuple) else (bool(r), ""))
+                res["physics"] = rep
+                if not ok: res["errors"].append("physics: " + str(rep))
+                for a in unreal.EditorAssetLibrary.list_assets(folder, False, False):
+                    if "_SM2" in a.split("/")[-1]: unreal.EditorAssetLibrary.save_asset(a, only_if_is_dirty=True)
+                unreal.EditorAssetLibrary.save_loaded_asset(mesh)
+            except Exception as e: res["errors"].append("physics: %r" % e)
 
 # ---- checks ----
 mesh = unreal.load_asset(folder + "/" + name)
