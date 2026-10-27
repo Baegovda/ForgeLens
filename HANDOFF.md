@@ -1660,3 +1660,28 @@ Disassembly: /workspace/vfxsh_dis/{pc,pg,dx_pc_dx12_sfx,dx_pc_dx12_distort}, GLS
 - An intermediate setting (WorldAlpha 1 / DampingAlpha 0.5) made the sorcerer explode (mean 234–611 cm, max 106 m). The 0/0 setting fixed it.
 - PNGs: box `/workspace/mtl_fix/phys_v3_<char>_cmp.png`.
 - `ue_mrq_warmup.py` sets the MRQ engine and render warm-up frames on a config (for cloth and RigidBody settling). It keeps a `_bakN` copy of the config.
+
+## mtl1-10 Chaos Cloth option (opt-in, 2026-10-27)
+- **How to run:**
+  1. Export with `--include-cloth-sim`.
+  2. Run `ue_bulk.py import <asset> <set> chaoscloth`, or `tools/ue/ue_chaos_cloth.py <asset> <set>` on its own.
+- **What it does:**
+  - Duplicates the mesh to `<asset>_ChaosCloth`. An existing copy is renamed `_bakN` first.
+  - `CreateChaosCloth` turns each `_SIM` section into Chaos clothing data, pins the maxDistance=0 particles, and binds the render sections.
+  - Every cloth that can't be converted stays on the bone method via `SetupFromJsonEx` (`<folder>/ChaosCloth/PA_*`, `ABP_*`).
+  - The bone method stays the default.
+- **Sim section match (HEURISTIC):**
+  - First by slot name with ≥80% of vertices within 2 cm of a sim particle.
+  - Otherwise the earlier geometry test (95% within 0.5 cm).
+- **Converted:**
+  - calgar: belt_01, belt_04
+  - tech_priest: skirt_v7, tabards_bck_v4
+  - sorcerer_exalted: skirt, tabard
+- **FLAG:** the cloak / ribbon / sleeves / tabards_frt / beads sections have slot hits of 0.00–0.74 against simPositionsUeCm. The sim positions don't match the imported section (likely a different bind space or a welded/split topology), so these stay bone-based. Not yet investigated.
+- **Live check:** PhysTestMap, SIE, `liveC.ps1`. Values are mean cm of the helper bones, physON vs animOnly. Converted cloths no longer drive their helper bones, so a lower number partly reflects that.
+  - calgar: bone 11–13 → chaos 7–8
+  - tech_priest: bone 23.5 → chaos 1.9–2.4. Visually, the robe no longer sags below the feet.
+  - sorcerer: bone 55–63 → chaos 20–21
+  - No NaN in any run.
+  - PNGs: box `/workspace/mtl_fix/cloth_cmp_{calgar,tech_priest,sorcerer_exalted}.png` (top = bone method, bottom = Chaos).
+- **MRQ:** before rendering cloth or RigidBody shots, run `tools/ue/ue_mrq_warmup.py <config> 32 8` so the sim settles (engine and render warm-up frames).

@@ -8,7 +8,8 @@
 # A re-import first DUPLICATES an existing /Game/SM2_Work/Tests/<set>/<asset> to <asset>_bakN, then reimports in place (never deletes).
 import sys, os, re, json, math, time, runpy, unreal
 mode, name = sys.argv[1], sys.argv[2]
-SET = sys.argv[3] if len(sys.argv) > 3 else "bulk"  # optional set name: Exports/<set>/<asset> -> /Game/SM2_Work/Tests/<set>/<asset>
+SET = sys.argv[3] if len(sys.argv) > 3 else "bulk"
+CHAOS = "chaoscloth" in [a.lower() for a in sys.argv[4:]]  # opt-in: also build <asset>_ChaosCloth (bone method stays the default)  # optional set name: Exports/<set>/<asset> -> /Game/SM2_Work/Tests/<set>/<asset>
 W = r"C:/Users/Revaptor_FX/Desktop/SM2_Work"
 root = W + "/Exports/" + SET + "/" + name + "/tpl/" + name + ".tpl/"
 folder = "/Game/SM2_Work/Tests/" + SET + "/" + name
@@ -175,4 +176,14 @@ if EAL.does_directory_exist(folder + "/Anims"):
 res["anims"] = an
 res["checkS"] = round(time.time() - t0, 1)
 json.dump(res, open(W + "/Exports/" + SET + "/" + name + ".ue.json", "w"), indent=1)
+if CHAOS and mode == "import":
+    import os
+    here = os.path.dirname(os.path.abspath(sys.argv[0] if not globals().get("__file__") else __file__))
+    cands = [os.path.join(here, "ue_chaos_cloth.py"), os.path.join(here, "mtl_fix", "ue_chaos_cloth.py")]
+    sc = next((c for c in cands if os.path.exists(c)), None)
+    if sc:
+        sys.argv = [sc, name, SET]
+        try: runpy.run_path(sc, run_name="__main__"); res["chaosCloth"] = name + "_ChaosCloth"
+        except Exception as e: res["warnings"].append("chaos cloth: %s" % e)
+    else: res["warnings"].append("chaos cloth: ue_chaos_cloth.py not found")
 print("BULKJSON " + json.dumps(res))

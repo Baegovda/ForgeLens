@@ -13,7 +13,7 @@ eas = unreal.get_editor_subsystem(unreal.EditorActorSubsystem)
 mine = [a for a in eas.get_all_level_actors() if a.actor_has_tag("SM2Phys")]
 if mode == "spawn":
     for a in mine: eas.destroy_actor(a)
-    m = unreal.load_asset(folder + "/" + name)
+    m = unreal.load_asset(folder + "/" + name + (sys.argv[4] if len(sys.argv) > 4 else ""))  # optional mesh suffix, e.g. _ChaosCloth
     an = unreal.EditorAssetLibrary.list_assets(folder + "/Anims", False, False); anim = unreal.load_asset(an[0]) if an else None
     for tag, pp_off in (("on", False), ("off", True)):
         a = eas.spawn_actor_from_class(unreal.SkeletalMeshActor, unreal.Vector(0, 20000, 0)); a.tags = [unreal.Name("SM2Phys"), unreal.Name(tag)]

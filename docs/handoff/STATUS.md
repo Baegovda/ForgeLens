@@ -240,3 +240,4 @@ glt.chameleon REA'd (FUN_142576f30 + glt PS 03558_0) and implemented in sidecar 
 ## mtl1-8a (2026-10-27 KST): Anim Only (Manny)
 - The `--anim-only-manny` CLI flag and the Forge Lens "Anim Only (Manny)" checkbox write `_Manny.fbx` clips directly on SK_Mannequin (HEURISTIC world-delta retarget). `ue_import_manny.py` imports them at yaw 0 and is wired into `ue_bulk`. On titus run/idle/attack, the bone error against SM2 is a mean of 8–10 cm. Status ~85%: only biped humanoids are mapped, fingers fall back, and nothing else has been checked yet.
 - mtl1-8/9 physics: in PhysTestMap, tech_priest mean is 23 cm (was 56; robe sag FLAG remains), sorcerer dash is 41–62 cm (was 69–137; no blow-up), and the other 4 characters are unchanged or better. Physics status ~90%.
+- mtl1-10 Chaos Cloth (opt-in): 6 SIM sections converted on 3 characters. tech_priest robe sag fixed with Chaos. Other sections fall back to bones (FLAG: sim/section mismatch). ~92%.

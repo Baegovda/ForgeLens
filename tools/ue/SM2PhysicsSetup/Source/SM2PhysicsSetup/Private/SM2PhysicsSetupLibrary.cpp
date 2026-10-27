@@ -468,6 +468,26 @@ bool USM2PhysicsSetupLibrary::CreateChaosCloth(USkeletalMesh* Mesh, const FStrin
     // 1. the _SIM section: every vertex sits on a sim particle (0.5 cm) and the vertex count is close.
     FSkeletalMeshLODModel& Lod = Model->LODModels[0];
     int32 SimSection = INDEX_NONE;
+    // 1a. by material slot name (the exporter names the sim mesh's slot after the cloth, e.g. cloak_SIM).
+    float SimHit = -1.f;
+    for (int32 S = 0; S < Lod.Sections.Num() && SimSection == INDEX_NONE; ++S)
+    {
+      const FSkelMeshSection& Sec = Lod.Sections[S];
+      if (Sec.bDisabled || Sec.HasClothingData() || !Mesh->GetMaterials().IsValidIndex(Sec.MaterialIndex))
+        continue;
+      if (!Mesh->GetMaterials()[Sec.MaterialIndex].MaterialSlotName.ToString().Equals(SimName, ESearchCase::IgnoreCase))
+        continue;
+      int32 Hit = 0;
+      for (const FSoftSkinVertex& V : Sec.SoftVertices)
+      {
+        float D;
+        Nearest(V.Position, D);
+        Hit += D < 2.0f;
+      }
+      SimHit = Sec.SoftVertices.Num() ? float(Hit) / Sec.SoftVertices.Num() : 0.f;
+      if (SimHit >= 0.8f) // HEURISTIC
+        SimSection = S;
+    }
     for (int32 S = 0; S < Lod.Sections.Num() && SimSection == INDEX_NONE; ++S)
     {
       const FSkelMeshSection& Sec = Lod.Sections[S];
@@ -505,7 +525,7 @@ bool USM2PhysicsSetupLibrary::CreateChaosCloth(USkeletalMesh* Mesh, const FStrin
     }
     if (SimSection == INDEX_NONE || RenderSections.Num() == 0)
     {
-      Log.Add(FString::Printf(TEXT("%s: sim section %d, %d render sections -> stays bone-based"), *SimName, SimSection, RenderSections.Num()));
+      Log.Add(FString::Printf(TEXT("%s: sim section %d (slot hit %.2f), %d render sections -> stays bone-based"), *SimName, SimSection, SimHit, RenderSections.Num()));
       continue;
     }
 
