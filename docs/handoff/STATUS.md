@@ -177,3 +177,12 @@ Done on the box only: no game launch, nothing touching EAC. Tools: dxc -dumpbin 
   - FUN_1418c09a0 computes (x-degFar[0])/(degFar[1]-degFar[0]), i.e. a linear start→end ramp. So DEGR.x/w = 1/(end-start) and DEGR.y/z = start is consistent (HEURISTIC, the final CB pack was not traced).
 - Blend, distortion power, exposure/light: no progress beyond vfx3j. Variant-bit readers were not reached within the time box.
 - VFX estimate remains ≈ 72%. The existing trail DEGR implementation matches the shader; only the slot→sfx-field assignment stays HEURISTIC.
+
+## vfx3l (shader pass sfx/distort/particles + trail packing, box only, 2026-10-27)
+Disassembly: /workspace/vfxsh_dis/{pc,pg,dx_pc_dx12_sfx,dx_pc_dx12_distort}, GLSL: /workspace/vfxsh_glsl/{pc,distort}. Ghidra: /workspace/rea/vfxl_1.c. Docs only; nothing new proven and implementable.
+- pc_dx12_distort is the scene distortion pass (CB_PASS_DISTORTION.DISTORT_PARAMS@0; 00000_2 PS writes the constant (0.5,0.5,1,1) = neutral offset), not particle power.
+- pc_dx12_sfx is the world/decal SFX material (SFX_DISTORT_PARAMS, SFX_DISTORT_*_LAYER, SFX_BLOOM_INTENSITY, SFX_TEX_DISTORT*), not particle emitters. SFX_BLEND_ADD_NO_ALPHA variants belong to it, so they do NOT prove the particle blend_add mapping.
+- Particles: the CPU path has CB_PARTICLES (view/proj, FPS_PARAMS[2]@368, SHADING_DATA[4]@400) and CB_PARTICLES_DATA (PARTICLES_TEXTURE_DATA[3072], raw). The GPU path keeps emitter params in the untyped f32 buffer PART_GPU_EMITTERS_PART_SHARED_DATA (PART_GPU_EMITTER_STATE is 404 B: data[3], simulationMask, render, alive, ...). Particle per-emitter constants are unnamed, so distortion power/ratioXY slots can't be read from reflection.
+- Exposure: particles read the global COMMON_HDR_EXPOSURE_DIV_AVG_LUM (CB_COMMON @336). So exposure is a runtime camera value, not a per-effect constant. The fixed 1/250 stays HEURISTIC.
+- Trail packing: readers of render-side +0x1f8..+0x218 in 0x141800000–0x142400000 are FUN_14187e8b0 (lerp of degNear/degFar fields vs +0xec.., i.e. LOD/state blend) and FUN_14189db00 (defaults: +0x1fc=255.0, +0x20c=0.5), plus unrelated hits at 141a1/141ef/141f2. The CB_PASS_TRAIL pack was NOT found. The DEGR slot mapping stays HEURISTIC.
+- VFX estimate remains ≈ 72%.
