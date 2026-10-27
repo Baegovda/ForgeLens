@@ -306,3 +306,33 @@ glt.chameleon REA'd (FUN_142576f30 + glt PS 03558_0) and implemented in sidecar 
 - Fix (importer, generic): new master scalar `SpecGainToF0` (default 0). The gain applied to F0 is `lerp(1, gain, SpecGainToF0)`, so gains no longer reach F0/F90. Set it to 1 for the old look. Limitation: Substrate cannot split direct and IBL F0, so the second lobe still reflects the sky at weight 1.
 - Verified: cc_hellbrute and cc_sorcerer imported from the same mtl15 export with the new script → /Game/SM2_Work/Tests/mtl16. Mean plate colour, front view with lights (mtl15 → mtl16): (58,105,116) → (43,84,104), so the paint is less cyan and less mirror-like. Box: /workspace/mtl_fix/hb16_face.png and hb16_cmp.png (rows: env 15/16, lit 15/16).
 - Still open: in-game plates are about (25,30,40), which is much darker and desaturated, and the flesh is purple rather than pink. Neither the chameleon ramp (C1..C3 remove red) nor F0 explains that hue. The likely remaining factor is the untraced per-instance RGB `_783` (instance buffer dword 0..2, which multiplies albedo in PS 03558_0) and/or the lighting of the reference. The chameleon threshold packing is still a HEURISTIC (CPU packer not traced).
+
+## mtl1-16b (sorcerer cloth penetration: solver substeps)
+- Plugin: new `SetClothConfigProps(Mesh, "Prop=Value;...")`. It sets reflected properties on every cloth config of every clothing asset, in memory only (the ChaosCloth config classes are not exposed to Python). Tools: tools/ue/mtl_fix/cfgtune.py and pen16.ps1, which runs the variants live through liveC and ends SIE.
+- Live SIE results on chars_cloth `_ChaosCloth`: free particles more than 1 cm inside, 3 samples, worst depth in cm.
+
+  | variant | sorcerer_exalted (4819) | tech_priest (3253) | calgar |
+  |---|---|---|---|
+  | base (Subdivision 1, Iteration 1) | 243-359 (11.2) | 132-140 (2.8) | 0 |
+  | SubdivisionCount 2 | 174-272 (11.1, later samples 4.8) | 59-192 (2.9) | 0 |
+  | IterationCount 4 | 210-359 (12.5) | | |
+  | Subdivision 2 + Iteration 4 | 164-279 (11.0) | | |
+  | Subdivision 4 + Iteration 4 | 172-260 (6.8) | | |
+  | Subdivision 2 + CollisionThickness 3 | 154-238 (10.7) | | |
+
+  A repeated base run matches within 1-9 particles, so the runs are near-deterministic.
+- Generic default (HEURISTIC): CreateChaosCloth now sets SubdivisionCount = 2 on ChaosClothSharedSimConfig. The sidecar can override it with `ue.chaosCloth.solverSubsteps` (1-8). Sorcerer penetration drops about 25%, and worst depth falls to about 4.8 cm after settling. Verified on a fresh mirr15 cc_sorcerer ChaosCloth: SubdivisionCount 2, live run stable (nan 0).
+- Existing `_ChaosCloth` assets keep 1 until they are recreated with ue_chaos_cloth.py (or set it with cfgtune.py and save).
+- Build: `RunUAT BuildPlugin -Package=Desktop\SM2_Work\build16`, then copy Binaries; the old binaries are in Plugins\SM2PhysicsSetup\Binaries_bak1 and _bak2. The editor needs a restart for a new plugin DLL.
+
+## mtl1-16c (MRQ render with keyed wind)
+- tools/ue/mtl_fix/mrqwind.py builds /Game/SM2_Work/Tests/mrq16 with these assets:
+  - L_wind16: sky, sun, floor, calgar ChaosCloth, CineCamera, and a WindDirectionalSource (tag SM2Wind).
+  - LS_wind16: 30 fps, frames 0-150. The camera cut is bound to the camera. The **wind component's Speed and Strength are keyed**: 0 for frames 0-40, ramping to Speed 8 (2000 cm/s) and Strength 1 by frame 60, then held to 150.
+  - CFG_wind16: PNG 960x540, engine warm-up 32, render warm-up 8.
+- It restores the previously open map without saving it.
+- Render: a separate CLI process, hidden and at Idle priority, with no window:
+  `UnrealEditor-Cmd.exe <uproject> /Game/SM2_Work/Tests/mrq16/L_wind16 -game -LevelSequence=… -MoviePipelineConfig=… -RenderOffscreen -windowed -Unattended -NoSplash -NoSound`
+  It finished in about 60 s with 150 frames in Desktop\SM2_Work\Captures\mrq16.
+- Frame-to-frame pixel change (>30/255): calm frames 20→21 and 30→31 changed 165 and 39 px; windy frames 100→101, 120→121 and 140→141 changed 3491, 3830 and 2600 px. The cloak streams sideways from about frame 60. So keyed wind drives Chaos cloth in an MRQ render. Box: /workspace/mtl_fix/mrq16_cmp.png (frames 10, 40, 60 / 80, 110, 145).
+- Known: the `{sequence_name}` token was empty in CLI mode, so files are named `.0000.png`. The framing is tight.

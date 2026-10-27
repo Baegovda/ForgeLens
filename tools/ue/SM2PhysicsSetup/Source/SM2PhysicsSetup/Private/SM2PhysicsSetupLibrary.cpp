@@ -849,6 +849,14 @@ bool USM2PhysicsSetupLibrary::CreateChaosCloth(USkeletalMesh* Mesh, const FStrin
     }
     else
       Log.Add(TEXT("no ChaosClothConfig class"));
+    // mtl1-16: 2 solver substeps by default (sidecar ue.chaosCloth.solverSubsteps overrides). HEURISTIC from live SIE runs
+    // (pen16): sorcerer_exalted free particles >1 cm inside 243-359 -> 174-272, worst 6.6-11.2 -> 4.8-11.1 cm; calgar stays 0;
+    // tech_priest 132-140 -> 59-192. 4 substeps or IterationCount 4 gave no further clear gain. Shared config = whichever
+    // ClothConfigs entry has SubdivisionCount (ChaosClothSharedSimConfig).
+    for (const auto& KV : Asset->ClothConfigs)
+      if (UClothConfigBase* Cfg = KV.Value.Get())
+        if (Cfg->GetClass()->FindPropertyByName(TEXT("SubdivisionCount")))
+          SetProp(Cfg, TEXT("SubdivisionCount"), FString::FromInt(FMath::Clamp((int32)Num(CC, TEXT("solverSubsteps"), 2), 1, 8)), Log);
 
     // 5b. mtl1-13: sidecar collision -> shared collision PhysicsAsset on this clothing asset.
     {
@@ -1187,4 +1195,41 @@ UPhysicsAsset* USM2PhysicsSetupLibrary::SetClothCollision(USkeletalMesh* Mesh, U
     }
   Mesh->MarkPackageDirty();
   return Prev;
+}
+
+int32 USM2PhysicsSetupLibrary::SetClothConfigProps(USkeletalMesh* Mesh, const FString& KeyValues, FString& Report)
+{
+  int32 N = 0;
+  TArray<FString> Log, Pairs;
+  if (!Mesh)
+    return 0;
+  KeyValues.ParseIntoArray(Pairs, TEXT(";"), true);
+  for (UClothingAssetBase* A : Mesh->GetMeshClothingAssets())
+    if (UClothingAssetCommon* C = Cast<UClothingAssetCommon>(A))
+      for (const auto& KV : C->ClothConfigs)
+      {
+        UClothConfigBase* Cfg = KV.Value.Get();
+        if (!Cfg)
+          continue;
+        for (const FString& Pair : Pairs)
+        {
+          FString K, V;
+          if (!Pair.Split(TEXT("="), &K, &V))
+            continue;
+          K.TrimStartAndEndInline();
+          FProperty* P = Cfg->GetClass()->FindPropertyByName(FName(*K));
+          if (!P)
+            continue;
+          FString Old;
+          P->ExportTextItem_Direct(Old, P->ContainerPtrToValuePtr<void>(Cfg), nullptr, Cfg, PPF_None);
+          Cfg->Modify();
+          if (SetProp(Cfg, *K, V.TrimStartAndEnd(), Log))
+          {
+            ++N;
+            Log.Add(FString::Printf(TEXT("%s.%s.%s %s->%s"), *C->GetName(), *Cfg->GetClass()->GetName(), *K, *Old, *V));
+          }
+        }
+      }
+  Report = FString::Join(Log, TEXT(" | "));
+  return N;
 }

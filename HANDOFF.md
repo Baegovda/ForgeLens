@@ -1795,3 +1795,6 @@ Disassembly: /workspace/vfxsh_dis/{pc,pg,dx_pc_dx12_sfx,dx_pc_dx12_distort}, GLS
 - mtl1-15w: WindDirectionalSource drives Chaos cloth (calgar diff test) -> Sequencer can key it; clothwind src fixed. Mirror check cc_sorcerer/cc_chaplain: hit=1.00, no mirror needed, live stable. See STATUS.
 
 - mtl1-16: M_SM2 `SpecGainToF0` (default 0). Aniso intensity, SecondSpecGain and ExtraIntensity no longer scale F0/F90; in the game they scale D (direct) only, and in UE they inflated IBL into a cyan mirror on the hellbrute paint. Remaining darker in-game tone is untraced (per-instance RGB _783). See STATUS.
+
+- mtl1-16b: plugin SetClothConfigProps and a CreateChaosCloth SubdivisionCount 2 default (sidecar solverSubsteps). Sorcerer penetration is about -25% (pen table in STATUS); calgar is still 0.
+- mtl1-16c: MRQ CLI render (hidden, -RenderOffscreen) of a Sequencer-keyed WindDirectionalSource drives Chaos cloth: calm frames change <200 px, windy frames 2.6-3.8k px. Tool: mrqwind.py. See STATUS.

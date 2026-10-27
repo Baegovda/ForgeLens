@@ -64,6 +64,12 @@ public:
   UFUNCTION(BlueprintCallable, Category = "SM2")
   static UPhysicsAsset* SetClothCollision(USkeletalMesh* Mesh, UPhysicsAsset* Collision);
 
+  /** mtl1-16: set reflected properties on every cloth config (ChaosClothConfig, ChaosClothSharedSimConfig, ...) of every
+   *  clothing asset of Mesh. KeyValues = "Prop=Value;Prop=Value" (UE text format). Only configs that have the property are
+   *  touched. Returns the number of properties set; Report lists old->new. Does not save the mesh. */
+  UFUNCTION(BlueprintCallable, Category = "SM2")
+  static int32 SetClothConfigProps(USkeletalMesh* Mesh, const FString& KeyValues, FString& Report);
+
   UFUNCTION(BlueprintCallable, Category = "SM2")
   static int32 MeasureClothPenetration(USkeletalMeshComponent* Comp, float ThresholdCm, FString& Report, UPhysicsAsset* OverrideCollision = nullptr);
 };
