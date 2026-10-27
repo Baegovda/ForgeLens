@@ -1328,3 +1328,14 @@ Disassembly: /workspace/vfxsh_dis/{pc,pg,dx_pc_dx12_sfx,dx_pc_dx12_distort}, GLS
   overlaps distortion localOffsetX (payload+0x90), so it belongs to another typeParams member. Unresolved.
 - Trail DEGR: the name handles 0x145025180/1a8/220/2c0 have only the registration WRITEs in FUN_1421ca290 (DataRefs);
   the packer reads them indirectly. Dead end statically.
+
+## vfx3p/q (2026-10-27 KST) — distortion.power + trail DEGR: no progress (stop rule hit)
+- distortion.power (desc+0x248): DispScan +0x248 over 0x141a00000–0x142600000. Float readers: 141e28110/141e28b00/141e29eb0/
+  141e2c500 (unrelated objects), 1424540e0 (material UV-transform packer: 0x214/0x2ec/0x3bc/0x248 = 4 texture-transform
+  slots of a material, not an emitter), 1423ba150. FUN_1417f0c60 (vfx3o) is gated by FUN_141a98e80 and loops desc+0x208/
+  0x218/0x228 → lwiGeom member, not distortion. The distortion fullscreen shaders (dx_pc_dx12_distort) only read CB_COMMON.
+  No distortion-power consumer found statically; mapping stays HEURISTIC.
+- Trail DEGR: DataRefs over 0x145025000..+0x300 → only the WRITEs in FUN_1421ca290; callers of FUN_1418c09a0
+  (1418beed0, 1418bf500, 1418c1940) update trail points (0x50-byte stride), not the CB. DispScan of 0x1418b0000–0x1418e0000
+  for +0xf0/+0x100 stores (MISC_2@240) gave no CB_PASS_TRAIL writer. Constants are likely set by handle through a
+  generic setter, so a capture is needed (not allowed: no game/EAC). DEGR slot mapping stays HEURISTIC.
