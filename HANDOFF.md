@@ -1349,3 +1349,8 @@ Disassembly: /workspace/vfxsh_dis/{pc,pg,dx_pc_dx12_sfx,dx_pc_dx12_distort}, GLS
 - Bench caveats: muzzle/blood/candle are tiny at the fixed bench camera; chainsaw blood + candle miss textures
   (part_splash_drops_01…, flame_sml_16x8); hierophant sheet renders empty in this run and VAT shows d=0 (needs the tex8/mesh set
   used in vfx3g) — fix the bench framing before comparing those.
+- GPU-capture route (user accepted EAC risk, 2026-10-27): no official no-EAC switch exists (official mod support = "mods
+  detected" mode, private lobbies, EAC still on). Least-invasive offline route without modifying files: run
+  `client_pc\root\bin\pc\Warhammer 40000 Space Marine 2 - Retail.exe` directly (what the Nexus Vortex extension's
+  "launch without EAC — offline only" tool does) via RenderDoc 1.46 portable (`Desktop\SM2_Work\Tools\RenderDoc_1.46_64`,
+  signature Valid). Not launched by the agent.
