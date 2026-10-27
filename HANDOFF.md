@@ -1530,5 +1530,5 @@ Disassembly: /workspace/vfxsh_dis/{pc,pg,dx_pc_dx12_sfx,dx_pc_dx12_distort}, GLS
   time-varying, no NaN. Frames: `Captures/mtl_fix/phys_<model>_t{1,2,3}_{physON,animOnly}_{front,side}.png`. No joint tuning needed yet (HEURISTIC limits).
 - KNOWN BUG (ue_bulk re-import): `rename_directory(folder -> _bakN)` on LOADED assets followed by importing into the same path yields a mesh
   with private references into `_bakN` (InterchangeAssetImportData / SkeletalMeshDescriptionBulkData) -> "Illegal reference to private object",
-  the mesh can't be saved. Workaround used: import into a fresh set (`mtl_phys`, export folders copied). Fix TODO: duplicate_directory to _bakN + reimport in place, or restart between.
+  the mesh can't be saved. Workaround used: import into a fresh set (`mtl_phys`, export folders copied). FIXED (mtl1-1): ue_bulk now duplicate_directory -> _bakN (saved), then reimports in place; mesh save is checked (error if it fails). Verified on mtl_phys/cc_lictor.
 - PC `Scripts/ue_bulk.py` had diverged from the repo copy; the physics block was patched in on the PC (backup `ue_bulk.py.bak1`).

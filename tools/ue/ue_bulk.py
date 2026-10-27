@@ -2,7 +2,7 @@
 # usage: ue_bulk.py import <asset>   (mesh + exported import_sm2_materials.py + {asset}__*.fbx clips, then check)
 #        ue_bulk.py check <asset>    (checks only)
 # Export root: Desktop/SM2_Work/Exports/bulk/<asset>/tpl/<asset>.tpl/. Writes Exports/bulk/<asset>.ue.json and prints BULKJSON.
-# A re-import moves an existing /Game/SM2_Work/Tests/bulk/<asset> to <asset>_bakN first (never deletes).
+# A re-import first DUPLICATES an existing /Game/SM2_Work/Tests/<set>/<asset> to <asset>_bakN, then reimports in place (never deletes).
 import sys, os, re, json, math, time, runpy, unreal
 mode, name = sys.argv[1], sys.argv[2]
 SET = sys.argv[3] if len(sys.argv) > 3 else "bulk"  # optional set name: Exports/<set>/<asset> -> /Game/SM2_Work/Tests/<set>/<asset>
@@ -24,7 +24,13 @@ if mode == "import":
     if EAL.does_directory_exist(folder):
         n = 1
         while EAL.does_directory_exist(folder + "_bak%d" % n): n += 1
-        EAL.rename_directory(folder, folder + "_bak%d" % n); res["warnings"].append("previous import moved to _bak%d" % n)
+        # Back up by DUPLICATING (not renaming): rename_directory on loaded assets + import into the same path left the new
+        # mesh with private refs into _bakN (InterchangeAssetImportData/SkeletalMeshDescriptionBulkData) -> unsaveable.
+        # The original objects are then reimported in place (replace_existing), a normal reimport.
+        okd = EAL.duplicate_directory(folder, folder + "_bak%d" % n)
+        if not okd: res["errors"].append("backup duplicate to _bak%d failed; aborting import" % n); print("BULKJSON " + json.dumps(res)); raise SystemExit
+        EAL.save_directory(folder + "_bak%d" % n, only_if_is_dirty=False, recursive=True)
+        res["warnings"].append("previous import copied to _bak%d" % n)
     t = unreal.AssetImportTask(); t.filename = root + name + ".fbx"; t.destination_path = folder
     t.automated = True; t.replace_existing = True; t.save = True
     o = unreal.FbxImportUI(); o.import_mesh = True; o.import_materials = False; o.import_textures = False; o.import_animations = False
@@ -45,6 +51,8 @@ if mode == "import":
         except Exception as e: res["errors"].append("anim import: %r" % e)
         res["animImportS"] = round(time.time() - t2, 1)
     res["clipFiles"] = len(clips)
+    if isinstance(mesh, unreal.SkeletalMesh) and not EAL.save_asset(folder + "/" + name, only_if_is_dirty=False):
+        res["errors"].append("mesh failed to save (see Saved/Logs, e.g. illegal private reference)")
     # Live physics (SM2PhysicsSetup editor plugin, tools/ue/SM2PhysicsSetup): PhysicsAsset + post-process RigidBody AnimBP
     # from {model}.physics.json. Skipped (warning) when the plugin is not loaded or the json has no cloth/jiggle.
     pj = root + name + ".physics.json"
