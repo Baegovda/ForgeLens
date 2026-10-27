@@ -88,7 +88,7 @@ public sealed class WeaponCustomization
     }
 
     foreach (var uids in c.UidsByTpl.Values)
-      uids.Sort((a, b) => a.Length.CompareTo(b.Length)); // plain uid before *_preorder / *_tac_reserve
+      uids.Sort((a, b) => c.Skins[b].Count != c.Skins[a].Count ? c.Skins[b].Count.CompareTo(c.Skins[a].Count) : a.Length.CompareTo(b.Length)); // the weapon with the skin set (not an aux/attachment user), plain uid before *_tac_reserve
     return c;
   }
 
@@ -129,6 +129,14 @@ public static class WeaponVariant
       if (!byName.TryGetValue(name, out var l))
         byName[name] = l = new List<int>();
       l.Add(i);
+      var lod = Regex.Match(name, "^(.+)_LOD\\d+$", RegexOptions.IgnoreCase); // base_01_LOD1 is a sibling node, not a child: same region
+      if (lod.Success)
+      {
+        if (!byName.TryGetValue(lod.Groups[1].Value, out var bl))
+          byName[lod.Groups[1].Value] = bl = new List<int>();
+        bl.Add(i);
+      }
+
       var parent = bones[i].Parent;
       if (parent >= 0 && parent < bones.Count)
         (children[parent] ??= new List<int>()).Add(i);
