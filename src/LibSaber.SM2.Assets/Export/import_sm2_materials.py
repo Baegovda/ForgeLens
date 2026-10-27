@@ -275,7 +275,12 @@ def spec_layers(material, albedo, metal, rough, normal, emissive, albedo_raw=Non
     dielectric = mul(material, mul(material, reflectance, reflectance, x - 160, y), const(material, 0.16, x - 160, y + 60), x - 20, y)
     f0 = lerp(material, dielectric, albedo, metal, x + 200, y)
     diffuse = mul(material, mul(material, albedo, unary(material, unreal.MaterialExpressionOneMinus, metal, x + 200, y + 100), x + 400, y + 80), occ, x + 540, y + 80)
-    intensity = scalar(material, "AnisoIntensity", 1.0, x, y + 300)
+    # mtl1-16: the game multiplies D by the intensity for DIRECT lights only (HANDOFF 1b/aniso: D = min(..,128) *
+    # intensity; second lobe direct lights only). In Substrate F0 also scales the sky/reflection-capture term, so
+    # F0 * 4 (aniso intensity 4, SecondSpecGain 4) turned paint (hellbrute blue albedo) into a cyan mirror.
+    # SpecGainToF0 (default 0) blends the gains out of F0/F90: gain_eff = lerp(1, gain, SpecGainToF0); 1 = old look.
+    to_f0 = scalar(material, "SpecGainToF0", 0.0, x - 300, y + 380)
+    intensity = lerp(material, one, scalar(material, "AnisoIntensity", 1.0, x, y + 300), to_f0, x + 200, y + 300)
     f0_i = unary(material, unreal.MaterialExpressionSaturate, mul(material, f0, intensity, x + 400, y + 260), x + 540, y + 260)
     f90_i = unary(material, unreal.MaterialExpressionSaturate, intensity, x + 540, y + 340)
     amount = scalar(material, "AnisoAnisotropy", 0.5, x, y + 450)
@@ -304,7 +309,7 @@ def spec_layers(material, albedo, metal, rough, normal, emissive, albedo_raw=Non
     # visibility (V = 1/4 at normal incidence). The instance sets 1 when the aniso (extra) lobe is used.
     gain = scalar(material, "SecondSpecGain", 4.0, x + 600, y2 - 60)
     extra_i = scalar(material, "AnisoExtraIntensity", 1.0, x + 600, y2 + 20)
-    gain_all = mul(material, gain, switch(material, "UseAnisoSpec", one, extra_i, x + 760, y2 + 20), x + 900, y2 - 40)
+    gain_all = lerp(material, one, mul(material, gain, switch(material, "UseAnisoSpec", one, extra_i, x + 760, y2 + 20), x + 900, y2 - 40), to_f0, x + 960, y2 - 40)
     f90_2 = unary(material, unreal.MaterialExpressionSaturate, mul(material, mask(material, f0_2, "g", x + 760, y2 - 140), const(material, 50.0, x + 760, y2 - 100), x + 900, y2 - 140), x + 1040, y2 - 140)
     f0_2g = unary(material, unreal.MaterialExpressionSaturate, mul(material, f0_2, gain_all, x + 1040, y2 - 220), x + 1180, y2 - 220)
     f90_2g = unary(material, unreal.MaterialExpressionSaturate, mul(material, f90_2, gain_all, x + 1180, y2 - 140), x + 1320, y2 - 140)
