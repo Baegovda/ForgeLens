@@ -1487,3 +1487,15 @@ Disassembly: /workspace/vfxsh_dis/{pc,pg,dx_pc_dx12_sfx,dx_pc_dx12_distort}, GLS
   parser FUN_14183a330) and the desc→instance copy FUN_14187f1e0; the CB pack is still not traced.
 - **Finisher blood saturation: still HEURISTIC** (scene ambient/fog; no exe evidence). SurfLight 60 unchanged.
 - No behaviour change, so no new env flag. VFX ≈ 80%.
+
+## vfx4-2 (2026-10-27 18:00 KST) — Unreal export test (no Niagara)
+- PC exports (SM2Extractor_9474df0, fbx-unreal) → `Desktop\SM2_Work\Exports\ue_export\`: grenade, muzzle group (no own textures;
+  textures from donors fx_cine_bolter_muzzle + part_mgs_cine_dread_window_chaos for phantom_hands), trail smoke, finisher blood,
+  tpl sfx_geom_muzzle + splashes_vtxa_lwi. Texture list = the bench SPRDBG `tex` names + sfx nameTex.
+- `tools/ue/ue_vfx_export_test.py` (import / capture / export, separate uerun calls; uerun args are ONE comma list, script path absolute):
+  imports into `/Game/SM2_Work/VfxExport` (existing → `_bakN`; _bak1/_bak2 are earlier test runs), masters M_SM2Vfx_Add / M_SM2Vfx_Blend
+  (unlit, two-sided; blend from the bench), MI per texture; muzzle mesh uses MI_phantom_hands tinted mzl_geom orange.
+  Preview only (whole flipbook, no curves) = HEURISTIC, not the game shader.
+- Verified: all 20 textures + 2 meshes render textured (`Desktop\SM2_Work\Captures\ue_export\ue_export_board.png`; first dark try
+  kept as `.png.bak1`, fix = manual exposure). Blood mesh uses its FBX lit materials (red). Backdrop BlackUnlitMaterial did not load →
+  grey sky background (cosmetic). Capture actors are SM2Cap-tagged and removed by `export`; the editor level was not saved.
