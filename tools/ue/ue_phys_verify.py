@@ -17,7 +17,7 @@ if mode == "spawn":
     an = unreal.EditorAssetLibrary.list_assets(folder + "/Anims", False, False); anim = unreal.load_asset(an[0]) if an else None
     for tag, pp_off in (("on", False), ("off", True)):
         a = eas.spawn_actor_from_class(unreal.SkeletalMeshActor, unreal.Vector(0, 20000, 0)); a.tags = [unreal.Name("SM2Phys"), unreal.Name(tag)]
-        c = a.skeletal_mesh_component; c.set_skeletal_mesh_asset(m)
+        c = a.skeletal_mesh_component; c.set_skeletal_mesh_asset(m); c.set_collision_enabled(unreal.CollisionEnabled.NO_COLLISION)  # test twins: no scene collision (no ComplexAsSimple warnings)
         c.set_editor_property("disable_post_process_blueprint", pp_off); c.set_update_animation_in_editor(True)
         if anim: c.play_animation(anim, True)
     print("PHYSV spawned", name, len(helpers))

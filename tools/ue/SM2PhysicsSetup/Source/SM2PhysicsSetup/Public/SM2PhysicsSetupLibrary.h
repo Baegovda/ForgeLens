@@ -5,6 +5,7 @@
 #include "SM2PhysicsSetupLibrary.generated.h"
 
 class USkeletalMesh;
+class UAnimBlueprint;
 
 UCLASS()
 class SM2PHYSICSSETUP_API USM2PhysicsSetupLibrary : public UBlueprintFunctionLibrary
@@ -21,4 +22,26 @@ public:
    */
   UFUNCTION(BlueprintCallable, Category = "SM2")
   static bool SetupFromJson(USkeletalMesh* Mesh, const FString& JsonPath, const FString& DestFolder, FString& Report);
+
+  /** mtl1-9: SetupFromJson, but cloths whose simMeshName is in SkipCloths get no helper bodies (they run as Chaos Cloth instead). */
+  UFUNCTION(BlueprintCallable, Category = "SM2")
+  static bool SetupFromJsonEx(USkeletalMesh* Mesh, const FString& JsonPath, const FString& DestFolder, const TArray<FString>& SkipCloths, FString& Report);
+
+  /**
+   * mtl1-9: edit the RigidBody node of an ABP made by SetupFromJson and recompile. SimSpace 0 = Component, 1 = World, 2 = BaseBone.
+   * Lets the SimSpace limits be tuned from Python without rebuilding the plugin.
+   */
+  UFUNCTION(BlueprintCallable, Category = "SM2")
+  static bool TuneRigidBody(UAnimBlueprint* ABP, int32 SimSpace, FName BaseBone, float WorldAlpha, float DampingAlpha, float MaxLinearVelocity,
+    float MaxLinearAcceleration, float MaxAngularVelocity, float MaxAngularAcceleration, FString& Report);
+
+  /**
+   * mtl1-9 Chaos Cloth option: for every cloth in {model}.physics.json, finds the LOD0 section that is the game _SIM mesh
+   * (positions match simPositionsUeCm), builds a Clothing Asset from it (section disabled, as the editor's
+   * "Create Clothing Data from Section"), paints MaxDistance from maxDistanceMeters (0 = pinned), sets the ChaosClothConfig
+   * from ue.chaosCloth and binds it to the render sections named in renderMeshes (material slot names).
+   * Modifies Mesh (call it on a duplicate). Converted lists the simMeshNames that became cloth; the rest stay bone-based.
+   */
+  UFUNCTION(BlueprintCallable, Category = "SM2")
+  static bool CreateChaosCloth(USkeletalMesh* Mesh, const FString& JsonPath, TArray<FString>& Converted, FString& Report);
 };

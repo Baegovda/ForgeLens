@@ -1635,3 +1635,28 @@ Disassembly: /workspace/vfxsh_dis/{pc,pg,dx_pc_dx12_sfx,dx_pc_dx12_distort}, GLS
   - The SceneCapture renders stayed on frame 0 because the editor world does not tick, so the plots are drawn from AnimPose instead.
 - **Test assets:** `/Game/SM2_Work/Anims_Mannequin/SM2ref` (titus SM2 reference clips) and `Anims_Mannequin_y0` (an earlier test).
 - **New test map:** `/Game/SM2_Work/Tests/PhysTestMap`, created with `phys_map.py`; it never saves Lightning_01. It is now the editor's current map.
+
+## mtl1-8/9 physics: robe pins, CENTRE base-bone sim space, PhysTestMap (2026-10-27)
+- **Plugin (cpp, installed in UE_VFX_57 and verified with PLUG True; old copy kept at `Build\sm2phys\installed_SM2PhysicsSetup.bak3`):**
+  - Multi-particle helpers are now pinned by the maxDistance=0 index.
+  - Every skeleton parent of a cloth pins its closest helper and gets a kinematic body.
+  - The RigidBody node simulates in the CENTRE base-bone space with WorldAlpha 0 and DampingAlpha 0, plus velocity and acceleration caps (all HEURISTIC).
+  - New UFUNCTIONs: `SetupFromJsonEx` (skip cloths), `TuneRigidBody`, and `CreateChaosCloth`.
+- **Tuning:**
+  - `ue_bulk.py` calls `TuneRigidBody` after setup, so an older installed binary gets the same defaults.
+  - `tools/ue/ue_tune_rb.py` is the manual tuning script.
+- **Live test:** runs in `/Game/SM2_Work/Tests/PhysTestMap` (`tools/ue/ue_phys_map.py`). Lightning_01 is never saved. The test twins use NO_COLLISION, so there is no ComplexAsSimple spam.
+- **Measured, mean/max cm (physON vs animOnly, all helper bones):**
+
+| char | mtl1-7 | now | NaN |
+|---|---|---|---|
+| calgar run | 11–17 / 80–132 | 11–13 / 87–121 | no |
+| chaplain idle | 8.8–9.0 / 46–50 | 5.9–6.0 / 35 | no |
+| commissar idle | 2.8–3.6 / 28–53 | 2.4–2.8 / 30–47 | no |
+| titus run | 9–17 / 43–75 | 8–14 / 33–54 | no |
+| tech_priest walk | 56–59 / 164–177 | 23–24 / 92–110 | no; **FLAG:** the robe still hangs about 70 cm low on helper 0 (constraint stiffness can't be set from Python) |
+| sorcerer_exalted dash | 69–137 / 208–467 | 41–62 / 245–341 | no |
+
+- An intermediate setting (WorldAlpha 1 / DampingAlpha 0.5) made the sorcerer explode (mean 234–611 cm, max 106 m). The 0/0 setting fixed it.
+- PNGs: box `/workspace/mtl_fix/phys_v3_<char>_cmp.png`.
+- `ue_mrq_warmup.py` sets the MRQ engine and render warm-up frames on a config (for cloth and RigidBody settling). It keeps a `_bakN` copy of the config.

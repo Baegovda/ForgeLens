@@ -80,6 +80,15 @@ if mode == "import":
             try:
                 r = lib.setup_from_json(mesh, pj, folder)
                 ok, rep = (r if isinstance(r, tuple) else (bool(r), ""))
+                # mtl1-9 RigidBody sim-space defaults (CENTRE base bone, no world feedback); same as the plugin cpp, applied here
+                # too so an older installed plugin build gets them. HEURISTIC (see HANDOFF mtl1-9).
+                abpc = mesh.get_editor_property("post_process_anim_blueprint")
+                has_centre = "CENTRE" in [str(b) for b in X.get_bone_names(X.get_reference_pose(mesh.skeleton))]
+                if ok and abpc and has_centre and hasattr(lib, "tune_rigid_body"):
+                    abp = unreal.load_asset(abpc.get_path_name().rsplit(".", 1)[0])
+                    tr = lib.tune_rigid_body(abp, 2, "CENTRE", 0.0, 0.0, 600.0, 2000.0, 10.0, 100.0)
+                    res["rigidBodyTune"] = str(tr[1] if isinstance(tr, tuple) else tr)
+                    unreal.EditorAssetLibrary.save_loaded_asset(abp)
                 res["physics"] = rep
                 if not ok: res["errors"].append("physics: " + str(rep))
                 for a in unreal.EditorAssetLibrary.list_assets(folder, False, False):

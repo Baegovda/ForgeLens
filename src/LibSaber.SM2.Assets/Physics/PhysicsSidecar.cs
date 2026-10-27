@@ -84,6 +84,9 @@ public static class PhysicsSidecar
         simVertices = shell?.Positions.Count ?? 0,
         pinned = maxDistance.Count(m => m <= 1e-4f),
         maxDistanceMeters = maxDistance,
+        // mtl1-9: sim particle bind positions in the Unreal FBX space (cm, Z-up), same order as maxDistanceMeters.
+        // SM2PhysicsSetup.CreateChaosCloth uses them to find the _SIM section and paint MaxDistance on its cloth particles.
+        simPositionsUeCm = shell?.Positions.SelectMany(p => Ue(p)).ToArray() ?? Array.Empty<float>(),
         helperBones = rig?.Clusters.Where(k => string.Equals(k.Cloth, c.SimMeshName, StringComparison.OrdinalIgnoreCase)).Select(k => new { bone = BoneName(k.Bone), parent = BoneName(k.Parent), particles = k.Particles.Length }).ToList(),
         source = cfg,
         ue = new

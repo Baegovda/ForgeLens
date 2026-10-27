@@ -6,6 +6,6 @@ public class SM2PhysicsSetup : ModuleRules
   {
     PCHUsage = PCHUsageMode.UseExplicitOrSharedPCHs;
     PublicDependencyModuleNames.AddRange(new[] { "Core", "CoreUObject", "Engine" });
-    PrivateDependencyModuleNames.AddRange(new[] { "UnrealEd", "AnimGraph", "AnimGraphRuntime", "BlueprintGraph", "Kismet", "Json", "AssetTools", "AssetRegistry", "PhysicsCore" });
+    PrivateDependencyModuleNames.AddRange(new[] { "UnrealEd", "AnimGraph", "AnimGraphRuntime", "BlueprintGraph", "Kismet", "Json", "AssetTools", "AssetRegistry", "PhysicsCore", "ClothingSystemRuntimeCommon", "ClothingSystemRuntimeInterface", "ClothingSystemEditorInterface", "ClothingSystemEditor" });
   }
 }
