@@ -1565,3 +1565,12 @@ Disassembly: /workspace/vfxsh_dis/{pc,pg,dx_pc_dx12_sfx,dx_pc_dx12_distort}, GLS
     - HELMET=helmet_tank_relic_01, LEFT_PAULDRON=left_pauldron_tank_relic_01: 53 visible parts.
 - **Install:** the browser and CLI are installed in `C:\Users\Revaptor_FX\SM2Extractor` (backups `*.exe.bak2`). This build also brings in the mtl1-2 chameleon preview.
 - CopyFromBox fails for 72 MB files ("temporarily unreachable"). Split them into 20 MB chunks and concatenate on the PC.
+
+## mtl1-4: heuristic refinements (2026-10-27 KST)
+- **Physics joint angles (changed):**
+  - Cloth helper swing limit is now DERIVED from NvCloth `maxDistanceMeters`, which is the motion-constraint radius r around the skinned position. A particle at pivot distance L can deviate by atan(r/L).
+  - Clamped to 5..60° (the clamp is HEURISTIC). The twist limit is half the swing. With no data it falls back to 25°. Jiggles keep 15° (no constraint data in current exports).
+  - Built into `Build\sm2phys\pkg` (previous build in `pkg_bak1`). **Not installed yet:** it needs an editor restart, and the VFX executor is using the editor. To install: copy `pkg` over `UE_VFX_57\Plugins\SM2PhysicsSetup` (back up as `.bakN` first), restart the editor, and re-run setup_from_json for the assets.
+- **Blood saturation, distortion 0.04, trail DEGR slot mapping:** unchanged and still HEURISTIC.
+  - vfx4-1 (VFX executor, same day) already re-checked the exe: only CB names / shader defines were found, with no CPU writer. A runtime capture is not allowed (EAC).
+  - These live in VFX files, which this task must not touch.

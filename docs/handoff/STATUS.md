@@ -229,3 +229,7 @@ glt.chameleon REA'd (FUN_142576f30 + glt PS 03558_0) and implemented in sidecar 
 - Weapon skins decoded: firearm_skins_library → geomCustomizerRegions → geom_customizer_preset_firearm meshes.
 - `--variant skin=` option, plus a browser ExportWindow part picker for armor and weapons. Tested on the bolt rifle and the tank marine.
 - HEURISTIC: `main` is always on; skin material and attachments are not applied.
+
+## mtl1-4 (2026-10-27 KST): heuristics
+- Cloth joint swing limits = atan(maxDist/segment), DERIVED. Plugin built, install pending an editor restart.
+- Blood, distortion 0.04 and DEGR unchanged (HEURISTIC, see vfx4-1).

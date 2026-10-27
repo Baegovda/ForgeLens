@@ -3,7 +3,7 @@
 // HEURISTIC (labelled): SM2 simulates cloth with an NvCloth-style particle solver (prop_cloth_sim); Unreal gets an
 // approximation: every helper bone is a small sphere body, pinned particles (maxDistance 0) and the helper parent
 // bone are kinematic, and every other helper is ball-jointed (swing/twist limited) to its nearest helper that is
-// closer to the anchor. Radius, limits and damping are not from the game.
+// closer to the anchor. Cloth swing limits are DERIVED from maxDistanceMeters (atan(r/L)); radius, clamps and damping are not from the game.
 #include "SM2PhysicsSetupLibrary.h"
 
 #include "AnimGraphNode_LinkedInputPose.h"
@@ -145,7 +145,7 @@ bool USM2PhysicsSetupLibrary::SetupFromJson(USkeletalMesh* Mesh, const FString& 
     const TSharedPtr<FJsonObject> Cloth = ClothV->AsObject();
     const TArray<TSharedPtr<FJsonValue>>* MaxDistV = nullptr;
     Cloth->TryGetArrayField(TEXT("maxDistanceMeters"), MaxDistV);
-    struct FHelper { FName Bone; FName Parent; FTransform T; float Dist; bool bPinned; };
+    struct FHelper { FName Bone; FName Parent; FTransform T; float Dist; bool bPinned; float MaxDistCm; };
     TArray<FHelper> Helpers;
     const TArray<TSharedPtr<FJsonValue>>& HB = Cloth->GetArrayField(TEXT("helperBones"));
     for (int32 I = 0; I < HB.Num(); ++I)
@@ -164,6 +164,7 @@ bool USM2PhysicsSetupLibrary::SetupFromJson(USkeletalMesh* Mesh, const FString& 
       // One particle per helper: helper N = sim vertex N, pinned when its max distance is 0 (HEURISTIC index match).
       const int32 Particles = H->HasField(TEXT("particles")) ? (int32)H->GetNumberField(TEXT("particles")) : 1;
       X.bPinned = Particles == 1 && MaxDistV && MaxDistV->IsValidIndex(I) && (*MaxDistV)[I]->AsNumber() <= 0.0;
+      X.MaxDistCm = MaxDistV && MaxDistV->IsValidIndex(I) ? (float)(*MaxDistV)[I]->AsNumber() * 100.0f : -1.0f;
       Helpers.Add(X);
     }
     if (Helpers.Num() == 0)
@@ -208,7 +209,11 @@ bool USM2PhysicsSetupLibrary::SetupFromJson(USkeletalMesh* Mesh, const FString& 
           AnchorT = Helpers[J].T;
         }
       }
-      AddConstraint(PA, H.Bone, Anchor, H.T, AnchorT, 25.0f);
+      // Swing limit DERIVED from NvCloth maxDistance (motion constraint radius r around the skinned position): a particle
+      // pivoting at distance L from its anchor can deviate atan(r / L). Clamped 5..60 deg (clamp HEURISTIC); 25 deg when no data.
+      const float Seg = FMath::Max(Best < BIG_NUMBER ? Best : (H.T.GetLocation() - AnchorT.GetLocation()).Size(), 0.1f);
+      const float Swing = H.MaxDistCm >= 0.0f ? FMath::Clamp(FMath::RadiansToDegrees(FMath::Atan(H.MaxDistCm / Seg)), 5.0f, 60.0f) : 25.0f;
+      AddConstraint(PA, H.Bone, Anchor, H.T, AnchorT, Swing);
     }
   }
 
