@@ -18,6 +18,9 @@ SETS = {  # name: (ref tag, sheet subdir, effect, frames)
     "bolter_muzzle": ("154807", "early", "fx_bolter_muzzle_client", [1, 2]),
     "bolter_trail": ("154843", "", "trail_stalker_bolter_smoke", [2, 5]),
     "chainsaw_blood": ("155018", "early", "part_mag_chainsaw_warrior_finisher_01", [2, 4]),
+    # vfx3z: the two older comparisons are now generated too (7 side-by-sides in total).
+    "blood_vs_hierophant": ("155018", "", "fx_mgs_hierophant_bomb_ee", [1, 3]),
+    "bolter_smoke": ("154833", "", "part_mg_candle_smoke_hub", [2, 5]),
 }
 for name, (tag, sub, fx, frames) in SETS.items():
     r = refimg(tag)
