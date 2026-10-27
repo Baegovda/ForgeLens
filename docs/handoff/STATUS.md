@@ -194,3 +194,4 @@ Disassembly: /workspace/vfxsh_dis/{pc,pg,dx_pc_dx12_sfx,dx_pc_dx12_distort}, GLS
 - vfx3r: in-game comparison prep — bench sheets in Captures\ingame_cmp, user refs go to Captures\ingame_ref.
 - vfx3s: textures added (tex9), Fit reframed (hierophant renders, VAT d=0.48); Retail.exe direct launch relaunches via start_protected_game + EAC → no capture (route disproved); steam_appid.txt.check incident (created/deleted in game root, verified gone). Open: muzzle/candle 0 quads, chainsaw blood 0 particles.
 - vfx3t: muzzle/candle were culled by degNear (camera < 2 m) → Fit keeps the eye outside degNear; isVisible=+0x88 is draw-only (FUN_1417f71b0) → hidden sources spawn children (SM2_VFX_HIDDEN_SPAWN=0 off); chainsaw blood is all-hidden in data → empty is correct. VFX ≈ 73%.
+- vfx3u: in-game refs compared (side_by_side_*.png); BLEND_REA default ON (grenade core/sparks); open: muzzle flash missing, blood too bright/orange, grenade fireball/smoke too weak. VFX ≈ 74%.

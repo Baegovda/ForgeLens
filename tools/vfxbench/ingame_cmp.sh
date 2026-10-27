@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
 # Re-render the in-game comparison bench sheets (vfx3r/vfx3s) and the contact sheet.
+# Columns: off = all flags off (SM2_VFX_BLEND_REA=0; it is default-on since vfx3u), blend = default build.
 # Usage: tools/vfxbench/ingame_cmp.sh <raw root> <out dir>
 set -euo pipefail
 R=${1:-/workspace/vfx3_raw}; O=${2:-/workspace/browser_run_shots/ingame_cmp}
@@ -9,10 +10,10 @@ dotnet build src/LibSaber.SM2Browser -c Release -m:1 -v q -nologo >/dev/null
 run() { local name=$1; shift; mkdir -p "$O/$name"
   env SM2_VFX_MESHES="$R/mesh1" "$@" xvfb-run -a -s "-screen 0 1920x1080x24" dotnet run --no-build --project src/LibSaber.SM2Browser -c Release -- \
     --vfxbench "$R/sfx" "$R/aliases/aliases/part_aliases/part_aliases.ps" "$R" "$O/$name" $FX > "$O/$name.log" 2>&1; }
-run off
+run off SM2_VFX_BLEND_REA=0
 run blend SM2_VFX_BLEND_REA=1
-run tint SM2_VFX_TINT_EXACT=1
-run vat SM2_VFX_VAT=1
+run tint SM2_VFX_BLEND_REA=0 SM2_VFX_TINT_EXACT=1
+run vat SM2_VFX_BLEND_REA=0 SM2_VFX_VAT=1
 run all SM2_VFX_BLEND_REA=1 SM2_VFX_TINT_EXACT=1 SM2_VFX_VAT=1 SM2_VFX_CONTRAST=1
 python3 - "$O" $FX <<'P'
 import sys, numpy as np

@@ -32,4 +32,11 @@ public class BlendReaTests
     Assert.Equal(0.5f, rgb2);
     Assert.Equal(0.125f, a2);
   }
+
+  [Fact]
+  public void DefaultOnUnlessDisabled()
+  {
+    var env = Environment.GetEnvironmentVariable("SM2_VFX_BLEND_REA");
+    Assert.Equal(env != "0", EffectBlendRea.Enabled);
+  }
 }

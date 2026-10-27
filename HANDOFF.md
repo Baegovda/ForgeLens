@@ -1399,3 +1399,22 @@ Disassembly: /workspace/vfxsh_dis/{pc,pg,dx_pc_dx12_sfx,dx_pc_dx12_distort}, GLS
   (template/disabled asset; the name in fx_huge_blood_explosion etc. is only an sfx_group node).
 - Re-rendered ingame_cmp (previous run → `ingame_cmp.bak2`), PC `Captures\ingame_cmp\` (old → `ingame_cmp.bak2`).
 - VFX estimate ≈ 73% (bench coverage, isVisible semantics proven; no format change).
+
+## vfx3u (2026-10-27 15:55 KST) — in-game reference comparison
+- Refs (user, photo mode, 3840×2160): box `/workspace/ingame_ref/`, PC `Captures\ingame_ref\`. Side-by-sides:
+  `/workspace/browser_run_shots/ingame_cmp/side_by_side_{grenade_early,grenade_late,bolter_muzzle,bolter_trail,blood_vs_hierophant}.png`
+  (left = in-game crop, right = bench frames off/blend/tint/vat/all).
+- 154731/154743 = frag grenade (fireball+sparks / smoke+sparks): **BLEND_REA matches best** (bright yellow-white additive core and
+  spark streaks; off/tint/vat are dull, ~10× fewer bright pixels). Still missing vs game: the big orange fireball volume, smoke
+  density/persistence (game smoke is thick and lit; ours thin and gone by ~1.3 s), spark count/length (game sparks are long streaks).
+- 154807 = bolter muzzle flash: game shows a large orange flash + flame tongues; bench shows ~nothing in every config →
+  muzzle is still broken (flash is probably the sfx_geom_muzzle mesh emitters, `meshes 0` in the log). Open.
+- 154833/154843 = bolter tracer (bright yellow line) + muzzle smoke wisp: tracer is a different effect (bolt projectile trail);
+  trail_stalker_bolter_smoke (pink thin quad) is not comparable. Muzzle smoke wisp matches candle-like soft smoke qualitatively.
+- 155018 = chainsaw execution blood (dark red, ~RGB 110/30/25, volumetric strands): not one of our bench effects
+  (part_mag_chainsaw_blood_splash_red_01 is all-hidden). Nearest = hierophant VAT splash: shape type matches (strand splash) but
+  ours is far too bright/orange (RGB ~156/115/53 incl. glow) → blood colour/lighting is wrong in all configs. Open.
+- Tint/VAT/CONTRAST: no visible evidence either way at these references (d ≤ 0.5). Keep opt-in.
+- **Default change:** `SM2_VFX_BLEND_REA` default ON (`=0` disables); test `DefaultOnUnlessDisabled`; ingame_cmp.sh sets
+  `=0` for the off/tint/vat columns so the sheets stay comparable.
+- VFX estimate ≈ 74%.
