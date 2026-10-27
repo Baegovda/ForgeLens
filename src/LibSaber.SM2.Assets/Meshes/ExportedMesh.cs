@@ -59,6 +59,8 @@ public sealed class MeshPart
   public SecondSpec? SecondSpec { get; set; }
   /// <summary><c>glt.anisotropic_spec</c> when the variant enables it with anisotropy above 0.01.</summary>
   public AnisoSpec? AnisoSpec { get; set; }
+  /// <summary><c>glt.chameleon</c> when the variant enables it.</summary>
+  public ChameleonSpec? Chameleon { get; set; }
   /// <summary>Glt-level metallicTint, reflectance, metalness and roughness scale/bias (engine defaults when unset).</summary>
   public BaseLayer BaseLayer { get; set; } = new();
   /// <summary>Index leaves LOD and collision shells unchecked. Defaults on so hand-built meshes still export whole.</summary>
@@ -87,6 +89,7 @@ public sealed class MeshPart
       BlendMode = BlendMode,
       SecondSpec = SecondSpec,
       AnisoSpec = AnisoSpec,
+      Chameleon = Chameleon,
       BaseLayer = BaseLayer,
       Visible = Visible,
       HideReason = HideReason,

@@ -69,6 +69,23 @@ public sealed class BaseLayer
   public float RoughnessBias { get; set; }
 }
 
+/// <summary>
+///   <c>glt.chameleon</c>: view-dependent albedo colour ramp. Field layout from the parser FUN_142576f30 / descriptor
+///   FUN_142578190 (sm2 retail): enabled +0, color0..3 +4/+0x14/+0x24/+0x34 (bytes * 1/255), offset1 +0x44, offset2 +0x48,
+///   fresnelPwr +0x4c. Shader (pc_dx12_glt.sdc, cb CB_STATIC_GLT rows 10..15 = PS_REG_GLT_CHAMELEON_COLORS[4] /
+///   PS_REG_GLT_CHAMELEON_OFFSETS[2], e.g. PS record 03558_0): t = pow(saturate(dot(N, V)), row15.z);
+///   c = lerp(C0, C1, sat((t - r14.x) * r14.y)); c = lerp(c, C2, sat((t - r14.z) * r14.w)); c = lerp(c, C3, sat((t - r15.x) * r15.y));
+///   albedo *= lerp(c, 1, metalness). HEURISTIC: unset colours default to white, unset offsets to 0 / 1, fresnelPwr to 1,
+///   and the CPU packing of offset1/offset2 into the three ramp thresholds (0, offset1, offset2) is not traced yet.
+/// </summary>
+public sealed class ChameleonSpec
+{
+  public float[][] Colors { get; set; } = { new[] { 1f, 1f, 1f, 1f }, new[] { 1f, 1f, 1f, 1f }, new[] { 1f, 1f, 1f, 1f }, new[] { 1f, 1f, 1f, 1f } };
+  public float Offset1 { get; set; }
+  public float Offset2 { get; set; } = 1f;
+  public float FresnelPower { get; set; } = 1f;
+}
+
 public static class SpecLayers
 {
   private const float AnisoThreshold = 0.01f; // [0x143c843ac], compared at 0x1423b8031
@@ -127,6 +144,22 @@ public static class SpecLayers
       result.RoughnessBias = Number(rough, "bias") ?? result.RoughnessBias;
     }
 
+    return result;
+  }
+
+  /// <summary>Null unless <c>glt.chameleon.enabled = true</c>. See <see cref="ChameleonSpec"/>.</summary>
+  public static ChameleonSpec? Chameleon(string variantBlock)
+  {
+    var block = Child(Glt(variantBlock), "chameleon");
+    if (block is null || !Flag(block, "enabled"))
+      return null;
+    var result = new ChameleonSpec();
+    for (var i = 0; i < 4; i++)
+      if (TintOf(block, "color" + i) is { } color)
+        result.Colors[i] = color;
+    result.Offset1 = Number(block, "offset1") ?? result.Offset1;
+    result.Offset2 = Number(block, "offset2") ?? result.Offset2;
+    result.FresnelPower = Number(block, "fresnelPwr") ?? result.FresnelPower;
     return result;
   }
 

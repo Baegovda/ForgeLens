@@ -990,6 +990,14 @@ public static class AssetExporter
         dirMap = aniso.DirMap.Length == 0 ? null : aniso.DirMap,
         extra = new { anisotropy = aniso.ExtraAnisotropy, intensity = aniso.ExtraIntensity, shift = aniso.ExtraShift },
       } : null,
+      // glt.chameleon (null when disabled): colors R, G, B, A in 0..1; see ChameleonSpec for the shader ramp.
+      chameleon = slot.Part.Chameleon is { } cham ? new
+      {
+        colors = cham.Colors,
+        offset1 = cham.Offset1,
+        offset2 = cham.Offset2,
+        fresnelPwr = cham.FresnelPower,
+      } : null,
       maps = slot.Part.Maps.Select(map => new
       {
         role = map.Role,

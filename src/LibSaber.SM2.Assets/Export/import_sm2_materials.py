@@ -329,6 +329,50 @@ def spec_layers(material, albedo, metal, rough, normal, emissive, albedo_raw=Non
     return switch(material, "UseSecondSpec", base, both, x + 1900, y - 300)
 
 
+CHAMELEON_HLSL = """float t = pow(saturate(NV), R1.z);
+float3 c = lerp(C0.rgb, C1.rgb, saturate((t - R0.x) * R0.y));
+c = lerp(c, C2.rgb, saturate((t - R0.z) * R0.w));
+c = lerp(c, C3.rgb, saturate((t - R1.x) * R1.y));
+return lerp(c, float3(1, 1, 1), saturate(M));"""
+
+
+def chameleon(material, albedo, metal, x, y):
+    # glt.chameleon (UseChameleon): the glt PS (pc_dx12_glt.sdc, e.g. record 03558_0, CB_STATIC_GLT rows 10..15 =
+    # PS_REG_GLT_CHAMELEON_COLORS[4] / _OFFSETS[2]) does t = pow(saturate(N.V), r15.z), a 4-colour ramp with three
+    # thresholds/scales (r14.xy, r14.zw, r15.xy), then albedo *= lerp(ramp, 1, metalness).
+    # HEURISTIC: offset1/offset2 -> thresholds (0, offset1, offset2) in chameleon_ramp(); CPU packer not traced.
+    mel = unreal.MaterialEditingLibrary
+    nv = expr(material, unreal.MaterialExpressionDotProduct, x - 700, y)
+    link(expr(material, unreal.MaterialExpressionPixelNormalWS, x - 900, y), "", nv, "A")
+    link(expr(material, unreal.MaterialExpressionCameraVectorWS, x - 900, y + 80), "", nv, "B")
+    node = expr(material, unreal.MaterialExpressionCustom, x - 300, y)
+    node.set_editor_property("code", CHAMELEON_HLSL)
+    node.set_editor_property("output_type", unreal.CustomMaterialOutputType.CMOT_FLOAT3)
+    names = ["NV", "M", "C0", "C1", "C2", "C3", "R0", "R1"]
+    pins = []
+    for n in names:
+        pin = unreal.CustomInput()
+        pin.set_editor_property("input_name", n)
+        pins.append(pin)
+    node.set_editor_property("inputs", pins)
+    link(nv, "", node, "NV")
+    link(metal, "", node, "M")
+    for i, n in enumerate(names[2:]):
+        p = expr(material, unreal.MaterialExpressionVectorParameter, x - 600, y + 120 + i * 90)
+        p.set_editor_property("parameter_name", "Chameleon" + n)
+        p.set_editor_property("default_value", unreal.LinearColor(1.0, 1.0, 1.0, 1.0) if n.startswith("C") else unreal.LinearColor(0.0, 1.0, 0.0, 1.0))
+        link(p, "", node, n)
+    tinted = mul(material, albedo, node, x, y)
+    return switch(material, "UseChameleon", albedo, tinted, x + 160, y)
+
+
+def chameleon_ramp(cham):
+    # HEURISTIC packing (see chameleon()): thresholds 0, offset1, offset2; each scale spans to the next threshold.
+    o1 = float(cham.get("offset1", 0.0)); o2 = float(cham.get("offset2", 1.0))
+    inv = lambda w: 1.0 / max(w, 1e-4)
+    return (0.0, inv(o1), o1, inv(o2 - o1)), (o2, inv(1.0 - o2), float(cham.get("fresnelPwr", 1.0)), 0.0)
+
+
 def make_master(folder, asset_name="M_SM2", translucent=False):
     # translucent=True is the Transp(a) parent (glass, gibs caps): diffuse alpha drives Opacity.
     tools = unreal.AssetToolsHelpers.get_asset_tools()
@@ -478,6 +522,7 @@ def make_master(folder, asset_name="M_SM2", translucent=False):
     tint_mix = lerp(material, mask(material, tint, "rgb", -360, -320), mask(material, metal_tint, "rgb", -360, -500), metal_b, -200, -400)
     albedo_rgb = mask(material, diffuse, "rgb", -360, -200, "RGB")
     tinted = mul(material, albedo_rgb, tint_mix, -200, -260)
+    tinted = chameleon(material, tinted, metal_b, -200, -900)
     front = spec_layers(material, tinted, metal_b, rough_b, detail_switch, emit_mul, albedo_rgb, metal, rough_switch, ao_source)
     if translucent:
         # Substrate translucency: coverage = diffuse alpha.
@@ -578,6 +623,16 @@ def srgb_to_linear(c):
 
 def apply_spec_layers(instance, slot, texture_for):
     mel = unreal.MaterialEditingLibrary
+    cham = slot.get("chameleon")
+    mel.set_material_instance_static_switch_parameter_value(instance, "UseChameleon", bool(cham))
+    if cham:
+        for i, c in enumerate((cham.get("colors") or [])[:4]):
+            # Colour bytes are scaled by 1/255 in FUN_142576f30; linearised like albedo_tint (HEURISTIC: sRGB).
+            lin = [srgb_to_linear(v) for v in (list(c) + [1, 1, 1])[:3]]
+            mel.set_material_instance_vector_parameter_value(instance, "ChameleonC%d" % i, unreal.LinearColor(lin[0], lin[1], lin[2], 1.0))
+        r0, r1 = chameleon_ramp(cham)
+        mel.set_material_instance_vector_parameter_value(instance, "ChameleonR0", unreal.LinearColor(*r0))
+        mel.set_material_instance_vector_parameter_value(instance, "ChameleonR1", unreal.LinearColor(*r1))
     second = slot.get("secondSpec")
     aniso = slot.get("anisotropicSpec")
     mel.set_material_instance_static_switch_parameter_value(instance, "UseSecondSpec", bool(second))

@@ -218,3 +218,5 @@ _Niagara conversion: off the roadmap (2026-10-27), listed under ROADMAP → Poss
 ## vfx4-3 (2026-10-27 KST) — browser polish
 - Search: several words must all match (`GameCatalog.MatchesAll`, tested). Ctrl+F focuses the box, Enter previews the first hit, Down moves into the list, Esc or ✕ clears. When nothing matches, the status bar says so.
 - Export: enabled only when something is selected. Label shows "Export N files…" and changes to "Exporting…" while it runs. Ctrl+E starts it.
+### mtl1 (2026-10-27)
+glt.chameleon REA'd (FUN_142576f30 + glt PS 03558_0) and implemented in sidecar + M_SM2 (offset packing heuristic). Sorcerer exported with baked cloth idle clip; lictor tentacle sway confirmed in UE frames. Hellbrute tone needs review. See HANDOFF.md.
