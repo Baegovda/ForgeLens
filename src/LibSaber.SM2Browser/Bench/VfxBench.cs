@@ -117,9 +117,9 @@ internal static class VfxBench
           gpu.Finish();
           gpuMs.Add(w.Elapsed.TotalMilliseconds);
           var pixels = gpu.ReadPixels();
-          if (Bloom && layer.MeshInstances > 0)
+          if (Bloom)
           {
-            gpu.RenderEffect(new EffectLayer { Batches = [], Lights = layer.Lights, Texture = textures.Get, Ground = false, Meshes = layer.Meshes, Mesh = meshes.Get, Time = t, Exposure = layer.Exposure, BloomPass = true }, view, projection, eye, Size, Size, fb);
+            gpu.RenderEffect(new EffectLayer { Batches = layer.Batches, Lights = layer.Lights, Texture = textures.Get, Ground = false, Meshes = layer.Meshes, Mesh = meshes.Get, Time = t, Exposure = layer.Exposure, BloomPass = true }, view, projection, eye, Size, Size, fb);
             gpu.Finish();
             BenchBloom.Apply(pixels, gpu.ReadPixels(), Size, Size);
           }

@@ -5,8 +5,15 @@ namespace LibSaber.SM2Browser.Bench;
 ///   weighted by the material <c>emissive.bloomIntensity</c> (EffectRenderer.BloomGain) over the clear colour. It is
 ///   blurred (3 box passes, radius SM2_VFX_BLOOM_RADIUS px, default 10) and added with SM2_VFX_BLOOM_STRENGTH (default 1.5).
 /// </summary>
+///   vfx3z: sprites are part of the source too, and only light above a bloom point blooms. The engine's bloom is a
+///   scene-wide HDR threshold bloom, not a per-material sprite value: strings "Bloom.BloomPoint" @0x14363dbf0,
+///   "COMMON_HDR_BLOOM_POINT" @0x1436e9f08, "Bloom.Intensity", "HDR_MAKE_BLOOM"; the particle shader (particles.sdc
+///   00000_0) writes unclamped HDR and has no bloom term, and sprite emitters carry no bloomIntensity (only sfx mesh
+///   materials, "bloomIntensity" @0x1436446f0). The point value is HEURISTIC (SM2_VFX_BLOOM_POINT, default 0.45 of LDR);
+///   it removes the dim red haze the large muzzle ring meshes produced.
 internal static class BenchBloom
 {
+  private static readonly float Point = float.TryParse(Environment.GetEnvironmentVariable("SM2_VFX_BLOOM_POINT"), System.Globalization.CultureInfo.InvariantCulture, out var p) ? p : 0.45f;
   private static readonly int Radius = int.TryParse(Environment.GetEnvironmentVariable("SM2_VFX_BLOOM_RADIUS"), out var r) ? r : 10;
   private static readonly float Strength = float.TryParse(Environment.GetEnvironmentVariable("SM2_VFX_BLOOM_STRENGTH"), System.Globalization.CultureInfo.InvariantCulture, out var s) ? s : 1.5f;
   private static readonly int[] Clear = [28, 24, 22];
@@ -17,7 +24,7 @@ internal static class BenchBloom
     for (var c = 0; c < 3; c++)
     {
       var ch = new float[w * h];
-      for (var i = 0; i < w * h; i++) ch[i] = Math.Max(0, src[i * 4 + c] - Clear[c]) / 255f;
+      for (var i = 0; i < w * h; i++) ch[i] = Math.Max(0f, Math.Max(0, src[i * 4 + c] - Clear[c]) / 255f - Point) / (1f - Point);
       for (var pass = 0; pass < 3; pass++) { Box(ch, w, h, true); Box(ch, w, h, false); }
       buf[c] = ch;
     }

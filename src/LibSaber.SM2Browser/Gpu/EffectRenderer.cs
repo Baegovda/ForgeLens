@@ -232,7 +232,7 @@ internal sealed unsafe class EffectRenderer : IDisposable
 
     DrawMeshes(layer, vp, eye, lights, translucent: false);
     DrawMeshes(layer, vp, eye, lights, translucent: true);
-    if (layer.BloomPass) return;
+    // vfx3z: sprites feed the bloom pass unweighted (HDR threshold bloom, see BenchBloom); meshes stay bloomIntensity-weighted.
 
     var quads = layer.Batches.Count == 0 ? 0 : layer.Batches.Max(b => b.QuadCount);
     if (quads > _iboQuads)
