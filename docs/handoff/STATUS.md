@@ -199,3 +199,6 @@ Disassembly: /workspace/vfxsh_dis/{pc,pg,dx_pc_dx12_sfx,dx_pc_dx12_distort}, GLS
 
 ## vfx3w (2026-10-27 KST) — VFX ~79%
 Muzzle mesh named-material (mzl_geom) fixed; hidden blood = templates, compare vs finisher copies; emitScale trace inconclusive; MaskClip opt-in; lit-smoke light heuristic. See HANDOFF.md.
+
+## vfx3x (2026-10-27 KST) — VFX ~80%
+phantom_hands extracted (rings textured but dim: no bloom); grey columns fixed via exact particles.sdc alpha-clip (SM2_VFX_CLIP_EXACT); socket +Z fallback (SM2_VFX_SOCKET_FWD). See HANDOFF.md.

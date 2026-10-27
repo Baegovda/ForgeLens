@@ -340,6 +340,8 @@ public sealed class EffectInstance
     }
   }
 
+  public static bool SocketForwardFallback { get; set; } = Environment.GetEnvironmentVariable("SM2_VFX_SOCKET_FWD") != "0";
+
   private Particle Spawn(EmitterState e, float emitterTime, Vector3? at = null)
   {
     var def = e.Def;
@@ -350,7 +352,10 @@ public sealed class EffectInstance
     var cosT = 1f - r.Float() * (1f - MathF.Cos(half));
     var sinT = MathF.Sqrt(Math.Max(0f, 1f - cosT * cosT));
     var phi = r.Float() * MathF.Tau;
-    var axis = at is null && def.EmitByNormal && def.NameParent.Length > 0 && Socket?.Invoke(def.NameParent, Time) is not null ? Vector3.UnitZ : def.EmitDir;
+    // vfx3x: with no host the effect root stands in for the socket (in-game the sfx is attached to it), so an
+    // isEmitByNormal emitter still emits along the socket's local +Z instead of the +Y default. HEURISTIC;
+    // SM2_VFX_SOCKET_FWD=0 restores +Y. Fixes the vertical flame_cross_4/6/8 columns (nameParent "tip", isAlignSpeed).
+    var axis = at is null && def.EmitByNormal && def.NameParent.Length > 0 && (SocketForwardFallback || Socket?.Invoke(def.NameParent, Time) is not null) ? Vector3.UnitZ : def.EmitDir;
     var tangent = Vector3.Normalize(Vector3.Cross(axis, MathF.Abs(axis.Y) < 0.9f ? Vector3.UnitY : Vector3.UnitX));
     var bitangent = Vector3.Cross(axis, tangent);
     var dir = axis * cosT + (tangent * MathF.Cos(phi) + bitangent * MathF.Sin(phi)) * sinT;

@@ -50,6 +50,10 @@ internal sealed unsafe class EffectRenderer : IDisposable
   ///   typeParams+0x140 = textureTintControl. Off: the older luminance heuristic (texture as intensity at tint 0).
   /// </summary>
   public static bool TintExact { get; set; } = Environment.GetEnvironmentVariable("SM2_VFX_TINT_EXACT") == "1";
+  /// <summary>vfx3x: tonemap premultiplied blend sprites (opt-in SM2_VFX_HDR_PREMUL=1; over-brightens flame_cross_4). HEURISTIC approximation of HDR blending.</summary>
+  public static bool HdrPremul { get; set; } = Environment.GetEnvironmentVariable("SM2_VFX_HDR_PREMUL") == "1";
+  /// <summary>vfx3x: particles.sdc alpha-clip math (vertex alpha inside the clip, 1-0.5*clip, no clip with flag 0x400). SM2_VFX_CLIP_EXACT=0 disables.</summary>
+  public static bool ClipExact { get; set; } = Environment.GetEnvironmentVariable("SM2_VFX_CLIP_EXACT") != "0";
   public static bool ContrastEnabled { get; set; } = Environment.GetEnvironmentVariable("SM2_VFX_CONTRAST") == "1";
   private readonly Dictionary<string, (uint Vao, uint Vbo, uint Ibo)?> _meshes = new(StringComparer.OrdinalIgnoreCase);
   private readonly uint _vao, _vbo, _ibo, _groundVao, _groundVbo;
@@ -273,6 +277,8 @@ internal sealed unsafe class EffectRenderer : IDisposable
       _gl.Uniform1(hasMaskLoc, mask != 0 ? 1 : 0);
       var rea = EffectBlendRea.Enabled;
       _gl.Uniform1(reaLoc, rea ? 1 : 0);
+      _gl.Uniform1(_gl.GetUniformLocation(_sprite, "uHdrPremul"), HdrPremul ? 1 : 0);
+      _gl.Uniform1(_gl.GetUniformLocation(_sprite, "uClipExact"), ClipExact ? 1 : 0);
       _gl.Uniform1(alphaMulLoc, (EffectBlendRea.Flags(batch.Emitter.Blend, batch.Emitter.BlendAlphaMultiply) & 0x400u) == 0 ? 1 : 0);
       if (rea)
         _gl.BlendFuncSeparate(BlendingFactor.One, BlendingFactor.OneMinusSrcAlpha, BlendingFactor.One, BlendingFactor.OneMinusSrcAlpha);
@@ -525,6 +531,8 @@ internal sealed unsafe class EffectRenderer : IDisposable
     uniform int uMode;
     uniform int uBlendRea;
     uniform int uAlphaMul;
+    uniform int uHdrPremul;
+    uniform int uClipExact;
     uniform float uTint;
     uniform vec3 uKey;
     uniform float uContrast;
@@ -556,7 +564,31 @@ internal sealed unsafe class EffectRenderer : IDisposable
       }
       vec3 c = toGamma(vec3(1.0) - exp(-hdr * uExposure));
       float alpha = clamp(vColor.a, 0.0, 1.0) * a;
-      if (uBlendRea == 1)
+      if (uHdrPremul == 1 && uMode != 1)
+      {
+        // vfx3x: particles.sdc 00000_0 writes SV_Target = hdr*alpha unclamped (only a NaN/Inf guard), so blending happens in
+        // HDR and the frame is tonemapped later. Per-fragment 1-exp() saturated hdr ~12000 to white, then *alpha 0.08 = grey.
+        // Approximation (HEURISTIC): tonemap the premultiplied contribution instead, keeping ONE/INV_SRC_ALPHA.
+        float va = clamp(vColor.a, 0.0, 1.0);
+        float k = uBlendRea == 1 ? va * (uAlphaMul == 1 ? a : 1.0) : (uMode == 2 ? a : alpha);
+        float ao = uBlendRea == 1 ? va * a : alpha;
+        outColor = vec4(toGamma(vec3(1.0) - exp(-hdr * uExposure * k)), ao);
+      }
+      else if (uBlendRea == 1 && uClipExact == 1)
+      {
+        // vfx3x: particles.sdc 00000_0 (vfxsh_glsl/pc lines 118-122, 466, 873-876): clip = flag0x400 ? 0 : TEXCOORD_2.y;
+        // ac = sat((tex.a*vertexA - clip) / (1 - 0.5*clip)); rgb *= sat(ac + flag0x400); SV_Target.w = add ? 0 : ac*mask.
+        // Vertex alpha is inside the clip, so low-alpha alphaClip-by-age sprites (flame_cross_4/6/8, va ~0.08) burn out.
+        float va = clamp(vColor.a, 0.0, 1.0);
+        float m = uHasMask == 1 ? texture(uMask, vMask).a : 1.0;
+        float ta = texture(uTex, vUv).a;
+        float ce = uAlphaMul == 1 ? clip : 0.0;
+        float ac = clamp((ta * va - ce) / (1.0 - 0.5 * ce), 0.0, 1.0);
+        float ga = uGround == 1 && vParams.y > 0.0 ? clamp((vWorld.y - uGroundY) / vParams.y, 0.0, 1.0) : 1.0;
+        float f = (uAlphaMul == 1 ? ac : va) * m * ga;
+        outColor = vec4(c * f, uMode == 1 ? 0.0 : ac * m * ga);
+      }
+      else if (uBlendRea == 1)
       {
         // vfx3m: particles.sdc 00000_0 flag bits 0x20/0x400 (EffectBlendRea), premultiplied ONE/INV_SRC_ALPHA.
         float va = clamp(vColor.a, 0.0, 1.0);
