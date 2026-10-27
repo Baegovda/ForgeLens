@@ -21,6 +21,10 @@ public sealed class VariantRequest
   public Dictionary<string, string> Regions { get; } = new(StringComparer.OrdinalIgnoreCase);
   public HashSet<string> Show { get; } = new(StringComparer.OrdinalIgnoreCase);
   public HashSet<string> Hide { get; } = new(StringComparer.OrdinalIgnoreCase);
+  /// <summary>Weapon tpls: FirearmSkin key in firearm_skins_library (skin_01 when null).</summary>
+  public string? Skin { get; private set; }
+  /// <summary>Weapon tpls: explicit geomCustomizerRegions (replaces the skin's list when set).</summary>
+  public List<string>? WeaponRegions { get; private set; }
 
   public static VariantRequest Default => new();
 
@@ -77,6 +81,12 @@ public sealed class VariantRequest
           break;
         case "team":
           request.Team = value.ToUpperInvariant();
+          break;
+        case "skin":
+          request.Skin = value;
+          break;
+        case "regions":
+          request.WeaponRegions = value.Split('|', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries).ToList();
           break;
         default:
           request.Regions[key.ToUpperInvariant()] = value;

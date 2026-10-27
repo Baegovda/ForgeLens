@@ -1,3 +1,4 @@
+using LibSaber.SM2.Assets.Customization;
 using LibSaber.SM2Browser.Gpu;
 using Avalonia;
 using Avalonia.Controls;
@@ -1473,7 +1474,30 @@ public partial class MainWindow : Window
     }
 
     var window = new ExportWindow();
-    var choice = await window.Choose(this, _settings.LastExportFolder);
+    VariantResult? parts = null;
+    Dictionary<string, List<string>>? skinRegions = null;
+    if (_catalog is { } pc && _store is { } ps && _previewFileIndex >= 0 && indices.Contains(_previewFileIndex))
+    {
+      var pi = _previewFileIndex;
+      StatusText.Text = "Reading customization parts…";
+      try
+      {
+        (parts, skinRegions) = await Task.Run(() =>
+        {
+          var d = AssetExporter.DescribeVariant(pc, ps, pi);
+          Dictionary<string, List<string>>? sr = null;
+          if (d is { Team: "WEAPON" } && AssetExporter.WeaponLibrary(pc, ps) is { } wl && wl.Skins.TryGetValue(d.Appearance, out var skins))
+            sr = skins.ToDictionary(k => k.Key, k => SslText.Strings(k.Skin.GetValueOrDefault("geomCustomizerRegions")).ToList(), StringComparer.OrdinalIgnoreCase);
+          return (d, sr);
+        });
+      }
+      catch (Exception ex)
+      {
+        StatusText.Text = "Customization parts unavailable: " + ex.Message;
+      }
+    }
+
+    var choice = await window.Choose(this, _settings.LastExportFolder, parts, skinRegions);
     if (choice is null)
       return;
     _settings.LastExportFolder = choice.Folder;

@@ -1,6 +1,7 @@
 using Avalonia.Controls;
 using Avalonia.Interactivity;
 using Avalonia.Platform.Storage;
+using LibSaber.SM2.Assets.Customization;
 using LibSaber.SM2.Assets.Export;
 using LibSaber.SM2.Assets.Meshes;
 
@@ -23,9 +24,17 @@ public partial class ExportWindow : Window
     InitializeComponent();
   }
 
-  public Task<ExportChoice?> Choose(Window owner, string? initialFolder)
+  private VariantResult? _parts;
+  private ComboBox? _presetBox;
+  private readonly Dictionary<string, ComboBox> _sectionBoxes = new(StringComparer.OrdinalIgnoreCase);
+  private readonly Dictionary<string, CheckBox> _regionBoxes = new(StringComparer.OrdinalIgnoreCase);
+  private Dictionary<string, List<string>> _skinRegions = new(StringComparer.OrdinalIgnoreCase);
+
+  public Task<ExportChoice?> Choose(Window owner, string? initialFolder, VariantResult? parts = null, Dictionary<string, List<string>>? skinRegions = null)
   {
     FolderBox.Text = initialFolder ?? "";
+    if (parts is not null)
+      BuildParts(parts, skinRegions);
     FitToScreen(owner);
     _result = new TaskCompletionSource<ExportChoice?>();
     ShowDialog(owner).ContinueWith(_ => _result.TrySetResult(null), TaskScheduler.FromCurrentSynchronizationContext());
@@ -93,6 +102,7 @@ public partial class ExportWindow : Window
       Space = SpaceBox.SelectedIndex == 1 ? ExportSpace.Blender : ExportSpace.Unreal,
       IncludeClothSim = ClothBox.IsChecked == true,
       RootMotion = RootMotionBox.IsChecked == true,
+      Variant = PartsSpec(),
     };
     _result?.TrySetResult(new ExportChoice { Folder = folder, Settings = settings, Clips = (ClipChoice)Math.Max(0, ClipBox.SelectedIndex) });
     Close();
@@ -104,4 +114,93 @@ public partial class ExportWindow : Window
     Close();
   }
 
+
+  /// <summary>Part picker for the previewed model: one combo per armor section, or a skin combo plus one toggle per weapon region.</summary>
+  private void BuildParts(VariantResult parts, Dictionary<string, List<string>>? skinRegions)
+  {
+    _parts = parts;
+    _skinRegions = skinRegions ?? new(StringComparer.OrdinalIgnoreCase);
+    var weapon = parts.Team == "WEAPON";
+    PartsPanel.IsVisible = true;
+    PartsPanel.Children.Add(new TextBlock
+    {
+      TextWrapping = Avalonia.Media.TextWrapping.Wrap,
+      FontWeight = Avalonia.Media.FontWeight.SemiBold,
+      Text = weapon
+        ? $"Parts: {parts.Template} ({parts.Appearance}). Pick a skin, then toggle regions. Only the checked regions are exported."
+        : $"Parts: {parts.Template} ({parts.Team}/{parts.Appearance}). Pick one region per slot. Only that combination is exported.",
+    });
+    var options = new List<string> { "(all parts, no filter)" };
+    options.AddRange(parts.Presets);
+    _presetBox = new ComboBox { ItemsSource = options, SelectedIndex = Math.Max(0, options.IndexOf(parts.Preset)), HorizontalAlignment = Avalonia.Layout.HorizontalAlignment.Stretch };
+    PartsPanel.Children.Add(Row(weapon ? "Skin" : "Preset", _presetBox));
+    if (weapon)
+    {
+      var wrap = new WrapPanel();
+      foreach (var region in parts.AvailableRegions.Keys.Where(r => !r.Equals("main", StringComparison.OrdinalIgnoreCase)).OrderBy(r => r))
+      {
+        var box = new CheckBox { Content = region, IsChecked = parts.Regions.ContainsKey(region), Margin = new Avalonia.Thickness(0, 0, 12, 0) };
+        _regionBoxes[region] = box;
+        wrap.Children.Add(box);
+      }
+
+      PartsPanel.Children.Add(wrap);
+      _presetBox.SelectionChanged += (_, _) =>
+      {
+        if (_presetBox.SelectedItem is string skin && _skinRegions.TryGetValue(skin, out var on))
+        {
+          foreach (var (r, b) in _regionBoxes)
+            b.IsChecked = on.Contains(r, StringComparer.OrdinalIgnoreCase);
+        }
+      };
+    }
+    else
+    {
+      foreach (var (section, regions) in parts.AvailableRegions.OrderBy(p => p.Key))
+      {
+        var items = new List<string>(regions);
+        var box = new ComboBox { ItemsSource = items, SelectedIndex = parts.Regions.TryGetValue(section, out var cur) ? items.IndexOf(cur) : -1, HorizontalAlignment = Avalonia.Layout.HorizontalAlignment.Stretch };
+        _sectionBoxes[section] = box;
+        PartsPanel.Children.Add(Row(section, box));
+      }
+    }
+
+    PartsPanel.Children.Add(new Separator());
+  }
+
+  private static Control Row(string label, Control control)
+  {
+    var dock = new DockPanel();
+    var text = new TextBlock { Text = label, Width = 150, VerticalAlignment = Avalonia.Layout.VerticalAlignment.Center };
+    DockPanel.SetDock(text, Dock.Left);
+    dock.Children.Add(text);
+    dock.Children.Add(control);
+    return dock;
+  }
+
+  /// <summary>--variant spec for the picked combination (null keeps the exporter default).</summary>
+  internal string? PartsSpec()
+  {
+    if (_parts is null || _presetBox is null)
+      return null;
+    if (_presetBox.SelectedIndex <= 0)
+      return "all";
+    var preset = (string)_presetBox.SelectedItem!;
+    if (_parts.Team == "WEAPON")
+    {
+      var on = _regionBoxes.Where(p => p.Value.IsChecked == true).Select(p => p.Key).ToList();
+      var skin = _skinRegions.GetValueOrDefault(preset) ?? new();
+      var same = on.Count == skin.Count(r => _regionBoxes.ContainsKey(r)) && on.All(r => skin.Contains(r, StringComparer.OrdinalIgnoreCase));
+      return same ? "skin=" + preset : "skin=" + preset + ",regions=" + string.Join("|", on);
+    }
+
+    var parts = new List<string> { "preset=" + preset.Replace(CustomizationLibrary.PresetPrefix, "") };
+    foreach (var (section, box) in _sectionBoxes)
+    {
+      if (box.SelectedItem is string uid)
+        parts.Add(section + "=" + uid);
+    }
+
+    return string.Join(",", parts);
+  }
 }

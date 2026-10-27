@@ -387,7 +387,7 @@ public static class AssetExporter
   {
     var template = AssetClassification.BaseName(file.Name);
     if (!CustomizationLibrary.IsConstructorTemplate(template))
-      return null;
+      return ApplyWeaponVariant(catalog, store, template, mesh, settings, report);
     var request = VariantRequest.Parse(settings.Variant);
     if (request.All)
     {
@@ -437,6 +437,63 @@ public static class AssetExporter
     result.Template = template;
     result.AppearanceSource = source;
     report.Messages.Add($"{template}: variant {team}/{appearance} {result.Preset}: hid {result.HiddenParts} armor parts of {result.CustomizableObjects} customizable objects, {result.VisibleParts} visible parts left. --variant all keeps every piece.");
+    foreach (var note in result.Notes.Take(8))
+      report.Messages.Add(template + ": " + note);
+    return result;
+  }
+
+  /// <summary>
+  ///   Slots for a part picker: armor (constructor tpl) = default preset regions + every region per body section;
+  ///   weapon tpl = skins (Presets), first skin's regions (Regions) and every region present in the tpl (AvailableRegions).
+  ///   Loads its own mesh copy; null when the file has no customization.
+  /// </summary>
+  public static VariantResult? DescribeVariant(GameCatalog catalog, ArchiveStore store, int index)
+  {
+    var file = catalog.GetFile(index);
+    var template = AssetClassification.BaseName(file.Name);
+    var report = new ExportReport();
+    var mesh = TemplateMeshReader.Load(catalog, store, index);
+    if (CustomizationLibrary.IsConstructorTemplate(template))
+      return ApplyVariant(catalog, store, file, mesh, new ExportSettings(), report);
+    if (!template.StartsWith("wpn_", StringComparison.OrdinalIgnoreCase))
+      return null;
+    var lib = WeaponLibrary(catalog, store);
+    var uid = lib?.UidFor(template);
+    if (lib is null || uid is null)
+      return null;
+    var result = WeaponVariant.Apply(mesh, lib, uid, VariantRequest.Default);
+    result.Template = template;
+    return result;
+  }
+
+  private static readonly System.Runtime.CompilerServices.ConditionalWeakTable<GameCatalog, WeaponCustomization?[]> WeaponLibraries = new();
+
+  public static WeaponCustomization? WeaponLibrary(GameCatalog catalog, ArchiveStore store)
+  {
+    var holder = WeaponLibraries.GetValue(catalog, _ => new WeaponCustomization?[1]);
+    lock (holder)
+      return holder[0] ??= WeaponCustomization.Load(catalog, store);
+  }
+
+  /// <summary>Weapon tpls only when a --variant is given (default export keeps every part, as before).</summary>
+  private static VariantResult? ApplyWeaponVariant(GameCatalog catalog, ArchiveStore store, string template, ExportedMesh mesh, ExportSettings settings, ExportReport report)
+  {
+    if (string.IsNullOrWhiteSpace(settings.Variant) || !template.StartsWith("wpn_", StringComparison.OrdinalIgnoreCase))
+      return null;
+    var request = VariantRequest.Parse(settings.Variant);
+    if (request.All || (request.Skin is null && request.WeaponRegions is null && request.Show.Count == 0 && request.Hide.Count == 0))
+      return null;
+    var lib = WeaponLibrary(catalog, store);
+    var uid = lib?.UidFor(template);
+    if (lib is null || uid is null)
+    {
+      report.Messages.Add($"{template}: no firearmUid (firearm mgs *_client.cls nameTpl) found; every part exported.");
+      return null;
+    }
+
+    var result = WeaponVariant.Apply(mesh, lib, uid, request);
+    result.AppearanceSource = "firearm mgs/" + uid;
+    report.Messages.Add($"{template}: weapon skin {uid}/{result.Preset}: hid {result.HiddenParts} parts of {result.CustomizableObjects} customizable objects, {result.VisibleParts} visible.");
     foreach (var note in result.Notes.Take(8))
       report.Messages.Add(template + ": " + note);
     return result;
