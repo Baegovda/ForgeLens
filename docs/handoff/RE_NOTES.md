@@ -104,3 +104,9 @@ All addresses are virtual addresses in `sm2_retail.exe` (retail Steam build, 81 
 ### vfx3e (2026-10-27)
 - Blood-splash VAT VS: pc_dx12_combine_material.sdc 00000_0 (string COMBINE_MATERIAL_SHADER0_BLOOD_SPLASH). See HANDOFF vfx3e.
 - Serialiser xrefs: ratioDependency 0x141790409, ratioXY 0x141786eb1, blend_add 0x141751d81/0x14178e041, genOnFly 0x1417acdc6/0x1417ae934.
+
+## vfx4-1 (2026-10-27)
+- `FUN_141796980` distortion typeParams parser: softDepth +0, visuals.texture +8, localOffsetX/Y +0x90/+0x94, **power +0x98** (spline, FUN_14177c520), isRandomFlip +0xa8, rotation +0xac, ratioDependency +0xc0, isNoOrientToCam +0xe8 (payload = desc+0x1b0).
+- `FUN_1417eeed0` CPU particle vertex: typeParams==1 → colour (0,0,0,power(age)) (desc+0x248 type 1 = 64-sample spline, else const desc+0x250); ×1.0 `DAT_143c844b4`; non-distortion colour ×1/255 `DAT_143560150`.
+- `"DISTORTION_SCALE_CONST_MUL_VC_ALPHA"` @0x1437f5a40 (FUN_14236e020 define table). `"CB_PASS_DISTORTION_POSTPROC"` @0x1437133f8, `"DISTORT_POSTPROC_PARAMS"` @0x143713418 (CB layout FUN_1421aa940; filler not found).
+- Trail desc parser `FUN_14183a330`: degNear +0x3e8, degFar +0x400 (FUN_14181e410 each), degradationRadius +0x418. `FUN_14187f1e0` copies desc+0x3e0..0x414 → instance +0x1ec..0x220 (degFar triplet scaled) and +0x418 → +0x224. `FUN_1418c09a0` reads +0x400/+0x404/+0x418.

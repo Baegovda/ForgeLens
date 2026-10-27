@@ -1477,3 +1477,13 @@ Disassembly: /workspace/vfxsh_dis/{pc,pg,dx_pc_dx12_sfx,dx_pc_dx12_distort}, GLS
 ## vfx4-0 (2026-10-27 17:30 KST) — roadmap change
 - User removed Niagara conversion from the roadmap; it is kept only under ROADMAP → "Possible future development". AGENTS.md rule 6, STATUS, WORKFLOW updated.
 - New order: vfx4-1 VFX heuristic reduction (finisher blood saturation, distortion power/0.04, trail DEGR), vfx4-2 UE export test (no Niagara) into /Game/SM2_Work, vfx4-3 browser viewer polish.
+
+## vfx4-1 (2026-10-27 17:50 KST) — VFX heuristic reduction (Ghidra ghidra_proj3)
+- Outputs /workspace/rea/vfx4_1.c (DispScan 0x248), vfx4_2.c (DecompAt strings), vfx4_3.c (DispScan trail offsets).
+- **distortion.power → vertex alpha: PROVEN.** FUN_1417eeed0 writes colour (0,0,0,power(age)) for distortion emitters; define
+  "DISTORTION_SCALE_CONST_MUL_VC_ALPHA" @0x1437f5a40. Current code already matches (r*alpha with alpha=alphaK); comment updated.
+- **0.04 resolve strength: still HEURISTIC.** Only the CB names were found (CB_PASS_DISTORTION_POSTPROC @0x1437133f8, layout FUN_1421aa940).
+- **Trail DEGR: still HEURISTIC** for the slot mapping. New proven desc offsets (degNear +0x3e8, degFar +0x400, degradationRadius +0x418,
+  parser FUN_14183a330) and the desc→instance copy FUN_14187f1e0; the CB pack is still not traced.
+- **Finisher blood saturation: still HEURISTIC** (scene ambient/fog; no exe evidence). SurfLight 60 unchanged.
+- No behaviour change, so no new env flag. VFX ≈ 80%.

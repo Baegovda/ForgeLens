@@ -47,8 +47,13 @@ internal sealed unsafe class EffectRenderer : IDisposable
   /// <summary>
   ///   vfx3z: particle distortion buffer math from particles.sdc 00005_1 (offset = normal * per-vertex scalar, mask =
   ///   sat(10*|offset|), no edge fade). The per-vertex scalar is V_TEXCOORD.w of the CPU vertex (VS 00001_1 l.1573
-  ///   passes it through); that it carries distortion.power x alpha is HEURISTIC (writer not traced, the power curve is
-  ///   GPU-bound by FUN_1417e29b0 inst+0x200 <- desc+0x1b8). Resolve scale DistortionStrength stays HEURISTIC.
+  ///   passes it through). vfx4-1 PROVEN: the CPU vertex writer FUN_1417eeed0 (@0x1417ef1xx, typeParams==1 branch) sets
+  ///   the particle colour to (0,0,0, power(age)): visuals.power is parsed by FUN_141796980 to payload+0x98 = desc+0x248,
+  ///   a 64-sample spline read at (age-start)*invRange or the constant at desc+0x250, scaled by 1.0 (DAT_143c844b4), and
+  ///   only multiplied by the per-particle colour when colour mode desc+0x108 == 4. Matching shader define
+  ///   "DISTORTION_SCALE_CONST_MUL_VC_ALPHA" @0x1437f5a40 (registered in FUN_14236e020). Our r*alpha product equals that
+  ///   for refraction-only emitters (alpha = alphaK). Resolve scale DistortionStrength (0.04) stays HEURISTIC: its CB
+  ///   "CB_PASS_DISTORTION_POSTPROC"/"DISTORT_POSTPROC_PARAMS" @0x1437133f8/0x143713418 (FUN_1421aa940) has no traced filler.
   ///   Default on; SM2_VFX_DISTORT_EXACT=0 restores the radial-edge version.
   /// </summary>
   public static bool DistortExact { get; set; } = Environment.GetEnvironmentVariable("SM2_VFX_DISTORT_EXACT") != "0";

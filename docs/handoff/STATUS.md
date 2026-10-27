@@ -86,7 +86,9 @@ Extractor build: PC `Desktop\SM2_Work\Bin\SM2Extractor_e4ceb7d`. Captures: PC `D
   - blend_add interpreted;
   - exposure 1/250 and lit ×100 tuned on corpus medians;
   - genOnFly approximated;
-  - distortion strength `SM2_VFX_DISTORT` 0.04 (buffer math exact since vfx3z, power→vertex scalar heuristic);
+  - distortion resolve scale `SM2_VFX_DISTORT` 0.04 (buffer math exact since vfx3z; power→vertex alpha PROVEN in vfx4-1, FUN_1417eeed0);
+  - trail DEGR slot→field mapping (desc offsets PROVEN in vfx4-1: degNear +0x3e8, degFar +0x400, degradationRadius +0x418; CB pack not traced);
+  - finisher blood saturation (scene ambient/fog; no exe evidence found in vfx4-1);
   - bench bloom point 0.45, surface light 60, LitScale 400 (vfx3z);
   - degNear curve shape;
   - flesh colour assumed dark red.
