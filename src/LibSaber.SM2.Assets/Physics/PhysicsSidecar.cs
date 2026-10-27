@@ -17,6 +17,9 @@ public static class PhysicsSidecar
   {
     static float[] V(Vector3 v) => new[] { v.X, v.Y, v.Z };
     static float[] Ue(Vector3 v) => V(AxisConvert.Direction(v, false) * 100f);
+    // mtl1-11: positions as UE shows the imported FBX mesh. Measured in UE 5.7: the imported sections sit at (-x, y, z) of Ue(p)
+    // (calgar ribbon_02_L sec centre 18.7 vs sidecar -18.7, same extents), so the X axis is mirrored here.
+    static float[] UeMesh(Vector3 v) { var a = Ue(v); a[0] = -a[0]; return a; }
     var bones = mesh.Bones;
     string BoneName(int i) => i >= 0 && i < bones.Count ? bones[i].Name : "";
 
@@ -86,7 +89,8 @@ public static class PhysicsSidecar
         maxDistanceMeters = maxDistance,
         // mtl1-9: sim particle bind positions in the Unreal FBX space (cm, Z-up), same order as maxDistanceMeters.
         // SM2PhysicsSetup.CreateChaosCloth uses them to find the _SIM section and paint MaxDistance on its cloth particles.
-        simPositionsUeCm = shell?.Positions.SelectMany(p => Ue(p)).ToArray() ?? Array.Empty<float>(),
+        simPositionsSpace = "ueMesh",
+        simPositionsUeCm = shell?.Positions.SelectMany(p => UeMesh(p)).ToArray() ?? Array.Empty<float>(),
         helperBones = rig?.Clusters.Where(k => string.Equals(k.Cloth, c.SimMeshName, StringComparison.OrdinalIgnoreCase)).Select(k => new { bone = BoneName(k.Bone), parent = BoneName(k.Parent), particles = k.Particles.Length }).ToList(),
         source = cfg,
         ue = new

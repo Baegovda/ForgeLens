@@ -1685,3 +1685,37 @@ Disassembly: /workspace/vfxsh_dis/{pc,pg,dx_pc_dx12_sfx,dx_pc_dx12_distort}, GLS
   - No NaN in any run.
   - PNGs: box `/workspace/mtl_fix/cloth_cmp_{calgar,tech_priest,sorcerer_exalted}.png` (top = bone method, bottom = Chaos).
 - **MRQ:** before rendering cloth or RigidBody shots, run `tools/ue/ue_mrq_warmup.py <config> 32 8` so the sim settles (engine and render warm-up frames).
+
+## mtl1-11: SIM section X-mirror fix and bone-mode chain-depth cap (2026-10-27)
+- **Unmatched SIM sections. Cause measured with `CreateChaosCloth` DIAG lines (`tools/ue/ue_cdiag.py`):**
+  - The sidecar's `simPositionsUeCm` is the imported section mirrored on X, with the same extents and Y/Z. Examples:
+    - calgar ribbon_02_L: section centre (18.7, 21.2, 144.6) vs sim (-18.7, 21.2, 144.6), extents 2.7/3.2/17.6 on both, slot hit 0.00.
+    - calgar cloak: centre (1.9, -39.3, 133.9) vs (-1.9, …), hit 0.74.
+    - sorcerer beads: 22.6 vs -22.6, hit 0.01.
+  - Only near-symmetric pieces had matched before.
+  - **Fix, exporter:** `PhysicsSidecar` now writes `simPositionsSpace="ueMesh"` and positions with X negated.
+  - **Fix, plugin:** for older exports it mirrors when that fits better, judged first by centroid, then by vertex hits.
+  - **Result:**
+    - calgar: 8/8 cloths converted (was 2)
+    - tech_priest: 4/4 (was 2)
+    - sorcerer_exalted: 4/4 (was 2)
+    - Hits 1.00, worstMatch 0.00 cm.
+  - Not yet measured: whether the other sidecar vectors (capsule offsets, wind) have the same X mirror.
+- **Bone-mode tech_priest sag. Cause measured with `ue_bdiag.py` (DescribeBody, SetSimGravity):**
+  - The skirt helpers formed long chains of 3.3 cm links.
+  - Helper 0 dropped from rest z 49 to z -15. With gravity off it stayed at z 45.
+  - A SLERP drive of 1e5 (`TuneConstraintDrive`, `ue_drive.py`) changed nothing in the RigidBody node, so stiffness alone can't fix it.
+  - **Fix:** `MaxChainDepth=1` (HEURISTIC). A helper anchors only to a pinned helper or to its own kinematic skeleton parent. Its swing stays bounded by atan(maxDistance/L), the source NvCloth motion-constraint bound.
+  - The depth-3 cap measured a 29 cm sag.
+- **Live check:** PhysTestMap, SIE, after `ue_resetup.py`. Values are mean/max cm.
+
+| char | before | now | NaN |
+|---|---|---|---|
+| tech_priest | 23.5 / 108 (h0 z -15 to -23) | 9.4–10.2 / 50–54 (h0 z 39–42 vs 49–51 anim) | no |
+| sorcerer_exalted | 41–62 / 245–341 | 22–30 / 192–276 | no |
+| calgar | 11–13 | 11.0–11.7 | no |
+| chaplain | ≈6 | 7.9 (slightly worse, FLAG) | no |
+| commissar | 2.4–2.8 | 2.8–3.0 | no |
+| titus | 8–14 | 7.9–8.0 | no |
+
+- New UFUNCTIONs: `TuneConstraintDrive`, `DescribeBody`, `SetSimGravity` (diagnostics).

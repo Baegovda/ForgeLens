@@ -221,6 +221,13 @@ bool USM2PhysicsSetupLibrary::SetupFromJsonEx(USkeletalMesh* Mesh, const FString
     const float Radius = FMath::Clamp(Spacing * 0.5f, 0.5f, 10.0f);
     for (const FHelper& H : Helpers)
       AddBody(PA, H.Parent, Radius, true); // kinematic body on every skeleton parent (was only Helpers[0].Parent)
+    // mtl1-11: chain depth cap. Measured: tech_priest skirt helpers formed chains of 3.3 cm links; with gravity the compounded
+    // 18-30 deg swing per link let helper 0 drop 64 cm (rest z 49 -> -15); with gravity off it stayed at 45; a SLERP drive of
+    // 1e5 changed nothing (RigidBody node). A helper deeper than MaxChainDepth hangs from its own kinematic skeleton parent
+    // instead, with the swing derived from NvCloth maxDistance (atan(r/L)), the same motion-constraint bound as the source sim.
+    constexpr int32 MaxChainDepth = 1; // HEURISTIC (measured: 3 -> tech_priest h0 sag 29 cm, 1 -> see HANDOFF mtl1-11)
+    TArray<int32> Depth;
+    Depth.Init(0, Helpers.Num());
     for (int32 I = 0; I < Helpers.Num(); ++I)
     {
       const FHelper& H = Helpers[I];
@@ -230,16 +237,21 @@ bool USM2PhysicsSetupLibrary::SetupFromJsonEx(USkeletalMesh* Mesh, const FString
       FTransform AnchorT = Pos(H.Parent);
       // mtl1-8: the own (kinematic) parent bone competes with earlier helpers, so chains stay short.
       float Best = H.Dist;
+      int32 AnchorJ = INDEX_NONE;
       for (int32 J = 0; J < I; ++J)
       {
+        if (Depth[J] >= MaxChainDepth)
+          continue;
         const float D = (Helpers[J].T.GetLocation() - H.T.GetLocation()).Size();
         if (D < Best)
         {
           Best = D;
           Anchor = Helpers[J].Bone;
           AnchorT = Helpers[J].T;
+          AnchorJ = J;
         }
       }
+      Depth[I] = H.bPinned ? 0 : (AnchorJ == INDEX_NONE ? 1 : Depth[AnchorJ] + 1);
       // Swing limit DERIVED from NvCloth maxDistance (motion constraint radius r around the skinned position): a particle
       // pivoting at distance L from its anchor can deviate atan(r / L). Clamped 5..60 deg (clamp HEURISTIC); 25 deg when no data.
       const float Seg = FMath::Max(Best, 0.1f);
@@ -449,6 +461,33 @@ bool USM2PhysicsSetupLibrary::CreateChaosCloth(USkeletalMesh* Mesh, const FStrin
     TArray<FVector3f> SimPos;
     for (int32 I = 0; I + 2 < PosV->Num(); I += 3)
       SimPos.Add(FVector3f((*PosV)[I]->AsNumber(), (*PosV)[I + 1]->AsNumber(), (*PosV)[I + 2]->AsNumber()));
+    // mtl1-11: exports before simPositionsSpace="ueMesh" are X-mirrored against the imported mesh. Detect on the slot-named
+    // section by centroid (mirror only if it fits clearly better) so old and new exports both work.
+    bool bMirrored = false;
+    {
+      FString Space;
+      Cloth->TryGetStringField(TEXT("simPositionsSpace"), Space);
+      const FSkeletalMeshLODModel& L0 = Model->LODModels[0];
+      for (const FSkelMeshSection& Sec : L0.Sections)
+      {
+        if (Space == TEXT("ueMesh") || Sec.SoftVertices.Num() == 0 || !Mesh->GetMaterials().IsValidIndex(Sec.MaterialIndex) ||
+          !Mesh->GetMaterials()[Sec.MaterialIndex].MaterialSlotName.ToString().Equals(SimName, ESearchCase::IgnoreCase))
+          continue;
+        FVector3f SC(0), PC(0);
+        for (const FSoftSkinVertex& V : Sec.SoftVertices) SC += V.Position;
+        for (const FVector3f& P : SimPos) PC += P;
+        SC /= Sec.SoftVertices.Num(); PC /= SimPos.Num();
+        const FVector3f PM(-PC.X, PC.Y, PC.Z);
+        if (FVector3f::Dist(SC, PM) + 0.5f < FVector3f::Dist(SC, PC))
+        {
+          for (FVector3f& P : SimPos) P.X = -P.X;
+          bMirrored = true;
+        }
+        break;
+      }
+    }
+    if (bMirrored)
+      Log.Add(SimName + TEXT(": simPositions X-mirrored to match the imported mesh (old export)"));
     auto Nearest = [&](const FVector3f& P, float& OutD) {
       int32 Best = INDEX_NONE;
       float BD = TNumericLimits<float>::Max();
@@ -477,14 +516,33 @@ bool USM2PhysicsSetupLibrary::CreateChaosCloth(USkeletalMesh* Mesh, const FStrin
         continue;
       if (!Mesh->GetMaterials()[Sec.MaterialIndex].MaterialSlotName.ToString().Equals(SimName, ESearchCase::IgnoreCase))
         continue;
-      int32 Hit = 0;
+      int32 Hit = 0, HitM = 0;
       for (const FSoftSkinVertex& V : Sec.SoftVertices)
       {
         float D;
         Nearest(V.Position, D);
         Hit += D < 2.0f;
+        Nearest(FVector3f(-V.Position.X, V.Position.Y, V.Position.Z), D);
+        HitM += D < 2.0f;
+      }
+      if (HitM > Hit && !bMirrored) // old export, X-mirrored: decide by vertex hits, not centroid
+      {
+        for (FVector3f& P : SimPos) P.X = -P.X;
+        bMirrored = true;
+        Hit = HitM;
+        Log.Add(SimName + TEXT(": simPositions X-mirrored by vertex hits"));
       }
       SimHit = Sec.SoftVertices.Num() ? float(Hit) / Sec.SoftVertices.Num() : 0.f;
+      {
+        FBox3f SB(ForceInit), PB(ForceInit);
+        for (const FSoftSkinVertex& V : Sec.SoftVertices) SB += V.Position;
+        for (const FVector3f& P : SimPos) PB += P;
+        const FVector3f DC = SB.GetCenter() - PB.GetCenter();
+        Log.Add(FString::Printf(TEXT("%s DIAG secVerts=%d simParticles=%d secCenter=(%.1f %.1f %.1f) simCenter=(%.1f %.1f %.1f) secExt=(%.1f %.1f %.1f) simExt=(%.1f %.1f %.1f) hit=%.2f"),
+          *SimName, Sec.SoftVertices.Num(), SimPos.Num(), SB.GetCenter().X, SB.GetCenter().Y, SB.GetCenter().Z, PB.GetCenter().X, PB.GetCenter().Y, PB.GetCenter().Z,
+          SB.GetExtent().X, SB.GetExtent().Y, SB.GetExtent().Z, PB.GetExtent().X, PB.GetExtent().Y, PB.GetExtent().Z, Sec.SoftVertices.Num() ? float(Hit) / Sec.SoftVertices.Num() : 0.f));
+        (void)DC;
+      }
       if (SimHit >= 0.8f) // HEURISTIC
         SimSection = S;
     }
@@ -640,4 +698,88 @@ bool USM2PhysicsSetupLibrary::CreateChaosCloth(USkeletalMesh* Mesh, const FStrin
   Mesh->MarkPackageDirty();
   Report = FString::Join(Log, TEXT(" | "));
   return Converted.Num() > 0;
+}
+
+bool USM2PhysicsSetupLibrary::TuneConstraintDrive(UPhysicsAsset* PA, float Stiffness, float Damping, float SwingScale, FString& Report)
+{
+  if (!PA)
+  {
+    Report = TEXT("no physics asset");
+    return false;
+  }
+  PA->Modify();
+  int32 N = 0;
+  for (UPhysicsConstraintTemplate* C : PA->ConstraintSetup)
+  {
+    if (!C)
+      continue;
+    C->Modify();
+    FConstraintInstance& CI = C->DefaultInstance;
+    CI.SetAngularDriveMode(EAngularDriveMode::SLERP);
+    CI.SetOrientationDriveSLERP(Stiffness > 0.f);
+    CI.SetAngularVelocityDriveSLERP(Damping > 0.f);
+    CI.SetAngularDriveParams(Stiffness, Damping, 0.f);
+    CI.SetAngularOrientationTarget(FQuat::Identity);
+    if (SwingScale > 0.f && SwingScale != 1.f)
+    {
+      CI.SetAngularSwing1Limit(CI.GetAngularSwing1Motion(), FMath::Clamp(CI.GetAngularSwing1Limit() * SwingScale, 1.f, 90.f));
+      CI.SetAngularSwing2Limit(CI.GetAngularSwing2Motion(), FMath::Clamp(CI.GetAngularSwing2Limit() * SwingScale, 1.f, 90.f));
+      CI.SetAngularTwistLimit(CI.GetAngularTwistMotion(), FMath::Clamp(CI.GetAngularTwistLimit() * SwingScale, 1.f, 90.f));
+    }
+    C->SetDefaultProfile(CI);
+    ++N;
+  }
+  PA->MarkPackageDirty();
+  Report = FString::Printf(TEXT("drive stiffness=%.0f damping=%.0f swingScale=%.2f constraints=%d"), Stiffness, Damping, SwingScale, N);
+  return N > 0;
+}
+
+FString USM2PhysicsSetupLibrary::DescribeBody(UPhysicsAsset* PA, USkeletalMesh* Mesh, FName Bone)
+{
+  if (!PA || !Mesh)
+    return TEXT("no PA/mesh");
+  const FReferenceSkeleton& RS = Mesh->GetRefSkeleton();
+  auto CS = [&](FName B) {
+    int32 I = RS.FindBoneIndex(B);
+    FTransform T = FTransform::Identity;
+    while (I != INDEX_NONE) { T = T * RS.GetRefBonePose()[I]; I = RS.GetParentIndex(I); }
+    return T;
+  };
+  FString Out;
+  const int32 BI = PA->FindBodyIndex(Bone);
+  const int32 SkI = RS.FindBoneIndex(Bone);
+  Out += FString::Printf(TEXT("%s body=%d type=%d skelParent=%s restZ=%.1f"), *Bone.ToString(), BI,
+    BI != INDEX_NONE ? (int32)PA->SkeletalBodySetups[BI]->PhysicsType : -1,
+    SkI != INDEX_NONE && RS.GetParentIndex(SkI) != INDEX_NONE ? *RS.GetBoneName(RS.GetParentIndex(SkI)).ToString() : TEXT("-"), CS(Bone).GetLocation().Z);
+  for (UPhysicsConstraintTemplate* C : PA->ConstraintSetup)
+  {
+    if (!C) continue;
+    const FConstraintInstance& CI = C->DefaultInstance;
+    if (CI.ConstraintBone1 != Bone && CI.ConstraintBone2 != Bone) continue;
+    const FName O = CI.ConstraintBone1 == Bone ? CI.ConstraintBone2 : CI.ConstraintBone1;
+    const int32 OB = PA->FindBodyIndex(O);
+    Out += FString::Printf(TEXT(" | %s %s(body %d type %d z %.1f) dist=%.1f lin=%d/%d/%d swing=%.0f/%.0f twist=%.0f f1=(%.1f %.1f %.1f) drive=%.0f"),
+      CI.ConstraintBone1 == Bone ? TEXT("child-of") : TEXT("parent-of"), *O.ToString(), OB, OB != INDEX_NONE ? (int32)PA->SkeletalBodySetups[OB]->PhysicsType : -1,
+      CS(O).GetLocation().Z, (CS(O).GetLocation() - CS(Bone).GetLocation()).Size(),
+      (int32)CI.GetLinearXMotion(), (int32)CI.GetLinearYMotion(), (int32)CI.GetLinearZMotion(), CI.GetAngularSwing1Limit(), CI.GetAngularSwing2Limit(), CI.GetAngularTwistLimit(),
+      CI.GetRefFrame(EConstraintFrame::Frame1).GetLocation().X, CI.GetRefFrame(EConstraintFrame::Frame1).GetLocation().Y, CI.GetRefFrame(EConstraintFrame::Frame1).GetLocation().Z,
+      CI.ProfileInstance.AngularDrive.SlerpDrive.Stiffness);
+  }
+  return Out;
+}
+
+int32 USM2PhysicsSetupLibrary::SetSimGravity(UPhysicsAsset* PA, bool bEnable)
+{
+  if (!PA) return 0;
+  PA->Modify();
+  int32 N = 0;
+  for (USkeletalBodySetup* B : PA->SkeletalBodySetups)
+    if (B && B->PhysicsType != PhysType_Kinematic)
+    {
+      B->Modify();
+      B->DefaultInstance.SetEnableGravity(bEnable);
+      ++N;
+    }
+  PA->MarkPackageDirty();
+  return N;
 }

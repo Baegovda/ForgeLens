@@ -7,6 +7,7 @@
 class USkeletalMesh;
 class UAnimBlueprint;
 
+class UPhysicsAsset;
 UCLASS()
 class SM2PHYSICSSETUP_API USM2PhysicsSetupLibrary : public UBlueprintFunctionLibrary
 {
@@ -34,6 +35,18 @@ public:
   UFUNCTION(BlueprintCallable, Category = "SM2")
   static bool TuneRigidBody(UAnimBlueprint* ABP, int32 SimSpace, FName BaseBone, float WorldAlpha, float DampingAlpha, float MaxLinearVelocity,
     float MaxLinearAcceleration, float MaxAngularVelocity, float MaxAngularAcceleration, FString& Report);
+
+  /** Angular SLERP drive toward the rest pose on every constraint (fights the sag of long cloth chains in bone mode), plus swing-limit scale. Saves nothing; caller saves. */
+  UFUNCTION(BlueprintCallable, Category = "SM2|Physics")
+  static bool TuneConstraintDrive(UPhysicsAsset* PA, float Stiffness, float Damping, float SwingScale, FString& Report);
+
+  /** Diagnostic: body type and every constraint touching Bone (limits, drive, anchor distance in the rest pose of Mesh). */
+  UFUNCTION(BlueprintCallable, Category = "SM2|Physics")
+  static FString DescribeBody(UPhysicsAsset* PA, USkeletalMesh* Mesh, FName Bone);
+
+  /** Diagnostic: gravity on/off for every simulated body. Caller saves. */
+  UFUNCTION(BlueprintCallable, Category = "SM2|Physics")
+  static int32 SetSimGravity(UPhysicsAsset* PA, bool bEnable);
 
   /**
    * mtl1-9 Chaos Cloth option: for every cloth in {model}.physics.json, finds the LOD0 section that is the game _SIM mesh
