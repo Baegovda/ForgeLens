@@ -778,7 +778,9 @@ bool USM2PhysicsSetupLibrary::CreateChaosCloth(USkeletalMesh* Mesh, const FStrin
       SetProp(Config, TEXT("TetherStiffness"), W(FMath::Max(0.5, Num(CC, TEXT("tetherStiffness"), 1))), Log);
       SetProp(Config, TEXT("TetherScale"), W(FMath::Clamp(Num(CC, TEXT("tetherScale"), 1), 1.0, 1.2)), Log);
       SetProp(Config, TEXT("DampingCoefficient"), FString::SanitizeFloat(FMath::Clamp(Num(CC, TEXT("dampingCoefficient"), 0.01), 0.0, 1.0)), Log);
-      SetProp(Config, TEXT("CollisionThickness"), FString::SanitizeFloat(FMath::Max(0.5, Num(CC, TEXT("collisionThicknessCm"), 1))), Log);
+      // mtl1-13b: thicker collision + CCD against fast limbs (HEURISTIC; measured penetration 2-6% at 1 cm).
+      SetProp(Config, TEXT("CollisionThickness"), FString::SanitizeFloat(FMath::Max(2.0, Num(CC, TEXT("collisionThicknessCm"), 1))), Log);
+      SetProp(Config, TEXT("bUseCCD"), TEXT("True"), Log);
       SetProp(Config, TEXT("FrictionCoefficient"), FString::SanitizeFloat(Num(CC, TEXT("frictionCoefficient"), 0.8)), Log);
       const double LV = FMath::Clamp(Num(CC, TEXT("linearVelocityScale"), 0.75), 0.0, 1.0);
       SetProp(Config, TEXT("LinearVelocityScale"), FString::Printf(TEXT("(X=%f,Y=%f,Z=%f)"), LV, LV, LV), Log);
@@ -916,7 +918,7 @@ int32 USM2PhysicsSetupLibrary::SetSimGravity(UPhysicsAsset* PA, bool bEnable)
   return N;
 }
 
-int32 USM2PhysicsSetupLibrary::MeasureClothPenetration(USkeletalMeshComponent* Comp, float ThresholdCm, FString& Report)
+int32 USM2PhysicsSetupLibrary::MeasureClothPenetration(USkeletalMeshComponent* Comp, float ThresholdCm, FString& Report, UPhysicsAsset* OverrideCollision)
 {
   if (!Comp || !Comp->GetSkeletalMeshAsset())
   {
@@ -924,10 +926,21 @@ int32 USM2PhysicsSetupLibrary::MeasureClothPenetration(USkeletalMeshComponent* C
     return -1;
   }
   TSet<UPhysicsAsset*> PAs;
-  for (UClothingAssetBase* A : Comp->GetSkeletalMeshAsset()->GetMeshClothingAssets())
-    if (UClothingAssetCommon* C = Cast<UClothingAssetCommon>(A))
-      if (C->PhysicsAsset)
+  // mtl1-13b: pinned particles (MaxDistance ~0) follow the skin and cannot be pushed out; count them separately.
+  TMap<int32, const TArray<float>*> MaxD;
+  const TArray<UClothingAssetBase*>& CAs = Comp->GetSkeletalMeshAsset()->GetMeshClothingAssets();
+  for (int32 Ai = 0; Ai < CAs.Num(); ++Ai)
+    if (UClothingAssetCommon* C = Cast<UClothingAssetCommon>(CAs[Ai]))
+    {
+      if (C->PhysicsAsset && !OverrideCollision)
         PAs.Add(C->PhysicsAsset);
+      if (C->LodData.Num() > 0)
+        if (const FPointWeightMap* M = C->LodData[0].PhysicalMeshData.FindWeightMap(EWeightMapTargetCommon::MaxDistance))
+          MaxD.Add(Ai, &M->Values);
+    }
+  if (OverrideCollision)
+    PAs.Add(OverrideCollision);
+  int32 InsidePinned = 0;
   const TMap<int32, FClothSimulData>& Data = Comp->GetCurrentClothingData_GameThread();
   const FTransform CompTM = Comp->GetComponentTransform();
   int32 Total = 0, Inside = 0, NaN = 0;
@@ -941,8 +954,11 @@ int32 USM2PhysicsSetupLibrary::MeasureClothPenetration(USkeletalMeshComponent* C
     for (const FVector3f& P : D.Positions) { CA += D.Transform.TransformPosition(FVector(P)); CB += CompTM.TransformPosition(FVector(P)); }
     CA /= D.Positions.Num(); CB /= D.Positions.Num();
     const bool bUseA = FVector::Dist(CA, Comp->Bounds.Origin) <= FVector::Dist(CB, Comp->Bounds.Origin);
-    for (const FVector3f& P3 : D.Positions)
+    const TArray<float>* const* MV = MaxD.Find(KV.Key);
+    for (int32 Pi = 0; Pi < D.Positions.Num(); ++Pi)
     {
+      const FVector3f& P3 = D.Positions[Pi];
+      const bool bPinned = MV && (*MV)->IsValidIndex(Pi) && (**MV)[Pi] < 0.1f;
       ++Total;
       if (P3.ContainsNaN()) { ++NaN; continue; }
       const FVector W = bUseA ? D.Transform.TransformPosition(FVector(P3)) : CompTM.TransformPosition(FVector(P3));
@@ -975,10 +991,29 @@ int32 USM2PhysicsSetupLibrary::MeasureClothPenetration(USkeletalMeshComponent* C
             if (Q.X < 0 && Q.Y < 0 && Q.Z < 0) Deepest = FMath::Min(Deepest, (float)Q.GetMax());
           }
         }
-      if (-Deepest > ThresholdCm) ++Inside;
-      Worst = FMath::Max(Worst, -Deepest);
+      if (-Deepest > ThresholdCm) { if (bPinned) ++InsidePinned; else ++Inside; }
+      if (!bPinned) Worst = FMath::Max(Worst, -Deepest);
     }
   }
-  Report = FString::Printf(TEXT("particles=%d inside>%.1fcm=%d worstCm=%.2f nan=%d collisionPAs=%d"), Total, ThresholdCm, Inside, Worst, NaN, PAs.Num());
+  Report = FString::Printf(TEXT("particles=%d inside>%.1fcm=%d (free) +%d pinned worstFreeCm=%.2f nan=%d collisionPAs=%d"), Total, ThresholdCm, Inside, InsidePinned, Worst, NaN, PAs.Num());
   return Inside;
+}
+
+UPhysicsAsset* USM2PhysicsSetupLibrary::SetClothCollision(USkeletalMesh* Mesh, UPhysicsAsset* Collision)
+{
+  UPhysicsAsset* Prev = nullptr;
+  if (!Mesh)
+    return Prev;
+  FScopedSkeletalMeshPostEditChange Scope(Mesh);
+  Mesh->Modify();
+  for (UClothingAssetBase* A : Mesh->GetMeshClothingAssets())
+    if (UClothingAssetCommon* C = Cast<UClothingAssetCommon>(A))
+    {
+      if (!Prev) Prev = C->PhysicsAsset;
+      C->Modify();
+      C->PhysicsAsset = Collision;
+      C->RefreshBoneMapping(Mesh);
+    }
+  Mesh->MarkPackageDirty();
+  return Prev;
 }

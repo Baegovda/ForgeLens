@@ -60,6 +60,10 @@ public:
   static bool CreateChaosCloth(USkeletalMesh* Mesh, const FString& JsonPath, TArray<FString>& Converted, FString& Report);
 
   /** mtl1-13 verification: cloth particles (current sim, game thread) inside the clothing assets' collision bodies by more than ThresholdCm. Returns the count. */
+  /** mtl1-13b: set (or clear with nullptr) the collision PhysicsAsset on every Clothing Asset of Mesh; returns the previous one. */
   UFUNCTION(BlueprintCallable, Category = "SM2")
-  static int32 MeasureClothPenetration(USkeletalMeshComponent* Comp, float ThresholdCm, FString& Report);
+  static UPhysicsAsset* SetClothCollision(USkeletalMesh* Mesh, UPhysicsAsset* Collision);
+
+  UFUNCTION(BlueprintCallable, Category = "SM2")
+  static int32 MeasureClothPenetration(USkeletalMeshComponent* Comp, float ThresholdCm, FString& Report, UPhysicsAsset* OverrideCollision = nullptr);
 };
