@@ -400,6 +400,7 @@ internal sealed unsafe class EffectRenderer : IDisposable
     var color = _gl.GetUniformLocation(_mesh, "uColor");
     var emissive = _gl.GetUniformLocation(_mesh, "uEmissive");
     var clip = _gl.GetUniformLocation(_mesh, "uClip");
+    var fresnel = _gl.GetUniformLocation(_mesh, "uSoftFresnel");
     var mode = _gl.GetUniformLocation(_mesh, "uTranslucent");
     var vatOn = _gl.GetUniformLocation(_mesh, "uVat");
     var vatMin = _gl.GetUniformLocation(_mesh, "uVatMin");
@@ -458,6 +459,7 @@ internal sealed unsafe class EffectRenderer : IDisposable
           _gl.Uniform4(color, c.X, c.Y, c.Z, c.W);
           _gl.Uniform1(emissive, inst.Emissive);
           _gl.Uniform1(clip, material.Clip);
+          _gl.Uniform1(fresnel, material.SoftFresnel);
           _gl.DrawElements(PrimitiveType.Triangles, (uint)count, DrawElementsType.UnsignedInt, (void*)(start * 4));
         }
       }
@@ -653,6 +655,7 @@ internal sealed unsafe class EffectRenderer : IDisposable
     uniform vec4 uColor;
     uniform float uEmissive;
     uniform float uClip;
+    uniform float uSoftFresnel;
     uniform int uTranslucent;
     uniform float uExposure;
     uniform vec3 uEye;
@@ -667,6 +670,7 @@ internal sealed unsafe class EffectRenderer : IDisposable
       float a = uColor.a * (uTranslucent == 1 ? t.a : 1.0);
       if (uTranslucent == 1 && uClip > 0.0) a *= clamp((t.a - uClip) / max(1e-3, 1.0 - uClip), 0.0, 1.0);
       vec3 n = normalize(gl_FrontFacing ? vNormal : -vNormal);
+      if (uSoftFresnel > 0.0) a *= pow(abs(dot(n, normalize(uEye - vWorld))), uSoftFresnel);
       vec3 base = t.rgb * pow(uColor.rgb, vec3(2.2)); // override colours are sRGB
       // Scene light in sprite HDR units (key + sky ~ EffectSprites.LitScale) plus the effect's point lights.
       vec3 light = vec3(200.0) * (0.35 + 0.65 * max(dot(n, normalize(vec3(0.4, 0.8, 0.3))), 0.0));

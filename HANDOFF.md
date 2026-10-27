@@ -1435,3 +1435,10 @@ Disassembly: /workspace/vfxsh_dis/{pc,pg,dx_pc_dx12_sfx,dx_pc_dx12_distort}, GLS
   too blobby/large (cpu_drops_3 size ~19 m at n 0.84 — size curve or scale suspect, open).
 - ingame_cmp.sh now also renders `<col>/early/` (480 Hz muzzle/grenade, force-visible blood) and runs
   tools/vfxbench/side_by_side.py. Debug `quad` lines in SPRDBG. VFX ≈ 77%.
+
+## vfx3w (2026-10-27 KST)
+- Muzzle mesh: tpl part Variant (shadingMtl) -> named td block (mzl_geom in water_drops_01.td: preset sfx, tint [255,237,72,18], emissive 111, softFreshnel power 5). EffectMeshes.Material now reads named block tex/tint/softFreshnel (SM2_VFX_MESH_MTL=0 disables). Fresnel alpha in mesh FS is heuristic. Texture "phantom_hands" not extracted -> white base. Open: flame_cross_4/6/8 grey columns (rgb ~26000 saturates).
+- Hidden blood emitters: part_mag_chainsaw_blood_splash_red_01 is a template (isVisible=False); visible copies are part_mag_chainsaw_*_finisher_01 (nameParent sfx_source_pt) and parent emitters2 overrides (fx_huge_blood_explosion). Bench/side-by-side now uses warrior_finisher_01; FORCE_VISIBLE dropped there.
+- Blood size: emitScale = emitter desc+0x70 (FUN_1417adea0), used in FUN_1417ecc30/1417f24a0/1417f3f60 as emission-count/threshold, not size (inconclusive) -> size unchanged. alphaMask.clip.power parsed (FUN_141782a60, desc+0x88) as EmitterDef.MaskClip, opt-in SM2_VFX_MASK_CLIP=1 (no visible change).
+- Finisher mesh colour: sfxMtlOverrides color constExpr [255,44,3,155] + emissiveIntensity spline 10.8->0 -> renders bright red; in-game darker (scene lighting/exposure). Open.
+- Lit smoke scene light: not traceable (runtime scene/sun); LitScale=100 stays heuristic (SM2_VFX_LIT=400 closer).

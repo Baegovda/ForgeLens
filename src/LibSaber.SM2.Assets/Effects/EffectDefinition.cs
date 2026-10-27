@@ -187,6 +187,12 @@ public sealed class EmitterDef
     return f.Length >= 4 ? new Vector3(f[1], f[2], f[3]) : f.Length == 3 ? new Vector3(f[0], f[1], f[2]) : Vector3.Zero;
   }
   public ScalarParam AlphaClip { get; init; } = ScalarParam.Constant(0);
+  /// <summary><c>visuals.alphaMask.clip.power</c> (mask desc +0x88; softClip +0xa0, clipEdgeRadius +0xa8; parser FUN_141782a60).
+  /// Age-driven dissolve threshold of the mask, e.g. chainsaw blood cpu_drops_3 0→0.6 over life. Null when absent/disabled.</summary>
+  public ScalarParam? MaskClip { get; init; }
+  /// <summary>SM2_VFX_MASK_CLIP=1 enables using <see cref="MaskClip"/> as the sprite clip threshold.
+  /// HEURISTIC: the consumer/shader math was not traced; we reuse the alphaClip path (clip applied after the mask multiply).</summary>
+  public static bool MaskClipEnabled { get; set; } = Environment.GetEnvironmentVariable("SM2_VFX_MASK_CLIP") == "1";
   public float SoftDepth { get; init; }
   /// <summary><c>visuals.alphaMask</c> (enabled): second texture whose alpha multiplies the sprite, sampled over the whole quad
   /// (not the flipbook cell) and rotated by a random angle from <c>tcIn.transform.rotation{x,y}</c> degrees.</summary>
@@ -483,6 +489,7 @@ public sealed class EffectDefinition
       AdditionalContrast = Math.Max(0f, visuals.Float("additionalContrast", 0f)),
       ContrastColorKey = EmitterDef.ContrastKey(visuals.Get("contrastColorKey")),
       AlphaClip = SslRead.Scalar(visuals.Get("alphaClip"), 0f),
+      MaskClip = visuals.Obj("alphaMask") is { } amc && (amc.Bool("isEnabled", false) || amc.Str("mode") == "Enabled") && amc.Obj("clip")?.Get("power") is { } mcp ? SslRead.Scalar(mcp, 0f) : null,
       SpeedInherit = SslRead.Range(particle.Obj("inherit")?.Get("speedInherit"), Vector2.Zero),
       SoftDepth = softDepth,
       Target = SslRead.UnionKind(tp.Obj("drawInSimulationTex")) == "drawInSimulationEnabled" ? DrawTarget.Simulation

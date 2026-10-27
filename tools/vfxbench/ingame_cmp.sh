@@ -31,13 +31,13 @@ for r, n in enumerate(fx):
 sheet.save(f"{o}/ingame_cmp_contact.png")
 P
 # vfx3v: sub-frame captures. Muzzle-flash (life ~0.044 s) and grenade fireball (main_core/flash_01, gone by ~0.18 s) are
-# missed by the 60 Hz / 3 s sheet, so re-capture them at 480 Hz over a short window; chainsaw blood is all isVisible=false
-# (gameplay-toggled) so it is drawn with the debug SM2_VFX_FORCE_VISIBLE=1.
+# missed by the 60 Hz / 3 s sheet, so re-capture them at 480 Hz over a short window; chainsaw blood uses the visible
+# finisher copy (part_mag_chainsaw_blood_splash_red_01 is a hidden template, isVisible=False).
 early() { local name=$1; shift; mkdir -p "$O/$name/early"
   env SM2_VFX_MESHES="$R/mesh1" SM2_VFX_STEP_HZ=480 "$@" xvfb-run -a -s "-screen 0 1920x1080x24" dotnet run --no-build --project src/LibSaber.SM2Browser -c Release -- \
     --vfxbench "$R/sfx" "$R/aliases/aliases/part_aliases/part_aliases.ps" "$R" "$O/$name/early" fx_bolter_muzzle_client@0.08 part_mg_frag_grenade_expl@0.32 > "$O/$name/early.log" 2>&1
-  env SM2_VFX_MESHES="$R/mesh1" SM2_VFX_FORCE_VISIBLE=1 "$@" xvfb-run -a -s "-screen 0 1920x1080x24" dotnet run --no-build --project src/LibSaber.SM2Browser -c Release -- \
-    --vfxbench "$R/sfx" "$R/aliases/aliases/part_aliases/part_aliases.ps" "$R" "$O/$name/early" part_mag_chainsaw_blood_splash_red_01 >> "$O/$name/early.log" 2>&1; }
+  env SM2_VFX_MESHES="$R/mesh1" "$@" xvfb-run -a -s "-screen 0 1920x1080x24" dotnet run --no-build --project src/LibSaber.SM2Browser -c Release -- \
+    --vfxbench "$R/sfx" "$R/aliases/aliases/part_aliases/part_aliases.ps" "$R" "$O/$name/early" part_mag_chainsaw_warrior_finisher_01 >> "$O/$name/early.log" 2>&1; }
 early off SM2_VFX_BLEND_REA=0
 early blend SM2_VFX_BLEND_REA=1
 early tint SM2_VFX_BLEND_REA=0 SM2_VFX_TINT_EXACT=1

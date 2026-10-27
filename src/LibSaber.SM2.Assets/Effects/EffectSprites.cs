@@ -150,7 +150,7 @@ public static class EffectSprites
     if (Debug && DbgSeen.TryGetValue(def.Name, out var seen) is var _ && seen < 4)
     {
       DbgSeen[def.Name] = seen + 1;
-      Console.Error.WriteLine($"  quad {def.Name}: n {n:0.00} size {size:0.000} rgb {rgb} alpha {alpha:0.000} life {p.Life:0.000} lit '{def.Lighting}'");
+      Console.Error.WriteLine($"  quad {def.Name}: n {n:0.00} size {size:0.000} rgb {rgb} alpha {alpha:0.000} life {p.Life:0.000} mclip {(def.MaskClip is { } dm ? dm.Sample(n, 0) : -1):0.00} mask {def.AlphaMask} lit '{def.Lighting}'");
     }
     if (distort)
     {
@@ -198,6 +198,7 @@ public static class EffectSprites
 
     var center = p.Position + ax * (def.LocalOffset.X * halfW * 2f) + ay * (def.LocalOffset.Y * halfH * 2f);
     var clip = Math.Clamp(def.AlphaClip.Sample(n, p.RandClip), 0f, 0.999f);
+    if (EmitterDef.MaskClipEnabled && def.MaskClip is { } mclip) clip = Math.Max(clip, Math.Clamp(mclip.Sample(n, p.RandClip), 0f, 0.999f));
     Span<(float X, float Y, float U, float V)> corners = [(-1, -1, u0, v1), (1, -1, u1, v1), (1, 1, u1, v0), (-1, 1, u0, v0)];
     var mc = MathF.Cos(p.MaskAngle);
     var ms = MathF.Sin(p.MaskAngle);

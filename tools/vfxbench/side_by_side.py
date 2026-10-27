@@ -17,7 +17,7 @@ SETS = {  # name: (ref tag, sheet subdir, effect, frames)
     "grenade_late": ("154743", "", "part_mg_frag_grenade_expl", [2, 3]),
     "bolter_muzzle": ("154807", "early", "fx_bolter_muzzle_client", [1, 2]),
     "bolter_trail": ("154843", "", "trail_stalker_bolter_smoke", [2, 5]),
-    "chainsaw_blood": ("155018", "early", "part_mag_chainsaw_blood_splash_red_01", [2, 4]),
+    "chainsaw_blood": ("155018", "early", "part_mag_chainsaw_warrior_finisher_01", [2, 4]),
 }
 for name, (tag, sub, fx, frames) in SETS.items():
     r = refimg(tag)

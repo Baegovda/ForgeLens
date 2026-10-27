@@ -8,7 +8,11 @@ using LibSaber.SM2.Assets.Meshes;
 namespace LibSaber.SM2Browser.Effects;
 
 /// <summary>Material look of a mesh-particle texture, read from its .td <c>materials.default</c> block.</summary>
-internal sealed record EffectMeshMaterial(string Texture, bool Translucent, Vector4 Tint, float Clip, LibSaber.SM2.Assets.Effects.VatParams? Vat = null);
+internal sealed record EffectMeshMaterial(string Texture, bool Translucent, Vector4 Tint, float Clip, LibSaber.SM2.Assets.Effects.VatParams? Vat = null)
+{
+  /// <summary><c>softFreshnel.power</c> when enabled (0 = off). HEURISTIC use: alpha *= |n·v|^power (soft silhouettes).</summary>
+  public float SoftFresnel { get; init; }
+}
 
 /// <summary>A geometry template flattened for the effect pass: pos(3) normal(3) uv(2) uv1(2) per vertex; sub-objects by node order.</summary>
 internal sealed class EffectMesh
@@ -104,8 +108,8 @@ internal sealed class EffectMeshes
       {
         var tex = part.Texture ?? "";
         if (tex.StartsWith("__default", StringComparison.Ordinal) || part.IndexCount < 3) continue;
-        var key = LibSaber.SM2.Assets.Effects.VatDecode.Enabled ? tex + "|" + part.Name : tex;
-        if (!materials.TryGetValue(key, out var mat)) materials[key] = mat = Material(tex, _td(tex), LibSaber.SM2.Assets.Effects.VatDecode.Enabled ? part.Name : null);
+        var key = (LibSaber.SM2.Assets.Effects.VatDecode.Enabled ? tex + "|" + part.Name : tex) + "|" + part.Variant;
+        if (!materials.TryGetValue(key, out var mat)) materials[key] = mat = Material(tex, _td(tex), LibSaber.SM2.Assets.Effects.VatDecode.Enabled ? part.Name : null, part.Variant);
         list.Add((part.IndexStart, part.IndexCount, mat));
       }
 
@@ -117,15 +121,25 @@ internal sealed class EffectMeshes
 
   /// <summary><c>preset = "sfx"</c> materials are translucent (premultiplied) with <c>tint [A,R,G,B]</c> and <c>clipping.level</c>;
   /// everything else (combine_material, ...) draws opaque and lit.</summary>
-  public static EffectMeshMaterial Material(string texture, string? td, string? partName = null)
+  /// <summary>SM2_VFX_MESH_MTL=0: ignore the tpl's <c>shadingMtl_Mtl</c> (vfx3w) and always use <c>materials.default</c>.</summary>
+  public static bool NamedMaterials { get; set; } = Environment.GetEnvironmentVariable("SM2_VFX_MESH_MTL") != "0";
+
+  public static EffectMeshMaterial Material(string texture, string? td, string? partName = null, string? variant = null)
   {
     if (td is null) return new EffectMeshMaterial(texture, false, Vector4.One, 0f);
     var start = td.IndexOf("materials", StringComparison.Ordinal);
     var body = start >= 0 ? td[start..] : td;
+    var named = false;
+    // vfx3w: the tpl names its material (shadingMtl_Mtl, e.g. sfx_geom_muzzle -> "mzl_geom" inside water_drops_01.td);
+    // that block, not materials.default, holds the shader (preset sfx, tint, emissive, its own tex = "...").
+    if (NamedMaterials && variant is { Length: > 0 } vn && vn != "default" &&
+        Regex.Match(body, @"(?m)^\s*" + Regex.Escape(vn) + @"\s*=\s*\{") is { Success: true } nm)
+    { body = body[nm.Index..]; named = true; }
     if (LibSaber.SM2.Assets.Effects.VatDecode.MaterialBlockFor(td, partName) is { } own) body = own;
     var next = body.IndexOf("__type_id = \"material_templ\"", StringComparison.Ordinal);
     if (next > 0) body = body[..next];
     var sfx = Regex.IsMatch(body, "preset\\s*=\\s*\"sfx\"");
+    if (named && sfx && Regex.Match(body, "(?m)^\\s*tex\\s*=\\s*\"([^\"]+)\"") is { Success: true } own2) texture = own2.Groups[1].Value;
     // Shader-driven materials whose texture is only a placeholder (solid_blood decodes to flat blue, flesh_material is a
     // flat normal-map default): the blood-splash shader colours the mesh from the sfxMtlOverrides colour, so draw white
     // and let the override tint it; "flesh" game materials get an assumed dark flesh red (not REA-confirmed).
@@ -142,6 +156,8 @@ internal sealed class EffectMeshes
     }
 
     var clip = Regex.Match(body, "clipping\\s*=\\s*\\{\\s*level\\s*=\\s*([\\d.]+)");
-    return new EffectMeshMaterial(texture, sfx, tint, clip.Success ? float.Parse(clip.Groups[1].Value, CultureInfo.InvariantCulture) : 0f);
+    var fres = Regex.Match(body, @"softFreshnel\s*=\s*\{\s*enabled\s*=\s*true\s*power\s*=\s*([\d.]+)");
+    return new EffectMeshMaterial(texture, sfx, tint, clip.Success ? float.Parse(clip.Groups[1].Value, CultureInfo.InvariantCulture) : 0f)
+    { SoftFresnel = named && fres.Success ? float.Parse(fres.Groups[1].Value, CultureInfo.InvariantCulture) : 0f };
   }
 }

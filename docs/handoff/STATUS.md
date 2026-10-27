@@ -196,3 +196,6 @@ Disassembly: /workspace/vfxsh_dis/{pc,pg,dx_pc_dx12_sfx,dx_pc_dx12_distort}, GLS
 - vfx3t: muzzle/candle were culled by degNear (camera < 2 m) → Fit keeps the eye outside degNear; isVisible=+0x88 is draw-only (FUN_1417f71b0) → hidden sources spawn children (SM2_VFX_HIDDEN_SPAWN=0 off); chainsaw blood is all-hidden in data → empty is correct. VFX ≈ 73%.
 - vfx3u: in-game refs compared (side_by_side_*.png); BLEND_REA default ON (grenade core/sparks); open: muzzle flash missing, blood too bright/orange, grenade fireball/smoke too weak. VFX ≈ 74%.
 - vfx3v: muzzle flash & grenade fireball were sub-frame lifetimes (SM2_VFX_STEP_HZ); chainsaw blood hidden-by-default (SM2_VFX_FORCE_VISIBLE debug) matches dark red; open: muzzle mesh untextured, smoke lit scale, blood size. VFX ≈ 77%.
+
+## vfx3w (2026-10-27 KST) — VFX ~79%
+Muzzle mesh named-material (mzl_geom) fixed; hidden blood = templates, compare vs finisher copies; emitScale trace inconclusive; MaskClip opt-in; lit-smoke light heuristic. See HANDOFF.md.
