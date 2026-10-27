@@ -187,6 +187,22 @@ public class EffectTests
   }
 
   [Fact]
+  public void HiddenSourceStillSpawnsAttachedChildren()
+  {
+    // isVisible only gates draw submission in the exe (FUN_1417f71b0 / FUN_1417ee5c0), so a hidden source still emits.
+    var hidden = Part.Replace("burst   =   {\n      isVisible   =   True", "burst   =   {\n      isVisible   =   False");
+    Assert.NotEqual(Part, hidden);
+    var library = new EffectLibrary(new MemoryEffectSource(new Dictionary<string, string> { ["fx_part"] = hidden }));
+    var def = EffectDefinition.Build("fx_part", library.Resolve("fx_part")!);
+    Assert.False(def.Emitters[0].Visible);
+    var instance = new EffectInstance(def, 7) { Ground = null };
+    instance.Seek(1f);
+    Assert.Equal(15, instance.Emitters[1].Particles.Count); // 5 hidden parents x numParts 3
+    var sprites = EffectSprites.Build(instance, PartAliases.Empty, Matrix4x4.CreateLookAt(new Vector3(0, 1, 8), Vector3.Zero, Vector3.UnitY));
+    Assert.DoesNotContain(sprites, b => b.Emitter == def.Emitters[0]); // hidden source itself never draws
+  }
+
+  [Fact]
   public void SimulationIsDeterministicAndSeekable()
   {
     var def = Load();

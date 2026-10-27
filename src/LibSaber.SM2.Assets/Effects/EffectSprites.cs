@@ -40,6 +40,8 @@ public static class EffectSprites
     foreach (var state in instance.Emitters)
     {
       var def = state.Def;
+      if (Debug && state.Particles.Count > 0)
+        Console.Error.WriteLine($"spr {def.Name}: n {state.Particles.Count} sprite {def.IsSprite} visible {def.Visible} target {def.Target} tex '{def.Texture}' distort '{def.DistortTexture}' blend {def.Blend}");
       if (!def.IsSprite || !def.Visible || def.Target == DrawTarget.Simulation || state.Particles.Count == 0 || (include is not null && !include(def)))
         continue;
       var passes = new List<bool>(2);
@@ -108,6 +110,10 @@ public static class EffectSprites
   /// <summary>SM2_VFX_DEGNEAR_FIX=1: degNear scale applies near the camera (as proven for trails), not beyond radEnd.</summary>
   public static bool DegNearFix { get; set; } = Environment.GetEnvironmentVariable("SM2_VFX_DEGNEAR_FIX") == "1";
 
+  /// <summary>SM2_VFX_SPRDBG=1: print per-emitter sprite state and the first reject reason (diagnostics only).</summary>
+  public static bool Debug { get; set; } = Environment.GetEnvironmentVariable("SM2_VFX_SPRDBG") == "1";
+  private static void Reject(EmitterDef def, string why) { if (Debug) Console.Error.WriteLine($"  reject {def.Name}: {why}"); }
+
   private static bool Quad(EmitterDef def, TextureFrames frames, in Particle p, Vector3 right, Vector3 up, Vector3 back, float[] v, int o, bool distort = false, Vector3? eye = null)
   {
     var n = Math.Clamp(p.Age / p.Life, 0f, 1f);
@@ -129,11 +135,11 @@ public static class EffectSprites
     }
 
     var size = def.Size.Sample(n, p.RandSize) * def.Scale * sizeK;
-    if (size <= 0) return false;
+    if (size <= 0) { Reject(def, $"size {size} n {n}"); return false; }
     var c = def.Color.Evaluate(n);
     var intensity = def.ColorIntensity.Sample(n, p.RandIntensity) * intensK;
     var alpha = c.W * def.AlphaIntensity * alphaK;
-    if (alpha <= 0.0005f && def.Blend != EffectBlend.Add) return false;
+    if (alpha <= 0.0005f && def.Blend != EffectBlend.Add) { Reject(def, $"alpha {alpha} c.W {c.W} aInt {def.AlphaIntensity} aK {alphaK} n {n}"); return false; }
     var rgb = new Vector3(c.X, c.Y, c.Z) * intensity;
     if (def.Lighting is not ("None" or ""))
       rgb *= LitScale * Math.Clamp(def.AmbientLight + 0.55f, 0f, 1f);
@@ -146,7 +152,7 @@ public static class EffectSprites
     }
 
     var frame = Frame(def, frames, p);
-    if (def.KillAfterSequence && !def.FrameCycle && frame >= frames.FrameMax) return false;
+    if (def.KillAfterSequence && !def.FrameCycle && frame >= frames.FrameMax) { Reject(def, $"frame {frame} >= {frames.FrameMax}"); return false; }
     var index = Math.Clamp((int)MathF.Floor(frame), 0, frames.FrameMax - 1);
     var fx = index % frames.FramesX;
     var fy = index / frames.FramesX;

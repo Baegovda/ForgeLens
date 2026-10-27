@@ -5,7 +5,7 @@ set -euo pipefail
 R=${1:-/workspace/vfx3_raw}; O=${2:-/workspace/browser_run_shots/ingame_cmp}
 FX="part_mg_frag_grenade_expl fx_bolter_muzzle_client part_mag_chainsaw_blood_splash_red_01 fx_mgs_hierophant_bomb_ee trail_stalker_bolter_smoke part_mg_candle_smoke_hub"
 cd "$(dirname "$0")/../.."
-dotnet build src/LibSaber.SM2Browser -c Release -v q -nologo >/dev/null
+dotnet build src/LibSaber.SM2Browser -c Release -m:1 -v q -nologo >/dev/null
 run() { local name=$1; shift; mkdir -p "$O/$name"
   env SM2_VFX_MESHES="$R/mesh1" "$@" xvfb-run -a -s "-screen 0 1920x1080x24" dotnet run --no-build --project src/LibSaber.SM2Browser -c Release -- \
     --vfxbench "$R/sfx" "$R/aliases/aliases/part_aliases/part_aliases.ps" "$R" "$O/$name" $FX > "$O/$name.log" 2>&1; }

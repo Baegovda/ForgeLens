@@ -77,6 +77,9 @@ public readonly record struct LightSample(LightDef Def, Vector3 Position, Vector
 /// </summary>
 public sealed class EffectInstance
 {
+  /// <summary>Hidden (isVisible = False) emitters with attached children still emit (see Step). Env SM2_VFX_HIDDEN_SPAWN=0 disables.</summary>
+  public static bool HiddenSpawn { get; set; } = Environment.GetEnvironmentVariable("SM2_VFX_HIDDEN_SPAWN") != "0";
+
   public const float Step = 1f / 60f;
   private readonly List<EmitterState> _emitters = [];
   private int _order;
@@ -234,7 +237,11 @@ public sealed class EffectInstance
     }
 
     particles.RemoveRange(write, particles.Count - write);
-    if (!def.Visible || dt <= 0 || def.IsAttachedChild)
+    // isVisible (emitter desc +0x88, parser FUN_1417adea0) only gates draw submission in the exe (FUN_1417f71b0 @0x1417f71c5,
+    // FUN_1417ee5c0 @0x1417ee5f4 return early when it is 0); no emission path in 0x1417d8000-0x141900000 reads it. Hidden
+    // emitters are spawn sources for their attached children (chainsaw blood: invisible drops_source2 -> genOnDie
+    // cpu_drops_2/3), so they keep emitting when they have children. SM2_VFX_HIDDEN_SPAWN=0 restores the old skip.
+    if ((!def.Visible && !(HiddenSpawn && def.Attached.Count > 0)) || dt <= 0 || def.IsAttachedChild)
     {
       e.Time += dt;
       return;

@@ -67,7 +67,7 @@ internal sealed class EffectTextures
 }
 
 /// <summary>Orbit camera for the standalone effect view (same lens as the mesh preview).</summary>
-internal readonly record struct EffectCamera(Vector3 Center, float Yaw, float Pitch, float Distance)
+internal readonly record struct EffectCamera(Vector3 Center, float Yaw, float Pitch, float Distance, float Fov = MathF.PI / 4f)
 {
   public (Matrix4x4 View, Matrix4x4 Projection, Vector3 Eye) Matrices(int width, int height)
   {
@@ -75,7 +75,7 @@ internal readonly record struct EffectCamera(Vector3 Center, float Yaw, float Pi
     var planar = MathF.Cos(pitch);
     var eye = Center + new Vector3(planar * MathF.Sin(Yaw), MathF.Sin(pitch), planar * MathF.Cos(Yaw)) * Distance;
     var view = Matrix4x4.CreateLookAt(eye, Center, Vector3.UnitY);
-    var projection = Matrix4x4.CreatePerspectiveFieldOfView(MathF.PI / 4f, width / (float)Math.Max(1, height), Math.Max(0.01f, Distance * 0.01f), Distance * 60f);
+    var projection = Matrix4x4.CreatePerspectiveFieldOfView(Fov, width / (float)Math.Max(1, height), Math.Max(0.01f, Distance * 0.01f), Distance * 60f);
     return (view, projection, eye);
   }
 
@@ -130,6 +130,28 @@ internal readonly record struct EffectCamera(Vector3 Center, float Yaw, float Pi
     // Small effects (muzzle, blood, candle): the particle spread can be near zero, so the sprite size sets the frame
     // and the minimum distance is 0.15 (was 0.4) so a 5 cm puff still fills a useful part of the view.
     var extent = Math.Max((max - min).Length() * 0.5f + Math.Min(P(sizes, 0.75f), 3f), Math.Min(P(sizes, 0.9f), 3f) * 0.75f);
-    return new EffectCamera(center, 0.6f, 0.22f, Math.Clamp(extent / MathF.Tan(MathF.PI / 8f) * 1.15f, 0.15f, 80f));
+    var distance = Math.Clamp(extent / MathF.Tan(MathF.PI / 8f) * 1.15f, 0.15f, 80f);
+    // optimization.degNear fades sprites out in the camera's face (e.g. candle/muzzle smoke radStart 6 -> radEnd 2,
+    // scaleAlpha 0: alpha 0 at <= 2 m). A tight frame for a small effect sat inside that zone, so every quad was culled
+    // (alphaK 0). Keep the eye at the distance where the fade is fully off and narrow the lens instead.
+    var clear = NearFadeClear(instance);
+    if (clear > distance)
+    {
+      var fov = 2f * MathF.Atan(extent * 1.15f / clear);
+      return new EffectCamera(center, 0.6f, 0.22f, clear, Math.Clamp(fov, 0.05f, MathF.PI / 4f));
+    }
+
+    return new EffectCamera(center, 0.6f, 0.22f, distance);
+  }
+
+  /// <summary>Smallest camera distance at which no sprite emitter's <c>degNear</c> reduces size/intensity/alpha
+  /// (Amount = 0 at radStart for a start &gt; end ramp). Capped at 20 m.</summary>
+  public static float NearFadeClear(LibSaber.SM2.Assets.Effects.EffectInstance instance)
+  {
+    var clear = 0f;
+    foreach (var e in instance.Emitters)
+      if (e.Def.IsSprite && e.Def.DegNear is { } f && (f.Size < 1 || f.Intens < 1 || f.Alpha < 1))
+        clear = Math.Max(clear, Math.Max(f.RadStart, f.RadEnd) * 1.05f);
+    return Math.Min(clear, 20f);
   }
 }

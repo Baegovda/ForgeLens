@@ -1379,3 +1379,23 @@ Disassembly: /workspace/vfxsh_dis/{pc,pg,dx_pc_dx12_sfx,dx_pc_dx12_distort}, GLS
 - Still open (not framing): fx_bolter_muzzle_client and part_mg_candle_smoke_hub build **0 quads** (3/9 particles alive, all
   filtered in EffectSprites.Build); part_mag_chainsaw_blood_splash_red_01 spawns **0 particles** in 0.5 s (covering-triggered?).
   Those three rows of the contact sheet are empty and not comparable yet.
+
+## vfx3t (2026-10-27 15:50 KST) — the 3 empty bench effects
+- **Muzzle + candle (0 quads): bench camera inside degNear.** `SM2_VFX_SPRDBG=1` (new, EffectSprites reject reasons) showed
+  every quad culled with alphaK = 0: their sprite emitters have `optimization.degNear radStart 6 → radEnd 2, scaleAlpha 0`
+  (alpha 0 at ≤ 2 m) and the tight small-effect frame put the eye at < 2 m. Not a format bug. Fix (bench only):
+  `EffectCamera.NearFadeClear` keeps the eye at max(radStart, radEnd)·1.05 of any fading sprite emitter (cap 20 m) and
+  narrows the FOV to keep the frame (`EffectCamera.Fov`). Now muzzle 1–3 quads, candle 1–9 quads per frame.
+- **Chainsaw blood (0 particles): isVisible.** The source `drops_source2` is `isVisible = False` (life 0.001 s, genOnDie →
+  cpu_drops_2 ×50, cpu_drops_3 ×2), and `EffectInstance.Step` skipped emission for hidden emitters.
+  Exe: `isVisible` (string 0x143645df0) is emitter desc **+0x88** (parser FUN_1417adea0, next to emitScale/isUseParentRotate);
+  DispScan +0x88 over 0x1417d8000–0x141900000: only draw-submission gates read it (FUN_1417f71b0 @0x1417f71c5 and
+  FUN_1417ee5c0 @0x1417ee5f4 return when 0; FUN_1417e9480 @0x1417ea4b9 checks the parent's flag for transforms). No emission
+  path reads it → hidden emitters still simulate (PROVEN for the draw gate; "no emission reader" = scan result).
+  Fix: hidden emitters with attached children keep emitting (`EffectInstance.HiddenSpawn`, default on,
+  `SM2_VFX_HIDDEN_SPAWN=0` = old behaviour); they still never draw. Test `HiddenSourceStillSpawnsAttachedChildren`.
+  The blood effect now spawns 259 particles but still draws nothing — **correctly**: all 4 emitters (incl. cpu_drops_2/3 and
+  em_covering_blood) are `isVisible = False` in the data, so the exe's draw gate skips them too. Its row stays empty by design
+  (template/disabled asset; the name in fx_huge_blood_explosion etc. is only an sfx_group node).
+- Re-rendered ingame_cmp (previous run → `ingame_cmp.bak2`), PC `Captures\ingame_cmp\` (old → `ingame_cmp.bak2`).
+- VFX estimate ≈ 73% (bench coverage, isVisible semantics proven; no format change).
