@@ -12,6 +12,11 @@ internal sealed record EffectMeshMaterial(string Texture, bool Translucent, Vect
 {
   /// <summary><c>softFreshnel.power</c> when enabled (0 = off). HEURISTIC use: alpha *= |n·v|^power (soft silhouettes).</summary>
   public float SoftFresnel { get; init; }
+  /// <summary>vfx3y: sfx <c>overrideAffixScroll</c> {override, speedX, speedY} (parser FUN_1425fd580: shader desc +0xd8/+0xdc;
+  ///   serializer FUN_1425ff110). Applied as UV offset = speed * effect time; units (UV/s) HEURISTIC.</summary>
+  public Vector2 Scroll { get; init; }
+  /// <summary>vfx3y: sfx <c>emissive.bloomIntensity</c>; drives the opt-in bench bloom (SM2_VFX_BLOOM=1, HEURISTIC).</summary>
+  public float Bloom { get; init; }
 }
 
 /// <summary>A geometry template flattened for the effect pass: pos(3) normal(3) uv(2) uv1(2) per vertex; sub-objects by node order.</summary>
@@ -158,6 +163,11 @@ internal sealed class EffectMeshes
     var clip = Regex.Match(body, "clipping\\s*=\\s*\\{\\s*level\\s*=\\s*([\\d.]+)");
     var fres = Regex.Match(body, @"softFreshnel\s*=\s*\{\s*enabled\s*=\s*true\s*power\s*=\s*([\d.]+)");
     return new EffectMeshMaterial(texture, sfx, tint, clip.Success ? float.Parse(clip.Groups[1].Value, CultureInfo.InvariantCulture) : 0f)
-    { SoftFresnel = named && fres.Success ? float.Parse(fres.Groups[1].Value, CultureInfo.InvariantCulture) : 0f };
+    {
+      SoftFresnel = named && fres.Success ? float.Parse(fres.Groups[1].Value, CultureInfo.InvariantCulture) : 0f,
+      Scroll = named && Regex.Match(body, @"overrideAffixScroll\s*=\s*\{\s*override\s*=\s*true\s*speedX\s*=\s*(-?[\d.]+)\s*speedY\s*=\s*(-?[\d.]+)") is { Success: true } sc
+        ? new Vector2(float.Parse(sc.Groups[1].Value, CultureInfo.InvariantCulture), float.Parse(sc.Groups[2].Value, CultureInfo.InvariantCulture)) : Vector2.Zero,
+      Bloom = sfx && Regex.Match(body, @"bloomIntensity\s*=\s*([\d.]+)") is { Success: true } bl ? float.Parse(bl.Groups[1].Value, CultureInfo.InvariantCulture) : 0f,
+    };
   }
 }

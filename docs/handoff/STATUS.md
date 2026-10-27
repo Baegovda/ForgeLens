@@ -202,3 +202,6 @@ Muzzle mesh named-material (mzl_geom) fixed; hidden blood = templates, compare v
 
 ## vfx3x (2026-10-27 KST) — VFX ~80%
 phantom_hands extracted (rings textured but dim: no bloom); grey columns fixed via exact particles.sdc alpha-clip (SM2_VFX_CLIP_EXACT); socket +Z fallback (SM2_VFX_SOCKET_FWD). See HANDOFF.md.
+
+## vfx3y (2026-10-27 KST) — VFX ~81%
+Mesh UV scroll (overrideAffixScroll, FUN_1425fd580) on; opt-in bench bloom from material bloomIntensity (SM2_VFX_BLOOM=1, heuristic). See HANDOFF.md.

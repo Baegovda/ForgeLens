@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # Re-render the in-game comparison bench sheets (vfx3r/vfx3s) and the contact sheet.
 # Columns: off = all flags off (SM2_VFX_BLEND_REA=0; it is default-on since vfx3u), blend = default build.
+# vfx3y: the all column also turns on the opt-in bench bloom (SM2_VFX_BLOOM=1, HEURISTIC).
 # Usage: tools/vfxbench/ingame_cmp.sh <raw root> <out dir>
 set -euo pipefail
 R=${1:-/workspace/vfx3_raw}; O=${2:-/workspace/browser_run_shots/ingame_cmp}
@@ -14,7 +15,7 @@ run off SM2_VFX_BLEND_REA=0
 run blend SM2_VFX_BLEND_REA=1
 run tint SM2_VFX_BLEND_REA=0 SM2_VFX_TINT_EXACT=1
 run vat SM2_VFX_BLEND_REA=0 SM2_VFX_VAT=1
-run all SM2_VFX_BLEND_REA=1 SM2_VFX_TINT_EXACT=1 SM2_VFX_VAT=1 SM2_VFX_CONTRAST=1
+run all SM2_VFX_BLEND_REA=1 SM2_VFX_TINT_EXACT=1 SM2_VFX_VAT=1 SM2_VFX_CONTRAST=1 SM2_VFX_BLOOM=1
 python3 - "$O" $FX <<'P'
 import sys, numpy as np
 from PIL import Image, ImageDraw
@@ -42,5 +43,5 @@ early off SM2_VFX_BLEND_REA=0
 early blend SM2_VFX_BLEND_REA=1
 early tint SM2_VFX_BLEND_REA=0 SM2_VFX_TINT_EXACT=1
 early vat SM2_VFX_BLEND_REA=0 SM2_VFX_VAT=1
-early all SM2_VFX_BLEND_REA=1 SM2_VFX_TINT_EXACT=1 SM2_VFX_VAT=1 SM2_VFX_CONTRAST=1
+early all SM2_VFX_BLEND_REA=1 SM2_VFX_TINT_EXACT=1 SM2_VFX_VAT=1 SM2_VFX_CONTRAST=1 SM2_VFX_BLOOM=1
 [ -d /workspace/ingame_ref ] && python3 tools/vfxbench/side_by_side.py /workspace/ingame_ref "$O"

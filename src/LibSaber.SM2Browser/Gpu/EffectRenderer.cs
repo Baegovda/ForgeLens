@@ -20,6 +20,10 @@ internal sealed class EffectLayer
   /// <summary>Mesh particles (lwiGeom) and their templates by name (null while loading).</summary>
   public List<MeshBatch> Meshes { get; init; } = [];
   public Func<string, Effects.EffectMesh?> Mesh { get; init; } = _ => Effects.EffectMesh.Missing;
+  /// <summary>Effect time (s) for material UV scroll.</summary>
+  public float Time { get; init; }
+  /// <summary>vfx3y bench bloom source pass: only meshes, weighted by material bloomIntensity (HEURISTIC).</summary>
+  public bool BloomPass { get; init; }
   public int MeshInstances => Meshes.Sum(m => m.Instances.Count);
   /// <summary>Total sprite quads (stats).</summary>
   public int Quads => Batches.Sum(b => b.QuadCount);
@@ -54,6 +58,10 @@ internal sealed unsafe class EffectRenderer : IDisposable
   public static bool HdrPremul { get; set; } = Environment.GetEnvironmentVariable("SM2_VFX_HDR_PREMUL") == "1";
   /// <summary>vfx3x: particles.sdc alpha-clip math (vertex alpha inside the clip, 1-0.5*clip, no clip with flag 0x400). SM2_VFX_CLIP_EXACT=0 disables.</summary>
   public static bool ClipExact { get; set; } = Environment.GetEnvironmentVariable("SM2_VFX_CLIP_EXACT") != "0";
+  /// <summary>vfx3y: material UV scroll (SM2_VFX_MESH_SCROLL=0 disables).</summary>
+  public static bool ScrollEnabled { get; set; } = Environment.GetEnvironmentVariable("SM2_VFX_MESH_SCROLL") != "0";
+  /// <summary>vfx3y HEURISTIC: bloom weight = min(1, bloomIntensity * gain); SM2_VFX_BLOOM_GAIN, default 0.01.</summary>
+  public static float BloomGain { get; set; } = float.TryParse(Environment.GetEnvironmentVariable("SM2_VFX_BLOOM_GAIN"), System.Globalization.CultureInfo.InvariantCulture, out var bg) ? bg : 0.01f;
   public static bool ContrastEnabled { get; set; } = Environment.GetEnvironmentVariable("SM2_VFX_CONTRAST") == "1";
   private readonly Dictionary<string, (uint Vao, uint Vbo, uint Ibo)?> _meshes = new(StringComparer.OrdinalIgnoreCase);
   private readonly uint _vao, _vbo, _ibo, _groundVao, _groundVbo;
@@ -224,6 +232,7 @@ internal sealed unsafe class EffectRenderer : IDisposable
 
     DrawMeshes(layer, vp, eye, lights, translucent: false);
     DrawMeshes(layer, vp, eye, lights, translucent: true);
+    if (layer.BloomPass) return;
 
     var quads = layer.Batches.Count == 0 ? 0 : layer.Batches.Max(b => b.QuadCount);
     if (quads > _iboQuads)
@@ -407,6 +416,10 @@ internal sealed unsafe class EffectRenderer : IDisposable
     var emissive = _gl.GetUniformLocation(_mesh, "uEmissive");
     var clip = _gl.GetUniformLocation(_mesh, "uClip");
     var fresnel = _gl.GetUniformLocation(_mesh, "uSoftFresnel");
+    var scrollLoc = _gl.GetUniformLocation(_mesh, "uScroll");
+    var bloomWLoc = _gl.GetUniformLocation(_mesh, "uBloomW");
+    _gl.Uniform1(_gl.GetUniformLocation(_mesh, "uTime"), ScrollEnabled ? layer.Time : 0f);
+    _gl.Uniform1(_gl.GetUniformLocation(_mesh, "uBloomPass"), layer.BloomPass ? 1 : 0);
     var mode = _gl.GetUniformLocation(_mesh, "uTranslucent");
     var vatOn = _gl.GetUniformLocation(_mesh, "uVat");
     var vatMin = _gl.GetUniformLocation(_mesh, "uVatMin");
@@ -466,6 +479,8 @@ internal sealed unsafe class EffectRenderer : IDisposable
           _gl.Uniform1(emissive, inst.Emissive);
           _gl.Uniform1(clip, material.Clip);
           _gl.Uniform1(fresnel, material.SoftFresnel);
+          _gl.Uniform2(scrollLoc, material.Scroll.X, material.Scroll.Y);
+          _gl.Uniform1(bloomWLoc, Math.Min(1f, material.Bloom * BloomGain));
           _gl.DrawElements(PrimitiveType.Triangles, (uint)count, DrawElementsType.UnsignedInt, (void*)(start * 4));
         }
       }
@@ -688,6 +703,10 @@ internal sealed unsafe class EffectRenderer : IDisposable
     uniform float uEmissive;
     uniform float uClip;
     uniform float uSoftFresnel;
+    uniform vec2 uScroll;
+    uniform float uTime;
+    uniform int uBloomPass;
+    uniform float uBloomW;
     uniform int uTranslucent;
     uniform float uExposure;
     uniform vec3 uEye;
@@ -698,7 +717,7 @@ internal sealed unsafe class EffectRenderer : IDisposable
     vec3 toGamma(vec3 c) { return mix(c * 12.92, 1.055 * pow(c, vec3(1.0 / 2.4)) - 0.055, step(0.0031308, c)); }
     void main()
     {
-      vec4 t = texture(uTex, vUv);
+      vec4 t = texture(uTex, vUv + uScroll * uTime);
       float a = uColor.a * (uTranslucent == 1 ? t.a : 1.0);
       if (uTranslucent == 1 && uClip > 0.0) a *= clamp((t.a - uClip) / max(1e-3, 1.0 - uClip), 0.0, 1.0);
       vec3 n = normalize(gl_FrontFacing ? vNormal : -vNormal);
@@ -718,6 +737,7 @@ internal sealed unsafe class EffectRenderer : IDisposable
       // Hue-preserving tonemap: per-channel 1-exp() turns saturated surfaces (blood red) orange/white under the key light.
       float lum = max(dot(hdr, vec3(0.2126, 0.7152, 0.0722)) * uExposure, 1e-5);
       vec3 c = toGamma(min(hdr * uExposure * ((1.0 - exp(-lum)) / lum), vec3(1.0)));
+      if (uBloomPass == 1) { outColor = uTranslucent == 1 ? vec4(c * a * uBloomW, 0.0) : vec4(c * uBloomW, 1.0); return; }
       if (uTranslucent == 1) outColor = vec4(c * a, a);
       else outColor = vec4(c, 1.0);
     }

@@ -19,6 +19,8 @@ namespace LibSaber.SM2Browser.Bench;
 internal static class VfxBench
 {
   /// <summary>Debug: SM2_VFX_ONLY / SM2_VFX_SKIP = comma-separated emitter-name substrings.</summary>
+  /// <summary>vfx3y HEURISTIC: SM2_VFX_BLOOM=1 adds a blurred mesh pass weighted by material bloomIntensity.</summary>
+  private static readonly bool Bloom = Environment.GetEnvironmentVariable("SM2_VFX_BLOOM") == "1";
   private static readonly string[] Only = (Environment.GetEnvironmentVariable("SM2_VFX_ONLY") ?? "").Split(',', StringSplitOptions.RemoveEmptyEntries);
   private static readonly string[] Skip = (Environment.GetEnvironmentVariable("SM2_VFX_SKIP") ?? "").Split(',', StringSplitOptions.RemoveEmptyEntries);
   private static bool Filter(EmitterDef e) =>
@@ -106,6 +108,7 @@ internal static class VfxBench
             Texture = textures.Get,
             Meshes = EffectMeshParticles.Build(instance),
             Mesh = meshes.Get,
+            Time = t,
           };
           buildMs.Add(w.Elapsed.TotalMilliseconds);
           fingerprint.Append(Hash(layer)).Append(';');
@@ -114,6 +117,12 @@ internal static class VfxBench
           gpu.Finish();
           gpuMs.Add(w.Elapsed.TotalMilliseconds);
           var pixels = gpu.ReadPixels();
+          if (Bloom && layer.MeshInstances > 0)
+          {
+            gpu.RenderEffect(new EffectLayer { Batches = [], Lights = layer.Lights, Texture = textures.Get, Ground = false, Meshes = layer.Meshes, Mesh = meshes.Get, Time = t, Exposure = layer.Exposure, BloomPass = true }, view, projection, eye, Size, Size, fb);
+            gpu.Finish();
+            BenchBloom.Apply(pixels, gpu.ReadPixels(), Size, Size);
+          }
           var ox = f % Cols * Size;
           var oy = f / Cols * Size;
           for (var y = 0; y < Size; y++)
