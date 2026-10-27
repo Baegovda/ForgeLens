@@ -18,7 +18,7 @@ r = lib.create_chaos_cloth(mesh, pj)
 if isinstance(r, tuple) and len(r) == 3: ok, conv, rep = r
 elif isinstance(r, tuple) and len(r) == 2: conv, rep = r; ok = len(conv) > 0  # UE drops the bool return when out params exist
 else: ok, conv, rep = r, [], ""
-print("CHAOS create", ok, list(conv), str(rep)[:600])
+print("CHAOS create", ok, list(conv)); [print("CHAOSLOG", l) for l in str(rep).split(" | ")]
 sk = [str(c) for c in conv]
 r2 = lib.setup_from_json_ex(mesh, pj, folder + "/ChaosCloth", sk)
 ok2, rep2 = (r2 if isinstance(r2, tuple) else (r2, ""))

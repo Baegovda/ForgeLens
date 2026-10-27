@@ -42,6 +42,18 @@ if mode == "wind":
             n += 1
             print("WIND set %s drag=%.3f lift=%.3f vel=(%.0f %.0f %.0f)" % (c["SimMeshName"], drag, lift, vel.x, vel.y, vel.z))
     print("WIND applied", n)
+elif mode == "probe":
+    w = ues.get_game_world()
+    for a in unreal.GameplayStatics.get_all_actors_with_tag(w, "SM2Phys"):
+        comp = a.skeletal_mesh_component; si = comp.get_clothing_simulation_interactor()
+        print("PROBE actor", a.get_name(), a.tags, type(si).__name__ if si else None)
+        if not si: continue
+        print("PROBE num", si.get_num_cloths(), si.get_num_dynamic_particles(), si.get_num_kinematic_particles())
+        cas = comp.get_skinned_asset().get_editor_property("mesh_clothing_assets")
+        for i, ca in enumerate(cas):
+            nm = str(ca.get_name())
+            for k in [nm, str(ca.get_fname()), nm.replace("_0", ""), str(i)]:
+                x = si.get_clothing_interactor(k); print("PROBE", i, repr(k), type(x).__name__ if x else None)
 elif mode == "src":
     x, y, z = [float(v) for v in sys.argv[2:5]]; st = float(sys.argv[5]) if len(sys.argv) > 5 else 1.0
     v = unreal.Vector(x, y, z); a = next((a for a in eas.get_all_level_actors() if a.actor_has_tag("SM2Wind")), None)

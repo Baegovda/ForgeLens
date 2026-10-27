@@ -598,6 +598,10 @@ bool USM2PhysicsSetupLibrary::CreateChaosCloth(USkeletalMesh* Mesh, const FStrin
     CollPA->MarkPackageDirty();
   }
 
+  // mtl1-14e GENERIC: binds made for earlier cloths can be lost when later cloths edit the mesh (the first clothing asset ended up
+  // with no bound section -> not simulated, no ChaosClothingInteractor). Remember each asset's render slots and re-verify after the loop.
+  struct FBindRec { UClothingAssetCommon* Asset; TArray<FName> Slots; FString Name; };
+  TArray<FBindRec> BindRecs;
   for (const TSharedPtr<FJsonValue>& ClothV : Root->GetArrayField(TEXT("cloths")))
   {
     const TSharedPtr<FJsonObject> Cloth = ClothV->AsObject();
@@ -856,10 +860,73 @@ bool USM2PhysicsSetupLibrary::CreateChaosCloth(USkeletalMesh* Mesh, const FStrin
         }
       }
     }
+    {
+      FBindRec R{Asset, {}, SimName};
+      for (int32 S : RenderSections)
+        if (Lod.Sections.IsValidIndex(S) && Mesh->GetMaterials().IsValidIndex(Lod.Sections[S].MaterialIndex))
+          R.Slots.AddUnique(Mesh->GetMaterials()[Lod.Sections[S].MaterialIndex].MaterialSlotName);
+      BindRecs.Add(R);
+    }
     if (Bound > 0)
       Converted.Add(SimName);
     Log.Add(FString::Printf(TEXT("%s: simSection=%d particles=%d pinned=%d worstMatchCm=%.2f boundSections=%d/%d"), *SimName, SimSection, PV.Num(), Pinned,
       WorstMatch, Bound, RenderSections.Num()));
+  }
+  if (BindRecs.Num() > 0)
+  {
+    FScopedSkeletalMeshPostEditChange Scope(Mesh);
+    FSkeletalMeshLODModel& L = Model->LODModels[0];
+    for (FBindRec& R : BindRecs)
+    {
+      int32 Idx = INDEX_NONE;
+      Mesh->GetMeshClothingAssets().Find(R.Asset, Idx);
+      int32 Have = 0, Re = 0;
+      for (int32 S = 0; S < L.Sections.Num(); ++S)
+      {
+        FSkelMeshSection& Sec = L.Sections[S];
+        if (Sec.HasClothingData() && Sec.ClothingData.AssetGuid == R.Asset->GetAssetGuid())
+        {
+          ++Have;
+          continue;
+        }
+        if (Sec.bDisabled || Sec.HasClothingData() || !Mesh->GetMaterials().IsValidIndex(Sec.MaterialIndex) ||
+          !R.Slots.Contains(Mesh->GetMaterials()[Sec.MaterialIndex].MaterialSlotName))
+          continue;
+        Log.Add(FString::Printf(TEXT("%s: bindTry sec=%d orig=%d chunk=%d verts=%d"), *R.Name, S, Sec.OriginalDataSectionIndex, Sec.ChunkedParentSectionIndex, Sec.SoftVertices.Num()));
+        if (R.Asset->BindToSkeletalMesh(Mesh, 0, S, 0))
+        {
+          FSkelMeshSourceSectionUserData& UD = L.UserSectionsData.FindOrAdd(Sec.OriginalDataSectionIndex);
+          UD.CorrespondClothAssetIndex = (int16)Idx;
+          UD.ClothingData.AssetGuid = R.Asset->GetAssetGuid();
+          UD.ClothingData.AssetLodIndex = 0;
+          ++Re;
+        }
+      }
+      Log.Add(FString::Printf(TEXT("%s: bindCheck assetIdx=%d had=%d rebound=%d slots=%d"), *R.Name, Idx, Have, Re, R.Slots.Num()));
+    }
+  }
+  // post-rebuild verification (after the scoped PostEditChange): which sections carry which clothing asset.
+  {
+    FSkeletalMeshLODModel& L = Model->LODModels[0];
+    {
+      FString All;
+      for (int32 S = 0; S < L.Sections.Num(); ++S)
+      {
+        const FSkelMeshSection& Sc = L.Sections[S];
+        const FSkelMeshSourceSectionUserData* U = L.UserSectionsData.Find(Sc.OriginalDataSectionIndex);
+        All += FString::Printf(TEXT("%d:o%d,c%d,v%d,%s%s%s "), S, Sc.OriginalDataSectionIndex, Sc.ChunkedParentSectionIndex, Sc.SoftVertices.Num(),
+          Sc.bDisabled ? TEXT("D") : TEXT(""), Sc.HasClothingData() ? TEXT("C") : TEXT(""), (U && U->ClothingData.AssetGuid.IsValid()) ? TEXT("u") : TEXT(""));
+      }
+      Log.Add(TEXT("sections ") + All);
+    }
+    for (FBindRec& R : BindRecs)
+    {
+      FString Secs;
+      for (int32 S = 0; S < L.Sections.Num(); ++S)
+        if (L.Sections[S].HasClothingData() && L.Sections[S].ClothingData.AssetGuid == R.Asset->GetAssetGuid())
+          Secs += FString::Printf(TEXT("%d(orig%d,chunk%d) "), S, L.Sections[S].OriginalDataSectionIndex, L.Sections[S].ChunkedParentSectionIndex);
+      Log.Add(FString::Printf(TEXT("%s: postBind sections=[%s]"), *R.Name, *Secs));
+    }
   }
   Mesh->MarkPackageDirty();
   Report = FString::Join(Log, TEXT(" | "));

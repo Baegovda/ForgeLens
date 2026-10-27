@@ -257,3 +257,18 @@ glt.chameleon REA'd (FUN_142576f30 + glt PS 03558_0) and implemented in sidecar 
 - Rebuilt ChaosCloth calgar/sorcerer/tech_priest. Calgar/tech_priest OK. Sorcerer cloak still fans out without wind (open); with wind x0.05 it hangs better.
 - Wind: first cloth per mesh gets no interactor (skirt_SIM, skirt_v7_SIM ...) - open. Old exports lack localWindCm -> vel 0 (re-export needed).
 - Captures: cloth_cmp_<char>_14d.png (box /workspace/mtl_fix).
+
+## mtl1-14e (cloth binding / wind re-export)
+- Re-exported calgar/sorcerer/tech_priest (Bin\SM2Extractor_14e) and swapped in only the physics.json (old one kept as .bakN). Sidecars now have localWindCm, simPositionsSpace=ueMesh and collision.space=boneLocal. Non-zero localWindCm: calgar cloak (300,-200,0); sorcerer cloak (0,0,-600), skirt (0,0,-400), tabard (100,200,100), beads (0,0,-1000). Tech_priest has none.
+- ROOT CAUSE of "no interactor" (tech_priest skirt_v7_SIM, sorcerer skirt_SIM): the cloth is never simulated (get_num_cloths=3 of 4). Its render section (o6) is CHUNKED into 9 sections because the 8-bit bone index (256 bones/section) limit applies (r.GPUSkin.Support16BitBoneIndex=False; SM2 has ~2600 cloth helper bones). The bind lands on the parent chunk only, and the mesh rebuild drops it. The plugin now re-checks and rebinds after the loop (bindCheck/postBind/sections logs), but the rebuild still drops chunked binds.
+- Generic fix options (need approval, project-level): (a) enable "Support 16-bit Bone Index" in the project's DefaultEngine.ini, restart and re-import the meshes; (b) plugin: before clothing, re-skin the render sections to the sim section's bones so they fit in one chunk.
+- Sorcerer cloak (asset idx0) now simulates after the rebind. It still fans out with collision; the wind run (vel 0,0,-30) hangs better. Not solved.
+- tech_priest wind penetration: not reproduced (14e run with collision 0-27, wind 0-17, no collision 51-229). Tech_priest has no sidecar wind (vel 0), so the earlier 156-401 rise was not caused by wind; most likely the different animation sample time.
+- Penetration ranges, free particles >1 cm inside:
+
+  | char | coll | noColl | wind |
+  |---|---|---|---|
+  | calgar | 0 | 209-272 | 0 |
+  | sorcerer | 53-171 | 447-634 | 127-178 |
+  | tech_priest | 0-27 | 51-229 | 0-17 |
+- cloth_cmp_<char>.png regenerated with all 4 rows (bone / coll / noColl / wind, tag e14*). Previous versions kept as _bak3.

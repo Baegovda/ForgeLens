@@ -1785,3 +1785,5 @@ Disassembly: /workspace/vfxsh_dis/{pc,pg,dx_pc_dx12_sfx,dx_pc_dx12_distort}, GLS
 - 2026-10-28 mtl1-14c cloth: sorcerer Chaos+collision EXPLODED cloak with X-mirrored Spine capsule (r38/25, offset -20) -> sidecar collision.space=ueMesh (json .bak kept) fixes explosion (cloak still flares). pen free>1cm: coll 11-38 vs NoColl 69. Wind: interactor keyed by clothing asset name (SM2Cloth_<sim>_0), must be applied AFTER sim starts; sidecar localWindCm x1 explodes cloth (also with AirDensity 1.225e-6), x0.05 stable -> clothwind default scale 0.05. skirt_SIM interactor not found (TODO). Bone row recaptured (cl5bone). cloth_cmp_*.png rebuilt (bone/coll/noColl/wind). calgar/tech_priest wind row is an old run where wind was not applied.
 
 - mtl1-14d: generic collision rule (boneLocal raw offsets + plugin rest-fit), sorcerer json reverted. Open: sorcerer cloak fan, first-cloth wind interactor missing. See STATUS.
+
+- mtl1-14e: re-export sidecars with wind; first/large cloth not simulated = chunked render section (8-bit bone index) - needs Support16BitBoneIndex (approval) or plugin re-skin; cloth_cmp full regen. See STATUS.
