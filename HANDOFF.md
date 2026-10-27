@@ -1418,3 +1418,20 @@ Disassembly: /workspace/vfxsh_dis/{pc,pg,dx_pc_dx12_sfx,dx_pc_dx12_distort}, GLS
 - **Default change:** `SM2_VFX_BLEND_REA` default ON (`=0` disables); test `DefaultOnUnlessDisabled`; ingame_cmp.sh sets
   `=0` for the off/tint/vat columns so the sheets stay comparable.
 - VFX estimate ≈ 74%.
+
+## vfx3v (2026-10-27 16:10 KST) — in-game gaps
+- **Muzzle flash "missing" = capture sampling, not format.** fx_bolter_muzzle_client: 11 flame emitters live 0.030–0.045 s
+  (SM2_VFX_SPRDBG `quad` lines), i.e. <3 steps at 60 Hz, and the 2 s/8-frame sheet first samples t=0.125 s. New
+  `SM2_VFX_STEP_HZ` (default 60) + `name@0.08` at 480 Hz shows the flash (flame_circle/cross/front, blue_smoke, 2 meshes).
+  Remaining diffs: core is blue-white (blue_smoke_01 rgb 70/252/555 Add) vs orange in game; flame_circle_1/2 mesh
+  emitters have no texture (`tex ''`) and draw as grey columns → mesh material for sfx_geom_muzzle still unresolved (open).
+- **Grenade fireball = same cause.** main_core_01..03 + flash_01 exist only for t < ~0.18 s; first 3 s-sheet frame is 0.1875 s.
+  At 480 Hz/@0.32 the fireball is there; blend/all match in-game colour+size best (off/tint/vat too pale).
+- **Smoke thin:** smoke emitters are lit ('Medium/Best Quality'); bench has no scene light and uses heuristic
+  `LitScale`=100. SM2_VFX_LIT=400 gives in-game-like grey smoke. Not defaulted (heuristic, needs scene light REA).
+- **Blood:** the earlier "too orange" was the hierophant *bomb*, wrong reference. part_mag_chainsaw_blood_splash_red_01 has
+  all 3 emitters isVisible=false (+0x88, parser FUN_1417adea0) → presumably made visible by gameplay (HEURISTIC, toggle
+  not traced). Debug `SM2_VFX_FORCE_VISIBLE=1` draws them: dark red (rgb ~30,0,0 lit) matches the in-game colour; shape is
+  too blobby/large (cpu_drops_3 size ~19 m at n 0.84 — size curve or scale suspect, open).
+- ingame_cmp.sh now also renders `<col>/early/` (480 Hz muzzle/grenade, force-visible blood) and runs
+  tools/vfxbench/side_by_side.py. Debug `quad` lines in SPRDBG. VFX ≈ 77%.

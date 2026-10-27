@@ -80,7 +80,9 @@ public sealed class EffectInstance
   /// <summary>Hidden (isVisible = False) emitters with attached children still emit (see Step). Env SM2_VFX_HIDDEN_SPAWN=0 disables.</summary>
   public static bool HiddenSpawn { get; set; } = Environment.GetEnvironmentVariable("SM2_VFX_HIDDEN_SPAWN") != "0";
 
-  public const float Step = 1f / 60f;
+  /// <summary>Fixed sim step. Default 60 Hz; SM2_VFX_STEP_HZ (e.g. 240) for capturing sub-frame-lived particles
+  /// such as muzzle flashes (life ~0.044 s = 2.6 steps at 60 Hz, so a 60 Hz capture only ever samples n=0 and n~0.77).</summary>
+  public static float Step { get; set; } = 1f / (float.TryParse(Environment.GetEnvironmentVariable("SM2_VFX_STEP_HZ"), System.Globalization.CultureInfo.InvariantCulture, out var hz) && hz >= 30 && hz <= 1000 ? hz : 60f);
   private readonly List<EmitterState> _emitters = [];
   private int _order;
 

@@ -42,7 +42,7 @@ public static class EffectSprites
       var def = state.Def;
       if (Debug && state.Particles.Count > 0)
         Console.Error.WriteLine($"spr {def.Name}: n {state.Particles.Count} sprite {def.IsSprite} visible {def.Visible} target {def.Target} tex '{def.Texture}' distort '{def.DistortTexture}' blend {def.Blend}");
-      if (!def.IsSprite || !def.Visible || def.Target == DrawTarget.Simulation || state.Particles.Count == 0 || (include is not null && !include(def)))
+      if (!def.IsSprite || (!def.Visible && !ForceVisible) || def.Target == DrawTarget.Simulation || state.Particles.Count == 0 || (include is not null && !include(def)))
         continue;
       var passes = new List<bool>(2);
       if (def.Target == DrawTarget.Color) passes.Add(false);
@@ -112,6 +112,10 @@ public static class EffectSprites
 
   /// <summary>SM2_VFX_SPRDBG=1: print per-emitter sprite state and the first reject reason (diagnostics only).</summary>
   public static bool Debug { get; set; } = Environment.GetEnvironmentVariable("SM2_VFX_SPRDBG") == "1";
+  /// <summary>Debug SM2_VFX_FORCE_VISIBLE=1: draw emitters whose isVisible (+0x88) is false. Not exe behaviour; used to check
+  /// gameplay-toggled effects (e.g. part_mag_chainsaw_blood_splash_red_01, all three emitters hidden) against in-game refs.</summary>
+  public static bool ForceVisible { get; set; } = Environment.GetEnvironmentVariable("SM2_VFX_FORCE_VISIBLE") == "1";
+  private static readonly Dictionary<string, int> DbgSeen = new();
   private static void Reject(EmitterDef def, string why) { if (Debug) Console.Error.WriteLine($"  reject {def.Name}: {why}"); }
 
   private static bool Quad(EmitterDef def, TextureFrames frames, in Particle p, Vector3 right, Vector3 up, Vector3 back, float[] v, int o, bool distort = false, Vector3? eye = null)
@@ -143,6 +147,11 @@ public static class EffectSprites
     var rgb = new Vector3(c.X, c.Y, c.Z) * intensity;
     if (def.Lighting is not ("None" or ""))
       rgb *= LitScale * Math.Clamp(def.AmbientLight + 0.55f, 0f, 1f);
+    if (Debug && DbgSeen.TryGetValue(def.Name, out var seen) is var _ && seen < 4)
+    {
+      DbgSeen[def.Name] = seen + 1;
+      Console.Error.WriteLine($"  quad {def.Name}: n {n:0.00} size {size:0.000} rgb {rgb} alpha {alpha:0.000} life {p.Life:0.000} lit '{def.Lighting}'");
+    }
     if (distort)
     {
       rgb = new Vector3(def.DistortPower.Sample(n, p.RandIntensity) * dispK, 0f, 0f);
