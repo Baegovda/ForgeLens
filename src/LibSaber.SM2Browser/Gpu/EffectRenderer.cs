@@ -44,6 +44,14 @@ internal sealed unsafe class EffectRenderer : IDisposable
   /// <summary>Screen offset (UV) at distortion power 1 and a full-strength normal; not REA'd (the refraction shader is in the GPU blob).</summary>
   public static float DistortionStrength { get; set; } =
     float.TryParse(Environment.GetEnvironmentVariable("SM2_VFX_DISTORT"), System.Globalization.CultureInfo.InvariantCulture, out var d) ? d : 0.04f;
+  /// <summary>
+  ///   vfx3z: particle distortion buffer math from particles.sdc 00005_1 (offset = normal * per-vertex scalar, mask =
+  ///   sat(10*|offset|), no edge fade). The per-vertex scalar is V_TEXCOORD.w of the CPU vertex (VS 00001_1 l.1573
+  ///   passes it through); that it carries distortion.power x alpha is HEURISTIC (writer not traced, the power curve is
+  ///   GPU-bound by FUN_1417e29b0 inst+0x200 <- desc+0x1b8). Resolve scale DistortionStrength stays HEURISTIC.
+  ///   Default on; SM2_VFX_DISTORT_EXACT=0 restores the radial-edge version.
+  /// </summary>
+  public static bool DistortExact { get; set; } = Environment.GetEnvironmentVariable("SM2_VFX_DISTORT_EXACT") != "0";
   public int DistortionQuads { get; private set; }
   /// <summary>Mesh parts drawn with the blood-splash VAT path (SM2_VFX_VAT=1).</summary>
   public int VatDraws { get; private set; }
@@ -351,6 +359,7 @@ internal sealed unsafe class EffectRenderer : IDisposable
     _gl.Uniform1(_gl.GetUniformLocation(_distort, "uScene"), 2);
     _gl.Uniform2(_gl.GetUniformLocation(_distort, "uInvSize"), 1f / viewport.X, 1f / viewport.Y);
     _gl.Uniform1(_gl.GetUniformLocation(_distort, "uStrength"), DistortionStrength);
+    _gl.Uniform1(_gl.GetUniformLocation(_distort, "uExact"), DistortExact ? 1 : 0);
     _gl.ActiveTexture(TextureUnit.Texture2);
     _gl.BindTexture(TextureTarget.Texture2D, scene);
     _gl.Enable(EnableCap.DepthTest);
@@ -633,6 +642,7 @@ internal sealed unsafe class EffectRenderer : IDisposable
     uniform sampler2D uScene;
     uniform vec2 uInvSize;
     uniform float uStrength;
+    uniform int uExact;
     out vec4 outColor;
     void main()
     {
@@ -641,9 +651,17 @@ internal sealed unsafe class EffectRenderer : IDisposable
       float edge = 1.0 - smoothstep(0.6, 1.0, length(q));
       float k = vColor.r * clamp(vColor.a, 0.0, 1.0) * edge;
       vec2 offset = (n.rg * 2.0 - 1.0) * uStrength * k;
+      float a = clamp(k * 4.0, 0.0, 1.0);
+      if (uExact == 1)
+      {
+        // vfx3z: particles.sdc 00005_1 (vfxsh_glsl/pc): o = (tex.rg*2.007874-1.007874) * TEXCOORD.w (per-vertex scalar);
+        // mask = sat(10*(|o.x|+|o.y|)); buffer = mask*(o*2+0.5), w = mask. No radial edge fade in the shader.
+        vec2 o = (n.rg * 2.007874 - 1.007874) * vColor.r * clamp(vColor.a, 0.0, 1.0);
+        a = clamp(10.0 * (abs(o.x) + abs(o.y)), 0.0, 1.0);
+        offset = o * uStrength;
+      }
       vec2 uv = gl_FragCoord.xy * uInvSize;
       vec3 c = texture(uScene, clamp(uv + offset, vec2(0.0), vec2(1.0))).rgb;
-      float a = clamp(k * 4.0, 0.0, 1.0);
       outColor = vec4(c * a, a);
     }
     """;
