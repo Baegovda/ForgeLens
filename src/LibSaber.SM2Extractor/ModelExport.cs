@@ -203,7 +203,8 @@ public static class ModelExport
       WriteMaterials = !options.AnimationOnly,
       WriteModelTextures = !options.AnimationOnly,
       IncludeClothSim = options.IncludeClothSim,
-      Physics = options.Physics,
+      Physics = options.Physics && options.MannequinReference is null,
+      MannequinReference = options.MannequinReference,
     };
   }
 

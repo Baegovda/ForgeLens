@@ -2,6 +2,9 @@
 # usage: ue_bulk.py import <asset>   (mesh + exported import_sm2_materials.py + {asset}__*.fbx clips, then check)
 #        ue_bulk.py check <asset>    (checks only)
 # Export root: Desktop/SM2_Work/Exports/bulk/<asset>/tpl/<asset>.tpl/. Writes Exports/bulk/<asset>.ue.json and prints BULKJSON.
+# "Anim Only (Manny)" exports ({asset}__{clip}_Manny.fbx, already on SK_Mannequin's skeleton) are imported onto
+# /Game/Characters/Mannequins/Meshes/SK_Mannequin into /Game/SM2_Work/Anims_Mannequin (ue_import_manny.py, yaw 0, _bakN
+# backups) and kept out of the SM2 clip import; an export with only _Manny files stops there.
 # A re-import first DUPLICATES an existing /Game/SM2_Work/Tests/<set>/<asset> to <asset>_bakN, then reimports in place (never deletes).
 import sys, os, re, json, math, time, runpy, unreal
 mode, name = sys.argv[1], sys.argv[2]
@@ -20,7 +23,20 @@ def anim_import_fn():
     a = src.index("# --- sm2_anim_import"); b = src.index("# --- end sm2_anim_import")
     g = {}; exec(src[a:b], g); return g["sm2_anim_import"]
 
+def manny_import():
+    files = sorted(root + f for f in os.listdir(root) if f.lower().endswith("_manny.fbx")) if os.path.isdir(root) else []
+    if not files: return 0
+    src = open(W + "/Scripts/ue_import_manny.py", encoding="utf-8").read()
+    g = {"__name__": "ue_import_manny"}; exec(src, g)
+    try:
+        paths = g["run"](files, g["DEST"], g["SKEL"], "0", anim_import_fn())
+        res["mannyClips"] = len(paths); res["mannyDest"] = g["DEST"]
+    except Exception as e: res["errors"].append("manny import: %r" % e)
+    return len(files)
+
 if mode == "import":
+    if manny_import() and not os.path.exists(root + name + ".fbx"):
+        res["importS"] = round(time.time() - t0, 1); print("BULKJSON " + json.dumps(res)); raise SystemExit
     if EAL.does_directory_exist(folder):
         n = 1
         while EAL.does_directory_exist(folder + "_bak%d" % n): n += 1
@@ -43,7 +59,7 @@ if mode == "import":
     try: runpy.run_path(sys.argv[0], run_name="__main__")
     except Exception as e: res["errors"].append("materials: %r" % e)
     res["matImportS"] = round(time.time() - t1, 1)
-    clips = sorted(root + f for f in os.listdir(root) if f.lower().endswith(".fbx") and "__" in f)
+    clips = sorted(root + f for f in os.listdir(root) if f.lower().endswith(".fbx") and "__" in f and not f.lower().endswith("_manny.fbx"))
     mesh = unreal.load_asset(folder + "/" + name)
     if clips and isinstance(mesh, unreal.SkeletalMesh):
         t2 = time.time()

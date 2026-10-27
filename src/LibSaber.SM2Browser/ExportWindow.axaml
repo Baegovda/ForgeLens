@@ -45,6 +45,7 @@
           <ComboBoxItem Content="The clip playing in the preview" />
           <ComboBoxItem Content="Every clip sharing the model's bone names" />
         </ComboBox>
+        <CheckBox x:Name="MannyBox" Content="Anim Only (Manny): clips retargeted to the UE5 Mannequin (SK_Mannequin), {clip}_Manny.fbx" />
         <CheckBox x:Name="RootMotionBox" Content="Root motion (0xF4 track on the root)" IsChecked="True" />
         <TextBlock TextWrapping="Wrap" Opacity="0.75" Text="Effects (.ps, .sfx) are copied raw, with any texture or model names found inside them. Particle systems are not converted." />
       </StackPanel>

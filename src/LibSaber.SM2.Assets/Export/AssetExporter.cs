@@ -64,6 +64,12 @@ public sealed class ExportSettings
   ///   The extractor's <c>--no-physics</c> turns this off.
   /// </summary>
   public bool Physics { get; init; } = true;
+  /// <summary>
+  ///   UE5 Mannequin reference pose JSON (tools/ue/ue_dump_skeleton.py on SK_Mannequin). When set, every clip is written as
+  ///   {clip}_Manny.fbx on the Mannequin skeleton (<see cref="Retarget.MannequinRetarget"/>) instead of the SM2 skeleton.
+  ///   The extractor's <c>--anim-mannequin &lt;json&gt;</c>.
+  /// </summary>
+  public string? MannequinReference { get; init; }
 }
 
 public sealed class ExportReport
@@ -287,6 +293,7 @@ public static class AssetExporter
     }
 
     var usedClips = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+    var mannequin = settings.MannequinReference is { } mannyRef ? Retarget.MannequinReference.Load(mannyRef) : null;
     foreach (var clip in settings.Clips)
     {
       clip.RootMotion = settings.RootMotion;
@@ -301,6 +308,21 @@ public static class AssetExporter
       while (!usedClips.Add(unique))
         unique = token + "_" + suffix++;
       exportMesh.Clip = clip;
+      if (mannequin is not null)
+      {
+        var manny = Retarget.MannequinRetarget.Build(exportMesh, clip, mannequin, report.Messages);
+        if (manny is not null && settings.WriteFbx)
+        {
+          var smPath = Destination(outputDirectory, AnimationRelative(file.Path, unique), ".fbx", batch);
+          var mannyPath = Path.Combine(Path.GetDirectoryName(smPath)!, Path.GetFileNameWithoutExtension(smPath) + Retarget.MannequinRetarget.Suffix + ".fbx");
+          FbxWriter.Write(mannyPath, manny, settings.Space, textureFiles, animationOnly: true, unrealRoot: true);
+          report.Written++;
+          var animScript = Path.Combine(Path.GetDirectoryName(mannyPath)!, "ue_import_anim.py");
+          if (!File.Exists(animScript) || usedClips.Count == 1)
+            WriteUnrealScript(animScript, report);
+        }
+        continue;
+      }
       if (physics is not null)
       {
         try

@@ -236,3 +236,6 @@ glt.chameleon REA'd (FUN_142576f30 + glt PS 03558_0) and implemented in sidecar 
 
 ## mtl1-5 (2026-10-27 KST): chars_phys batch
 - Six characters (calgar, chaplain, commissar, tech_priest, sorcerer_exalted, titus_assault) are in /Game/SM2_Work/Tests/chars_phys with PA and ABP, 0 errors. The live sim check needs clips (pending).
+
+## mtl1-8a (2026-10-27 KST): Anim Only (Manny)
+- The `--anim-only-manny` CLI flag and the Forge Lens "Anim Only (Manny)" checkbox write `_Manny.fbx` clips directly on SK_Mannequin (HEURISTIC world-delta retarget). `ue_import_manny.py` imports them at yaw 0 and is wired into `ue_bulk`. On titus run/idle/attack, the bone error against SM2 is a mean of 8–10 cm. Status ~85%: only biped humanoids are mapped, fingers fall back, and nothing else has been checked yet.

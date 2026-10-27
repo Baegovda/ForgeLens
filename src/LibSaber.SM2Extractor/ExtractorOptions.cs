@@ -10,7 +10,7 @@ LibSaber.SM2Extractor — list and extract Warhammer 40,000: Space Marine 2 arch
 Usage:
   LibSaber.SM2Extractor list <archive-or-folder> [options]
   LibSaber.SM2Extractor extract <archive-or-folder> --output <folder> [options]
-  LibSaber.SM2Extractor export <game-folder> --asset <path> --format <fbx-unreal|gltf|both> --output <folder> [--lod <n>] [--anim <name|all>]... [--anim-only] [--anim-rebase <first-frame|none>] [--no-root-motion] [--include-cloth-sim] [--no-physics] [--variant <spec>] [--tex-formats <list>]
+  LibSaber.SM2Extractor export <game-folder> --asset <path> --format <fbx-unreal|gltf|both> --output <folder> [--lod <n>] [--anim <name|all>]... [--anim-only] [--anim-only-manny] [--anim-mannequin <json>] [--anim-rebase <first-frame|none>] [--no-root-motion] [--include-cloth-sim] [--no-physics] [--variant <spec>] [--tex-formats <list>]
 
 The game ships .pak archives with a sibling cache of the same name plus ".cache"
 (client_pc\something.pak and client_pc\something.pak.cache). .pck files with a
@@ -43,6 +43,12 @@ Options:
                           end in __ADD.
   --anim-only             Write the clip files only: no bind mesh, materials, or textures.
                           Use with a skeleton that is already in the Unreal project.
+  --anim-only-manny       "Anim Only (Manny)": anim-only FBX on the UE5 Mannequin. Writes {model}__{clip}_Manny.fbx with SK_Mannequin
+                          bone names, hierarchy and ref pose, retargeted in the extractor (world-delta,
+                          pelvis-height scaled root motion), so it imports with Skeleton=SK_Mannequin and
+                          plays with no IK Retargeter. Uses the built-in UE 5.7 SK_Mannequin ref pose.
+  --anim-mannequin <json> Same, with another reference (tools/ue/ue_dump_skeleton.py on a Manny-named skeleton).
+                          Implies --anim-only and skips physics. SM2 humanoids only. export only.
   --anim-rebase <mode>    first-frame (default): move each clip's first frame to the bind
                           position and heading, so level-space cinematics start at the origin.
                           The removed offset goes to {clip}.rebase.json. Clips that already
@@ -106,6 +112,7 @@ Examples:
   public bool RebaseFirstFrame { get; private init; } = true;
   public bool IncludeClothSim { get; private init; }
   public bool Physics { get; private init; } = true;
+  public string? MannequinReference { get; private init; }
   /// <summary><c>--variant</c> spec, or null for the default (PREDEFINED_PRESET_1 on constructor tpls).</summary>
   public string? Variant { get; private init; }
   public bool WriteDds { get; private init; } = true;
@@ -154,6 +161,7 @@ Examples:
     var rootMotion = true;
     var unrealRootBone = true;
     var animationOnly = false;
+    string? mannequin = null;
     var rebase = true;
     var rebaseSet = false;
     var rootMotionSet = false;
@@ -245,6 +253,26 @@ Examples:
         }
 
         texFormats = texValue ?? "";
+        continue;
+      }
+
+      if (arg == "--anim-only-manny")
+      {
+        mannequin = "builtin";
+        animationOnly = true;
+        continue;
+      }
+
+      if (TryTakeValue(args, ref i, arg, "--anim-mannequin", "--anim-mannequin", out var mannyValue))
+      {
+        if (string.IsNullOrWhiteSpace(mannyValue) || !File.Exists(mannyValue))
+        {
+          error = "--anim-mannequin needs a reference JSON (tools/ue/ue_dump_skeleton.py).";
+          return false;
+        }
+
+        mannequin = mannyValue;
+        animationOnly = true;
         continue;
       }
 
@@ -504,6 +532,7 @@ Examples:
       RebaseFirstFrame = rebase,
       IncludeClothSim = includeClothSim,
       Physics = physics,
+      MannequinReference = mannequin,
       Variant = variant,
       WriteDds = dds,
       WritePng = png,

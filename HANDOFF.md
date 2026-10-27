@@ -1616,3 +1616,22 @@ Disassembly: /workspace/vfxsh_dis/{pc,pg,dx_pc_dx12_sfx,dx_pc_dx12_distort}, GLS
 - PNGs: `Captures\mtl_fix\phys_<name>_live_{physON,animOnly}_{front,side}.png`. Side-by-side copies are on the box at `/workspace/mtl_fix/phys_live_<name>_cmp.png`.
 - **Next:** for tech_priest and sorcerer_exalted, check that the top cloth bodies are kinematic and constrained to the parent, and add linear limits. Python can't edit constraints, so this has to go in the plugin cpp.
 - The editor map in use, `/Game/Work/02/Lightning_01` (not ours), was dirtied by the temporary actors (all cleared). **Do not save it.**
+
+## mtl1-8a: "Anim Only (Manny)" — clips written directly on SK_Mannequin (2026-10-27)
+- **CLI:** `export ... --anim <clips> --anim-only-manny` (built-in SKM_Manny reference, `Retarget/SK_Mannequin.ref.json`, 161 bones, embedded) or `--anim-mannequin <ref.json>` (a dump from `tools/ue/ue_dump_skeleton.py`). Both imply anim-only and turn physics off. Output: `{model}__{clip}_Manny.fbx`, which already uses SK_Mannequin's bone names, hierarchy and ref pose. No IK Retargeter is needed in UE.
+- **Forge Lens:** Export window checkbox **"Anim Only (Manny)"**.
+- **Method (HEURISTIC, world-delta, `MannequinRetarget.cs`):** W_manny = Rref_manny · A · inv(Rref_sm2) · R_sm2(t).
+  - A is the shortest arc from the Manny bone direction to the SM2 bone direction.
+  - Root and pelvis translation are scaled by the pelvis-height ratio (titus 0.649).
+  - Unmapped bones (twist, corrective) keep their ref locals. `ik_*` copy the foot and hand worlds.
+  - World composition recurses because SM2 parents can come after their children (titus LEG2L = 4, parent LEG1L = 156).
+  - `SM2_MANNY_DEBUG=1` prints DBG lines.
+- **UE import:** `tools/ue/ue_import_manny.py <fbx|folder>` imports onto `/Game/Characters/Mannequins/Meshes/SK_Mannequin` into `/Game/SM2_Work/Anims_Mannequin`, keeping `_bakN` backups.
+  - **Yaw is 0.** Auto would give 180 and turn the clip around.
+  - A reimport reuses the yaw stored on the existing asset, so the script resets it first. This was the cause of the earlier "rotated 180°" result.
+  - `ue_bulk.py import` picks up `*_Manny.fbx` automatically, imports them onto SK_Mannequin, and leaves them out of the SM2 clip import.
+- **Verified (titus run / idle / attack), AnimPose world positions:** Manny vs SM2 ×0.649 at 8 bones × 4 times, mean 8.0–9.6 cm, max 14.8 cm. The remaining gap is proportions.
+  - Plots: box `/workspace/mtl_fix/retarget_{run,idle,attack}.png` (red SM2, blue Manny, front and side).
+  - The SceneCapture renders stayed on frame 0 because the editor world does not tick, so the plots are drawn from AnimPose instead.
+- **Test assets:** `/Game/SM2_Work/Anims_Mannequin/SM2ref` (titus SM2 reference clips) and `Anims_Mannequin_y0` (an earlier test).
+- **New test map:** `/Game/SM2_Work/Tests/PhysTestMap`, created with `phys_map.py`; it never saves Lightning_01. It is now the editor's current map.

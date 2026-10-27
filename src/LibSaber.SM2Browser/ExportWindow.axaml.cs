@@ -102,6 +102,9 @@ public partial class ExportWindow : Window
       Space = SpaceBox.SelectedIndex == 1 ? ExportSpace.Blender : ExportSpace.Unreal,
       IncludeClothSim = ClothBox.IsChecked == true,
       RootMotion = RootMotionBox.IsChecked == true,
+      MannequinReference = MannyBox.IsChecked == true ? "builtin" : null,
+      AnimationOnly = MannyBox.IsChecked == true,
+      Physics = MannyBox.IsChecked != true,
       Variant = PartsSpec(),
     };
     _result?.TrySetResult(new ExportChoice { Folder = folder, Settings = settings, Clips = (ClipChoice)Math.Max(0, ClipBox.SelectedIndex) });

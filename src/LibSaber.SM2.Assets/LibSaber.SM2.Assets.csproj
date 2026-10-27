@@ -27,4 +27,7 @@
     </AssemblyAttribute>
   </ItemGroup>
 
+  <ItemGroup>
+    <EmbeddedResource Include="Retarget/SK_Mannequin.ref.json" LogicalName="SK_Mannequin.ref.json" />
+  </ItemGroup>
 </Project>
