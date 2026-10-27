@@ -1574,3 +1574,20 @@ Disassembly: /workspace/vfxsh_dis/{pc,pg,dx_pc_dx12_sfx,dx_pc_dx12_distort}, GLS
 - **Blood saturation, distortion 0.04, trail DEGR slot mapping:** unchanged and still HEURISTIC.
   - vfx4-1 (VFX executor, same day) already re-checked the exe: only CB names / shader defines were found, with no CPU writer. A runtime capture is not allowed (EAC).
   - These live in VFX files, which this task must not touch.
+
+## mtl1-5: batch characters with physics (2026-10-27 KST)
+- **Set:** `Exports\chars_phys\<name>` → `/Game/SM2_Work/Tests/chars_phys/<name>` (mesh, materials, `PA_<name>_SM2`, `ABP_<name>_SM2Phys`). Imported with `ue_bulk.py import <name> chars_phys`. Physics comes from the currently installed plugin (old fixed limits of 25°/15°).
+
+| name | cloths | jiggles | helpers | bones | slots |
+|---|---|---|---|---|---|
+| cc_calgar | 8 | 3 | 1294 | 1596 | 44 |
+| cc_chaplain | 4 | 23 | 894 | 1396 | 34 |
+| cc_commissar | 6 | 0 | 1764 | 1970 | 13 |
+| cc_tech_priest | 4 | 7 | 2002 | 2684 | 41 |
+| cc_sorcerer_exalted | 4 | 2 | 2614 | 3038 | 30 |
+| cc_titus_assault | 6 | 34 | 922 | 1455 | 41 |
+
+- All six imported with 0 errors, 0 material mismatches and 0 ref-pose NaNs.
+- **Sim check is inconclusive:** these exports have no clips, so `ue_phys_verify` stays at t=0 with deviation 0 (no NaN). The editor does not advance the AnimBP without a playing clip. Next step: export one clip per character (or use a pose-tick) and re-sample.
+- `ue_bulk`'s `physics` report string comes back empty through Python (out-param), although the PA and ABP are created.
+- Customization visual check: box `/workspace/cust_test/{bolter_01red_vs_05h,bolter_01red_vs_custom,marine_default_vs_relic}.png` (numpy rasterizer of the exported glbs).

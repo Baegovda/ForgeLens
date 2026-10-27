@@ -233,3 +233,6 @@ glt.chameleon REA'd (FUN_142576f30 + glt PS 03558_0) and implemented in sidecar 
 ## mtl1-4 (2026-10-27 KST): heuristics
 - Cloth joint swing limits = atan(maxDist/segment), DERIVED. Plugin built, install pending an editor restart.
 - Blood, distortion 0.04 and DEGR unchanged (HEURISTIC, see vfx4-1).
+
+## mtl1-5 (2026-10-27 KST): chars_phys batch
+- Six characters (calgar, chaplain, commissar, tech_priest, sorcerer_exalted, titus_assault) are in /Game/SM2_Work/Tests/chars_phys with PA and ABP, 0 errors. The live sim check needs clips (pending).
