@@ -85,7 +85,8 @@ Extractor build: PC `Desktop\SM2_Work\Bin\SM2Extractor_e4ceb7d`. Captures: PC `D
   - blend_add interpreted;
   - exposure 1/250 and lit ×100 tuned on corpus medians;
   - genOnFly approximated;
-  - distortion strength `SM2_VFX_DISTORT` 0.04;
+  - distortion strength `SM2_VFX_DISTORT` 0.04 (buffer math exact since vfx3z, power→vertex scalar heuristic);
+  - bench bloom point 0.45, surface light 60, LitScale 400 (vfx3z);
   - degNear curve shape;
   - flesh colour assumed dark red.
 - **VFX not implemented:**
@@ -205,3 +206,6 @@ phantom_hands extracted (rings textured but dim: no bloom); grey columns fixed v
 
 ## vfx3y (2026-10-27 KST) — VFX ~81%
 Mesh UV scroll (overrideAffixScroll, FUN_1425fd580) on; opt-in bench bloom from material bloomIntensity (SM2_VFX_BLOOM=1, heuristic). See HANDOFF.md.
+
+### vfx3z (2026-10-27)
+Bloom includes sprites + bloom point (heuristic value, threshold design from Bloom.BloomPoint); finisher blood darker (combine_material deferred, SurfLight 60 heuristic); LitScale 400 (runtime light, heuristic value); distortion buffer math from particles.sdc 00005_1 (power mapping heuristic); trail DEGR still heuristic (0 refs). VFX ≈ 79%. See HANDOFF.md.

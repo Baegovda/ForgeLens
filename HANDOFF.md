@@ -1451,3 +1451,25 @@ Disassembly: /workspace/vfxsh_dis/{pc,pg,dx_pc_dx12_sfx,dx_pc_dx12_distort}, GLS
 ## vfx3y (2026-10-27 KST)
 - Mesh UV scroll: sfx `overrideAffixScroll {override, speedX, speedY}` parsed by FUN_1425fd580 (shader desc +0xd8 speedX, +0xdc speedY; serializer FUN_1425ff110; strings @1437ffc18). EffectMeshMaterial.Scroll; mesh FS samples uv + scroll*time (EffectLayer.Time = effect time). Units UV/s HEURISTIC. Default on, SM2_VFX_MESH_SCROLL=0 disables. mzl_geom: speedY 11. Evidence output /workspace/rea/vfxy_1.c.
 - Bench bloom (opt-in SM2_VFX_BLOOM=1, HEURISTIC, not the game's post chain): second mesh-only pass weighted min(1, bloomIntensity*SM2_VFX_BLOOM_GAIN[0.01]), 3x box blur radius SM2_VFX_BLOOM_RADIUS[10] px, added x SM2_VFX_BLOOM_STRENGTH[1.5] (Bench/BenchBloom.cs). Only meshes feed it (sprites have no bloomIntensity read yet). ingame_cmp.sh "all" column enables it. Muzzle rings now give a warm orange glow, closer to in-game; slight red haze over the whole tile from the large ring meshes.
+
+## vfx3z (2026-10-27 17:15 KST)
+- z1 Bench bloom: sprites now feed the bloom pass; only light above a bloom point blooms (BenchBloom, SM2_VFX_BLOOM_POINT
+  default 0.45, HEURISTIC). Evidence: engine bloom is a scene HDR threshold bloom ("Bloom.BloomPoint" @0x14363dbf0,
+  "COMMON_HDR_BLOOM_POINT" @0x1436e9f08); sprite emitters have no bloomIntensity (only sfx mesh materials, @0x1436446f0).
+  The dim red haze from the big muzzle ring meshes is gone; the core keeps a warm orange glow.
+- z2 Finisher blood: combine_material is a deferred G-buffer shader (dxil-spirv of pc_dx12_combine_material.sdc →
+  /workspace/vfxsh_glsl/combine/, perm 00001_0: 5 RTs, instance colour /255 + sRGB→linear polynomial, emissive RT4 =
+  CB_COMMON[22].x·mtl[8].x·material emissive, not the sfx tint). Brightness = scene light, so lit (non-sfx) meshes get
+  bench light EffectRenderer.SurfLight 60 (was 200; SM2_VFX_SURF_LIGHT, HEURISTIC). Blood red R 186→111 vs ref ~107.
+  Still more saturated than in-game (ref G/B ~60/44 from scene ambient/fog).
+- z3 LitScale 100→400 (SM2_VFX_LIT). Lit particle shaders read only runtime light (COMMON_SUN_INTENSITY @0x1436e9ed0,
+  COMMON_SKY_SH_HARMONICS @0x1436eb790, light grid) × COMMON_HDR_EXPOSURE_DIV_AVG_LUM @0x1436e9ee8; no per-effect
+  constant exists. Value from the in-game refs: HEURISTIC.
+- z4 Distortion: particles.sdc 00005_1 PS: o = (tex.rg·2.007874−1.007874)·TEXCOORD.w, mask = sat(10·(|o.x|+|o.y|)),
+  RT = mask·(o·2+0.5); VS 00001_1 passes V_TEXCOORD.w through. Implemented (SM2_VFX_DISTORT_EXACT=0 = old radial edge).
+  Power→V_TEXCOORD.w and the resolve scale (SM2_VFX_DISTORT 0.04) stay HEURISTIC.
+- z5 Trail DEGR: CB_PASS_TRAIL member strings @0x14378f170..0x14378f288 have 0 code refs (ghidra_proj3 DataRefs) → CB
+  filled by fixed layout. No new evidence; mapping stays HEURISTIC.
+- z6 7 side-by-sides (side_by_side.py now also writes blood_vs_hierophant, bolter_smoke). Box old run →
+  ingame_cmp.bak7; PC Captures\ingame_cmp old → next .bakN.
+- Patches /workspace/patches/vfx3z/. VFX ≈ 79%.
