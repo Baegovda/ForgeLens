@@ -37,6 +37,8 @@
 #include "Rendering/SkeletalMeshModel.h"
 #include "Rendering/SkeletalMeshLODModel.h"
 #include "ComponentReregisterContext.h"
+#include "Components/SkeletalMeshComponent.h"
+#include "ClothingSimulation.h"
 
 namespace
 {
@@ -380,6 +382,111 @@ UAnimGraphNode_RigidBody* FindRigidBodyNode(UAnimBlueprint* ABP)
 }
 
 // Reflection setter so the plugin needs no link dependency on ChaosCloth (property names from UE 5.7 ChaosClothConfig.h).
+
+// mtl1-13: cloth collision from the sidecar (ue.chaosCloth.collision). Offsets are bone-local cm; exports without
+// collision.space="ueMesh" are X-mirrored against the imported mesh (measured mtl1-11 for points, derived for bone-local).
+USkeletalBodySetup* CollBody(UPhysicsAsset* PA, FName Bone)
+{
+  const int32 Existing = PA->FindBodyIndex(Bone);
+  if (Existing != INDEX_NONE)
+    return PA->SkeletalBodySetups[Existing];
+  USkeletalBodySetup* Body = NewObject<USkeletalBodySetup>(PA, NAME_None, RF_Transactional);
+  Body->BoneName = Bone;
+  Body->PhysicsType = PhysType_Kinematic;
+  PA->SkeletalBodySetups.Add(Body);
+  PA->UpdateBodySetupIndexMap();
+  return Body;
+}
+
+FVector JVec(const TSharedPtr<FJsonObject>& O, const TCHAR* F, bool bMirror)
+{
+  const TArray<TSharedPtr<FJsonValue>>* A = nullptr;
+  if (!O.IsValid() || !O->TryGetArrayField(F, A) || A->Num() < 3)
+    return FVector::ZeroVector;
+  const FVector V((*A)[0]->AsNumber(), (*A)[1]->AsNumber(), (*A)[2]->AsNumber());
+  return bMirror ? FVector(-V.X, V.Y, V.Z) : V;
+}
+
+int32 AddCollision(UPhysicsAsset* PA, const TSharedPtr<FJsonObject>& Coll, const FReferenceSkeleton& RS, const TArray<FTransform>& CS, TArray<FString>& Log, const FString& Who)
+{
+  if (!Coll.IsValid())
+    return 0;
+  FString Space;
+  Coll->TryGetStringField(TEXT("space"), Space);
+  const bool bMirror = Space != TEXT("ueMesh");
+  int32 N = 0, Missing = 0;
+  auto BoneCS = [&](const FString& B, FTransform& Out) {
+    const int32 I = RS.FindBoneIndex(FName(*B));
+    if (I == INDEX_NONE) { ++Missing; return false; }
+    Out = CS[I];
+    return true;
+  };
+  const TArray<TSharedPtr<FJsonValue>>* Arr = nullptr;
+  if (Coll->TryGetArrayField(TEXT("capsules"), Arr))
+    for (const TSharedPtr<FJsonValue>& V : *Arr)
+    {
+      const TSharedPtr<FJsonObject> K = V->AsObject();
+      const FString B1 = K->GetStringField(TEXT("BoneFirst")), B2 = K->GetStringField(TEXT("BoneSecond"));
+      FTransform T1, T2;
+      if (!BoneCS(B1, T1)) continue;
+      const FVector P1 = JVec(K, TEXT("offsetFirstCm"), bMirror);
+      FVector P2 = P1;
+      if (!B2.IsEmpty() && BoneCS(B2, T2))
+        P2 = T1.InverseTransformPosition(T2.TransformPosition(JVec(K, TEXT("offsetSecondCm"), bMirror)));
+      const float R1 = (float)K->GetNumberField(TEXT("radiusFirstCm")), R2 = (float)K->GetNumberField(TEXT("radiusSecondCm"));
+      const FVector Axis = P2 - P1;
+      const float Len = Axis.Size();
+      USkeletalBodySetup* Body = CollBody(PA, FName(*B1));
+      const FQuat Rot = Len > KINDA_SMALL_NUMBER ? FQuat::FindBetweenNormals(FVector::UpVector, Axis / Len) : FQuat::Identity;
+      if (Len <= KINDA_SMALL_NUMBER)
+      {
+        FKSphereElem E(FMath::Max(R1, R2));
+        E.Center = P1;
+        Body->AggGeom.SphereElems.Add(E);
+      }
+      else if (FMath::IsNearlyEqual(R1, R2, 0.05f))
+      {
+        FKSphylElem E(R1, Len);
+        E.Center = (P1 + P2) * 0.5;
+        E.Rotation = Rot.Rotator();
+        Body->AggGeom.SphylElems.Add(E);
+      }
+      else
+      {
+        FKTaperedCapsuleElem E(R1, R2, Len); // Radius0 at -Z (first), Radius1 at +Z (second)
+        E.Center = (P1 + P2) * 0.5;
+        E.Rotation = Rot.Rotator();
+        Body->AggGeom.TaperedCapsuleElems.Add(E);
+      }
+      ++N;
+    }
+  if (Coll->TryGetArrayField(TEXT("spheres"), Arr))
+    for (const TSharedPtr<FJsonValue>& V : *Arr)
+    {
+      const TSharedPtr<FJsonObject> K = V->AsObject();
+      FTransform T;
+      if (!BoneCS(K->GetStringField(TEXT("Bone")), T)) continue;
+      FKSphereElem E((float)K->GetNumberField(TEXT("radiusCm")));
+      E.Center = JVec(K, TEXT("offsetCm"), bMirror);
+      CollBody(PA, FName(*K->GetStringField(TEXT("Bone"))))->AggGeom.SphereElems.Add(E);
+      ++N;
+    }
+  if (Coll->TryGetArrayField(TEXT("boxes"), Arr))
+    for (const TSharedPtr<FJsonValue>& V : *Arr)
+    {
+      const TSharedPtr<FJsonObject> K = V->AsObject();
+      FTransform T;
+      if (!BoneCS(K->GetStringField(TEXT("Bone")), T)) continue;
+      const FVector Sz = JVec(K, TEXT("sizeCm"), false);
+      FKBoxElem E(Sz.X, Sz.Y, Sz.Z);
+      E.Center = JVec(K, TEXT("offsetCm"), bMirror);
+      CollBody(PA, FName(*K->GetStringField(TEXT("Bone"))))->AggGeom.BoxElems.Add(E);
+      ++N;
+    }
+  Log.Add(FString::Printf(TEXT("%s: collision shapes=%d missingBones=%d mirrored=%d"), *Who, N, Missing, bMirror ? 1 : 0));
+  return N;
+}
+
 bool SetProp(UObject* Obj, const TCHAR* Name, const FString& Value, TArray<FString>& Log)
 {
   FProperty* P = Obj ? Obj->GetClass()->FindPropertyByName(FName(Name)) : nullptr;
@@ -447,6 +554,17 @@ bool USM2PhysicsSetupLibrary::CreateChaosCloth(USkeletalMesh* Mesh, const FStrin
   UClass* ChaosConfigClass = FindObject<UClass>(nullptr, TEXT("/Script/ChaosCloth.ChaosClothConfig"));
   TArray<FString> Log;
   Mesh->Modify();
+  const TArray<FTransform> RefCS = RefComponentSpace(Mesh->GetRefSkeleton());
+  UPhysicsAsset* CollPA = nullptr;
+  {
+    const FString Folder = FPackageName::GetLongPackagePath(Mesh->GetOutermost()->GetName()) / TEXT("ChaosCloth");
+    const FString Name = FreeName(Folder, TEXT("PA_") + Mesh->GetName() + TEXT("_ClothCollision"));
+    UPackage* Pkg = CreatePackage(*(Folder / Name));
+    CollPA = NewObject<UPhysicsAsset>(Pkg, *Name, RF_Public | RF_Standalone | RF_Transactional);
+    CollPA->PreviewSkeletalMesh = Mesh;
+    FAssetRegistryModule::AssetCreated(CollPA);
+    CollPA->MarkPackageDirty();
+  }
 
   for (const TSharedPtr<FJsonValue>& ClothV : Root->GetArrayField(TEXT("cloths")))
   {
@@ -673,6 +791,18 @@ bool USM2PhysicsSetupLibrary::CreateChaosCloth(USkeletalMesh* Mesh, const FStrin
     else
       Log.Add(TEXT("no ChaosClothConfig class"));
 
+    // 5b. mtl1-13: sidecar collision -> shared collision PhysicsAsset on this clothing asset.
+    {
+      const TSharedPtr<FJsonObject>* CO = nullptr;
+      TSharedPtr<FJsonObject> Coll;
+      if (CC.IsValid() && CC->TryGetObjectField(TEXT("collision"), CO))
+        Coll = *CO;
+      if (AddCollision(CollPA, Coll, Mesh->GetRefSkeleton(), RefCS, Log, SimName) > 0 || CollPA->SkeletalBodySetups.Num() > 0)
+      {
+        Asset->PhysicsAsset = CollPA;
+        Asset->RefreshBoneMapping(Mesh);
+      }
+    }
     // 6. bind to the render sections (mesh-to-mesh skinning, as the editor's Apply Clothing).
     int32 Bound = 0;
     {
@@ -784,4 +914,71 @@ int32 USM2PhysicsSetupLibrary::SetSimGravity(UPhysicsAsset* PA, bool bEnable)
     }
   PA->MarkPackageDirty();
   return N;
+}
+
+int32 USM2PhysicsSetupLibrary::MeasureClothPenetration(USkeletalMeshComponent* Comp, float ThresholdCm, FString& Report)
+{
+  if (!Comp || !Comp->GetSkeletalMeshAsset())
+  {
+    Report = TEXT("no component");
+    return -1;
+  }
+  TSet<UPhysicsAsset*> PAs;
+  for (UClothingAssetBase* A : Comp->GetSkeletalMeshAsset()->GetMeshClothingAssets())
+    if (UClothingAssetCommon* C = Cast<UClothingAssetCommon>(A))
+      if (C->PhysicsAsset)
+        PAs.Add(C->PhysicsAsset);
+  const TMap<int32, FClothSimulData>& Data = Comp->GetCurrentClothingData_GameThread();
+  const FTransform CompTM = Comp->GetComponentTransform();
+  int32 Total = 0, Inside = 0, NaN = 0;
+  float Worst = 0.f;
+  for (const auto& KV : Data)
+  {
+    const FClothSimulData& D = KV.Value;
+    if (D.Positions.Num() == 0) continue;
+    // positions are in the space of D.Transform (component-relative in Chaos); pick the candidate whose centroid lies inside the component bounds.
+    FVector CA(0), CB(0);
+    for (const FVector3f& P : D.Positions) { CA += D.Transform.TransformPosition(FVector(P)); CB += CompTM.TransformPosition(FVector(P)); }
+    CA /= D.Positions.Num(); CB /= D.Positions.Num();
+    const bool bUseA = FVector::Dist(CA, Comp->Bounds.Origin) <= FVector::Dist(CB, Comp->Bounds.Origin);
+    for (const FVector3f& P3 : D.Positions)
+    {
+      ++Total;
+      if (P3.ContainsNaN()) { ++NaN; continue; }
+      const FVector W = bUseA ? D.Transform.TransformPosition(FVector(P3)) : CompTM.TransformPosition(FVector(P3));
+      float Deepest = 0.f;
+      for (UPhysicsAsset* PA : PAs)
+        for (USkeletalBodySetup* B : PA->SkeletalBodySetups)
+        {
+          const int32 BI = Comp->GetBoneIndex(B->BoneName);
+          if (BI == INDEX_NONE) continue;
+          const FTransform BT = Comp->GetBoneTransform(BI);
+          for (const FKSphereElem& E : B->AggGeom.SphereElems)
+          {
+            const float Dd = (W - BT.TransformPosition(E.Center)).Size() - E.Radius;
+            Deepest = FMath::Min(Deepest, Dd);
+          }
+          auto Seg = [&](const FVector& C, const FRotator& R, float Len, float R0, float R1) {
+            const FVector Ax = BT.TransformVectorNoScale(R.Quaternion().GetUpVector());
+            const FVector Cw = BT.TransformPosition(C);
+            const float T = FMath::Clamp((float)FVector::DotProduct(W - Cw, Ax), -Len * 0.5f, Len * 0.5f);
+            const float Rr = FMath::Lerp(R0, R1, (T + Len * 0.5f) / FMath::Max(Len, 0.001f));
+            Deepest = FMath::Min(Deepest, (float)(W - (Cw + Ax * T)).Size() - Rr);
+          };
+          for (const FKSphylElem& E : B->AggGeom.SphylElems) Seg(E.Center, E.Rotation, E.Length, E.Radius, E.Radius);
+          for (const FKTaperedCapsuleElem& E : B->AggGeom.TaperedCapsuleElems) Seg(E.Center, E.Rotation, E.Length, E.Radius0, E.Radius1);
+          for (const FKBoxElem& E : B->AggGeom.BoxElems)
+          {
+            const FVector L = BT.InverseTransformPosition(W) - E.Center;
+            const FVector Lr = E.Rotation.Quaternion().UnrotateVector(L);
+            const FVector Q = Lr.GetAbs() - FVector(E.X, E.Y, E.Z) * 0.5;
+            if (Q.X < 0 && Q.Y < 0 && Q.Z < 0) Deepest = FMath::Min(Deepest, (float)Q.GetMax());
+          }
+        }
+      if (-Deepest > ThresholdCm) ++Inside;
+      Worst = FMath::Max(Worst, -Deepest);
+    }
+  }
+  Report = FString::Printf(TEXT("particles=%d inside>%.1fcm=%d worstCm=%.2f nan=%d collisionPAs=%d"), Total, ThresholdCm, Inside, Worst, NaN, PAs.Num());
+  return Inside;
 }

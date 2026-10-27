@@ -8,6 +8,7 @@ class USkeletalMesh;
 class UAnimBlueprint;
 
 class UPhysicsAsset;
+class USkeletalMeshComponent;
 UCLASS()
 class SM2PHYSICSSETUP_API USM2PhysicsSetupLibrary : public UBlueprintFunctionLibrary
 {
@@ -57,4 +58,8 @@ public:
    */
   UFUNCTION(BlueprintCallable, Category = "SM2")
   static bool CreateChaosCloth(USkeletalMesh* Mesh, const FString& JsonPath, TArray<FString>& Converted, FString& Report);
+
+  /** mtl1-13 verification: cloth particles (current sim, game thread) inside the clothing assets' collision bodies by more than ThresholdCm. Returns the count. */
+  UFUNCTION(BlueprintCallable, Category = "SM2")
+  static int32 MeasureClothPenetration(USkeletalMeshComponent* Comp, float ThresholdCm, FString& Report);
 };
