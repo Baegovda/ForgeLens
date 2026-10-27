@@ -61,6 +61,15 @@ internal sealed unsafe class EffectRenderer : IDisposable
   /// <summary>vfx3y: material UV scroll (SM2_VFX_MESH_SCROLL=0 disables).</summary>
   public static bool ScrollEnabled { get; set; } = Environment.GetEnvironmentVariable("SM2_VFX_MESH_SCROLL") != "0";
   /// <summary>vfx3y HEURISTIC: bloom weight = min(1, bloomIntensity * gain); SM2_VFX_BLOOM_GAIN, default 0.01.</summary>
+  /// <summary>
+  ///   vfx3z: bench key light for lit (non-sfx, combine_material) mesh particles such as finisher blood. combine_material
+  ///   is a deferred G-buffer shader (pc_dx12_combine_material.sdc perm 00001_0: 5 render targets, instance colour
+  ///   unpacked /255 then sRGB-to-linear x*(x*(0.3053x+0.6822)+0.0125); emissive RT4 = CB_COMMON[22].x * mtl[8].x *
+  ///   material emissive colour, not the sfxMtlOverrides tint). So its brightness comes from scene lighting, which the
+  ///   bench does not have. Value 60 (was 200 = sprite light) matches the in-game finisher ref 155018 (~RGB 110/30/25):
+  ///   HEURISTIC. SM2_VFX_SURF_LIGHT overrides.
+  /// </summary>
+  public static float SurfLight { get; set; } = float.TryParse(Environment.GetEnvironmentVariable("SM2_VFX_SURF_LIGHT"), System.Globalization.CultureInfo.InvariantCulture, out var sl) ? sl : 60f;
   public static float BloomGain { get; set; } = float.TryParse(Environment.GetEnvironmentVariable("SM2_VFX_BLOOM_GAIN"), System.Globalization.CultureInfo.InvariantCulture, out var bg) ? bg : 0.01f;
   public static bool ContrastEnabled { get; set; } = Environment.GetEnvironmentVariable("SM2_VFX_CONTRAST") == "1";
   private readonly Dictionary<string, (uint Vao, uint Vbo, uint Ibo)?> _meshes = new(StringComparer.OrdinalIgnoreCase);
@@ -420,6 +429,7 @@ internal sealed unsafe class EffectRenderer : IDisposable
     var bloomWLoc = _gl.GetUniformLocation(_mesh, "uBloomW");
     _gl.Uniform1(_gl.GetUniformLocation(_mesh, "uTime"), ScrollEnabled ? layer.Time : 0f);
     _gl.Uniform1(_gl.GetUniformLocation(_mesh, "uBloomPass"), layer.BloomPass ? 1 : 0);
+    _gl.Uniform1(_gl.GetUniformLocation(_mesh, "uSurfLight"), SurfLight);
     var mode = _gl.GetUniformLocation(_mesh, "uTranslucent");
     var vatOn = _gl.GetUniformLocation(_mesh, "uVat");
     var vatMin = _gl.GetUniformLocation(_mesh, "uVatMin");
@@ -709,6 +719,7 @@ internal sealed unsafe class EffectRenderer : IDisposable
     uniform float uBloomW;
     uniform int uTranslucent;
     uniform float uExposure;
+    uniform float uSurfLight;
     uniform vec3 uEye;
     uniform int uLightCount;
     uniform vec4 uLightPos[8];
@@ -724,7 +735,7 @@ internal sealed unsafe class EffectRenderer : IDisposable
       if (uSoftFresnel > 0.0) a *= pow(abs(dot(n, normalize(uEye - vWorld))), uSoftFresnel);
       vec3 base = t.rgb * pow(uColor.rgb, vec3(2.2)); // override colours are sRGB
       // Scene light in sprite HDR units (key + sky ~ EffectSprites.LitScale) plus the effect's point lights.
-      vec3 light = vec3(200.0) * (0.35 + 0.65 * max(dot(n, normalize(vec3(0.4, 0.8, 0.3))), 0.0));
+      vec3 light = vec3(uTranslucent == 1 ? 200.0 : uSurfLight) * (0.35 + 0.65 * max(dot(n, normalize(vec3(0.4, 0.8, 0.3))), 0.0));
       for (int i = 0; i < uLightCount; i++)
       {
         vec3 d = uLightPos[i].xyz - vWorld;
