@@ -117,13 +117,14 @@ public static class PhysicsSidecar
             subdivisionCount = Math.Max(1, (int)MathF.Ceiling(cfg.SolverFrequency / 60f)),
             bUseSelfCollisions = cfg.SelfCollision.Enable,
             localWindCm = UeMesh(cfg.Environment.LocalWindVelocity),
+            windSpace = "ueMesh", // component-space vector: X-mirrored like simPositionsUeCm
             collision = new
             {
               note = "PhysicsAsset bodies for the cloth: capsules as tapered capsules (Chaos Cloth only) when radii differ, spheres, boxes (size is the full extent).",
-              space = "ueMesh", // mtl1-12: offsets/wind X-mirrored like simPositionsUeCm (UE import mirrors X; a reflection M conjugates bone frames, so bone-local offsets map by the same M). Gravity is -Z only, unchanged.
-              capsules = cfg.Capsules.Select(k => new { k.Name, k.BoneFirst, radiusFirstCm = k.RadiusFirst * 100f, offsetFirstCm = UeMesh(k.BoneFirstOffset), k.BoneSecond, radiusSecondCm = k.RadiusSecond * 100f, offsetSecondCm = UeMesh(k.BoneSecondOffset) }),
-              spheres = cfg.Spheres.Select(k => new { k.Name, k.Bone, radiusCm = k.Radius * 100f, offsetCm = UeMesh(k.BoneOffset) }),
-              boxes = cfg.Boxes.Select(k => new { k.Name, k.Bone, sizeCm = V(new Vector3(k.Size.X, k.Size.Z, k.Size.Y) * 100f), offsetCm = UeMesh(k.BoneOffset) }),
+              space = "boneLocal", // mtl1-14d: bone-local offsets are NOT mirrored (imported bone frames absorb the X reflection; mirroring blew up the sorcerer cloak). Plugin also shrinks shapes off free rest particles.
+              capsules = cfg.Capsules.Select(k => new { k.Name, k.BoneFirst, radiusFirstCm = k.RadiusFirst * 100f, offsetFirstCm = Ue(k.BoneFirstOffset), k.BoneSecond, radiusSecondCm = k.RadiusSecond * 100f, offsetSecondCm = Ue(k.BoneSecondOffset) }),
+              spheres = cfg.Spheres.Select(k => new { k.Name, k.Bone, radiusCm = k.Radius * 100f, offsetCm = Ue(k.BoneOffset) }),
+              boxes = cfg.Boxes.Select(k => new { k.Name, k.Bone, sizeCm = V(new Vector3(k.Size.X, k.Size.Z, k.Size.Y) * 100f), offsetCm = Ue(k.BoneOffset) }),
             },
           },
         },

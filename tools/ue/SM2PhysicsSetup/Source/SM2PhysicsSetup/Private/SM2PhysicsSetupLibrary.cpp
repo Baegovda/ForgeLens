@@ -385,6 +385,11 @@ UAnimGraphNode_RigidBody* FindRigidBodyNode(UAnimBlueprint* ABP)
 
 // mtl1-13: cloth collision from the sidecar (ue.chaosCloth.collision). Offsets are bone-local cm; exports without
 // collision.space="ueMesh" are X-mirrored against the imported mesh (measured mtl1-11 for points, derived for bone-local).
+// mtl1-14d GENERIC RULE (replaces the above for bone-local offsets): imported bone frames already absorb the X reflection
+// (same finding as the Manny retarget), so bone-local offsets must be the RAW SM2 values. Raw = files without space or
+// space="boneLocal"; files written with space="ueMesh" (mtl1-12..14 extractor) carry X-negated offsets and are un-negated.
+// Then every capsule/sphere is shrunk so no FREE rest-pose particle of that cloth starts inside it (start-inside particles
+// are what blew the sorcerer cloak into a disc / spike ball).
 USkeletalBodySetup* CollBody(UPhysicsAsset* PA, FName Bone)
 {
   const int32 Existing = PA->FindBodyIndex(Bone);
@@ -407,13 +412,33 @@ FVector JVec(const TSharedPtr<FJsonObject>& O, const TCHAR* F, bool bMirror)
   return bMirror ? FVector(-V.X, V.Y, V.Z) : V;
 }
 
-int32 AddCollision(UPhysicsAsset* PA, const TSharedPtr<FJsonObject>& Coll, const FReferenceSkeleton& RS, const TArray<FTransform>& CS, TArray<FString>& Log, const FString& Who)
+int32 AddCollision(UPhysicsAsset* PA, const TSharedPtr<FJsonObject>& Coll, const FReferenceSkeleton& RS, const TArray<FTransform>& CS, TArray<FString>& Log, const FString& Who,
+  const TArray<FVector3f>* RestPV = nullptr, const TArray<float>* RestMaxDist = nullptr, float ThickCm = 2.0f)
 {
+  int32 Fitted = 0;
+  float MinScale = 1.0f;
+  // Largest radius scale s (<=1) so that every free rest particle P is outside the swept shape: dist(P) >= s*r(t) + ThickCm.
+  auto FitScale = [&](const FVector& A, const FVector& B, float RA, float RB) {
+    float S = 1.0f;
+    if (!RestPV) return S;
+    const FVector AB = B - A; const double L2 = AB.SizeSquared();
+    for (int32 I = 0; I < RestPV->Num(); ++I)
+    {
+      if (RestMaxDist && RestMaxDist->IsValidIndex(I) && (*RestMaxDist)[I] <= 0.1f) continue; // pinned: follows skin
+      const FVector P((*RestPV)[I]);
+      const double T = L2 > 1e-6 ? FMath::Clamp(FVector::DotProduct(P - A, AB) / L2, 0.0, 1.0) : 0.0;
+      const float R = FMath::Lerp(RA, RB, (float)T);
+      const float D = (float)FVector::Dist(P, A + AB * T);
+      if (R > KINDA_SMALL_NUMBER && D < R + ThickCm)
+        S = FMath::Min(S, FMath::Max(0.0f, D - ThickCm) / R);
+    }
+    return FMath::Max(S, 0.25f); // HEURISTIC floor: keep a core so limbs still collide
+  };
   if (!Coll.IsValid())
     return 0;
   FString Space;
   Coll->TryGetStringField(TEXT("space"), Space);
-  const bool bMirror = Space != TEXT("ueMesh");
+  const bool bMirror = Space == TEXT("ueMesh"); // un-negate extractor-mirrored offsets -> raw bone-local
   int32 N = 0, Missing = 0;
   auto BoneCS = [&](const FString& B, FTransform& Out) {
     const int32 I = RS.FindBoneIndex(FName(*B));
@@ -433,7 +458,11 @@ int32 AddCollision(UPhysicsAsset* PA, const TSharedPtr<FJsonObject>& Coll, const
       FVector P2 = P1;
       if (!B2.IsEmpty() && BoneCS(B2, T2))
         P2 = T1.InverseTransformPosition(T2.TransformPosition(JVec(K, TEXT("offsetSecondCm"), bMirror)));
-      const float R1 = (float)K->GetNumberField(TEXT("radiusFirstCm")), R2 = (float)K->GetNumberField(TEXT("radiusSecondCm"));
+      float R1 = (float)K->GetNumberField(TEXT("radiusFirstCm")), R2 = (float)K->GetNumberField(TEXT("radiusSecondCm"));
+      {
+        const float S = FitScale(T1.TransformPosition(P1), T1.TransformPosition(P2), R1, R2);
+        if (S < 0.999f) { ++Fitted; MinScale = FMath::Min(MinScale, S); R1 *= S; R2 *= S; }
+      }
       const FVector Axis = P2 - P1;
       const float Len = Axis.Size();
       USkeletalBodySetup* Body = CollBody(PA, FName(*B1));
@@ -466,8 +495,11 @@ int32 AddCollision(UPhysicsAsset* PA, const TSharedPtr<FJsonObject>& Coll, const
       const TSharedPtr<FJsonObject> K = V->AsObject();
       FTransform T;
       if (!BoneCS(K->GetStringField(TEXT("Bone")), T)) continue;
-      FKSphereElem E((float)K->GetNumberField(TEXT("radiusCm")));
-      E.Center = JVec(K, TEXT("offsetCm"), bMirror);
+      float Rs = (float)K->GetNumberField(TEXT("radiusCm"));
+      const FVector C = JVec(K, TEXT("offsetCm"), bMirror);
+      { const float S = FitScale(T.TransformPosition(C), T.TransformPosition(C), Rs, Rs); if (S < 0.999f) { ++Fitted; MinScale = FMath::Min(MinScale, S); Rs *= S; } }
+      FKSphereElem E(Rs);
+      E.Center = C;
       CollBody(PA, FName(*K->GetStringField(TEXT("Bone"))))->AggGeom.SphereElems.Add(E);
       ++N;
     }
@@ -483,7 +515,7 @@ int32 AddCollision(UPhysicsAsset* PA, const TSharedPtr<FJsonObject>& Coll, const
       CollBody(PA, FName(*K->GetStringField(TEXT("Bone"))))->AggGeom.BoxElems.Add(E);
       ++N;
     }
-  Log.Add(FString::Printf(TEXT("%s: collision shapes=%d missingBones=%d mirrored=%d"), *Who, N, Missing, bMirror ? 1 : 0));
+  Log.Add(FString::Printf(TEXT("%s: collision shapes=%d missingBones=%d unnegated=%d restFitted=%d minRadiusScale=%.2f"), *Who, N, Missing, bMirror ? 1 : 0, Fitted, MinScale));
   return N;
 }
 
@@ -799,7 +831,7 @@ bool USM2PhysicsSetupLibrary::CreateChaosCloth(USkeletalMesh* Mesh, const FStrin
       TSharedPtr<FJsonObject> Coll;
       if (CC.IsValid() && CC->TryGetObjectField(TEXT("collision"), CO))
         Coll = *CO;
-      if (AddCollision(CollPA, Coll, Mesh->GetRefSkeleton(), RefCS, Log, SimName) > 0 || CollPA->SkeletalBodySetups.Num() > 0)
+      if (AddCollision(CollPA, Coll, Mesh->GetRefSkeleton(), RefCS, Log, SimName, &PV, &Mask.Values, FMath::Max(2.0f, (float)Num(CC, TEXT("collisionThicknessCm"), 1))) > 0 || CollPA->SkeletalBodySetups.Num() > 0)
       {
         Asset->PhysicsAsset = CollPA;
         Asset->RefreshBoneMapping(Mesh);

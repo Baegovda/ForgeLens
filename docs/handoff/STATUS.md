@@ -250,3 +250,10 @@ glt.chameleon REA'd (FUN_142576f30 + glt PS 03558_0) and implemented in sidecar 
 - 2026-10-28 mtl1-14b: Manny verified via fixed-camera SIE side/front captures (tools/ue/mtl_fix/mcap3.ps1; camera not following pelvis, red line = ground z=0): run/idle/attack upright, feet z~11 (ankle), run faces +Y, AnimPose root along +Y. "play mode" error earlier was our own leftover SIE; pie.py ends PIE/SIE. Persona viewport camera not scriptable (opens inside mesh). Cloth: cpp10 (pinned/free pen split, CCD, thickness>=2) + clothwind.py (ChaosClothingInteractor.set_wind / WindDirectionalSource tag SM2Wind, Sequencer-friendly) + nocoll.py committed.
 
 - 2026-10-28 mtl1-14c cloth: sorcerer Chaos+collision EXPLODED cloak with X-mirrored Spine capsule (r38/25, offset -20) -> sidecar collision.space=ueMesh (json .bak kept) fixes explosion (cloak still flares). pen free>1cm: coll 11-38 vs NoColl 69. Wind: interactor keyed by clothing asset name (SM2Cloth_<sim>_0), must be applied AFTER sim starts; sidecar localWindCm x1 explodes cloth (also with AirDensity 1.225e-6), x0.05 stable -> clothwind default scale 0.05. skirt_SIM interactor not found (TODO). Bone row recaptured (cl5bone). cloth_cmp_*.png rebuilt (bone/coll/noColl/wind). calgar/tech_priest wind row is an old run where wind was not applied.
+
+## mtl1-14d (generic cloth collision)
+- GENERIC: sidecar collision offsets are raw `Ue(v)` bone-local (`space="boneLocal"`); plugin only un-negates when `space=="ueMesh"`. No per-character json edits (sorcerer json restored from .bak1).
+- Plugin AddCollision rest-fit: capsule/sphere radii shrink (floor 0.25) so free rest particles sit >= thickness outside. Log: `unnegated/restFitted/minRadiusScale`.
+- Rebuilt ChaosCloth calgar/sorcerer/tech_priest. Calgar/tech_priest OK. Sorcerer cloak still fans out without wind (open); with wind x0.05 it hangs better.
+- Wind: first cloth per mesh gets no interactor (skirt_SIM, skirt_v7_SIM ...) - open. Old exports lack localWindCm -> vel 0 (re-export needed).
+- Captures: cloth_cmp_<char>_14d.png (box /workspace/mtl_fix).

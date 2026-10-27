@@ -23,7 +23,7 @@ if mode == "wind":
         for c in pj.get("cloths", []):
             cc = c.get("ue", {}).get("chaosCloth");
             if not cc: continue
-            v = cc.get("localWindCm", [0, 0, 0]); mir = cc.get("collision", {}).get("space") != "ueMesh"
+            v = cc.get("localWindCm", [0, 0, 0]); mir = not (cc.get("windSpace") == "ueMesh" or cc.get("collision", {}).get("space") == "ueMesh")
             vel = unreal.Vector((-v[0] if mir else v[0]) * sc, v[1] * sc, v[2] * sc)
             ci = None
             for nm in [c["SimMeshName"]] + names:
