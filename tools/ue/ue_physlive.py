@@ -9,7 +9,9 @@ elif mode == "cams":
     eas = unreal.get_editor_subsystem(unreal.EditorActorSubsystem)
     for a in [a for a in eas.get_all_level_actors() if a.actor_has_tag("SM2PhysCam")]: eas.destroy_actor(a)
     for a in [a for a in eas.get_all_level_actors() if a.actor_has_tag("SM2Phys") and isinstance(a, unreal.SkeletalMeshActor)]:
-        lab = "on" if a.actor_has_tag("on") else "off"; o, e = a.get_actor_bounds(False); r = e.length()
+        lab = "on" if a.actor_has_tag("on") else "off"; bm = unreal.load_asset("/Game/SM2_Work/Tests/%s/%s/%s" % (SET, name, name)); bb = bm.get_bounds() if bm else None; o, e = a.get_actor_bounds(False)
+        if bb: o = a.get_actor_location() + bb.origin; e = bb.box_extent  # mtl1-12: frame from the base mesh asset bounds so the _ChaosCloth twin (larger cloth bounds) frames the same
+        r = e.length()
         for view, dv in (("front", unreal.Vector(1, 0, 0)), ("side", unreal.Vector(0, 1, 0))):
             pos = o + dv * (r * 2.2); rot = unreal.MathLibrary.find_look_at_rotation(pos, o)
             cam = eas.spawn_actor_from_class(unreal.SceneCapture2D, pos, rot); cam.tags = [unreal.Name("SM2PhysCam"), unreal.Name(lab + "_" + view)]

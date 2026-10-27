@@ -116,13 +116,14 @@ public static class PhysicsSidecar
             frictionCoefficient = cfg.Friction,
             subdivisionCount = Math.Max(1, (int)MathF.Ceiling(cfg.SolverFrequency / 60f)),
             bUseSelfCollisions = cfg.SelfCollision.Enable,
-            localWindCm = Ue(cfg.Environment.LocalWindVelocity),
+            localWindCm = UeMesh(cfg.Environment.LocalWindVelocity),
             collision = new
             {
               note = "PhysicsAsset bodies for the cloth: capsules as tapered capsules (Chaos Cloth only) when radii differ, spheres, boxes (size is the full extent).",
-              capsules = cfg.Capsules.Select(k => new { k.Name, k.BoneFirst, radiusFirstCm = k.RadiusFirst * 100f, offsetFirstCm = Ue(k.BoneFirstOffset), k.BoneSecond, radiusSecondCm = k.RadiusSecond * 100f, offsetSecondCm = Ue(k.BoneSecondOffset) }),
-              spheres = cfg.Spheres.Select(k => new { k.Name, k.Bone, radiusCm = k.Radius * 100f, offsetCm = Ue(k.BoneOffset) }),
-              boxes = cfg.Boxes.Select(k => new { k.Name, k.Bone, sizeCm = V(new Vector3(k.Size.X, k.Size.Z, k.Size.Y) * 100f), offsetCm = Ue(k.BoneOffset) }),
+              space = "ueMesh", // mtl1-12: offsets/wind X-mirrored like simPositionsUeCm (UE import mirrors X; a reflection M conjugates bone frames, so bone-local offsets map by the same M). Gravity is -Z only, unchanged.
+              capsules = cfg.Capsules.Select(k => new { k.Name, k.BoneFirst, radiusFirstCm = k.RadiusFirst * 100f, offsetFirstCm = UeMesh(k.BoneFirstOffset), k.BoneSecond, radiusSecondCm = k.RadiusSecond * 100f, offsetSecondCm = UeMesh(k.BoneSecondOffset) }),
+              spheres = cfg.Spheres.Select(k => new { k.Name, k.Bone, radiusCm = k.Radius * 100f, offsetCm = UeMesh(k.BoneOffset) }),
+              boxes = cfg.Boxes.Select(k => new { k.Name, k.Bone, sizeCm = V(new Vector3(k.Size.X, k.Size.Z, k.Size.Y) * 100f), offsetCm = UeMesh(k.BoneOffset) }),
             },
           },
         },

@@ -1724,3 +1724,28 @@ Disassembly: /workspace/vfxsh_dis/{pc,pg,dx_pc_dx12_sfx,dx_pc_dx12_distort}, GLS
   - Bone mean cm: calgar 10.7–12.3, tech_priest 9.7–9.8 (h0 z 40–41 vs 49–50 anim), sorcerer 18–31.
   - Chaos: every cloth is converted, so the helper-bone deviation is 0 by construction and the check is visual only. The cloak trails behind on calgar's run in both modes.
   - The Chaos captures frame smaller (camera placed from the actor bounds; cloth bounds are larger). This is cosmetic. No NaN in any run.
+
+## mtl1-12: chaplain regression, capture framing, collision/wind mirror, gravity restore (2026-10-27)
+- **Chaplain:**
+  - Cause: all 4 of chaplain's cloths have single-particle helpers only, and mtl1-11's MaxChainDepth=1 cap made them worse (≈6 → 7.9 cm).
+  - Fix: the cap now applies only to cloths that have multi-particle helpers (`bAnyMulti`, HEURISTIC).
+- **PhysTestMap re-check after `ue_resetup.py`, mean cm (no NaN):**
+  - chaplain: 5.69–5.74 (fixed)
+  - calgar: 12.3–14.7
+  - commissar: 2.9–3.2
+  - titus: 8.2–8.8
+  - tech_priest: 12.8–13.2. h0 z stays at 38.5–39.1, so the skirt sag fix holds. The tabards and sleeves are uncapped again, which raises the mean from 9.7.
+  - sorcerer: 18.1–22.2 (was 22–30)
+- **Capture framing:** `ue_physlive.py cams` frames both twins from the base mesh asset bounds. The `_ChaosCloth` mesh has larger cloth bounds and used to frame smaller.
+  - Re-done PNGs: box `/workspace/mtl_fix/cloth_cmp_{calgar,tech_priest,sorcerer_exalted}.png` (tag cl3, top = bone, bottom = Chaos, same framing).
+- **Collision and wind vectors:**
+  - `localWindCm` is a world-space vector, so it is X-mirrored the same way as the simPositions (measured mirror in mtl1-11).
+    - Wind X is nonzero on 7 cloths, e.g. titus stamp_R_01 (600, 400, 200) and calgar cloak (-300, -200, 0).
+  - Capsule, sphere and box `offset*Cm` are bone-local. The UE import is a reflection M, and bone frames conjugate by M, so local offsets map by the same M.
+    - This part is DERIVED, not measured in UE.
+    - 33 offsets with nonzero X across the 6 characters.
+  - The sidecar now writes all of these through `UeMesh` (X negated), with `collision.space="ueMesh"`.
+  - Gravity is -Z only and unchanged.
+  - Neither the plugin nor CreateChaosCloth reads capsules or wind yet. Only `ue_sm2_physics.py` (manual Chaos config) does, so no runtime results change.
+- **Gravity:** the diagnostic PAs (`PA_cc_tech_priest_SM2`, `_1`, `_2`, `_3`, plus `_4` and `_5`) have gravity back on (`ue_bdiag.py … 1`).
+- **Old PA/ABP versions:** kept, nothing deleted.

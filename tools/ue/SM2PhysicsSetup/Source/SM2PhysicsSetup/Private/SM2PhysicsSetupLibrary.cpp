@@ -164,6 +164,7 @@ bool USM2PhysicsSetupLibrary::SetupFromJsonEx(USkeletalMesh* Mesh, const FString
     Cloth->TryGetArrayField(TEXT("maxDistanceMeters"), MaxDistV);
     struct FHelper { FName Bone; FName Parent; FTransform T; float Dist; bool bPinned; float MaxDistCm; };
     TArray<FHelper> Helpers;
+    bool bAnyMulti = false; // mtl1-12: cloth has multi-particle helpers (robe-style chains)
     const TArray<TSharedPtr<FJsonValue>>& HB = Cloth->GetArrayField(TEXT("helperBones"));
     for (int32 I = 0; I < HB.Num(); ++I)
     {
@@ -182,7 +183,7 @@ bool USM2PhysicsSetupLibrary::SetupFromJsonEx(USkeletalMesh* Mesh, const FString
       const int32 Particles = H->HasField(TEXT("particles")) ? (int32)H->GetNumberField(TEXT("particles")) : 1;
       // mtl1-8: the index match also applies to multi-particle helpers (particles=3 on robes/leg cloths); before, those had
       // no pins at all and 1024 bodies hung from one pin (tech_priest robe sagged ~1.4 m). HEURISTIC, same as above.
-      (void)Particles;
+      bAnyMulti |= Particles > 1;
       X.bPinned = MaxDistV && MaxDistV->IsValidIndex(I) && (*MaxDistV)[I]->AsNumber() <= 0.0;
       X.MaxDistCm = MaxDistV && MaxDistV->IsValidIndex(I) ? (float)(*MaxDistV)[I]->AsNumber() * 100.0f : -1.0f;
       Helpers.Add(X);
@@ -225,7 +226,8 @@ bool USM2PhysicsSetupLibrary::SetupFromJsonEx(USkeletalMesh* Mesh, const FString
     // 18-30 deg swing per link let helper 0 drop 64 cm (rest z 49 -> -15); with gravity off it stayed at 45; a SLERP drive of
     // 1e5 changed nothing (RigidBody node). A helper deeper than MaxChainDepth hangs from its own kinematic skeleton parent
     // instead, with the swing derived from NvCloth maxDistance (atan(r/L)), the same motion-constraint bound as the source sim.
-    constexpr int32 MaxChainDepth = 1; // HEURISTIC (measured: 3 -> tech_priest h0 sag 29 cm, 1 -> see HANDOFF mtl1-11)
+    // mtl1-12: only for cloths with multi-particle helpers; chaplain (all single-particle) got worse with the cap (6 -> 7.9 cm).
+    const int32 MaxChainDepth = bAnyMulti ? 1 : MAX_int32; // HEURISTIC (measured: 3 -> tech_priest h0 sag 29 cm, 1 -> ~10 cm)
     TArray<int32> Depth;
     Depth.Init(0, Helpers.Num());
     for (int32 I = 0; I < Helpers.Num(); ++I)

@@ -242,3 +242,4 @@ glt.chameleon REA'd (FUN_142576f30 + glt PS 03558_0) and implemented in sidecar 
 - mtl1-8/9 physics: in PhysTestMap, tech_priest mean is 23 cm (was 56; robe sag FLAG remains), sorcerer dash is 41–62 cm (was 69–137; no blow-up), and the other 4 characters are unchanged or better. Physics status ~90%.
 - mtl1-10 Chaos Cloth (opt-in): 6 SIM sections converted on 3 characters. tech_priest robe sag fixed with Chaos. Other sections fall back to bones (FLAG: sim/section mismatch). ~92%.
 - mtl1-11: SIM sections were X-mirrored; fixed in the exporter and the plugin, so Chaos now converts 16/16 cloths on 3 characters. Bone-mode chain-depth cap brings the tech_priest sag from 64 cm to about 10 cm. ~95%.
+- mtl1-12: chaplain fixed (5.7 cm), Chaos framing unified, sidecar wind/collision offsets X-mirror fixed, gravity restored on the diag PAs. ~97%.
