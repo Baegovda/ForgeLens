@@ -1591,3 +1591,9 @@ Disassembly: /workspace/vfxsh_dis/{pc,pg,dx_pc_dx12_sfx,dx_pc_dx12_distort}, GLS
 - **Sim check is inconclusive:** these exports have no clips, so `ue_phys_verify` stays at t=0 with deviation 0 (no NaN). The editor does not advance the AnimBP without a playing clip. Next step: export one clip per character (or use a pose-tick) and re-sample.
 - `ue_bulk`'s `physics` report string comes back empty through Python (out-param), although the PA and ABP are created.
 - Customization visual check: box `/workspace/cust_test/{bolter_01red_vs_05h,bolter_01red_vs_custom,marine_default_vs_relic}.png` (numpy rasterizer of the exported glbs).
+
+## mtl1-6: Forge Lens rename + dark theme (2026-10-27)
+- User-facing name is now **Forge Lens**. The SM2Browser csproj has AssemblyName=ForgeLens and Product "Forge Lens", and the window titles changed to match. Namespaces, project folders, the app.manifest identity and the RecentAssets appdata folder (`LibSaber.SM2Browser`) are unchanged, so existing recents are kept.
+- Install: `C:\Users\Revaptor_FX\SM2Extractor\ForgeLens.exe` (MD5 AE60BB09C98C1F1A5D797FADF5E57424). The old `LibSaber.SM2Browser.exe` is kept, with a copy at `.bak3`. When the user says "실행해줘" ("run it"), launch ForgeLens.exe.
+- Theme (App.axaml only; no behaviour changes): Fluent Dark palette, greys #1E1F22/#252629/#2B2C30, one accent #E8892B. Buttons and inputs are 28 px with radius 3, toolbar and status bar have borders, column headers use the `header` class, and the Export button uses the `accent` class.
+- Screenshots: `Captures\mtl_fix\ui_before.png` and `ui_after.png`, also on the box at /workspace/mtl_fix/. Captured with `Scripts\mtl_fix\wincap.ps1` (PrintWindow, off-screen, no focus; run it under powershell.exe 5.1).

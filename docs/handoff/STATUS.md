@@ -22,7 +22,7 @@ Percentages are the previous agent's estimates of how complete each track is aga
 | UE verification of constructors + physics | done (first pass) | 100 / 85 | open issues below |
 | In-game side-by-side comparison | todo | 0 | needs the PC free + in-game captures |
 | Unreal export test (no Niagara) | done (preview materials) | 100 | `/Game/SM2_Work/VfxExport`: 20 textures, 2 meshes, 2 masters + 20 MIs; capture `Captures\ue_export\ue_export_board.png` |
-| Browser viewer polish | todo | 0 | search, preview, export button |
+| Browser viewer polish → **Forge Lens** (rename + dark theme, mtl1-6) | done | 90 | ForgeLens.exe; theme is visual-only (App.axaml); ui_before/after.png |
 
 ## Commits this session (2026-10-27, oldest first)
 | Commit | What |

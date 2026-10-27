@@ -10,6 +10,9 @@
     <BuiltInComInteropSupport>false</BuiltInComInteropSupport>
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
     <RootNamespace>LibSaber.SM2Browser</RootNamespace>
+    <AssemblyName>ForgeLens</AssemblyName>
+    <Product>Forge Lens</Product>
+    <AssemblyTitle>Forge Lens</AssemblyTitle>
   </PropertyGroup>
 
   <ItemGroup>

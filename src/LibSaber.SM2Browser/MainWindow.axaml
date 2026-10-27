@@ -4,13 +4,13 @@
         xmlns:local="using:LibSaber.SM2Browser"
         xmlns:gpu="using:LibSaber.SM2Browser.Gpu"
         x:Class="LibSaber.SM2Browser.MainWindow"
-        Title="Space Marine 2 assets"
+        Title="Forge Lens — Space Marine 2 assets"
         Width="1440"
         Height="800"
         MinWidth="1100"
         MinHeight="640">
   <DockPanel>
-    <Border DockPanel.Dock="Top" Padding="8" Background="#1C1E22">
+    <Border DockPanel.Dock="Top" Padding="10,8" Background="{DynamicResource FL.Toolbar}" BorderBrush="{DynamicResource FL.Border}" BorderThickness="0,0,0,1">
       <Grid ColumnDefinitions="Auto,*,Auto,220,140,Auto">
         <Button x:Name="OpenButton" Content="Open game folder" Click="OpenClicked" Margin="0,0,8,0" ToolTip.Tip="The game root or client_pc. Caches are found in subfolders." />
         <TextBlock x:Name="FolderText" Grid.Column="1" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" Margin="0,0,8,0" />
@@ -27,16 +27,16 @@
           <ComboBoxItem Content="Effects" />
           <ComboBoxItem Content="Text / YAML" />
         </ComboBox>
-        <Button x:Name="ExportButton" Grid.Column="4" Content="Export…" Click="ExportClicked" IsEnabled="False" Margin="8,0,0,0"
+        <Button x:Name="ExportButton" Grid.Column="4" Content="Export…" Classes="accent" Click="ExportClicked" IsEnabled="False" Margin="8,0,0,0"
                 ToolTip.Tip="Select files in the list first (Ctrl/Shift for several). Ctrl+E" />
       </Grid>
     </Border>
-    <Border DockPanel.Dock="Bottom" Padding="8,4" Background="#16181C">
+    <Border DockPanel.Dock="Bottom" Padding="10,5" Background="{DynamicResource FL.Toolbar}" BorderBrush="{DynamicResource FL.Border}" BorderThickness="0,1,0,0">
       <TextBlock x:Name="StatusText" Text="Open the game folder (the one that contains the .pak files)." />
     </Border>
     <Grid ColumnDefinitions="240,6,*,6,2*">
-      <tdg:TreeDataGrid x:Name="FolderTree" Grid.Column="0" MinWidth="160" Background="#14161A" />
-      <GridSplitter Grid.Column="1" Width="6" Background="#2C3138" ResizeDirection="Columns" />
+      <tdg:TreeDataGrid x:Name="FolderTree" Grid.Column="0" MinWidth="160" Background="{DynamicResource FL.PanelDeep}" />
+      <GridSplitter Grid.Column="1" Width="4" Background="{DynamicResource FL.Border}" ResizeDirection="Columns" />
       <DockPanel Grid.Column="2" MinWidth="220">
         <StackPanel DockPanel.Dock="Top" Orientation="Horizontal" Spacing="6" Margin="8,4,8,0">
           <Button x:Name="FilesTab" Content="Files" Click="FilesTabClicked" />
@@ -45,10 +45,10 @@
         <StackPanel x:Name="FileHeader" DockPanel.Dock="Top" Margin="8,4">
           <CheckBox x:Name="SubfoldersBox" Content="Include subfolders" Click="SubfoldersChanged" ToolTip.Tip="List every file under the selected folder." />
           <Grid ColumnDefinitions="*,100,70,170" Margin="0,4,0,0">
-            <TextBlock Text="Path" FontWeight="SemiBold" VerticalAlignment="Center" />
-            <TextBlock Grid.Column="1" Text="Type" FontWeight="SemiBold" VerticalAlignment="Center" />
-            <TextBlock Grid.Column="2" Text="Size" FontWeight="SemiBold" VerticalAlignment="Center" />
-            <TextBlock Grid.Column="3" Text="Archive" FontWeight="SemiBold" VerticalAlignment="Center" />
+            <TextBlock Text="PATH" Classes="header" VerticalAlignment="Center" />
+            <TextBlock Grid.Column="1" Text="TYPE" Classes="header" VerticalAlignment="Center" />
+            <TextBlock Grid.Column="2" Text="SIZE" Classes="header" VerticalAlignment="Center" />
+            <TextBlock Grid.Column="3" Text="ARCHIVE" Classes="header" VerticalAlignment="Center" />
           </Grid>
         </StackPanel>
         <Grid>
@@ -76,7 +76,7 @@
         </ListBox>
         </Grid>
       </DockPanel>
-      <GridSplitter Grid.Column="3" Width="6" Background="#2C3138" ResizeDirection="Columns" />
+      <GridSplitter Grid.Column="3" Width="4" Background="{DynamicResource FL.Border}" ResizeDirection="Columns" />
       <Grid Grid.Column="4" ColumnDefinitions="*,6,240" MinWidth="320">
       <DockPanel Grid.Column="0" Margin="8,8,4,8" MinWidth="280">
         <WrapPanel DockPanel.Dock="Top" Orientation="Horizontal">
@@ -155,7 +155,7 @@
           <CheckBox x:Name="VfxGroundToggle" Content="Ground" IsChecked="True" Click="VfxOptionsChanged" />
         </WrapPanel>
         <TextBlock x:Name="PreviewNote" DockPanel.Dock="Bottom" TextWrapping="Wrap" Margin="0,8,0,0" />
-        <Border x:Name="ViewBorder" Background="#121418" ClipToBounds="True"
+        <Border x:Name="ViewBorder" Background="{DynamicResource FL.Viewport}" CornerRadius="4" BorderBrush="{DynamicResource FL.Border}" BorderThickness="1" ClipToBounds="True"
                 PointerPressed="ViewPressed" PointerMoved="ViewMoved" PointerReleased="ViewReleased" PointerWheelChanged="ViewWheel">
           <Grid>
             <gpu:GpuPreviewControl x:Name="GpuView" IsVisible="False" />
@@ -171,10 +171,10 @@
           </Grid>
         </Border>
       </DockPanel>
-      <GridSplitter Grid.Column="1" Width="6" Background="#2C3138" ResizeDirection="Columns" />
+      <GridSplitter Grid.Column="1" Width="4" Background="{DynamicResource FL.Border}" ResizeDirection="Columns" />
       <DockPanel Grid.Column="2" Margin="4,8,8,8">
-        <TextBlock DockPanel.Dock="Top" Text="Meshes" FontWeight="SemiBold" Margin="4,0,0,4" />
-        <TreeView x:Name="MeshList" Background="#14161A">
+        <TextBlock DockPanel.Dock="Top" Text="MESHES" Classes="header" Margin="4,0,0,4" />
+        <TreeView x:Name="MeshList" Background="{DynamicResource FL.PanelDeep}">
           <TreeView.ItemTemplate>
             <TreeDataTemplate x:DataType="local:MeshToggle" ItemsSource="{Binding Children}">
               <CheckBox IsChecked="{Binding Visible}" ToolTip.Tip="{Binding Tip}" Margin="2,1">

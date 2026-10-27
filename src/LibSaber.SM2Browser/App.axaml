@@ -2,9 +2,94 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              x:Class="LibSaber.SM2Browser.App"
              RequestedThemeVariant="Dark">
+  <!-- Forge Lens dark theme: neutral greys + one accent (#E8892B). Visual only; no behaviour lives here. -->
+  <Application.Resources>
+    <SolidColorBrush x:Key="FL.Bg" Color="#1E1F22" />
+    <SolidColorBrush x:Key="FL.Panel" Color="#252629" />
+    <SolidColorBrush x:Key="FL.PanelDeep" Color="#1A1B1E" />
+    <SolidColorBrush x:Key="FL.Toolbar" Color="#2B2C30" />
+    <SolidColorBrush x:Key="FL.Viewport" Color="#151618" />
+    <SolidColorBrush x:Key="FL.Border" Color="#3A3C41" />
+    <SolidColorBrush x:Key="FL.Control" Color="#323337" />
+    <SolidColorBrush x:Key="FL.ControlHover" Color="#3C3D42" />
+    <SolidColorBrush x:Key="FL.Text" Color="#DCDDDF" />
+    <SolidColorBrush x:Key="FL.TextDim" Color="#9A9CA2" />
+    <SolidColorBrush x:Key="FL.Accent" Color="#E8892B" />
+    <SolidColorBrush x:Key="FL.AccentSoft" Color="#4DE8892B" />
+  </Application.Resources>
   <Application.Styles>
-    <FluentTheme />
+    <FluentTheme>
+      <FluentTheme.Palettes>
+        <ColorPaletteResources x:Key="Dark" Accent="#E8892B" AltHigh="#1E1F22" AltMedium="#252629" AltMediumLow="#2B2C30"
+                               BaseHigh="#DCDDDF" BaseMedium="#9A9CA2" ChromeMedium="#2B2C30" ChromeLow="#1A1B1E"
+                               RegionColor="#1E1F22" ListLow="#2E2F33" ListMedium="#383A3E" />
+      </FluentTheme.Palettes>
+    </FluentTheme>
     <!-- Without this include the folder grid has no template and draws as an empty pane. -->
     <StyleInclude Source="avares://Avalonia.Controls.TreeDataGrid/Themes/Fluent.axaml" />
+
+    <Style Selector="Window">
+      <Setter Property="Background" Value="{DynamicResource FL.Bg}" />
+      <Setter Property="FontFamily" Value="Segoe UI, Inter, sans-serif" />
+      <Setter Property="FontSize" Value="13" />
+      <Setter Property="Foreground" Value="{DynamicResource FL.Text}" />
+    </Style>
+    <Style Selector="Button, ToggleButton">
+      <Setter Property="Background" Value="{DynamicResource FL.Control}" />
+      <Setter Property="BorderBrush" Value="{DynamicResource FL.Border}" />
+      <Setter Property="BorderThickness" Value="1" />
+      <Setter Property="CornerRadius" Value="3" />
+      <Setter Property="Padding" Value="10,4" />
+      <Setter Property="MinHeight" Value="28" />
+      <Setter Property="VerticalContentAlignment" Value="Center" />
+    </Style>
+    <Style Selector="Button:pointerover /template/ ContentPresenter, ToggleButton:pointerover /template/ ContentPresenter">
+      <Setter Property="Background" Value="{DynamicResource FL.ControlHover}" />
+      <Setter Property="BorderBrush" Value="{DynamicResource FL.Accent}" />
+    </Style>
+    <Style Selector="ToggleButton:checked /template/ ContentPresenter">
+      <Setter Property="Background" Value="{DynamicResource FL.AccentSoft}" />
+      <Setter Property="BorderBrush" Value="{DynamicResource FL.Accent}" />
+      <Setter Property="Foreground" Value="{DynamicResource FL.Text}" />
+    </Style>
+    <Style Selector="TextBox, ComboBox">
+      <Setter Property="Background" Value="{DynamicResource FL.PanelDeep}" />
+      <Setter Property="BorderBrush" Value="{DynamicResource FL.Border}" />
+      <Setter Property="CornerRadius" Value="3" />
+      <Setter Property="MinHeight" Value="28" />
+    </Style>
+    <Style Selector="ListBox, TreeView">
+      <Setter Property="Background" Value="{DynamicResource FL.PanelDeep}" />
+    </Style>
+    <Style Selector="ListBoxItem">
+      <Setter Property="Padding" Value="8,3" />
+      <Setter Property="MinHeight" Value="24" />
+    </Style>
+    <Style Selector="ListBoxItem:selected /template/ ContentPresenter">
+      <Setter Property="Background" Value="{DynamicResource FL.AccentSoft}" />
+    </Style>
+    <Style Selector="TreeViewItem">
+      <Setter Property="MinHeight" Value="24" />
+    </Style>
+    <Style Selector="GridSplitter">
+      <Setter Property="Background" Value="{DynamicResource FL.Border}" />
+    </Style>
+    <Style Selector="CheckBox">
+      <Setter Property="MinHeight" Value="24" />
+    </Style>
+    <Style Selector="TextBlock.header">
+      <Setter Property="Foreground" Value="{DynamicResource FL.TextDim}" />
+      <Setter Property="FontWeight" Value="SemiBold" />
+      <Setter Property="FontSize" Value="11" />
+    </Style>
+    <Style Selector="Button.accent">
+      <Setter Property="Background" Value="{DynamicResource FL.Accent}" />
+      <Setter Property="Foreground" Value="#1A1B1E" />
+      <Setter Property="FontWeight" Value="SemiBold" />
+    </Style>
+    <Style Selector="Button.accent:pointerover /template/ ContentPresenter">
+      <Setter Property="Background" Value="#F29A42" />
+      <Setter Property="Foreground" Value="#1A1B1E" />
+    </Style>
   </Application.Styles>
 </Application>

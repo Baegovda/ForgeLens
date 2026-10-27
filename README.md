@@ -1,5 +1,7 @@
 # LibSaber
 
+**Forge Lens** is the desktop asset browser/exporter built on this library (project `src/LibSaber.SM2Browser`, published as `ForgeLens.exe`; the CLI stays `LibSaber.SM2Extractor.exe`).
+
 > Agents / contributors continuing the Space Marine 2 work: start with [`AGENTS.md`](AGENTS.md) and [`docs/handoff/`](docs/handoff/).
 
 A work-in-progress library for parsing game files used by Saber Interactive's Saber3D engine.

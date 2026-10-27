@@ -1,7 +1,7 @@
 <Window xmlns="https://github.com/avaloniaui"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         x:Class="LibSaber.SM2Browser.ExportWindow"
-        Title="Export"
+        Title="Forge Lens — Export"
         Width="560"
         MinWidth="480"
         MinHeight="360"
@@ -13,7 +13,7 @@
       <DockPanel>
         <StackPanel DockPanel.Dock="Bottom" Orientation="Horizontal" HorizontalAlignment="Right" Spacing="8" Margin="0,12,0,0">
           <Button Content="Cancel" MinWidth="96" MinHeight="32" IsCancel="True" Click="CancelClicked" />
-          <Button Content="Export" MinWidth="96" MinHeight="32" IsDefault="True" Click="ExportClicked" />
+          <Button Content="Export" Classes="accent" MinWidth="96" MinHeight="32" IsDefault="True" Click="ExportClicked" />
         </StackPanel>
         <TextBlock x:Name="FolderError" DockPanel.Dock="Bottom" Foreground="#E85D4C" TextWrapping="Wrap" Margin="0,4,0,0" />
         <TextBlock DockPanel.Dock="Top" Text="Output folder" Margin="0,0,0,4" />
