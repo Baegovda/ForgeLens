@@ -191,7 +191,8 @@ public static class AssetExporter
       if (document.Format == SpaceMarine2.Enumerations.SM2TextureFormat.DXN && !TextureInfo.IsNormalName(file.Path))
       {
         // BC5 masks (MetGray(r)+Roughness(a)) store two channels. B is not a normal Z here.
-        for (var i = 2; i < pixels.Length; i += 4)
+        // Decode returns BGRA, so blue is byte 0. (Byte 2 is red = metalness; zeroing it made every spec mask non-metal.)
+        for (var i = 0; i < pixels.Length; i += 4)
           pixels[i] = 0;
       }
       if (note.Length > 0)

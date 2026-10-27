@@ -286,3 +286,12 @@ glt.chameleon REA'd (FUN_142576f30 + glt PS 03558_0) and implemented in sidecar 
   | tech_priest | 131-139 (2.8) | 954-1138 (22.3) | 123-138 (6.5) |
 - Sorcerer no longer explodes; cloak/skirt simulate with collision. Remaining penetration is shallow (<10 cm) vs no-collision (~29 cm).
 - cloth_cmp_<char>.png regenerated (bone e14b / coll f15c / noColl f15n / wind f15w). Previous versions kept as _bak5. Sorcerer frame is small because its bounds include the large staff/horn parts.
+
+## mtl1-15m (materials: BC5 spec metalness was wiped on export)
+- User report: Hellbrute armour plates and the cc_sorcerer helmet face/collar looked flat dark grey.
+- ROOT CAUSE (exporter, generic): AssetExporter zeroed byte 2 of BC5 textures to drop the reconstructed normal Z. TextureDecode returns **BGRA**, so byte 2 is **R**. On `MetGray(r)+Roughness(a)` spec masks (BC5, DXGI 83) that wiped metalness: every exported *_spec.png had R=0 since 37f43a1 (2026-10-26). Evidence: ch_rubric_helmet_05_spec DDS R (decoded with /workspace/mtl_fix/bc5.py) has metal ~1 on the gold trims, while the PNG R was 0.
+- Why it looked grey: M_SM2 chameleon does `albedo *= lerp(ramp, 1, metal)`. With metal 0, the beige/gold metal parts of the paint slots (secondSpec + aniso + chameleon) were multiplied by the cyan/teal ramp -> dark grey-green diffuse.
+- Fix: zero byte 0 (B) instead. Re-export is required: all exports since 37f43a1 (bulk, bulk_fix, mtl_cham, chars_*, re14e) have metal=0. Importer/shader unchanged.
+- Verified: re-exported (SM2Extractor_15m) cc_hellbrute, cc_sorcerer, cc_sorcerer_exalted into /Game/SM2_Work/Tests/mtl15/*. Captures in Captures\mtl_fix\mtl15 (before = mtl_cham/chars_cloth imports): Hellbrute plates and the sorcerer helmet are metallic gold/teal instead of flat grey. Box composites /workspace/mtl_fix/mtl15_hb_front.png, mtl15_scf.png, mtl15_face.png.
+- Tools: tools/ue/mtl_fix/mtl15imp.py (FBX + exported materials import), capf.py (bone-framed capture, fixed distance), mchk.py, findmesh.py.
+- Note: new MIs render as the grey default for ~2 min after import (shader compile); wait before capturing.
