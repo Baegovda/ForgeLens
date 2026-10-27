@@ -107,3 +107,8 @@ Extractor build: PC `Desktop\SM2_Work\Bin\SM2Extractor_e4ceb7d`. Captures: PC `D
 - Tests: SM2.Assets 120, Extractor 42, LibSaber.Tests 5 — pass.
 - VAT VS found (combine_material.sdc 00000_0) + VatDecode helpers; renderer hookup pending. Sprite degNear fix behind SM2_VFX_DEGNEAR_FIX=1.
 - VFX estimate ≈ 81% (estimate; VAT decode known but not rendered).
+
+### 2026-10-27 (KST) vfx3f
+- Tests: SM2.Assets 121, Extractor 42, LibSaber.Tests 5 — pass. VAT hooked into EffectRenderer behind SM2_VFX_VAT=1 (unverified on real assets).
+- Ghidra 12.1.4 light re-analysis running: /workspace/rea/ghidra_proj3 (log /workspace/rea/ghidra3.log).
+- VFX estimate ≈ 82% (estimate; VAT path unverified).

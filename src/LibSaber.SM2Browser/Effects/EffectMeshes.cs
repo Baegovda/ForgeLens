@@ -8,9 +8,9 @@ using LibSaber.SM2.Assets.Meshes;
 namespace LibSaber.SM2Browser.Effects;
 
 /// <summary>Material look of a mesh-particle texture, read from its .td <c>materials.default</c> block.</summary>
-internal sealed record EffectMeshMaterial(string Texture, bool Translucent, Vector4 Tint, float Clip);
+internal sealed record EffectMeshMaterial(string Texture, bool Translucent, Vector4 Tint, float Clip, LibSaber.SM2.Assets.Effects.VatParams? Vat = null);
 
-/// <summary>A geometry template flattened for the effect pass: pos(3) normal(3) uv(2) per vertex; sub-objects by node order.</summary>
+/// <summary>A geometry template flattened for the effect pass: pos(3) normal(3) uv(2) uv1(2) per vertex; sub-objects by node order.</summary>
 internal sealed class EffectMesh
 {
   public static readonly EffectMesh Missing = new() { Name = "", Vertices = [], Indices = [] };
@@ -81,15 +81,18 @@ internal sealed class EffectMeshes
   private EffectMesh Build(string name)
   {
     if (_load(name) is not { HasTriangles: true } m) return EffectMesh.Missing;
-    var v = new float[m.Positions.Count * 8];
+    var v = new float[m.Positions.Count * 10];
     for (var i = 0; i < m.Positions.Count; i++)
     {
       var p = m.Positions[i];
       var n = i < m.Normals.Count ? m.Normals[i] : Vector3.UnitY;
       var uv = i < m.Uvs.Count ? m.Uvs[i] : Vector2.Zero;
-      v[i * 8] = p.X; v[i * 8 + 1] = p.Y; v[i * 8 + 2] = p.Z;
-      v[i * 8 + 3] = n.X; v[i * 8 + 4] = n.Y; v[i * 8 + 5] = n.Z;
-      v[i * 8 + 6] = uv.X; v[i * 8 + 7] = uv.Y;
+      var uv1 = i < m.Uvs1.Count ? m.Uvs1[i] : Vector2.Zero;
+      var o = i * 10;
+      v[o] = p.X; v[o + 1] = p.Y; v[o + 2] = p.Z;
+      v[o + 3] = n.X; v[o + 4] = n.Y; v[o + 5] = n.Z;
+      v[o + 6] = uv.X; v[o + 7] = uv.Y;
+      v[o + 8] = uv1.X; v[o + 9] = uv1.Y;
     }
 
     var mesh = new EffectMesh { Name = name, Vertices = v, Indices = m.Indices.Select(i => (uint)i).ToArray() };
@@ -125,7 +128,7 @@ internal sealed class EffectMeshes
     // flat normal-map default): the blood-splash shader colours the mesh from the sfxMtlOverrides colour, so draw white
     // and let the override tint it; "flesh" game materials get an assumed dark flesh red (not REA-confirmed).
     if (Regex.IsMatch(body, "shaderType\\s*=\\s*\"shader_blood_splash\""))
-      return new EffectMeshMaterial("", false, Vector4.One, 0f);
+      return new EffectMeshMaterial("", false, Vector4.One, 0f, LibSaber.SM2.Assets.Effects.VatDecode.Parse(body));
     if (!sfx && !Regex.IsMatch(body, "preset\\s*=") && Regex.IsMatch(body, "game_material\\s*=\\s*\"flesh\""))
       return new EffectMeshMaterial("", false, new Vector4(0.42f, 0.09f, 0.08f, 1f), 0f);
     var tint = Vector4.One;

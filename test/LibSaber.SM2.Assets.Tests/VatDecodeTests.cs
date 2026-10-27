@@ -26,3 +26,33 @@ public class VatDecodeTests
     Assert.Equal(118f * 0.5f, VatDecode.StageFrame(0.5f, 119), 1e-4f);
   }
 }
+
+public class VatParseTests
+{
+  [Fact]
+  public void ParsesBloodSplashMaterial()
+  {
+    const string td = """
+      shaderType = "shader_blood_splash"
+      floatParam0 = -0.5
+      floatParam1 = -0.5
+      floatParam2 = -0.0624
+      floatParam3 = 0.00392157
+      floatParam4 = 0.00392157
+      floatParam5 = 0.001397
+      floatParam6 = 120
+      floatParam7 = 119
+      tex1 = { name = "splash_5_v2_anim_data" }
+      addInfo = "splash_5_v2_anim_data_n"
+      tex2 = { addInfo = "splash_5_v2_anim_data_d" }
+      """;
+    var p = VatDecode.Parse(td);
+    Assert.NotNull(p);
+    Assert.Equal("splash_5_v2_anim_data", p!.PositionTexture);
+    Assert.Equal("splash_5_v2_anim_data_n", p.NormalTexture);
+    Assert.Equal(119f, p.Frames);
+    Assert.Equal(8, p.Bands);
+    Assert.Equal(-0.0624f, p.Min.Z, 1e-6f);
+    Assert.Null(VatDecode.Parse("shaderType = \"combine_material\""));
+  }
+}

@@ -374,6 +374,7 @@ public static class TemplateMeshReader
     public List<Vector3> Positions { get; } = new();
     public List<Vector3> Normals { get; } = new();
     public List<Vector2> Uvs { get; } = new();
+    public List<Vector2> Uvs1 { get; } = new();
     public List<int> Indices { get; } = new();
     public List<SkinWeights> Skin { get; } = new();
     public List<MeshPart> Parts { get; } = new();
@@ -383,6 +384,7 @@ public static class TemplateMeshReader
       mesh.Positions.AddRange(Positions);
       mesh.Normals.AddRange(Normals);
       mesh.Uvs.AddRange(Uvs);
+      if (Uvs1.Count == Positions.Count) mesh.Uvs1.AddRange(Uvs1);
       mesh.Indices.AddRange(Indices);
       mesh.Skin.AddRange(Skin);
       mesh.Parts.AddRange(Parts);
@@ -564,7 +566,7 @@ public static class TemplateMeshReader
         }
       }
 
-      var uvs = ReadUvs(reader, slice, sub, info.VertexOffset, vertices.Length, out var colors);
+      var uvs = ReadUvs(reader, slice, sub, info.VertexOffset, vertices.Length, out var colors, out var uv1s);
       var faces = new FaceSerializer(slice.Face).DeserializeRange(reader, faceStart, faceEnd).ToArray();
       var nodeName = NodeName(graph, sub.NodeId);
       var partName = nodeName.Length > 0 ? nodeName : PartName(graph, sub, slice.MeshIndex);
@@ -575,7 +577,7 @@ public static class TemplateMeshReader
       if (rigid >= 0)
         rigidParts++;
       var simStart = target.Positions.Count;
-      AppendRange(mesh, target, vertices, uvs, faces, info.VertexOffset, skinned, sub.BoneIds, partName, sub.Material, !hidden, hideReason, ref rejected, rigid, sub.NodeId);
+      AppendRange(mesh, target, vertices, uvs, faces, info.VertexOffset, skinned, sub.BoneIds, partName, sub.Material, !hidden, hideReason, ref rejected, rigid, sub.NodeId, uv1s);
       if (partName.Contains("_SIM", StringComparison.OrdinalIgnoreCase) && target.Positions.Count > simStart)
         CaptureClothSim(mesh, target, simStart, partName, colors, faces, info.VertexOffset);
     }
@@ -613,10 +615,11 @@ public static class TemplateMeshReader
     mesh.ClothSims.Add(shell);
   }
 
-  private static Vector2[] ReadUvs(NativeReader reader, MeshSlice slice, GeometrySubMesh sub, int vertexOffset, int count, out Vector4[]? colors)
+  private static Vector2[] ReadUvs(NativeReader reader, MeshSlice slice, GeometrySubMesh sub, int vertexOffset, int count, out Vector4[]? colors, out Vector2[] uv1s)
   {
     colors = null;
     var uvs = new Vector2[count];
+    uv1s = new Vector2[count];
     if (slice.Uv is null || count == 0)
       return uvs;
     var start = slice.UvBase + vertexOffset;
@@ -637,6 +640,12 @@ public static class TemplateMeshReader
       {
         colors ??= new Vector4[count];
         colors[index] = data.Color0;
+      }
+      if (data.HasUV1)
+      {
+        var s1 = 1f;
+        if (sub.UvScaling != null && sub.UvScaling.TryGetValue(1, out var raw1)) s1 = raw1;
+        uv1s[index] = new Vector2(data.UV1.X * s1, data.UV1.Y * s1);
       }
       var source = UvChannel(data, set);
       // Index MeshBuilder.AddVertexUV multiplies the serializer UV by the submesh UvScaling
@@ -766,7 +775,8 @@ public static class TemplateMeshReader
     string? hideReason,
     ref int rejected,
     int rigidJoint = -1,
-    int node = -1)
+    int node = -1,
+    Vector2[]? uv1s = null)
   {
     if (vertices.Length == 0 || faces.Length == 0)
       return;
@@ -776,6 +786,7 @@ public static class TemplateMeshReader
     {
       var uv = (uint)i < (uint)uvs.Length ? uvs[i] : Vector2.Zero;
       AddVertex(target, vertices[i], uv, anySkin, boneIds);
+      target.Uvs1.Add(uv1s is not null && (uint)i < (uint)uv1s.Length ? uv1s[i] : Vector2.Zero);
       if (!anySkin && rigidJoint >= 0)
         target.Skin.Add(new SkinWeights { J0 = (ushort)rigidJoint, W0 = 1 });
     }

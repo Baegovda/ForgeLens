@@ -1187,3 +1187,14 @@ with the trail-VS semantics, so the fix is behind `SM2_VFX_DEGNEAR_FIX=1` (HEURI
   ratioXY 0x143644f28 (0x141786eb1…), blend_add 0x14363ab78 (0x141751d81, 0x14178e041…), genOnFly 0x143645d38 (0x1417acdc6,
   0x1417ae934 writes to [rsi+0x9b0]…). Next: follow these desc offsets into the runtime like the shared-data packer.
 - exposure 1/250, light ×100, distortion strength: not traced this pass.
+
+## 2026-10-27 (KST) — vfx3f: VAT hooked into the browser (SM2_VFX_VAT=1)
+- Reader: `TemplateMeshReader` now keeps UV set 1 (`ExportedMesh.Uvs1`, × submesh UvScaling[1], no flip — HEURISTIC,
+  mirrors the VS `uv1 * cb7[1].w`). EffectMesh vertices are pos/normal/uv/uv1 (stride 40, attrib 6 `aTex1`).
+- `VatDecode.Parse(td)` reads floatParam0..7(,10) and the `*anim_data*` / `*anim_data*_n` textures from shader_blood_splash
+  materials (HEURISTIC key/name matching; bands default 8). `EffectMeshMaterial.Vat` carries it.
+- Mesh VS: with `SM2_VFX_VAT=1` and the position texture loaded, it reproduces the combine_material VS decode
+  (two rows f0/f0+1, lerp, pos = min + rgb·255·scale, normal = rgb·2.007874 − 1.007874); textures via `LinearTexture` (units 3/4).
+- Frame = `StageFrame(particle normalised age, frames)`, i.e. animStage := age/life — HEURISTIC (CPU source of animStage untraced).
+- Not verified visually (no splash assets on the box); `EffectRenderer.VatDraws` counts VAT draws for checking.
+  Possible mismatch: reader bakes node transforms into positions, VAT positions are object-local.

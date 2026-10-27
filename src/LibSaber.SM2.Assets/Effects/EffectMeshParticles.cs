@@ -72,7 +72,8 @@ public sealed class MeshParticleDef
 }
 
 /// <summary>One mesh-particle instance ready to draw.</summary>
-public readonly record struct MeshInstance(Matrix4x4 World, Vector4 Color, float Emissive, int Variant);
+/// <param name="Stage">Normalised particle age, fed to the VAT shader as combineMtlAnimControl.animStage (HEURISTIC).</param>
+public readonly record struct MeshInstance(Matrix4x4 World, Vector4 Color, float Emissive, int Variant, float Stage = 0);
 
 public sealed class MeshBatch
 {
@@ -108,7 +109,7 @@ public static class EffectMeshParticles
         var c = geom.ColorAt(n);
         var alpha = c.W * (geom.Transparency?.Evaluate(n) ?? 1f);
         var world = Matrix4x4.CreateScale(size) * rot * Matrix4x4.CreateTranslation(p.Position);
-        batch.Instances.Add(new MeshInstance(world, new Vector4(c.X, c.Y, c.Z, alpha), geom.Emissive?.Evaluate(n) ?? 0f, p.Variant));
+        batch.Instances.Add(new MeshInstance(world, new Vector4(c.X, c.Y, c.Z, alpha), geom.Emissive?.Evaluate(n) ?? 0f, p.Variant, n));
       }
 
       if (batch.Instances.Count > 0) batches.Add(batch);

@@ -189,6 +189,8 @@ public sealed class ExportedMesh
   public List<Vector3> Positions { get; } = new();
   public List<Vector3> Normals { get; } = new();
   public List<Vector2> Uvs { get; } = new();
+  /// <summary>Raw UV set 1 (times its submesh UvScaling, no flip); used by the blood-splash VAT lookup. May be empty.</summary>
+  public List<Vector2> Uvs1 { get; } = new();
   public List<int> Indices { get; } = new();
   public List<Bone> Bones { get; } = new();
   public List<SkinWeights> Skin { get; } = new();

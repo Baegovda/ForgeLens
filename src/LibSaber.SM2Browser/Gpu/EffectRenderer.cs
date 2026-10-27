@@ -41,6 +41,8 @@ internal sealed unsafe class EffectRenderer : IDisposable
   public static float DistortionStrength { get; set; } =
     float.TryParse(Environment.GetEnvironmentVariable("SM2_VFX_DISTORT"), System.Globalization.CultureInfo.InvariantCulture, out var d) ? d : 0.04f;
   public int DistortionQuads { get; private set; }
+  /// <summary>Mesh parts drawn with the blood-splash VAT path (SM2_VFX_VAT=1).</summary>
+  public int VatDraws { get; private set; }
   /// <summary><c>SM2_VFX_CONTRAST=1</c> turns on the additionalContrast boost (formula from particles.sdc 00114_2; not yet compared in-game).</summary>
   /// <summary>
   ///   <c>SM2_VFX_TINT_EXACT=1</c>: the particles.sdc PS tint blend <c>rgb = c + t*(t*V.rgb*tex.a - c)</c> with
@@ -120,6 +122,7 @@ internal sealed unsafe class EffectRenderer : IDisposable
     _gl.BindAttribLocation(program, 3, "aParams");
     _gl.BindAttribLocation(program, 4, "aMask");
     _gl.BindAttribLocation(program, 5, "aNormal");
+    _gl.BindAttribLocation(program, 6, "aTex1");
     _gl.LinkProgram(program);
     _gl.GetProgram(program, ProgramPropertyARB.LinkStatus, out var linked);
     if (linked == 0)
@@ -351,11 +354,13 @@ internal sealed unsafe class EffectRenderer : IDisposable
     _gl.BindBuffer(BufferTargetARB.ArrayBuffer, vbo);
     _gl.BufferData<float>(BufferTargetARB.ArrayBuffer, mesh.Vertices, BufferUsageARB.StaticDraw);
     _gl.EnableVertexAttribArray(0);
-    _gl.VertexAttribPointer(0, 3, VertexAttribPointerType.Float, false, 32, (void*)0);
+    _gl.VertexAttribPointer(0, 3, VertexAttribPointerType.Float, false, 40, (void*)0);
     _gl.EnableVertexAttribArray(5);
-    _gl.VertexAttribPointer(5, 3, VertexAttribPointerType.Float, false, 32, (void*)12);
+    _gl.VertexAttribPointer(5, 3, VertexAttribPointerType.Float, false, 40, (void*)12);
     _gl.EnableVertexAttribArray(1);
-    _gl.VertexAttribPointer(1, 2, VertexAttribPointerType.Float, false, 32, (void*)24);
+    _gl.VertexAttribPointer(1, 2, VertexAttribPointerType.Float, false, 40, (void*)24);
+    _gl.EnableVertexAttribArray(6);
+    _gl.VertexAttribPointer(6, 2, VertexAttribPointerType.Float, false, 40, (void*)32);
     _gl.BindBuffer(BufferTargetARB.ElementArrayBuffer, ibo);
     _gl.BufferData<uint>(BufferTargetARB.ElementArrayBuffer, mesh.Indices, BufferUsageARB.StaticDraw);
     _gl.BindVertexArray(0);
@@ -389,6 +394,13 @@ internal sealed unsafe class EffectRenderer : IDisposable
     var emissive = _gl.GetUniformLocation(_mesh, "uEmissive");
     var clip = _gl.GetUniformLocation(_mesh, "uClip");
     var mode = _gl.GetUniformLocation(_mesh, "uTranslucent");
+    var vatOn = _gl.GetUniformLocation(_mesh, "uVat");
+    var vatMin = _gl.GetUniformLocation(_mesh, "uVatMin");
+    var vatScale = _gl.GetUniformLocation(_mesh, "uVatScale");
+    var vatAnim = _gl.GetUniformLocation(_mesh, "uVatAnim");
+    var vatHasN = _gl.GetUniformLocation(_mesh, "uVatHasNormal");
+    _gl.Uniform1(_gl.GetUniformLocation(_mesh, "uVatPos"), 3);
+    _gl.Uniform1(_gl.GetUniformLocation(_mesh, "uVatNrm"), 4);
     _gl.Enable(EnableCap.DepthTest);
     _gl.DepthMask(!translucent);
     if (translucent)
@@ -417,6 +429,24 @@ internal sealed unsafe class EffectRenderer : IDisposable
           var tex = Texture(layer, material.Texture, missingWhite: true);
           if (tex == 0) continue;
           _gl.BindTexture(TextureTarget.Texture2D, tex);
+          var vat = LibSaber.SM2.Assets.Effects.VatDecode.Enabled ? material.Vat : null;
+          var vatPos = vat is null ? 0 : LinearTexture(layer, vat.PositionTexture);
+          if (vat is not null && vatPos != 0)
+          {
+            var vatN = vat.NormalTexture is { } nt ? LinearTexture(layer, nt) : 0;
+            _gl.ActiveTexture(TextureUnit.Texture3);
+            _gl.BindTexture(TextureTarget.Texture2D, vatPos);
+            _gl.ActiveTexture(TextureUnit.Texture4);
+            _gl.BindTexture(TextureTarget.Texture2D, vatN);
+            _gl.ActiveTexture(TextureUnit.Texture0);
+            _gl.Uniform1(vatOn, 1);
+            _gl.Uniform3(vatMin, vat.Min.X, vat.Min.Y, vat.Min.Z);
+            _gl.Uniform3(vatScale, vat.Scale.X, vat.Scale.Y, vat.Scale.Z);
+            _gl.Uniform3(vatAnim, LibSaber.SM2.Assets.Effects.VatDecode.StageFrame(inst.Stage, vat.Frames), vat.Frames, vat.Bands);
+            _gl.Uniform1(vatHasN, vatN != 0 ? 1 : 0);
+            VatDraws++;
+          }
+          else _gl.Uniform1(vatOn, 0);
           var c = inst.Color * material.Tint;
           _gl.Uniform4(color, c.X, c.Y, c.Z, c.W);
           _gl.Uniform1(emissive, inst.Emissive);
@@ -548,16 +578,44 @@ internal sealed unsafe class EffectRenderer : IDisposable
     in vec3 aPos;
     in vec3 aNormal;
     in vec2 aTex;
+    in vec2 aTex1;
     uniform mat4 uVP;
     uniform mat4 uModel;
+    // Blood-splash VAT (pc_dx12_combine_material.sdc 00000_0): x = frame, y = frames, z = bands.
+    uniform int uVat;
+    uniform int uVatHasNormal;
+    uniform vec3 uVatMin;
+    uniform vec3 uVatScale;
+    uniform vec3 uVatAnim;
+    uniform sampler2D uVatPos;
+    uniform sampler2D uVatNrm;
     out vec3 vWorld;
     out vec3 vNormal;
     out vec2 vUv;
+    float vatRow(float f)
+    {
+      float q = f / uVatAnim.y;
+      if (uVatAnim.z < 2.0) return -q;
+      float fr = fract(abs(q));
+      return aTex1.y - (q >= 0.0 ? fr : -fr) / uVatAnim.z;
+    }
     void main()
     {
-      vec4 w = uModel * vec4(aPos, 1.0);
+      vec3 p = aPos;
+      vec3 nrm = aNormal;
+      if (uVat == 1)
+      {
+        float f0 = floor(uVatAnim.x);
+        float t = uVatAnim.x - f0;
+        vec2 a = vec2(aTex1.x, vatRow(f0));
+        vec2 b = vec2(aTex1.x, vatRow(f0 + 1.0));
+        p = uVatMin + mix(textureLod(uVatPos, a, 0.0).rgb, textureLod(uVatPos, b, 0.0).rgb, t) * 255.0 * uVatScale;
+        if (uVatHasNormal == 1)
+          nrm = mix(textureLod(uVatNrm, a, 0.0).rgb, textureLod(uVatNrm, b, 0.0).rgb, t) * 2.007874 - 1.007874;
+      }
+      vec4 w = uModel * vec4(p, 1.0);
       vWorld = w.xyz;
-      vNormal = mat3(uModel) * aNormal;
+      vNormal = mat3(uModel) * nrm;
       vUv = aTex;
       gl_Position = uVP * w;
     }

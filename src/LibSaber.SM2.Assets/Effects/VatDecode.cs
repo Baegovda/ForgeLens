@@ -1,4 +1,6 @@
+using System.Globalization;
 using System.Numerics;
+using System.Text.RegularExpressions;
 
 namespace LibSaber.SM2.Assets.Effects;
 
@@ -43,4 +45,34 @@ public static class VatDecode
 
   /// <summary>Normal = texel * 2.007874 - 1.007874 (= (b*255 - 128)/127), normalised after the instance transform.</summary>
   public static Vector3 Normal(Vector3 texel) => texel * 2.007874f - new Vector3(1.007874f);
+
+  /// <summary>Whether the browser animates blood-splash meshes (SM2_VFX_VAT=1; parameter mapping is partly heuristic).</summary>
+  public static bool Enabled { get; set; } = Environment.GetEnvironmentVariable("SM2_VFX_VAT") == "1";
+
+  /// <summary>
+  /// Reads VAT parameters from a <c>shader_blood_splash</c> .td body. HEURISTIC: floatParamN keys and texture names are
+  /// matched loosely (position = first quoted name containing "anim_data" without an _n/_d suffix, normal = the "_n" one);
+  /// bands default to 8 (the band count seen in splashe05 UV1) when floatParam10 is absent.
+  /// </summary>
+  public static VatParams? Parse(string? td)
+  {
+    if (td is null || !Regex.IsMatch(td, "shaderType\\s*=\\s*\"shader_blood_splash\"")) return null;
+    var fp = new Dictionary<int, float>();
+    foreach (Match m in Regex.Matches(td, @"floatParam(\d+)\s*=\s*(-?[\d.]+(?:[eE][-+]?\d+)?)"))
+      fp.TryAdd(int.Parse(m.Groups[1].Value), float.Parse(m.Groups[2].Value, CultureInfo.InvariantCulture));
+    string? pos = null, nrm = null;
+    foreach (Match m in Regex.Matches(td, "\"([^\"]*anim_data[^\"]*)\""))
+    {
+      var n = m.Groups[1].Value;
+      if (n.EndsWith("_n", StringComparison.OrdinalIgnoreCase)) nrm ??= n;
+      else if (!n.EndsWith("_d", StringComparison.OrdinalIgnoreCase)) pos ??= n;
+    }
+    if (pos is null || !fp.TryGetValue(7, out var frames) || frames < 1) return null;
+    float F(int k, float d) => fp.TryGetValue(k, out var v) ? v : d;
+    return new VatParams(new Vector3(F(0, 0), F(1, 0), F(2, 0)), new Vector3(F(3, 1 / 255f), F(4, 1 / 255f), F(5, 1 / 255f)),
+      F(6, 0), frames, (int)MathF.Round(F(10, 8)), pos, nrm);
+  }
 }
+
+/// <summary>Blood-splash VAT material constants (cb3 rows 6..8) and its two textures.</summary>
+public sealed record VatParams(Vector3 Min, Vector3 Scale, float Rate, float Frames, int Bands, string PositionTexture, string? NormalTexture);
