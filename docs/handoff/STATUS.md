@@ -14,9 +14,10 @@ Percentages are the previous agent's estimates of how complete each track is aga
 | Constructor (customization library) tpls: `--variant`, `--tex-formats` | done + UE verified | 100 | see "UE verification" below |
 | Animation `.sani` (v1/v2/v3, additive, root motion, rebase, anim-only, multi-clip) | done | 95 | 23,227/23,227 decode; v3 raw sub-1 codec unused by retail |
 | FBX → UE root motion (ROOT bone 0, single tpl root = bone 0) | done | 100 | Tyranid/walker fix ec02444 |
-| Mannequin → SM2 retarget prototype | prototype | 70 | Cadian index finger curl −14…−20° open |
+| Mannequin → SM2 retarget prototype | prototype | 70 | Cadian index finger curl −14…−20° open; Anim Only (Manny) root yaw-180 fix mtl1-13 |
 | Browser GPU preview (v3/v4: ANGLE, MSAA, blend passes, anim ordering, Space) | done | 95 | CPU renderer ignores blend and physics |
 | Secondary physics (jiggle exact port, cloth PBD ≈ NvCloth) browser + FBX bake + **live UE (plugin v2, mtl1-7)** | done + UE live verified | 88 | 6 chars live, no NaN; tech_priest robe drop + sorcerer_exalted dash lag FLAG |
+| Chaos Cloth option (opt-in) + sidecar collision PA | in progress | 70 | mtl1-13: collision wired, no NaN, 2–6% particles >1 cm inside; wind not yet applied |
 | Browser VFX (`.sfx` sprites, meshes, trails, lights, distortion, sockets, anim-event cues) | in progress | ~85 | see ROADMAP "VFX3 remaining" |
 | Bulk validation (37 assets) | done | 100 | PASS 31 / WARN 3 / FAIL 3 → constructors fixed afterwards |
 | UE verification of constructors + physics | done (first pass) | 100 / 85 | open issues below |

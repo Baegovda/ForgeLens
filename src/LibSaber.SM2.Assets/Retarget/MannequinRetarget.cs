@@ -70,6 +70,7 @@ public sealed class MannequinReference
 public static class MannequinRetarget
 {
   public const string Suffix = "_Manny";
+  public static bool RootImportYawFix = Environment.GetEnvironmentVariable("SM2_MANNY_ROOTFIX") != "0";
 
   /// <summary>SM2 bone for a Mannequin bone, or null. Several candidates: the first present wins (gauntlet hands lack fingers 3-5).</summary>
   private static string[]? Source(string manny)
@@ -115,6 +116,12 @@ public static class MannequinRetarget
   {
     "ik_foot_l" => "foot_l", "ik_foot_r" => "foot_r", "ik_hand_gun" => "hand_r", "ik_hand_l" => "hand_l", "ik_hand_r" => "hand_r", _ => null,
   };
+
+  private static Matrix4x4 YawOnly(Matrix4x4 m)
+  {
+    var x = new Vector3(m.M11, m.M12, 0f);
+    return x.LengthSquared() < 1e-8f ? Matrix4x4.Identity : Matrix4x4.CreateRotationZ(MathF.Atan2(x.Y, x.X));
+  }
 
   private static Matrix4x4 Rot(Matrix4x4 m) { m.Translation = Vector3.Zero; return m; }
 
@@ -260,6 +267,7 @@ public static class MannequinRetarget
     var src = new Matrix4x4[sm2.Bones.Count];
     var world = new Matrix4x4[mb.Count];
     var root = sIndex.TryGetValue("ROOT", out var r0) ? r0 : -1;
+    Matrix4x4? rootStart = null;
     for (var f = 0; f < samples.Length; f++)
     {
       ClipPose.Apply(sm2.Bones, clip, samples[f], src);
@@ -275,7 +283,17 @@ public static class MannequinRetarget
           var delta = Inv(Rot(sRef[s])) * Rot(sw[s]);
           w = Rot(mb[i].World) * align[i] * delta;
           if (mb[i].Name == "root")
-            w.Translation = sw[s].Translation * scale;
+          {
+            // mtl1-13: the SM2 ROOT is rotated against its bind in clips (titus run: constant 180 yaw), which left the
+            // Manny root at yaw 180 and made the anim editor's root-motion preview drive the body away from the root.
+            // Root = Manny ref * yaw-only delta from the clip's first frame (identity for straight clips).
+            rootStart ??= Rot(sw[s]);
+            // The FBX import (yaw 0) turns the root key by 180 yaw (measured: AnimPose root yaw 180 with an identity root
+            // key, children worlds correct), so the root key carries a compensating 180 and imports as identity.
+            w = Rot(mb[i].World) * YawOnly(Inv(rootStart.Value) * Rot(sw[s])) * (RootImportYawFix ? Matrix4x4.CreateRotationZ(MathF.PI) : Matrix4x4.Identity);
+            var rt = sw[s].Translation * scale;
+            w.Translation = new Vector3(rt.X, rt.Y, 0f);
+          }
           else if (mb[i].Name == "pelvis")
             w.Translation = mb[i].World.Translation + (sw[s].Translation - sRef[s].Translation) * scale;
           else

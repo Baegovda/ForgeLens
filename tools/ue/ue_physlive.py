@@ -13,9 +13,10 @@ elif mode == "cams":
         if bb: o = a.get_actor_location() + bb.origin; e = bb.box_extent  # mtl1-12: frame from the base mesh asset bounds so the _ChaosCloth twin (larger cloth bounds) frames the same
         r = e.length()
         for view, dv in (("front", unreal.Vector(1, 0, 0)), ("side", unreal.Vector(0, 1, 0))):
-            pos = o + dv * (r * 2.2); rot = unreal.MathLibrary.find_look_at_rotation(pos, o)
+            half = max(e.z, e.y if view == "front" else e.x, 0.6 * e.z); fov = 30.0; dist = half * 1.06 / math.tan(math.radians(fov / 2)) + (e.x if view == "front" else e.y)  # mtl1-13: FOV fit so the character fills the frame
+            pos = o + dv * dist; rot = unreal.MathLibrary.find_look_at_rotation(pos, o)
             cam = eas.spawn_actor_from_class(unreal.SceneCapture2D, pos, rot); cam.tags = [unreal.Name("SM2PhysCam"), unreal.Name(lab + "_" + view)]
-            cam.capture_component2d.set_editor_property("capture_every_frame", False)
+            cam.capture_component2d.set_editor_property("capture_every_frame", False); cam.capture_component2d.set_editor_property("fov_angle", fov)
     print("PHYSV cams placed")
 elif mode == "camclear":
     eas = unreal.get_editor_subsystem(unreal.EditorActorSubsystem)
@@ -43,6 +44,9 @@ else:
         d = [(co.get_socket_location(b) - cf.get_socket_location(b)).length() for b in hb]
         nan = any(math.isnan(x) or math.isinf(x) for x in d)
         print("PHYSV", name, "t=%.2f/%.2f" % (co.get_position(), cf.get_position()), "h0on", [round(x,1) for x in (co.get_socket_location(hb[0]).x, co.get_socket_location(hb[0]).z)], "h0off", [round(x,1) for x in (cf.get_socket_location(hb[0]).x, cf.get_socket_location(hb[0]).z)], "bones=%d mean=%.2f max=%.2f nan=%s" % (len(d), sum(d) / max(1, len(d)), max(d or [0]), nan))
+        try:
+            pr = unreal.SM2PhysicsSetupLibrary.measure_cloth_penetration(co, 1.0); print("PHYSV pen", name, pr)
+        except Exception as ex: print("PHYSV pen err", ex)
     elif mode == "cap":
         tag = sys.argv[4]; n = 0
         for cam in unreal.GameplayStatics.get_all_actors_with_tag(w, "SM2PhysCam"):

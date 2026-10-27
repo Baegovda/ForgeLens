@@ -1749,3 +1749,31 @@ Disassembly: /workspace/vfxsh_dis/{pc,pg,dx_pc_dx12_sfx,dx_pc_dx12_distort}, GLS
   - Neither the plugin nor CreateChaosCloth reads capsules or wind yet. Only `ue_sm2_physics.py` (manual Chaos config) does, so no runtime results change.
 - **Gravity:** the diagnostic PAs (`PA_cc_tech_priest_SM2`, `_1`, `_2`, `_3`, plus `_4` and `_5`) have gravity back on (`ue_bdiag.py … 1`).
 - **Old PA/ABP versions:** kept, nothing deleted.
+
+## mtl1-13: Manny root fix, Chaos cloth collision, FOV-fit captures (2026-10-28)
+- **Anim Only (Manny) fix (user report: body floating away from the root and tilted in the anim editor):**
+  - Cause (measured with `tools/ue/ue_anim_probe.py`, AnimPose world): the imported `_Manny` clips had the **root at yaw 180**. The children worlds were right (pelvis z 83–94, feet z 11–45, moving +Y). The FBX import (yaw 0) turns an identity root key by 180. The anim editor's root-motion preview then moved the mesh against the root, which looked like a floating, offset body.
+  - Fix in `MannequinRetarget.cs`:
+    - The root key carries a compensating 180 yaw (`SM2_MANNY_ROOTFIX=0` disables it), so it imports as identity.
+    - The root rotation is a yaw-only delta from the clip's first frame.
+    - The root z is clamped to 0.
+  - Verified after reimport (titus run/idle/attack, old assets kept as `_Manny_bak1..6`): root (0 0 0 | 0 0 0) at every sampled time, children unchanged.
+  - Simulate-In-Editor renders (`tools/ue/ue_manny_cap.py`, ortho 300 cm, red line = ground): box `/workspace/mtl_fix/manny_fix_{run,idle,attack}.png`. Feet are on the ground (foot bone z 11–14 at rest) and the body is upright, facing and moving +Y.
+  - The run's ~40° forward lean is in the source: SM2ref CENTRE→HEAD is 35°.
+- **Chaos cloth collision (plugin cpp):**
+  - `CreateChaosCloth` now builds `ChaosCloth/PA_<mesh>_ClothCollision` (kinematic bodies) from `ue.chaosCloth.collision` and assigns it to each Clothing Asset's PhysicsAsset:
+    - capsules → Sphyl, or TaperedCapsule when the radii differ;
+    - spheres and boxes → their matching shapes.
+  - Exports without `collision.space="ueMesh"` are X-mirrored. This is **HEURISTIC**: it is derived from the mtl1-11 point mirror.
+  - New UFUNCTION `MeasureClothPenetration(Comp, ThresholdCm)` counts sim particles that are deeper than the threshold inside the collision shapes.
+  - Wind: no ChaosClothConfig property exists. It is **not applied yet**; the runtime `ChaosClothingInteractor.set_wind` is the plan.
+- **Live result (PhysTestMap, `_ChaosCloth`, cl4):** no NaN. Particles more than 1 cm inside the collision, worst depth about 10–12 cm:
+
+  | Character | Inside | Share |
+  |---|---|---|
+  | calgar | 110–186 / 3039 | 4–6% |
+  | tech_priest | 45 / 1220 | 4% |
+  | sorcerer_exalted | 55–81 / 2573 | 2–3% |
+
+  - There is no collision-off baseline yet, so this is not yet proof that cloth stays outside the body.
+- **Capture framing:** `ue_physlive.py cams` now fits FOV 30 to the bounds height, so the character fills the frame. Box `/workspace/mtl_fix/cloth_cmp_*.png`: top row is the mtl1-12 bone captures (old framing), bottom row is Chaos with collision (new framing). The old files are kept as `cloth_cmp_*_bak1.png`.
