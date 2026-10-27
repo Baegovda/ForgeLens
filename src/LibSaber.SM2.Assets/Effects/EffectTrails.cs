@@ -44,7 +44,10 @@ public sealed class TrailDef
   ///   <c>optimization.degNear/degFar</c> on the trail. The trail VS applies two per-vertex camera-distance ramps
   ///   <c>saturate((d - TRAIL_DEGR.y) * TRAIL_DEGR.x)</c> / <c>saturate((d - TRAIL_DEGR.z) * TRAIL_DEGR.w)</c> to width
   ///   (TRAIL_MISC.y/z) and colour/alpha (TRAIL_MISC.w, TRAIL_OFFSET.z), i.e. the same linear radStart->radEnd ramp as sprites.
-  ///   Which DEGR/MISC slot holds which sfx scale is inferred (heuristic).
+  ///   Which DEGR/MISC slot holds which sfx scale is inferred (HEURISTIC). vfx3z retry: the CB member names
+  ///   ("CB_PASS_TRAIL" @0x14378f170, "TRAIL_MISC" @0x14378f1d8, "TRAIL_DEGR" @0x14378f1e8, "TRAIL_OFFSET" @0x14378f230,
+  ///   "TRAIL_MISC_2" @0x14378f288) have no code references in ghidra_proj3 (DataRefs: 0 refs), so the CB is packed by
+  ///   fixed layout, not by name; the trail shaders (vfxsh_glsl/trail) only consume it. Mapping stays HEURISTIC.
   /// </summary>
   public DistanceFade? DegNear { get; init; }
   public DistanceFade? DegFar { get; init; }
