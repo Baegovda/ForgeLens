@@ -160,3 +160,20 @@ Outputs: /workspace/rea/vfxj_1.c, vfxj_3.c. Docs only. Nothing new reached "prov
 - Blend: the particle shader permutation table FUN_142450650 defines SFX_ALPHA_BLEND (perm word +0x205 bit0) and SFX_BLEND_ADD_NO_ALPHA (bit1). Trails have the matching TRAIL_BLEND_ADD_NO_ALPHA (FUN_1424e32c0). HEURISTIC, link not traced: blend_add selects the "add, no alpha" variant (ONE/ONE ignoring src alpha) and blend selects ALPHA_BLEND. I still have not found the D3D12_BLEND_DESC builder. The full-binary +0x48c scan was skipped as too noisy; the only real reader is FUN_1417e1e50 (vfx3i).
 - Trails (PROVEN wiring only): emitter+0x9e0/+0x9e8 is a list of 24-byte trail-name strings. At runtime FUN_1418bfcc0 matches a trail object's name (trail+0x10) and registers trail+0x178 into the emitter instance list inst+0x3d0. TRAIL_MISC/TRAIL_DEGR/TRAIL_OFFSET/TRAIL_MISC_2 are only shader-constant name registrations in FUN_1421ca290 (globals 145025180/1450251a8/145025220/1450252c0). The CPU packing of these constants was not reached.
 - VFX estimate remains ≈ 72%.
+
+## vfx3k (shader disassembly + Ghidra, box only, 2026-10-27)
+Done on the box only: no game launch, nothing touching EAC. Tools: dxc -dumpbin (/workspace/vfxsh_dis), dxil-spirv --glsl (/workspace/vfxsh_glsl/trail), Ghidra scripts DataRefs.java/Callers.java/DispScan.java (outputs /workspace/rea/vfxk_*.c). Docs only. Nothing new reached "proven + not yet implemented", so this round has no code or env flag.
+- CB_PASS_TRAIL layout (PROVEN, reflection in trail.sdc 00020_0, bound at cb4): MAPPING@0, ALPHA_MAPPING@16, ALPHA_MASK_PARAMS@32, COLOR_FADEOFF@48, MISC@64, DEGR@80, PS_REG_TRAIL_EMISSIVE@96, PS_REG_TRAIL_CONST_COLOR@112, OFFSET@128, SDR_MAPPING@144, SDR_ROTATION@160, FLATLIGHTING[4]@176, MISC_2@240, TRAIL_PROJ_PARAMS@256 (blendMaskScale/Bias, height, yOffset, normalMapScale, parallaxScale, zFadeScale, angleFadeScale/Bias, flags).
+- Shader use (PROVEN, trail 00001_2 GLSL). d is the vertex→camera distance, as in our existing EffectTrails implementation.
+  - The two ramps: rN = sat((d-DEGR.y)*DEGR.x), rF = sat((d-DEGR.z)*DEGR.w).
+  - Width scales by lerp(MISC.y,1,rN)*lerp(1,MISC.z,rF). Colour/alpha scale by lerp(MISC.w,1,rN)*lerp(1,OFFSET.z,rF).
+  - OFFSET.x is subtracted from TEXCOORD5.y, the along-trail coordinate.
+  - MISC.x is a squared-distance normaliser: sat(|v|²/(MISC.x+1e-4)).
+  - MISC_2.yzw is an axis vector used in cross products.
+  - Most frequent component is OFFSET.w (not decoded).
+- CPU side (PARTIAL): the CB_PASS_TRAIL name table is built only by FUN_1421ca290 (DataRefs found no other refs to 145025000..+0x300). So constants are packed into a struct and uploaded by layout, not written by name.
+- Trail desc layout (PROVEN, FUN_14183b3a0): renderPass +0x84, isThinTrail +0x88, visuals +0x90, trailParams +0x280 (FUN_141839b50), physics +0x3b0, degNear +0x3e8, degFar +0x400 (FUN_14181ec90, 24 bytes each), degradationRadius +0x418, optimizeBranchQuality +0x41c, nTrailData +0x420.
+  - Runtime: FUN_14187cf20 copies degNear/degFar fields to the render-side struct (+0x1f8..+0x218).
+  - FUN_1418c09a0 computes (x-degFar[0])/(degFar[1]-degFar[0]), i.e. a linear start→end ramp. So DEGR.x/w = 1/(end-start) and DEGR.y/z = start is consistent (HEURISTIC, the final CB pack was not traced).
+- Blend, distortion power, exposure/light: no progress beyond vfx3j. Variant-bit readers were not reached within the time box.
+- VFX estimate remains ≈ 72%. The existing trail DEGR implementation matches the shader; only the slot→sfx-field assignment stays HEURISTIC.
