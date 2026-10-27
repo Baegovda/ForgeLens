@@ -75,15 +75,29 @@ public sealed class BaseLayer
 ///   fresnelPwr +0x4c. Shader (pc_dx12_glt.sdc, cb CB_STATIC_GLT rows 10..15 = PS_REG_GLT_CHAMELEON_COLORS[4] /
 ///   PS_REG_GLT_CHAMELEON_OFFSETS[2], e.g. PS record 03558_0): t = pow(saturate(dot(N, V)), row15.z);
 ///   c = lerp(C0, C1, sat((t - r14.x) * r14.y)); c = lerp(c, C2, sat((t - r14.z) * r14.w)); c = lerp(c, C3, sat((t - r15.x) * r15.y));
-///   albedo *= lerp(c, 1, metalness). HEURISTIC: unset colours default to white, unset offsets to 0 / 1, fresnelPwr to 1,
-///   and the CPU packing of offset1/offset2 into the three ramp thresholds (0, offset1, offset2) is not traced yet.
+///   albedo *= lerp(c, 1, metalness). Defaults (parser FUN_142576f30 passes 0 as the default to every read): unset colours are
+///   (0,0,0,0) black, unset offset1/offset2/fresnelPwr are 0. Text colours are [a,r,g,b] (FUN_142820d20 stores 2nd,3rd,4th,1st).
+///   CPU packer FUN_1423ba150 (glt desc +0xb8 = chameleon): o1 = clamp01(offset1); o2 = offset2 &lt; offset1 ? offset1 + 1e-6 : offset2,
+///   clamp01; r14 = (0, 1/(o1+1e-6), o1, 1/(o2-o1+1e-6)); r15 = (o2, 1/(1-o2+1e-6), fresnelPwr, -); colours rows 10..13 in order.
+///   See <see cref="ChameleonSpec.Ramp"/>.
 /// </summary>
 public sealed class ChameleonSpec
 {
-  public float[][] Colors { get; set; } = { new[] { 1f, 1f, 1f, 1f }, new[] { 1f, 1f, 1f, 1f }, new[] { 1f, 1f, 1f, 1f }, new[] { 1f, 1f, 1f, 1f } };
+  public float[][] Colors { get; set; } = { new float[4], new float[4], new float[4], new float[4] };
   public float Offset1 { get; set; }
-  public float Offset2 { get; set; } = 1f;
-  public float FresnelPower { get; set; } = 1f;
+  public float Offset2 { get; set; }
+  public float FresnelPower { get; set; }
+
+  /// <summary>CB_STATIC_GLT rows 14/15 exactly as the CPU packer FUN_1423ba150 writes them (eps [0x143c8435c] = 1e-6).</summary>
+  public static (float[] R14, float[] R15) Ramp(float offset1, float offset2, float fresnelPower)
+  {
+    const float Eps = 1e-6f;
+    var o1 = offset1;
+    var o2 = offset2 < o1 ? o1 + Eps : offset2;
+    o1 = Math.Clamp(o1, 0f, 1f);
+    o2 = Math.Clamp(o2, 0f, 1f);
+    return (new[] { 0f, 1f / (o1 + Eps), o1, 1f / (o2 - o1 + Eps) }, new[] { o2, 1f / (1f - o2 + Eps), fresnelPower, 0f });
+  }
 }
 
 public static class SpecLayers

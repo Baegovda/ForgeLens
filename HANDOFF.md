@@ -1506,7 +1506,7 @@ Disassembly: /workspace/vfxsh_dis/{pc,pg,dx_pc_dx12_sfx,dx_pc_dx12_distort}, GLS
 ## mtl1 (2026-10-27 18:20 KST) — sorcerer/hellbrute colours: glt.chameleon; cloth bake; lictor sway
 - Cause: textures/sRGB were fine and no tintByMask/colorization is used; Thousand Sons `paint`/`blue`/`ruby` variants enable `glt.chameleon`, which we ignored.
 - REA: parser FUN_142576f30 (enabled +0, color0..3 +4/+0x14/+0x24/+0x34 ×1/255 const _DAT_1435640d0, offset1 +0x44, offset2 +0x48, fresnelPwr +0x4c), descriptor FUN_142578190, writer FUN_142577110, glt parse FUN_1425bb840, regs FUN_1421b0bc0, define GLT_CHAMELEON FUN_1423b6260 (strings 0x1437f9de0, 0x143729b78/b98). Shader pc_dx12_glt.sdc PS 03558_0, CB_STATIC_GLT rows 10-13 colours, 14-15 offsets: t=pow(sat(N·V),r15.z); 3-step colour ramp (r14.xy, r14.zw, r15.xy); albedo *= lerp(ramp, 1, metal).
-- Code: SpecLayers.Chameleon → MeshPart.Chameleon → sidecar `chameleon`; M_SM2 `UseChameleon` + ChameleonC0..3/R0/R1 (Custom node). HEURISTIC: offset1/offset2 → thresholds (0, o1, o2) (CPU packer not traced), unset colour = white, colours treated sRGB.
+- Code: SpecLayers.Chameleon → MeshPart.Chameleon → sidecar `chameleon`; M_SM2 `UseChameleon` + ChameleonC0..3/R0/R1 (Custom node). (mtl1-18: packer FUN_1423ba150 traced = these thresholds; unset colour = black (0,0,0,0) per parser; colours treated sRGB.)
 - PC: exports Exports\mtl_cham\{cc_sorcerer (+idle clip lesser_sorcerer_idle_lesser_sorcerer, 585 cloth helper bones baked), cc_hellbrute}; UE /Game/SM2_Work/Tests/mtl_cham/* (earlier import kept as _bak1). Captures Captures\mtl_fix\after_cham_*, lictor_sway_t*_*.png, lictor_face.jpg.
 - Open: hellbrute after-capture looks greyer than the bulk "before" (check variant/texture vs bulk, and chameleon defaults); browser GL preview does not render chameleon yet (cloth/physics preview already from 642fb56).
 
@@ -1800,3 +1800,5 @@ Disassembly: /workspace/vfxsh_dis/{pc,pg,dx_pc_dx12_sfx,dx_pc_dx12_distort}, GLS
 - mtl1-16c: MRQ CLI render (hidden, -RenderOffscreen) of a Sequencer-keyed WindDirectionalSource drives Chaos cloth: calm frames change <200 px, windy frames 2.6-3.8k px. Tool: mrqwind.py. See STATUS.
 
 - 2026-10-28 KST mtl1-17: degNear/degFar applied to lwiGeom mesh particles via shared `EffectSprites.DistanceFadeK` (see STATUS "mtl1-17"); bench no-regression; ROADMAP VFX item 7 left: SELF_DISTORTION render.
+
+- 2026-10-28 KST mtl1-18: chameleon CPU path REA'd (parser defaults 0 -> unset colours black; packer FUN_1423ba150 = our thresholds, now exact via ChameleonSpec.Ramp). Hellbrute only darkens at rims; in-game navy is not a material constant -> per-instance _783 or viewer lighting. See STATUS "mtl1-18".

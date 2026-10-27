@@ -132,4 +132,68 @@ public class SpecLayersTests
     Assert.Equal(1f, defaults.RoughnessScale);
     Assert.Equal(new[] { 1f, 1f, 1f, 0f }, defaults.MetallicTint);
   }
+
+  // ch_hellbrute_armor_01.td "blue": color0 unset.
+  private const string HellbruteBlue = """
+    {
+       shaders = {
+          glt = {
+             chameleon = {
+                enabled = true
+                color1 = [
+                   255,
+                   0,
+                   255,
+                   255
+                ]
+                offset1 = 0.500000
+                offset2 = 0.900000
+                fresnelPwr = 0.700000
+             }
+             __type_id = "glt_sh_templ"
+          }
+       }
+    }
+    """;
+
+  [Fact]
+  public void Chameleon_UnsetValuesAreZeroLikeTheEngineParser()
+  {
+    var cham = SpecLayers.Chameleon(HellbruteBlue)!;
+    Assert.Equal(new[] { 0f, 0f, 0f, 0f }, cham.Colors[0]);
+    Assert.Equal(new[] { 0f, 1f, 1f, 1f }, cham.Colors[1]);
+    Assert.Equal(new[] { 0f, 0f, 0f, 0f }, cham.Colors[3]);
+    Assert.Equal(0.7f, cham.FresnelPower, 1e-3f);
+    var bare = SpecLayers.Chameleon("""
+      {
+         shaders = {
+            glt = {
+               chameleon = {
+                  enabled = true
+               }
+            }
+         }
+      }
+      """)!;
+    Assert.Equal(0f, bare.Offset2);
+    Assert.Equal(0f, bare.FresnelPower);
+  }
+
+  [Fact]
+  public void ChameleonRamp_MatchesCpuPacker()
+  {
+    var (r14, r15) = ChameleonSpec.Ramp(0.5f, 0.9f, 0.7f);
+    Assert.Equal(0f, r14[0]);
+    Assert.Equal(2f, r14[1], 1e-3f);
+    Assert.Equal(0.5f, r14[2]);
+    Assert.Equal(2.5f, r14[3], 1e-3f);
+    Assert.Equal(0.9f, r15[0]);
+    Assert.Equal(10f, r15[1], 1e-3f);
+    Assert.Equal(0.7f, r15[2]);
+    // offset2 < offset1 -> offset1 + eps; both clamped to [0, 1].
+    var (b14, b15) = ChameleonSpec.Ramp(1.5f, 0.2f, 1f);
+    Assert.Equal(1f, b14[2]);
+    Assert.Equal(1f, b15[0]);
+    Assert.True(b15[1] > 1e5f);
+  }
 }

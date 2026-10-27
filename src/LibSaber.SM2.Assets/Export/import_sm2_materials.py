@@ -341,7 +341,7 @@ def chameleon(material, albedo, metal, normal_ts, x, y):
     # glt.chameleon (UseChameleon): the glt PS (pc_dx12_glt.sdc, e.g. record 03558_0, CB_STATIC_GLT rows 10..15 =
     # PS_REG_GLT_CHAMELEON_COLORS[4] / _OFFSETS[2]) does t = pow(saturate(N.V), r15.z), a 4-colour ramp with three
     # thresholds/scales (r14.xy, r14.zw, r15.xy), then albedo *= lerp(ramp, 1, metalness).
-    # HEURISTIC: offset1/offset2 -> thresholds (0, offset1, offset2) in chameleon_ramp(); CPU packer not traced.
+    # Thresholds/scales packed like the CPU packer FUN_1423ba150, see chameleon_ramp().
     mel = unreal.MaterialEditingLibrary
     # N.V in tangent space like the PS (normal map normal . tangent-space view vector). PixelNormalWS cannot be
     # used here: it feeds the Substrate front material, which owns the normal (circular -> default grey material).
@@ -377,10 +377,13 @@ def chameleon(material, albedo, metal, normal_ts, x, y):
 
 
 def chameleon_ramp(cham):
-    # HEURISTIC packing (see chameleon()): thresholds 0, offset1, offset2; each scale spans to the next threshold.
-    o1 = float(cham.get("offset1", 0.0)); o2 = float(cham.get("offset2", 1.0))
-    inv = lambda w: 1.0 / max(w, 1e-4)
-    return (0.0, inv(o1), o1, inv(o2 - o1)), (o2, inv(1.0 - o2), float(cham.get("fresnelPwr", 1.0)), 0.0)
+    # Exact CPU packer FUN_1423ba150 (eps 1e-6); parser FUN_142576f30 defaults every missing value to 0.
+    eps = 1e-6
+    o1 = float(cham.get("offset1", 0.0)); o2 = float(cham.get("offset2", 0.0))
+    if o2 < o1:
+        o2 = o1 + eps
+    o1 = min(max(o1, 0.0), 1.0); o2 = min(max(o2, 0.0), 1.0)
+    return (0.0, 1.0 / (o1 + eps), o1, 1.0 / (o2 - o1 + eps)), (o2, 1.0 / (1.0 - o2 + eps), float(cham.get("fresnelPwr", 0.0)), 0.0)
 
 
 def make_master(folder, asset_name="M_SM2", translucent=False):

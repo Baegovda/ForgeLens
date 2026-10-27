@@ -739,15 +739,14 @@ internal sealed unsafe class GlPreview : IDisposable
     if (cham is null)
       return;
     static float Lin(float c) => c <= 0.04045f ? c / 12.92f : MathF.Pow((c + 0.055f) / 1.055f, 2.4f);
-    static float Inv(float w) => 1f / MathF.Max(w, 1e-4f);
     for (var i = 0; i < 4; i++)
     {
-      var c = i < cham.Colors.Length && cham.Colors[i] is { Length: >= 3 } v ? v : new[] { 1f, 1f, 1f };
+      var c = i < cham.Colors.Length && cham.Colors[i] is { Length: >= 3 } v ? v : new[] { 0f, 0f, 0f };
       _gl.Uniform3(U("uChamC[" + i + "]"), Lin(c[0]), Lin(c[1]), Lin(c[2]));
     }
-    float o1 = cham.Offset1, o2 = cham.Offset2;
-    _gl.Uniform4(U("uChamR0"), 0f, Inv(o1), o1, Inv(o2 - o1));
-    _gl.Uniform4(U("uChamR1"), o2, Inv(1f - o2), cham.FresnelPower, 0f);
+    var (r14, r15) = ChameleonSpec.Ramp(cham.Offset1, cham.Offset2, cham.FresnelPower);
+    _gl.Uniform4(U("uChamR0"), r14[0], r14[1], r14[2], r14[3]);
+    _gl.Uniform4(U("uChamR1"), r15[0], r15[1], r15[2], r15[3]);
   }
 
   /// <summary>Last resolved frame as top-down BGRA.</summary>
