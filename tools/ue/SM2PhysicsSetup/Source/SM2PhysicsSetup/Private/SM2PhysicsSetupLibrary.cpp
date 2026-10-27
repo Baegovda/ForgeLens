@@ -39,6 +39,7 @@
 #include "ComponentReregisterContext.h"
 #include "Components/SkeletalMeshComponent.h"
 #include "ClothingSimulation.h"
+#include "SkinnedAssetCompiler.h"
 
 namespace
 {
@@ -566,8 +567,21 @@ bool USM2PhysicsSetupLibrary::TuneRigidBody(UAnimBlueprint* ABP, int32 SimSpace,
   return ABP->Status != BS_Error;
 }
 
+// mtl1-15c: skeletal mesh builds run async in UE5; editing the LODModel (cloth bind) while a build from an earlier
+// PostEditChange (PA/ABP assignment, previous cloth) is still in flight produced spiky garbage render data on the
+// sorcerer (16-bit bone index, 2+ clothing assets). Always drain the mesh's async build before and after each edit.
+static void SM2WaitMeshBuild(USkeletalMesh* Mesh)
+{
+  if (Mesh)
+  {
+    USkinnedAsset* A = Mesh;
+    FSkinnedAssetCompilingManager::Get().FinishCompilation(MakeArrayView(&A, 1));
+  }
+}
+
 bool USM2PhysicsSetupLibrary::CreateChaosCloth(USkeletalMesh* Mesh, const FString& JsonPath, TArray<FString>& Converted, FString& Report)
 {
+  SM2WaitMeshBuild(Mesh);
   Converted.Reset();
   FString Text;
   TSharedPtr<FJsonObject> Root;
@@ -723,20 +737,26 @@ bool USM2PhysicsSetupLibrary::CreateChaosCloth(USkeletalMesh* Mesh, const FStrin
     if (Cloth->TryGetArrayField(TEXT("RenderMeshes"), RV))
       for (const TSharedPtr<FJsonValue>& V : *RV)
         RenderNames.Add(V->AsString());
+    // mtl1-15: exact (case-insensitive) slot match first; Contains only when no exact hit (beads_REND vs beads_REND1 etc).
     TArray<int32> RenderSections;
-    for (int32 S = 0; S < Lod.Sections.Num(); ++S)
-    {
-      const FSkelMeshSection& Sec = Lod.Sections[S];
-      if (S == SimSection || Sec.bDisabled || Sec.HasClothingData() || !Mesh->GetMaterials().IsValidIndex(Sec.MaterialIndex))
-        continue;
-      const FString Slot = Mesh->GetMaterials()[Sec.MaterialIndex].MaterialSlotName.ToString();
-      for (const FString& R : RenderNames)
-        if (!R.IsEmpty() && (Slot.Equals(R, ESearchCase::IgnoreCase) || Slot.Contains(R, ESearchCase::IgnoreCase) || R.Contains(Slot, ESearchCase::IgnoreCase)))
-        {
-          RenderSections.AddUnique(S);
-          break;
-        }
-    }
+    TArray<FName> RenderSlots;
+    for (int32 Pass = 0; Pass < 2 && RenderSections.Num() == 0; ++Pass)
+      for (int32 S = 0; S < Lod.Sections.Num(); ++S)
+      {
+        const FSkelMeshSection& Sec = Lod.Sections[S];
+        if (S == SimSection || Sec.bDisabled || Sec.HasClothingData() || !Mesh->GetMaterials().IsValidIndex(Sec.MaterialIndex))
+          continue;
+        const FName SlotN = Mesh->GetMaterials()[Sec.MaterialIndex].MaterialSlotName;
+        const FString Slot = SlotN.ToString();
+        for (const FString& R : RenderNames)
+          if (!R.IsEmpty() && (Slot.Equals(R, ESearchCase::IgnoreCase) ||
+            (Pass == 1 && (Slot.Contains(R, ESearchCase::IgnoreCase) || R.Contains(Slot, ESearchCase::IgnoreCase)))))
+          {
+            RenderSections.AddUnique(S);
+            RenderSlots.AddUnique(SlotN);
+            break;
+          }
+      }
     if (SimSection == INDEX_NONE || RenderSections.Num() == 0)
     {
       Log.Add(FString::Printf(TEXT("%s: sim section %d (slot hit %.2f), %d render sections -> stays bone-based"), *SimName, SimSection, SimHit, RenderSections.Num()));
@@ -760,6 +780,7 @@ bool USM2PhysicsSetupLibrary::CreateChaosCloth(USkeletalMesh* Mesh, const FStrin
       if (Asset)
         Mesh->AddClothingAsset(Asset);
     }
+    SM2WaitMeshBuild(Mesh);
     if (!Asset || Asset->LodData.Num() == 0)
     {
       Log.Add(SimName + TEXT(": factory failed"));
@@ -842,29 +863,76 @@ bool USM2PhysicsSetupLibrary::CreateChaosCloth(USkeletalMesh* Mesh, const FStrin
       }
     }
     // 6. bind to the render sections (mesh-to-mesh skinning, as the editor's Apply Clothing).
+    // mtl1-15: one rebuild scope per section, indices re-resolved by slot each time (they move after every rebuild), and a
+    // failed bind is cleaned off the section: sorcerer skirt/beads (2 render sections) left a half-bound second section that
+    // turned the whole mesh into spikes on the next PostEditChange (16-bit bone index build).
     int32 Bound = 0;
+    // mtl1-15b: UClothingAssetCommon::BindToSkeletalMesh maps one section per asset LOD (LodMap "already mapped" -> false);
+    // the failed 2nd attempt on skirt_adds_REND / beads_REND1 still left the sorcerer mesh exploding after the next rebuild.
+    // So bind the first matching render slot only; the other render sections of the cloth stay bone-skinned (logged).
+    TArray<FName> Extra;
     {
-      FScopedSkeletalMeshPostEditChange Scope(Mesh);
+      // primary = the matching render section with the most vertices (the cloth body, not trims/metal bits).
+      TMap<FName, int32> NV;
+      for (const FSkelMeshSection& Sx : Lod.Sections)
+        if (Mesh->GetMaterials().IsValidIndex(Sx.MaterialIndex))
+          NV.FindOrAdd(Mesh->GetMaterials()[Sx.MaterialIndex].MaterialSlotName) += Sx.SoftVertices.Num();
+      RenderSlots.StableSort([&](const FName& A, const FName& B) { return NV.FindRef(A) > NV.FindRef(B); });
+    }
+    while (RenderSlots.Num() > 1)
+      Extra.Add(RenderSlots.Pop());
+    if (Extra.Num() > 0)
+    {
+      FString E;
+      for (const FName& N : Extra) E += N.ToString() + TEXT(" ");
+      Log.Add(FString::Printf(TEXT("%s: extra render slots stay bone-skinned [%s]"), *SimName, *E));
+    }
+    {
+      FString SlotLog;
+      for (const FName& N : RenderSlots) SlotLog += N.ToString() + TEXT(" ");
       int32 AssetIndex = INDEX_NONE;
       Mesh->GetMeshClothingAssets().Find(Asset, AssetIndex);
-      for (int32 S : RenderSections)
+      int32 Fail = 0;
+      for (const FName& SlotN : RenderSlots)
       {
-        FSkelMeshSection& Sec = Lod.Sections[S];
-        FSkelMeshSourceSectionUserData& UD = Lod.UserSectionsData.FindOrAdd(Sec.OriginalDataSectionIndex);
-        if (Asset->BindToSkeletalMesh(Mesh, 0, S, 0))
+        SM2WaitMeshBuild(Mesh);
+        FScopedSkeletalMeshPostEditChange Scope(Mesh);
+        FSkeletalMeshLODModel& L6 = Model->LODModels[0];
+        for (int32 S = 0; S < L6.Sections.Num(); ++S)
         {
-          UD.CorrespondClothAssetIndex = (int16)AssetIndex;
-          UD.ClothingData.AssetGuid = Asset->GetAssetGuid();
-          UD.ClothingData.AssetLodIndex = 0;
-          ++Bound;
+          FSkelMeshSection& Sec = L6.Sections[S];
+          if (Sec.bDisabled || Sec.HasClothingData() || !Mesh->GetMaterials().IsValidIndex(Sec.MaterialIndex) ||
+            Mesh->GetMaterials()[Sec.MaterialIndex].MaterialSlotName != SlotN)
+            continue;
+          if (Asset->BindToSkeletalMesh(Mesh, 0, S, 0))
+          {
+            FSkelMeshSourceSectionUserData& UD = L6.UserSectionsData.FindOrAdd(Sec.OriginalDataSectionIndex);
+            UD.CorrespondClothAssetIndex = (int16)AssetIndex;
+            UD.ClothingData.AssetGuid = Asset->GetAssetGuid();
+            UD.ClothingData.AssetLodIndex = 0;
+            ++Bound;
+          }
+          else
+          {
+            ++Fail;
+            Sec.ClothMappingDataLODs.Empty();
+            Sec.ClothingData = FClothingSectionData();
+            Sec.CorrespondClothAssetIndex = INDEX_NONE;
+            if (FSkelMeshSourceSectionUserData* UD = L6.UserSectionsData.Find(Sec.OriginalDataSectionIndex))
+            {
+              UD->CorrespondClothAssetIndex = INDEX_NONE;
+              UD->ClothingData = FClothingSectionData();
+            }
+          }
+          break; // one section per slot
         }
       }
+      SM2WaitMeshBuild(Mesh);
+      Log.Add(FString::Printf(TEXT("%s: slots=[%s] bound=%d failed=%d"), *SimName, *SlotLog, Bound, Fail));
     }
     {
       FBindRec R{Asset, {}, SimName};
-      for (int32 S : RenderSections)
-        if (Lod.Sections.IsValidIndex(S) && Mesh->GetMaterials().IsValidIndex(Lod.Sections[S].MaterialIndex))
-          R.Slots.AddUnique(Mesh->GetMaterials()[Lod.Sections[S].MaterialIndex].MaterialSlotName);
+      R.Slots = RenderSlots;
       BindRecs.Add(R);
     }
     if (Bound > 0)
@@ -881,14 +949,16 @@ bool USM2PhysicsSetupLibrary::CreateChaosCloth(USkeletalMesh* Mesh, const FStrin
       int32 Idx = INDEX_NONE;
       Mesh->GetMeshClothingAssets().Find(R.Asset, Idx);
       int32 Have = 0, Re = 0;
+      for (const FSkelMeshSection& Sx : L.Sections)
+        Have += Sx.HasClothingData() && Sx.ClothingData.AssetGuid == R.Asset->GetAssetGuid();
+      if (Have > 0) // mtl1-15: already bound -> never rebind (rebind attached wrong sections on sorcerer)
+      {
+        Log.Add(FString::Printf(TEXT("%s: bindCheck assetIdx=%d had=%d rebound=skip"), *R.Name, Idx, Have));
+        continue;
+      }
       for (int32 S = 0; S < L.Sections.Num(); ++S)
       {
         FSkelMeshSection& Sec = L.Sections[S];
-        if (Sec.HasClothingData() && Sec.ClothingData.AssetGuid == R.Asset->GetAssetGuid())
-        {
-          ++Have;
-          continue;
-        }
         if (Sec.bDisabled || Sec.HasClothingData() || !Mesh->GetMaterials().IsValidIndex(Sec.MaterialIndex) ||
           !R.Slots.Contains(Mesh->GetMaterials()[Sec.MaterialIndex].MaterialSlotName))
           continue;
@@ -905,6 +975,7 @@ bool USM2PhysicsSetupLibrary::CreateChaosCloth(USkeletalMesh* Mesh, const FStrin
       Log.Add(FString::Printf(TEXT("%s: bindCheck assetIdx=%d had=%d rebound=%d slots=%d"), *R.Name, Idx, Have, Re, R.Slots.Num()));
     }
   }
+  SM2WaitMeshBuild(Mesh);
   // post-rebuild verification (after the scoped PostEditChange): which sections carry which clothing asset.
   {
     FSkeletalMeshLODModel& L = Model->LODModels[0];
@@ -929,6 +1000,7 @@ bool USM2PhysicsSetupLibrary::CreateChaosCloth(USkeletalMesh* Mesh, const FStrin
     }
   }
   Mesh->MarkPackageDirty();
+  SM2WaitMeshBuild(Mesh);
   Report = FString::Join(Log, TEXT(" | "));
   return Converted.Num() > 0;
 }

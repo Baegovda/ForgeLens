@@ -272,3 +272,17 @@ glt.chameleon REA'd (FUN_142576f30 + glt PS 03558_0) and implemented in sidecar 
   | sorcerer | 53-171 | 447-634 | 127-178 |
   | tech_priest | 0-27 | 51-229 | 0-17 |
 - cloth_cmp_<char>.png regenerated with all 4 rows (bone / coll / noColl / wind, tag e14*). Previous versions kept as _bak3.
+
+## mtl1-14f (ChaosCloth: 16-bit bone index, one render section per cloth)
+- Approved project change: `[/Script/Engine.RendererSettings] r.GPUSkin.Support16BitBoneIndex=True` in the project's DefaultEngine.ini. **Meshes must be re-imported afterwards** (the existing render data keeps the chunked 8-bit sections). After that the large cloths (calgar cloak, sorcerer skirt, tech_priest skirt_v7) are no longer chunked and they simulate; WIND gets all 4 interactors.
+- Plugin (cpp15e): (1) waits for the async skeletal-mesh build (FSkinnedAssetCompilingManager::FinishCompilation) before and after every cloth edit; editing the LODModel during an in-flight build gave the sorcerer spiky garbage. (2) Render slot match: exact name first, Contains only as a fallback (beads_REND vs beads_REND1). (3) **Only one render section is bound per cloth** (the matching slot with the most vertices). BindToSkeletalMesh maps one section per asset LOD, so a 2nd bind fails and the half-bound section exploded the mesh on the next rebuild. The other matching sections stay bone-skinned (logged: `extra render slots stay bone-skinned`). A failed bind is cleared off its section.
+- **Restart the editor after a ChaosCloth rebuild** (CreateChaosCloth on a mesh already open/used in the level): the live component keeps the stale clothing render data until restart.
+- Penetration (free particles >1 cm inside, t=7/9/11 s; worst free depth in cm). Particle counts are higher than in 14e because all cloths now simulate (calgar 3039, sorcerer 4819, tech_priest 3253):
+
+  | char | coll | noColl | wind x0.05 |
+  |---|---|---|---|
+  | calgar | 0 (0.0) | 250-295 (27.4) | 0 (0.3) |
+  | sorcerer_exalted | 236-334 (9.4) | 752-981 (28.8) | 271-297 (8.6) |
+  | tech_priest | 131-139 (2.8) | 954-1138 (22.3) | 123-138 (6.5) |
+- Sorcerer no longer explodes; cloak/skirt simulate with collision. Remaining penetration is shallow (<10 cm) vs no-collision (~29 cm).
+- cloth_cmp_<char>.png regenerated (bone e14b / coll f15c / noColl f15n / wind f15w). Previous versions kept as _bak5. Sorcerer frame is small because its bounds include the large staff/horn parts.
