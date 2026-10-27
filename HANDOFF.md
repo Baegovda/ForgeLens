@@ -1791,3 +1791,5 @@ Disassembly: /workspace/vfxsh_dis/{pc,pg,dx_pc_dx12_sfx,dx_pc_dx12_distort}, GLS
 - mtl1-14f: Support16BitBoneIndex=True (+ mesh reimport required), plugin waits async mesh build, exact slot match, one render section bound per cloth, restart editor after ChaosCloth rebuild. All cloths simulate; sorcerer stable. Pen table in STATUS.
 
 - mtl1-15m: exporter BC5 fix (BGRA: zero B, not R) - spec metalness was 0 in every export since 37f43a1 -> paint slots grey (chameleon ramp on non-metal). RE-EXPORT needed. See STATUS.
+
+- mtl1-15w: WindDirectionalSource drives Chaos cloth (calgar diff test) -> Sequencer can key it; clothwind src fixed. Mirror check cc_sorcerer/cc_chaplain: hit=1.00, no mirror needed, live stable. See STATUS.

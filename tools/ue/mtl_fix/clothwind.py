@@ -58,8 +58,10 @@ elif mode == "src":
     x, y, z = [float(v) for v in sys.argv[2:5]]; st = float(sys.argv[5]) if len(sys.argv) > 5 else 1.0
     v = unreal.Vector(x, y, z); a = next((a for a in eas.get_all_level_actors() if a.actor_has_tag("SM2Wind")), None)
     if not a: a = eas.spawn_actor_from_class(unreal.WindDirectionalSource, unreal.Vector(0, 0, 300)); a.tags = [unreal.Name("SM2Wind")]
-    a.set_actor_rotation(v.rotation(), False); c = a.get_component_by_class(unreal.WindDirectionalSourceComponent)
-    c.set_strength(st); c.set_speed(v.length() / 100.0); print("WIND source", a.get_name(), v, st)
+    a.set_actor_rotation(unreal.MathLibrary.make_rot_from_x(v), False); c = a.get_component_by_class(unreal.WindDirectionalSourceComponent)
+    # mtl1-15: Vector has no rotation() in UE python. Cloth wind velocity = dir * Speed * 250 (USkeletalMeshComponent WindUnitScale),
+    # so Speed = |v| / 250 gives v in cm/s.
+    c.set_strength(st); c.set_speed(v.length() / 250.0); print("WIND source", a.get_name(), v, st, "speed", v.length() / 250.0)
 elif mode == "srcclear":
     for a in [a for a in eas.get_all_level_actors() if a.actor_has_tag("SM2Wind")]: eas.destroy_actor(a)
     print("WIND sources cleared")
