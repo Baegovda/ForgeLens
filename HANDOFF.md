@@ -1866,4 +1866,33 @@ Disassembly: /workspace/vfxsh_dis/{pc,pg,dx_pc_dx12_sfx,dx_pc_dx12_distort}, GLS
   - `CroppedBitmap` must be created on the UI thread.
   - An ItemsControl with a custom ScrollViewer did not virtualize; use ListBox.
   - A ListBox ItemsSource that implements IList must return -1 from IndexOf for stale items.
-- **Next:** an optional Kitbasher-style customization parts picker (from the .sso; see `A/Customization/SslText.cs`, `ArmorVariant.cs`, `AssetExporter.ApplyVariant`). Not started.
+- **Next:** the Kitbasher-style parts picker — done in ui-44 below.
+
+## Update ui-44 (2026-10-28 KST): Forge Lens Kitbasher (customization parts picker)
+- **Data (acdcf79, `SM2.Assets/Customization/Kitbash.cs`, 4 tests in `KitbashTests.cs`):**
+  - `KitbashLibrary.From(CustomizationLibrary)` reads `character_customization_library.sso` like the Kitbasher add-on: `appearancesByTeams → team → customizationPresets → class → armorPresets / bodySections.SLOT.regions → meshes (+ equipmentActorMeshes)` and the team's `sharedOutfitParts.outfitParts.SLOT.regions`.
+  - Presets: `PREDEFINED_PRESET_N` with `bodySectionRegionUids {SLOT: {__value}}`; champion presets (`isChampion`, `dlcLock.dlcUid`, `skinOverrides … PveSkinChampion0N`) have no regions.
+  - `Options(class, slot, classOnly)`: the class's regions, then shared regions. With classOnly a shared region is offered when it is `isForAllCharacters`, has no `appearanceUids`, or lists the class (`PVE_PVP_X` = `PVP_X` = `PVE_X`).
+  - `Spec(...)` builds the exporter's `--variant` string: `appearance=TEAM/CLASS,preset=N,SLOT=uid|none,…`. **`SLOT=none` is new in `ArmorVariant`**: it removes the slot, so every object of that slot's regions hides. Empty mesh names in the library (CHAOS engineer left pauldron) are skipped instead of noted.
+- **UI (aece011, `MainWindow.Kitbash.cs`, right column tab "⚒ Kitbash" next to "Meshes"):**
+  - Faction / Class / Preset combos, then one combo per slot (add-on slot order) with "— empty —" first. Badges: `shared`, rarity (non-common), `hidden` (isHidden), `⚠ not in tpl`. The tooltip lists the objects, rarity, source and the appearanceUids.
+  - Filters: **This class only** (default on) and **Parts not in model** (default off: parts none of whose objects are bones of the loaded tpl are hidden from the lists; a chosen one stays).
+  - Picking a class finds its tpl (`KitbashLibrary.TemplateCandidates` → `catalog.FindByFileName`) and previews it through the normal model path (`PreviewFileAsync`). Every change restores the tpl's load-time visibility (cloth SIM shells stay off) and re-applies `ArmorVariant.Apply` with the spec, so the preview is exactly the export filter. The MESHES tree reflects it.
+  - Buttons: **Preset parts** (reset the slots), **Randomize** (skips hidden and not-in-tpl parts), **Export combination…**. The export opens the normal export dialog with the combination shown read-only, sets `ExportSettings.Variant` = the spec and `PartVisibility` = the preview, and exports only the class tpl.
+  - The status card shows filled slots / shown / hidden surfaces. Notes list library uids that don't resolve, and a count of picked objects missing from the tpl.
+  - Persisted (settings.json): tab open, team, class, preset, slot picks, both filters.
+  - Also: the preview note under the viewer is capped at 5 lines (full text in its tooltip). The constructor tpl note was long enough to squeeze the viewport to nothing.
+- **Verified (box):**
+  - Tank constructor with preset 1: preview and export both hid 978 parts and showed 54. Kitbash `CHEST=none,HELMET=helmet_tank_relic_01` export hid 996 and showed 36 (`AssetExporter.Export`, dev pak).
+  - CHAOS engineer constructor loads and fills 10/10 slots.
+  - Real library: LOYALIST PVE_PVP_TANK has 10 presets; its HELMET has more than 7 class-filtered options.
+- **HEURISTIC / limits:**
+  1. STORY_X classes use `cc_sm_constructor_x` (then `cc_sm_x_story`), on the assumption that their regions name the same objects.
+  2. A champion preset maps to `cc_{sm|ch}_champion_{x}_{NN}` from `PveSkinChampionNN`. It is shown and exported complete (no slots). When that tpl is missing, the constructor is shown with the first preset that lists regions.
+  3. Shared-part filtering by `appearanceUids` follows the add-on. In the tank constructor, about half of the shared-part objects are not bones of that tpl (for example `helmet_E_lamenters_grp` is only in the engineer constructor). The game may compose those from other tpls; we don't, and the lists mark them `⚠ not in tpl`.
+  4. Vanity combat shields are `equipmentActorMeshes` (a separate actor), so they show `⚠ not in tpl`.
+- **Screenshots (box, Xvfb, dev pak `/workspace/ui43dev/game` now also holding the real tank and engineer constructors):** `/workspace/browser_run_shots/ui44/`
+  - `01_kitbash_tank_preset1.png`, `02_helmet_dropdown.png`, `03_helmet_relic.png`
+  - `04_random_combo.png`, `05_chest_empty.png`
+  - `06_chaos_no_tpl.png`, `07_chaos_engineer.png`, `08_export_combination.png`
+- Tests: SM2.Assets 237, Extractor 43, LibSaber.Tests 5, python 8 — all pass. HaloCEA is still out of scope: it needs a Halo install path.

@@ -3,6 +3,7 @@
 Branch `cursor/sm2-pck-extractor-4420`, PR #1. Always confirm the current state with `git fetch && git log --oneline -30 origin/cursor/sm2-pck-extractor-4420`.
 Percentages are the previous agent's estimates of how complete each track is against the "looks exactly like in-game" goal.
 
+## ui-44 (2026-10-28 KST): Forge Lens Kitbasher — Kitbash tab: faction/class/preset + one part per slot from the customization .sso, live preview = export filter (ArmorVariant, SLOT=none), Export combination. Story/champion tpl mapping HEURISTIC (HANDOFF "Update ui-44")
 ## ui-43 (2026-10-28 KST): Forge Lens UE5-style Content Browser — Favorites / Folders|Categories / Collections, thumbnail grid + list, chips, hover-animated cached thumbnails; Anim wheel steps clips. Category name rules, effect splat and clay thumbnails are HEURISTIC (HANDOFF "Update ui-43")
 ## mtl1-42 physics/materials batch (2026-10-28 KST): Calgar cape stripe = detail tiling, 60 Hz Calgar clips, PA assign, cloth bone cap 4096, CDT sweep
 ## mtl1-42 (2026-10-28 KST): VFX black squares/fly-by fixed, cloth SIM shells hidden in preview, export In place, file list UI
@@ -604,4 +605,9 @@ Evidence: box /workspace/rdc/NOTES.md and /workspace/rdc/<scene>/{nightly,deep} 
   - effects are a CPU splat approximation (HEURISTIC);
   - clips without an owner model show a glyph.
 - Tests: SM2.Assets 233, Extractor 43, LibSaber.Tests 5, chameleon python 8 — all pass.
-- Open: the Kitbasher parts picker (optional, not started); close-time state saving is unverified under Xvfb.
+- Open: close-time state saving is unverified under Xvfb.
+
+## ui-44 (2026-10-28 KST): Kitbasher
+- `KitbashLibrary` (Customization/Kitbash.cs) + right-column **Kitbash** tab. Preview and export share `ArmorVariant`. Tank preset 1 preview and export: 978 hidden / 54 shown. Kitbash spec export checked (996 / 36).
+- HEURISTIC: STORY_X → loyalist constructor; champion preset → `cc_*_champion_x_NN`; about half of the shared-part objects are not in a given constructor tpl (marked `⚠ not in tpl`).
+- Tests: SM2.Assets 237, Extractor 43, LibSaber.Tests 5, python 8 — all pass.
