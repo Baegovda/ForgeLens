@@ -24,6 +24,8 @@ internal sealed class EffectLayer
   public float Time { get; init; }
   /// <summary>vfx3y bench bloom source pass: only meshes, weighted by material bloomIntensity (HEURISTIC).</summary>
   public bool BloomPass { get; init; }
+  /// <summary>DEMO/HEURISTIC covering host (plane/sphere with a painted coveringMask), null = off.</summary>
+  public CoveringDemo? Covering { get; init; }
   public int MeshInstances => Meshes.Sum(m => m.Instances.Count);
   /// <summary>Total sprite quads (stats).</summary>
   public int Quads => Batches.Sum(b => b.QuadCount);
@@ -39,7 +41,10 @@ internal sealed class EffectLayer
 internal sealed unsafe class EffectRenderer : IDisposable
 {
   private readonly GL _gl;
-  private readonly uint _sprite, _ground, _mesh, _distort;
+  private readonly uint _sprite, _ground, _mesh, _distort, _cover;
+  private CoveringDemo? _coverDemo;
+  private uint _coverVao, _coverVbo, _coverIbo, _coverTex;
+  private int _coverIndexCount, _coverVersion = -1;
   private readonly Dictionary<string, uint> _linear = new(StringComparer.OrdinalIgnoreCase);
   /// <summary>Screen offset (UV) at distortion power 1 and a full-strength normal; not REA'd (the refraction shader is in the GPU blob).</summary>
   public static float DistortionStrength { get; set; } =
@@ -103,6 +108,7 @@ internal sealed unsafe class EffectRenderer : IDisposable
     _ground = Link(header + GroundVs, header + GroundFs);
     _mesh = Link(header + MeshVs, header + MeshFs);
     _distort = Link(header + SpriteVs, header + DistortFs);
+    _cover = Link(header + CoverVs, header + CoverFs);
     _vao = gl.GenVertexArray();
     _vbo = gl.GenBuffer();
     _ibo = gl.GenBuffer();
@@ -257,6 +263,7 @@ internal sealed unsafe class EffectRenderer : IDisposable
       _gl.DrawArrays(PrimitiveType.Triangles, 0, 6);
     }
 
+    if (layer.Covering is { Kind: not CoveringHostKind.Off } cover && !layer.BloomPass) DrawCovering(cover, vp, eye, lights, layer.Exposure);
     DrawMeshes(layer, vp, eye, lights, translucent: false);
     DrawMeshes(layer, vp, eye, lights, translucent: true);
     // vfx3z: sprites feed the bloom pass unweighted (HDR threshold bloom, see BenchBloom); meshes stay bloomIntensity-weighted.
@@ -541,6 +548,8 @@ internal sealed unsafe class EffectRenderer : IDisposable
       if (b is { } x) { _gl.DeleteVertexArray(x.Vao); _gl.DeleteBuffer(x.Vbo); _gl.DeleteBuffer(x.Ibo); }
     _gl.DeleteProgram(_mesh);
     _gl.DeleteProgram(_distort);
+    _gl.DeleteProgram(_cover);
+    if (_coverVao != 0) { _gl.DeleteVertexArray(_coverVao); _gl.DeleteBuffer(_coverVbo); _gl.DeleteBuffer(_coverIbo); _gl.DeleteTexture(_coverTex); }
     foreach (var id in _linear.Values)
       if (id != uint.MaxValue) _gl.DeleteTexture(id);
     foreach (var id in _textures.Values.Distinct())
@@ -811,6 +820,152 @@ internal sealed unsafe class EffectRenderer : IDisposable
       if (uBloomPass == 1) { outColor = uTranslucent == 1 ? vec4(c * a * uBloomW, 0.0) : vec4(c * uBloomW, 1.0); return; }
       if (uTranslucent == 1) outColor = vec4(c * a, a);
       else outColor = vec4(c, 1.0);
+    }
+    """;
+
+  /// <summary>Covering demo host: rebuilds the plane/sphere mesh per demo instance and re-uploads the mask on change.</summary>
+  private void DrawCovering(CoveringDemo demo, Matrix4x4 vp, Vector3 eye, LightSample[] lights, float exposure)
+  {
+    if (!ReferenceEquals(demo, _coverDemo))
+    {
+      _coverDemo = demo;
+      _coverVersion = -1;
+      int nu = demo.Kind == CoveringHostKind.Sphere ? 64 : 1, nv = demo.Kind == CoveringHostKind.Sphere ? 32 : 1;
+      var verts = new List<float>();
+      for (var j = 0; j <= nv; j++)
+      for (var i = 0; i <= nu; i++)
+      {
+        float u = (float)i / nu, v = (float)j / nv;
+        var p = demo.SurfacePoint(u, v);
+        var n = demo.Kind == CoveringHostKind.Sphere ? Vector3.Normalize(p - demo.Center) : demo.Axis;
+        verts.AddRange([p.X, p.Y, p.Z, n.X, n.Y, n.Z, u, v]);
+      }
+
+      var idx = new List<uint>();
+      for (var j = 0; j < nv; j++)
+      for (var i = 0; i < nu; i++)
+      {
+        uint a = (uint)(j * (nu + 1) + i), b = a + 1, c = a + (uint)(nu + 1), d = c + 1;
+        idx.AddRange([a, c, b, b, c, d]);
+      }
+
+      if (_coverVao == 0)
+      {
+        _coverVao = _gl.GenVertexArray();
+        _coverVbo = _gl.GenBuffer();
+        _coverIbo = _gl.GenBuffer();
+        _coverTex = _gl.GenTexture();
+      }
+
+      _gl.BindVertexArray(_coverVao);
+      _gl.BindBuffer(BufferTargetARB.ArrayBuffer, _coverVbo);
+      _gl.BufferData<float>(BufferTargetARB.ArrayBuffer, verts.ToArray(), BufferUsageARB.StaticDraw);
+      _gl.EnableVertexAttribArray(0);
+      _gl.VertexAttribPointer(0, 3, VertexAttribPointerType.Float, false, 32, (void*)0);
+      _gl.EnableVertexAttribArray(1);
+      _gl.VertexAttribPointer(1, 3, VertexAttribPointerType.Float, false, 32, (void*)12);
+      _gl.EnableVertexAttribArray(2);
+      _gl.VertexAttribPointer(2, 2, VertexAttribPointerType.Float, false, 32, (void*)24);
+      _gl.BindBuffer(BufferTargetARB.ElementArrayBuffer, _coverIbo);
+      _gl.BufferData<uint>(BufferTargetARB.ElementArrayBuffer, idx.ToArray(), BufferUsageARB.StaticDraw);
+      _gl.BindVertexArray(0);
+      _coverIndexCount = idx.Count;
+    }
+
+    _gl.ActiveTexture(TextureUnit.Texture0);
+    _gl.BindTexture(TextureTarget.Texture2D, _coverTex);
+    if (demo.Version != _coverVersion)
+    {
+      _coverVersion = demo.Version;
+      var bytes = new byte[demo.Mask.Length];
+      for (var i = 0; i < bytes.Length; i++) bytes[i] = (byte)(Math.Clamp(demo.Mask[i], 0f, 1f) * 255f + 0.5f);
+      _gl.PixelStore(PixelStoreParameter.UnpackAlignment, 1);
+      fixed (byte* m = bytes)
+        _gl.TexImage2D(TextureTarget.Texture2D, 0, InternalFormat.R8, CoveringDemo.Res, CoveringDemo.Res, 0, PixelFormat.Red, PixelType.UnsignedByte, m);
+      _gl.PixelStore(PixelStoreParameter.UnpackAlignment, 4);
+      _gl.TexParameter(TextureTarget.Texture2D, TextureParameterName.TextureMinFilter, (int)TextureMinFilter.Linear);
+      _gl.TexParameter(TextureTarget.Texture2D, TextureParameterName.TextureMagFilter, (int)TextureMagFilter.Linear);
+      _gl.TexParameter(TextureTarget.Texture2D, TextureParameterName.TextureWrapS, (int)(demo.Kind == CoveringHostKind.Sphere ? TextureWrapMode.Repeat : TextureWrapMode.ClampToEdge));
+      _gl.TexParameter(TextureTarget.Texture2D, TextureParameterName.TextureWrapT, (int)TextureWrapMode.ClampToEdge);
+    }
+
+    var (albedo, gloss) = CoveringDemo.Style(demo.CoveringKind);
+    _gl.UseProgram(_cover);
+    SetMatrix(_cover, "uVP", vp);
+    _gl.Uniform1(_gl.GetUniformLocation(_cover, "uMask"), 0);
+    _gl.Uniform3(_gl.GetUniformLocation(_cover, "uEye"), eye.X, eye.Y, eye.Z);
+    _gl.Uniform3(_gl.GetUniformLocation(_cover, "uCovAlbedo"), albedo.X, albedo.Y, albedo.Z);
+    _gl.Uniform1(_gl.GetUniformLocation(_cover, "uCovGloss"), gloss);
+    _gl.Uniform1(_gl.GetUniformLocation(_cover, "uExposure"), exposure);
+    _gl.Uniform1(_gl.GetUniformLocation(_cover, "uLightCount"), lights.Length);
+    for (var i = 0; i < lights.Length; i++)
+    {
+      var l = lights[i];
+      _gl.Uniform4(_gl.GetUniformLocation(_cover, $"uLightPos[{i}]"), l.Position.X, l.Position.Y, l.Position.Z, Math.Max(0.01f, l.Radius));
+      _gl.Uniform3(_gl.GetUniformLocation(_cover, $"uLightColor[{i}]"), l.Color.X * l.Intensity, l.Color.Y * l.Intensity, l.Color.Z * l.Intensity);
+    }
+
+    _gl.Enable(EnableCap.DepthTest);
+    _gl.DepthMask(true);
+    _gl.Disable(EnableCap.Blend);
+    _gl.Enable(EnableCap.PolygonOffsetFill);
+    _gl.PolygonOffset(-1f, -1f); // plane host lies on the ground grid
+    _gl.BindVertexArray(_coverVao);
+    _gl.DrawElements(PrimitiveType.Triangles, (uint)_coverIndexCount, DrawElementsType.UnsignedInt, (void*)0);
+    _gl.Disable(EnableCap.PolygonOffsetFill);
+    _gl.BindVertexArray(0);
+  }
+
+  private const string CoverVs = """
+    layout(location = 0) in vec3 aPos;
+    layout(location = 1) in vec3 aNormal;
+    layout(location = 2) in vec2 aUv;
+    uniform mat4 uVP;
+    out vec3 vWorld;
+    out vec3 vNormal;
+    out vec2 vUv;
+    void main()
+    {
+      vWorld = aPos; vNormal = aNormal; vUv = aUv;
+      gl_Position = uVP * vec4(aPos, 1.0);
+    }
+    """;
+
+  // DEMO/HEURISTIC covering material: grey host, covered texels lerp to the kind's albedo and get glossier (wet look).
+  private const string CoverFs = """
+    in vec3 vWorld;
+    in vec3 vNormal;
+    in vec2 vUv;
+    uniform sampler2D uMask;
+    uniform vec3 uEye;
+    uniform vec3 uCovAlbedo;
+    uniform float uCovGloss;
+    uniform float uExposure;
+    uniform int uLightCount;
+    uniform vec4 uLightPos[8];
+    uniform vec3 uLightColor[8];
+    out vec4 outColor;
+    vec3 toGamma(vec3 c) { return mix(c * 12.92, 1.055 * pow(c, vec3(1.0 / 2.4)) - 0.055, step(0.0031308, c)); }
+    void main()
+    {
+      float m = smoothstep(0.02, 0.6, texture(uMask, vUv).r);
+      vec2 ck = floor(vUv * vec2(16.0, 16.0));
+      vec3 base = vec3(0.30, 0.30, 0.31) * (0.9 + 0.1 * mod(ck.x + ck.y, 2.0));
+      vec3 albedo = mix(base, uCovAlbedo, m);
+      float gloss = mix(0.15, uCovGloss, m);
+      vec3 n = normalize(gl_FrontFacing ? vNormal : -vNormal);
+      vec3 v = normalize(uEye - vWorld);
+      vec3 l = normalize(vec3(0.4, 1.0, 0.3));
+      vec3 h = normalize(l + v);
+      float spec = pow(max(dot(n, h), 0.0), exp2(2.0 + 9.0 * gloss)) * mix(0.02, 0.6, gloss);
+      vec3 col = albedo * (0.25 + 0.9 * max(dot(n, l), 0.0)) + vec3(spec);
+      for (int i = 0; i < uLightCount; i++)
+      {
+        vec3 d = uLightPos[i].xyz - vWorld;
+        float f = clamp(1.0 - length(d) / uLightPos[i].w, 0.0, 1.0);
+        col += albedo * uLightColor[i] * uExposure * 8.0 * f * f * max(0.0, dot(n, normalize(d)));
+      }
+      outColor = vec4(toGamma(vec3(1.0) - exp(-col * 1.6)), 1.0);
     }
     """;
 

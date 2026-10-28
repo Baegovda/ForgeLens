@@ -153,6 +153,12 @@
           <TextBlock x:Name="VfxTime" VerticalAlignment="Center" Text="0.00s" />
           <CheckBox x:Name="VfxLoopToggle" Content="Loop" IsChecked="True" Click="VfxOptionsChanged" />
           <CheckBox x:Name="VfxGroundToggle" Content="Ground" IsChecked="True" Click="VfxOptionsChanged" />
+          <ComboBox x:Name="VfxCoveringBox" SelectedIndex="1" IsVisible="False" SelectionChanged="VfxCoveringChanged"
+                    ToolTip.Tip="DEMO / HEURISTIC: shows em_covering_* on a built-in host surface (painted where particles land). Not game-accurate.">
+            <ComboBoxItem Content="Covering demo: off" />
+            <ComboBoxItem Content="Covering demo: plane (heuristic)" />
+            <ComboBoxItem Content="Covering demo: sphere (heuristic)" />
+          </ComboBox>
         </WrapPanel>
         <TextBlock x:Name="PreviewNote" DockPanel.Dock="Bottom" TextWrapping="Wrap" Margin="0,8,0,0" />
         <Border x:Name="ViewBorder" Background="{DynamicResource FL.Viewport}" CornerRadius="4" BorderBrush="{DynamicResource FL.Border}" BorderThickness="1" ClipToBounds="True"

@@ -84,6 +84,9 @@ internal static class VfxBench
         Line($"{name}: emitters {def.Emitters.Count} (sprite {sprites}, mesh {meshCount}, other {def.Emitters.Count - sprites - meshCount}) lights {def.Lights.Count} trails {def.Trails.Count} covering {def.Coverings.Count} other {def.Unsupported.Count} [{string.Join(", ", def.Unsupported.Select(u => u.Type).Distinct())}] duration {def.Duration:0.00}s capture {seconds:0.00}s missing textures [{string.Join(", ", missing)}] missing meshes [{string.Join(", ", missingMeshes)}]");
         var instance = EffectInstance.Standalone(def, 1);
         var camera = EffectCamera.Fit(instance, seconds);
+        // SM2_VFX_COVERING=plane|sphere: DEMO/HEURISTIC covering host for em_covering_* effects.
+        var coverKind = Enum.TryParse<CoveringHostKind>(Environment.GetEnvironmentVariable("SM2_VFX_COVERING"), true, out var ck) ? ck : CoveringHostKind.Off;
+        var cover = coverKind != CoveringHostKind.Off && def.Coverings.Count > 0 ? new CoveringDemo(coverKind, def, instance.Root) : null;
         if (parts.Length > 2 && float.TryParse(parts[2], CultureInfo.InvariantCulture, out var distance))
           camera = camera with { Distance = distance };
         var (view, projection, eye) = camera.Matrices(Size, Size);
@@ -96,7 +99,14 @@ internal static class VfxBench
         {
           var t = seconds * (f + 0.5f) / frames;
           var w = Stopwatch.StartNew();
+          if (cover is not null) // paint at 60 Hz between the sparse sheet frames, like the interactive view does per frame
+            for (var ts = MathF.Max(0f, instance.Time) + 1f / 60f; ts < t; ts += 1f / 60f)
+            {
+              instance.Seek(ts);
+              cover.Update(instance);
+            }
           instance.Seek(t);
+          cover?.Update(instance);
           simMs.Add(w.Elapsed.TotalMilliseconds);
           peak = Math.Max(peak, instance.ParticleCount);
           w.Restart();
@@ -109,6 +119,7 @@ internal static class VfxBench
             Meshes = EffectMeshParticles.Build(instance, view),
             Mesh = meshes.Get,
             Time = t,
+            Covering = cover,
           };
           buildMs.Add(w.Elapsed.TotalMilliseconds);
           fingerprint.Append(Hash(layer)).Append(';');
@@ -129,7 +140,7 @@ internal static class VfxBench
             Buffer.BlockCopy(pixels, y * Size * 4, sheet, ((oy + y) * Cols * Size + ox) * 4, Size * 4);
           if (Environment.GetEnvironmentVariable("SM2_VFX_FRAMES") == "1")
             PreviewBench.Png(Path.Combine(output, $"{name}_f{f}_{t:0.000}s.png"), pixels, Size, Size);
-          Line($"  t={t:0.000}s particles {instance.ParticleCount} quads {layer.Quads} meshes {layer.MeshInstances} batches {layer.Batches.Count} lights {layer.Lights.Count} distortion {gpu.DistortionQuads} vatDraws(cum) {gpu.VatDraws}");
+          Line($"  t={t:0.000}s particles {instance.ParticleCount} quads {layer.Quads} meshes {layer.MeshInstances} batches {layer.Batches.Count} lights {layer.Lights.Count} distortion {gpu.DistortionQuads} vatDraws(cum) {gpu.VatDraws}{(cover is null ? "" : $" coverHits(cum) {cover.Hits} coverMax {cover.Mask.Max():0.00}")}");
         }
 
         PreviewBench.Png(Path.Combine(output, name + "_sheet.png"), sheet, Cols * Size, Rows * Size);

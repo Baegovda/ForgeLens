@@ -53,6 +53,8 @@ public partial class MainWindow
     public double Last;
     public int Particles;
     public int Quads;
+    /// <summary>DEMO/HEURISTIC covering host for em_covering_* effects (rebuilt when the host kind changes).</summary>
+    public CoveringDemo? Cover;
   }
 
   private GameCatalog? _vfxCatalog;
@@ -151,6 +153,9 @@ public partial class MainWindow
     if (def.Coverings.Count > 0)
       notes.Add("Surface covering (paints the coveringMask of nearby surfaces, not a particle): "
         + string.Join(", ", def.Coverings.Select(c => $"{c.Kind} r×{c.RadiusScale:0.##}{(c.Visible ? "" : " (off)")}")) + ".");
+    VfxCoveringBox.IsVisible = def.Coverings.Count > 0;
+    if (def.Coverings.Count > 0)
+      notes.Add("Covering demo host (DEMO / HEURISTIC preview, not game-accurate): a built-in plane or sphere whose mask is painted where particles land; the game paints the hit character's own covering layer.");
     notes.Add("Standalone view on a ground grid; socketed emitters sit 1.2 m up, pointing +X; effects with trails fly along +X at 40 m/s. Drag to orbit, wheel to zoom, Space plays.");
     PreviewNote.Text = string.Join(" ", notes);
     PreviewText.Text = "";
@@ -204,6 +209,14 @@ public partial class MainWindow
       fx.Last = now;
       fx.Instance.Seek(fx.Time);
       var (view, projection, eye) = fx.Camera.Matrices(width, height);
+      var host = fx.Definition.Coverings.Count > 0 ? VfxCoveringHost : CoveringHostKind.Off;
+      if (host == CoveringHostKind.Off) fx.Cover = null;
+      else
+      {
+        if (fx.Cover?.Kind != host) fx.Cover = new CoveringDemo(host, fx.Definition, fx.Instance.Root);
+        fx.Cover.Update(fx.Instance);
+      }
+
       var watch = Stopwatch.StartNew();
       var layer = new EffectLayer
       {
@@ -213,6 +226,7 @@ public partial class MainWindow
         Ground = VfxGroundIsOn,
         Meshes = EffectMeshParticles.Build(fx.Instance, view),
         Mesh = _vfxMeshes.Get,
+        Covering = fx.Cover,
       };
       fx.Particles = fx.Instance.ParticleCount;
       fx.Quads = layer.Quads;
@@ -222,6 +236,7 @@ public partial class MainWindow
 
   private volatile bool VfxLoopIsOn = true;
   private volatile bool VfxGroundIsOn = true;
+  private volatile CoveringHostKind VfxCoveringHost = CoveringHostKind.Plane;
 
   private void VfxTogglePlay()
   {
@@ -251,10 +266,18 @@ public partial class MainWindow
     GpuView.ShowEffect(GpuView.Effect);
   }
 
+  private void VfxCoveringChanged(object? sender, SelectionChangedEventArgs e)
+  {
+    if (VfxCoveringBox is null) return;
+    VfxCoveringHost = (CoveringHostKind)Math.Max(0, VfxCoveringBox.SelectedIndex);
+    GpuView?.ShowEffect(GpuView.Effect);
+  }
+
   private void VfxOptionsChanged(object? sender, RoutedEventArgs e)
   {
     VfxLoopIsOn = VfxLoopToggle.IsChecked == true;
     VfxGroundIsOn = VfxGroundToggle.IsChecked == true;
+    VfxCoveringHost = (CoveringHostKind)Math.Max(0, VfxCoveringBox.SelectedIndex);
     GpuView.ShowEffect(GpuView.Effect);
   }
 
