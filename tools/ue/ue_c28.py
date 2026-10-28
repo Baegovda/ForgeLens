@@ -1,4 +1,5 @@
-# ue_c28.py spawn|start|sample|cap <tag>|kick|stop|clean <name> <set>: Chaos Cloth live check of the unsaved diag duplicate (ue_cdiag) vs the base mesh.
+# ue_c28.py spawn|start|sample|sampleref|cap|exp <tag>|kick|stop|clean <name> <set>
+# sampleref (mtl1-31): penetration of every cloth vs a FIXED reference = the mesh's body PhysicsAsset (independent of the cloth colliders).: Chaos Cloth live check of the unsaved diag duplicate (ue_cdiag) vs the base mesh.
 import unreal, sys, math
 mode, name, SET = sys.argv[1], sys.argv[2], sys.argv[3]
 W = r"C:/Users/Revaptor_FX/Desktop/SM2_Work"; TAG = "C28"
@@ -34,6 +35,10 @@ else:
         for lab in ("base", "cloth"):
             r = unreal.SM2PhysicsSetupLibrary.measure_cloth_penetration(A[lab].skeletal_mesh_component, 1.0)
             print("C28", lab, r)
+    elif mode == "sampleref":
+        ref = base.get_editor_property("physics_asset")
+        r = unreal.SM2PhysicsSetupLibrary.measure_cloth_penetration(A["cloth"].skeletal_mesh_component, 1.0, ref)
+        print("C28 clothREF", ref.get_name() if ref else None, r)
     elif mode == "kick":
         for lab in ("base", "cloth"): A[lab].add_actor_world_offset(unreal.Vector(0, 0, 80), False, False)
         print("C28 kicked +80z")

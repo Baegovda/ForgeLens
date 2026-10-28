@@ -149,17 +149,27 @@ public static class PhysicsParser
       e.FluidDensity = Num(env, "fluidDensity", e.FluidDensity);
     }
 
-    // mtl1-30 HEURISTIC: a cloth config with no cdtCapsules/cdtSpheres/cdtBoxes lists at all (e.g. lesser_sorcerer
-    // skirt_SIM/ribbons_SIM) collides against every prop-level shared CDT shape. Not proven from the exe; an explicit
-    // (even empty) list keeps its own meaning. Shapes without bones or with radius <= 0 are skipped.
-    if (Child(o, "cdtCapsules") is null && Child(o, "cdtSpheres") is null && Child(o, "cdtBoxes") is null &&
-        allShared is not null && allShared.Capsules.Count + allShared.Spheres.Count + allShared.Boxes.Count > 0)
+    // mtl1-31 HEURISTIC (data evidence): prop-level sharedCDT* shapes apply to EVERY cloth of the prop, in addition to the
+    // config's own cdt lists. In the 282 retail cls files with prop_cloth_sim, no cdt list item references a shared shape by
+    // name (0 name-only items, 306 with bones), while 217 files define shared shapes, so a by-name-only reading would leave
+    // them unused. (mtl1-30 applied them only to configs without any cdt list.) Shapes without bones / radius <= 0 are skipped;
+    // a shared shape equal to an own shape (same name and bones) is not added twice.
+    if (allShared is not null && allShared.Capsules.Count + allShared.Spheres.Count + allShared.Boxes.Count > 0)
     {
-      c.Capsules.AddRange(allShared.Capsules.Where(x => x.BoneFirst.Length > 0 && Math.Max(x.RadiusFirst, x.RadiusSecond) > 0));
-      c.Spheres.AddRange(allShared.Spheres.Where(x => x.Bone.Length > 0 && x.Radius > 0));
-      c.Boxes.AddRange(allShared.Boxes.Where(x => x.Bone.Length > 0 && x.Size != Vector3.Zero));
-      c.CollisionFromShared = true;
-      notes.Add($"{owner}: no cdt lists; using all shared CDT shapes ({c.Capsules.Count} capsules, {c.Spheres.Count} spheres, {c.Boxes.Count} boxes) (HEURISTIC).");
+      int before = c.Capsules.Count + c.Spheres.Count + c.Boxes.Count;
+      foreach (var x in allShared.Capsules.Where(x => x.BoneFirst.Length > 0 && Math.Max(x.RadiusFirst, x.RadiusSecond) > 0))
+        if (!c.Capsules.Any(k => k == x || (k.Name == x.Name && k.BoneFirst == x.BoneFirst && k.BoneSecond == x.BoneSecond)))
+          c.Capsules.Add(x);
+      foreach (var x in allShared.Spheres.Where(x => x.Bone.Length > 0 && x.Radius > 0))
+        if (!c.Spheres.Any(k => k == x || (k.Name == x.Name && k.Bone == x.Bone)))
+          c.Spheres.Add(x);
+      foreach (var x in allShared.Boxes.Where(x => x.Bone.Length > 0 && x.Size != Vector3.Zero))
+        if (!c.Boxes.Any(k => k == x || (k.Name == x.Name && k.Bone == x.Bone)))
+          c.Boxes.Add(x);
+      c.SharedShapesAdded = c.Capsules.Count + c.Spheres.Count + c.Boxes.Count - before;
+      c.CollisionFromShared = before == 0 && c.SharedShapesAdded > 0;
+      if (c.SharedShapesAdded > 0)
+        notes.Add($"{owner}: +{c.SharedShapesAdded} shared CDT shapes ({before} own) (HEURISTIC: shared shapes apply to every cloth).");
     }
 
     c.SolverFrequency = Num(o, "solverFrequency", c.SolverFrequency);

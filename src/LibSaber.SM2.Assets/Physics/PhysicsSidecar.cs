@@ -129,7 +129,8 @@ public static class PhysicsSidecar
             collision = new
             {
               note = "PhysicsAsset bodies for the cloth: capsules as tapered capsules (Chaos Cloth only) when radii differ, spheres, boxes (size is the full extent).",
-              source = cfg.CollisionFromShared ? "sharedCDT (HEURISTIC: config has no cdt lists)" : "config",
+              source = cfg.SharedShapesAdded == 0 ? "config" : cfg.CollisionFromShared ? "sharedCDT (HEURISTIC)" : "config+sharedCDT (HEURISTIC)",
+              sharedShapesAdded = cfg.SharedShapesAdded,
               space = "boneLocal", // mtl1-14d: bone-local offsets are NOT mirrored (imported bone frames absorb the X reflection; mirroring blew up the sorcerer cloak). Plugin also shrinks shapes off free rest particles.
               capsules = cfg.Capsules.Select(k => new { k.Name, k.BoneFirst, radiusFirstCm = k.RadiusFirst * 100f, offsetFirstCm = Ue(k.BoneFirstOffset), k.BoneSecond, radiusSecondCm = k.RadiusSecond * 100f, offsetSecondCm = Ue(k.BoneSecondOffset) }),
               spheres = cfg.Spheres.Select(k => new { k.Name, k.Bone, radiusCm = k.Radius * 100f, offsetCm = Ue(k.BoneOffset) }),

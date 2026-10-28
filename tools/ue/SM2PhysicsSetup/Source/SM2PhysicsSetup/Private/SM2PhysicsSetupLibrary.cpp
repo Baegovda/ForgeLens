@@ -601,16 +601,20 @@ bool USM2PhysicsSetupLibrary::CreateChaosCloth(USkeletalMesh* Mesh, const FStrin
   TArray<FString> Log;
   Mesh->Modify();
   const TArray<FTransform> RefCS = RefComponentSpace(Mesh->GetRefSkeleton());
-  UPhysicsAsset* CollPA = nullptr;
-  {
+  // mtl1-31 GENERIC: one collision PhysicsAsset PER CLOTH (the game's cdt shapes belong to one cloth config). A single PA shared
+  // by all cloths made e.g. the tech_priest skirt collide with the tabards' 30 cm leg capsules (fitted only to the tabard rest
+  // particles). Sidecar ue.chaosCloth.collisionPerCloth=false puts that cloth back on the shared PA (pre-mtl1-31 behaviour).
+  UPhysicsAsset* SharedCollPA = nullptr;
+  auto NewCollPA = [&](const FString& Suffix) {
     const FString Folder = FPackageName::GetLongPackagePath(Mesh->GetOutermost()->GetName()) / TEXT("ChaosCloth");
-    const FString Name = FreeName(Folder, TEXT("PA_") + Mesh->GetName() + TEXT("_ClothCollision"));
+    const FString Name = FreeName(Folder, TEXT("PA_") + Mesh->GetName() + TEXT("_ClothCollision") + Suffix);
     UPackage* Pkg = CreatePackage(*(Folder / Name));
-    CollPA = NewObject<UPhysicsAsset>(Pkg, *Name, RF_Public | RF_Standalone | RF_Transactional);
-    CollPA->PreviewSkeletalMesh = Mesh;
-    FAssetRegistryModule::AssetCreated(CollPA);
-    CollPA->MarkPackageDirty();
-  }
+    UPhysicsAsset* PA = NewObject<UPhysicsAsset>(Pkg, *Name, RF_Public | RF_Standalone | RF_Transactional);
+    PA->PreviewSkeletalMesh = Mesh;
+    FAssetRegistryModule::AssetCreated(PA);
+    PA->MarkPackageDirty();
+    return PA;
+  };
 
   // mtl1-14e GENERIC: binds made for earlier cloths can be lost when later cloths edit the mesh (the first clothing asset ended up
   // with no bound section -> not simulated, no ChaosClothingInteractor). Remember each asset's render slots and re-verify after the loop.
@@ -814,6 +818,15 @@ bool USM2PhysicsSetupLibrary::CreateChaosCloth(USkeletalMesh* Mesh, const FStrin
       continue;
     }
 
+    UPhysicsAsset* CollPA = nullptr;
+    {
+      bool bPerCloth = true;
+      const TSharedPtr<FJsonObject>* UeP = nullptr;
+      const TSharedPtr<FJsonObject>* CCP = nullptr;
+      if (Cloth->TryGetObjectField(TEXT("ue"), UeP) && (*UeP)->TryGetObjectField(TEXT("chaosCloth"), CCP))
+        (*CCP)->TryGetBoolField(TEXT("collisionPerCloth"), bPerCloth);
+      CollPA = bPerCloth ? NewCollPA(TEXT("_") + SimName) : (SharedCollPA ? SharedCollPA : (SharedCollPA = NewCollPA(FString())));
+    }
     // mtl1-30: steps 3-5b as a lambda so one cloth can make several clothing assets (UE binds one section per asset LOD).
     auto MakeAsset = [&](int32 Src, bool bRemoveSrc, const FString& Suffix, bool bAddCollision, int32& Pinned, float& WorstMatch) -> UClothingAssetCommon*
     {
@@ -1267,21 +1280,19 @@ int32 USM2PhysicsSetupLibrary::MeasureClothPenetration(USkeletalMeshComponent* C
     Report = TEXT("no component");
     return -1;
   }
-  TSet<UPhysicsAsset*> PAs;
+  TMap<int32, UPhysicsAsset*> AssetPA; // mtl1-31: each cloth is tested against ITS OWN collision PA (or the override)
   // mtl1-13b: pinned particles (MaxDistance ~0) follow the skin and cannot be pushed out; count them separately.
   TMap<int32, const TArray<float>*> MaxD;
   const TArray<UClothingAssetBase*>& CAs = Comp->GetSkeletalMeshAsset()->GetMeshClothingAssets();
   for (int32 Ai = 0; Ai < CAs.Num(); ++Ai)
     if (UClothingAssetCommon* C = Cast<UClothingAssetCommon>(CAs[Ai]))
     {
-      if (C->PhysicsAsset && !OverrideCollision)
-        PAs.Add(C->PhysicsAsset);
+      if (C->PhysicsAsset || OverrideCollision)
+        AssetPA.Add(Ai, OverrideCollision ? OverrideCollision : C->PhysicsAsset.Get());
       if (C->LodData.Num() > 0)
         if (const FPointWeightMap* M = C->LodData[0].PhysicalMeshData.FindWeightMap(EWeightMapTargetCommon::MaxDistance))
           MaxD.Add(Ai, &M->Values);
     }
-  if (OverrideCollision)
-    PAs.Add(OverrideCollision);
   int32 InsidePinned = 0;
   const TMap<int32, FClothSimulData>& Data = Comp->GetCurrentClothingData_GameThread();
   const FTransform CompTM = Comp->GetComponentTransform();
@@ -1297,6 +1308,9 @@ int32 USM2PhysicsSetupLibrary::MeasureClothPenetration(USkeletalMeshComponent* C
     CA /= D.Positions.Num(); CB /= D.Positions.Num();
     const bool bUseA = FVector::Dist(CA, Comp->Bounds.Origin) <= FVector::Dist(CB, Comp->Bounds.Origin);
     const TArray<float>* const* MV = MaxD.Find(KV.Key);
+    TArray<UPhysicsAsset*, TInlineAllocator<1>> PAs;
+    if (UPhysicsAsset* const* PAk = AssetPA.Find(KV.Key))
+      PAs.Add(*PAk);
     for (int32 Pi = 0; Pi < D.Positions.Num(); ++Pi)
     {
       const FVector3f& P3 = D.Positions[Pi];
@@ -1337,7 +1351,7 @@ int32 USM2PhysicsSetupLibrary::MeasureClothPenetration(USkeletalMeshComponent* C
       if (!bPinned) Worst = FMath::Max(Worst, -Deepest);
     }
   }
-  Report = FString::Printf(TEXT("particles=%d inside>%.1fcm=%d (free) +%d pinned worstFreeCm=%.2f nan=%d collisionPAs=%d"), Total, ThresholdCm, Inside, InsidePinned, Worst, NaN, PAs.Num());
+  Report = FString::Printf(TEXT("particles=%d inside>%.1fcm=%d (free) +%d pinned worstFreeCm=%.2f nan=%d collisionPAs=%d"), Total, ThresholdCm, Inside, InsidePinned, Worst, NaN, [&] { TSet<UPhysicsAsset*> U; for (const auto& KV : AssetPA) U.Add(KV.Value); return U.Num(); }());
   return Inside;
 }
 

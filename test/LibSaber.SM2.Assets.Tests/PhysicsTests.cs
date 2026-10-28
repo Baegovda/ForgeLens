@@ -382,7 +382,7 @@ public class PhysicsTests
   }
 
   [Fact]
-  public void ClothWithoutCdtListsUsesAllSharedShapes()
+  public void SharedCdtShapesApplyToEveryCloth()
   {
     // Shape of npc_lesser_sorcerer_client.cls (trimmed): the cloths have no cdt lists, only prop-level shared shapes.
     const string text = """
@@ -436,8 +436,9 @@ public class PhysicsTests
     Assert.Single(skirt.Spheres); // the radius-less backpack sphere is skipped
     Assert.Equal("CENTRE", skirt.Spheres[0].Bone);
     var own = setup.Cloths[1].Config;
-    Assert.False(own.CollisionFromShared); // an explicit list keeps its meaning
-    Assert.Empty(own.Capsules);
-    Assert.Single(own.Spheres);
+    Assert.False(own.CollisionFromShared); // own list present: shared shapes are added on top (mtl1-31)
+    Assert.Single(own.Capsules);
+    Assert.Single(own.Spheres); // the own "Pelvis" reference resolves to the shared one, not added twice
+    Assert.Equal(1, own.SharedShapesAdded);
   }
 }
