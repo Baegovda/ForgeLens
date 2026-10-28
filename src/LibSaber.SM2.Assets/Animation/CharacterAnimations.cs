@@ -56,7 +56,50 @@ public static class CharacterAnimations
       => NamesCharacter(clipPath.Replace('\\', '/'), Tokens);
   }
 
-  private sealed record ClassInfo(string Name, string? Tpl, string? Bundle, string? AnimSet, string? Parent, string Path);
+  /// <summary>
+  ///   ui-43: one <c>.cls</c> scan row: class name (file stem), <c>geom.nameTpl</c>, <c>morphemeController.nameBundle</c>,
+  ///   <c>animSet</c>, parent class (last <c>__type</c>) and archive path. Shared with <see cref="AssetCategories"/>.
+  /// </summary>
+  public sealed record ClassInfo(string Name, string? Tpl, string? Bundle, string? AnimSet, string? Parent, string Path);
+
+  /// <summary>ui-43: every scanned class by name (cached per catalog).</summary>
+  public static IReadOnlyDictionary<string, ClassInfo> AllClasses(GameCatalog catalog, ArchiveStore store)
+    => Classes(catalog, store);
+
+  /// <summary>
+  ///   ui-43: clip paths (no <c>.resource</c>) a Morpheme bundle links in <c>morpheme/{bundle}/{bundle}.mr.resource</c>
+  ///   <c>linksAnimation</c>; empty when the resource is missing or unreadable.
+  /// </summary>
+  public static IReadOnlySet<string> BundleClips(GameCatalog catalog, ArchiveStore store, string bundle)
+  {
+    var main = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+    foreach (var index in catalog.FindByPath($"morpheme/{bundle}/{bundle}.mr.resource"))
+    {
+      try
+      {
+        using var json = JsonDocument.Parse(store.Read(index));
+        if (!json.RootElement.TryGetProperty("linksAnimation", out var links))
+          continue;
+        foreach (var link in links.EnumerateArray())
+        {
+          var text = link.GetString() ?? "";
+          if (text.StartsWith("res://", StringComparison.Ordinal))
+            text = text[6..];
+          if (text.EndsWith(".resource", StringComparison.OrdinalIgnoreCase))
+            text = text[..^9];
+          main.Add(text);
+        }
+      }
+      catch (Exception)
+      {
+        // A broken resource only loses the data link; the name fallback still works.
+      }
+
+      break;
+    }
+
+    return main;
+  }
 
   private static readonly ConditionalWeakTable<GameCatalog, Dictionary<string, ClassInfo>> ClassCache = new();
   private static readonly Regex TplRegex = new(@"\bgeom\s*=\s*\{\s*nameTpl\s*=\s*""([^""]+)""", RegexOptions.Compiled);
@@ -136,32 +179,7 @@ public static class CharacterAnimations
 
     var main = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
     foreach (var bundle in bundles)
-    {
-      foreach (var index in catalog.FindByPath($"morpheme/{bundle}/{bundle}.mr.resource"))
-      {
-        try
-        {
-          using var json = JsonDocument.Parse(store.Read(index));
-          if (!json.RootElement.TryGetProperty("linksAnimation", out var links))
-            continue;
-          foreach (var link in links.EnumerateArray())
-          {
-            var text = link.GetString() ?? "";
-            if (text.StartsWith("res://", StringComparison.Ordinal))
-              text = text[6..];
-            if (text.EndsWith(".resource", StringComparison.OrdinalIgnoreCase))
-              text = text[..^9];
-            main.Add(text);
-          }
-        }
-        catch (Exception)
-        {
-          // A broken resource only loses the data link; the name fallback still works.
-        }
-
-        break;
-      }
-    }
+      main.UnionWith(BundleClips(catalog, store, bundle));
 
     var source = main.Count > 0
       ? $"{names.Count} class(es) with nameTpl \"{stem}\" → Morpheme bundle {string.Join(", ", bundles)} ({main.Count:N0} linked clips)"
