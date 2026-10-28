@@ -81,6 +81,7 @@ public partial class MainWindow : Window
     ShowAllBox.IsChecked = _settings.ShowAllFiles;
     RestoreFilterState();
     InitContentBrowser();
+    InitKitbash();
     // ui-43: the wheel over a CLOSED clip / LOD / part box steps to the previous (wheel up) or next (wheel down) row of
     // the current (filtered) list and loads it like a click would (WheelComboBox; the dropdown stays closed). A clip
     // chosen with the wheel also starts playing.
@@ -165,6 +166,7 @@ public partial class MainWindow : Window
       ContentBrowserCatalogChanged(catalog, _store);
       BindTree(catalog);
       ContentBrowserTreeBound();
+      KitbashCatalogChanged();
       UpdateExportButton();
     }
     catch (OperationCanceledException)
@@ -434,9 +436,16 @@ public partial class MainWindow : Window
     _previewRow = null;
     if (row is null)
       return;
+    await PreviewFileAsync(row.Index);
+  }
 
+  /// <summary>Shows one catalog file in the viewer (the file list selection, or the Kitbasher's class tpl).</summary>
+  private async Task PreviewFileAsync(int index)
+  {
+    if (_catalog is null || _store is null)
+      return;
     var generation = ++_previewGeneration;
-    var file = _catalog.GetFile(row.Index);
+    var file = _catalog.GetFile(index);
     _recent.Touch(file.Path, file.ArchiveName);
     ShowLoading();
     _playTimer.Stop();
@@ -473,7 +482,7 @@ public partial class MainWindow : Window
     {
       if (file.Kind is AssetKind.Texture)
       {
-        var document = await Task.Run(() => TextureLoader.Load(_catalog, _store, row.Index));
+        var document = await Task.Run(() => TextureLoader.Load(_catalog, _store, index));
         if (generation != _previewGeneration)
           return;
         _texture = document;
@@ -487,14 +496,14 @@ public partial class MainWindow : Window
       {
         var loaded = await Task.Run(() =>
         {
-          var decoded = TemplateMeshReader.Load(_catalog, _store, row.Index);
-          return (decoded, ResolvePreview(_catalog, _store, decoded, row.Index));
+          var decoded = TemplateMeshReader.Load(_catalog, _store, index);
+          return (decoded, ResolvePreview(_catalog, _store, decoded, index));
         });
         if (generation != _previewGeneration)
           return;
         var mesh = loaded.decoded;
         _mesh = mesh;
-        _previewFileIndex = row.Index;
+        _previewFileIndex = index;
         _modelKey = ModelKey(file.Path);
         SmoothToggle.IsVisible = mesh.HasTriangles;
         _albedo = loaded.Item2.Albedo;
@@ -505,6 +514,7 @@ public partial class MainWindow : Window
         _yaw = 0.7f;
         _pitch = 0.18f;
         FillModelControls(mesh);
+        KitbashModelLoaded(mesh, index);
         SkeletonToggle.IsVisible = mesh.Bones.Count > 0;
         SkeletonToggle.IsChecked = false;
         WireToggle.IsVisible = mesh.HasTriangles;
@@ -531,11 +541,11 @@ public partial class MainWindow : Window
 
       if (file.Kind is AssetKind.Animation)
       {
-        var clip = await Task.Run(() => SaniReader.Load(_catalog, _store, row.Index));
+        var clip = await Task.Run(() => SaniReader.Load(_catalog, _store, index));
         if (generation != _previewGeneration)
           return;
         _clip = clip;
-        _clipIndex = row.Index;
+        _clipIndex = index;
         ApplyClipToMesh(clip);
         SkeletonToggle.IsVisible = _mesh is { Bones.Count: > 0 };
         PreviewText.Text = Describe(clip);
@@ -559,7 +569,7 @@ public partial class MainWindow : Window
         return;
       }
 
-      if (file.Path.EndsWith(".sfx", StringComparison.OrdinalIgnoreCase) && await TryShowEffectAsync(row.Index, file.Path, generation))
+      if (file.Path.EndsWith(".sfx", StringComparison.OrdinalIgnoreCase) && await TryShowEffectAsync(index, file.Path, generation))
       {
         HideLoading(generation);
         return;
@@ -567,7 +577,7 @@ public partial class MainWindow : Window
 
       if (generation != _previewGeneration)
         return;
-      var bytes = await Task.Run(() => _store.Read(row.Index));
+      var bytes = await Task.Run(() => _store.Read(index));
       if (generation != _previewGeneration)
         return;
       if (file.Kind == AssetKind.TextureMip)

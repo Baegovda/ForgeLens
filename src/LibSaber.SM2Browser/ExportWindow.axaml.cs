@@ -30,10 +30,14 @@ public partial class ExportWindow : Window
   private readonly Dictionary<string, CheckBox> _regionBoxes = new(StringComparer.OrdinalIgnoreCase);
   private Dictionary<string, List<string>> _skinRegions = new(StringComparer.OrdinalIgnoreCase);
 
-  public Task<ExportChoice?> Choose(Window owner, string? initialFolder, VariantResult? parts = null, Dictionary<string, List<string>>? skinRegions = null)
+  private string? _fixedVariant;
+
+  public Task<ExportChoice?> Choose(Window owner, string? initialFolder, VariantResult? parts = null, Dictionary<string, List<string>>? skinRegions = null, string? fixedVariant = null, string? fixedSummary = null)
   {
     FolderBox.Text = initialFolder ?? "";
-    if (parts is not null)
+    if (fixedVariant is not null)
+      BuildFixed(fixedVariant, fixedSummary);
+    else if (parts is not null)
       BuildParts(parts, skinRegions);
     FitToScreen(owner);
     _result = new TaskCompletionSource<ExportChoice?>();
@@ -172,6 +176,27 @@ public partial class ExportWindow : Window
     PartsPanel.Children.Add(new Separator());
   }
 
+  /// <summary>ui-44 Kitbasher: the combination was picked in the main window; show it read-only and export exactly it.</summary>
+  private void BuildFixed(string spec, string? summary)
+  {
+    _fixedVariant = spec;
+    PartsPanel.IsVisible = true;
+    PartsPanel.Children.Add(new TextBlock
+    {
+      TextWrapping = Avalonia.Media.TextWrapping.Wrap,
+      FontWeight = Avalonia.Media.FontWeight.SemiBold,
+      Text = "Kitbash combination (only these parts are exported):",
+    });
+    PartsPanel.Children.Add(new TextBlock
+    {
+      TextWrapping = Avalonia.Media.TextWrapping.Wrap,
+      FontSize = 12,
+      Opacity = 0.8,
+      Text = summary ?? spec.Replace(",", "\n"),
+    });
+    PartsPanel.Children.Add(new Separator());
+  }
+
   private static Control Row(string label, Control control)
   {
     var dock = new DockPanel();
@@ -185,6 +210,8 @@ public partial class ExportWindow : Window
   /// <summary>--variant spec for the picked combination (null keeps the exporter default).</summary>
   internal string? PartsSpec()
   {
+    if (_fixedVariant is not null)
+      return _fixedVariant;
     if (_parts is null || _presetBox is null)
       return null;
     if (_presetBox.SelectedIndex <= 0)

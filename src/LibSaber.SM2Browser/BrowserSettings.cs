@@ -34,6 +34,14 @@ public sealed class BrowserSettings
   public string? ViewMode { get; set; }
   public double? TileSize { get; set; }
   public bool AnimateAll { get; set; }
+  /// <summary>ui-44 Kitbasher: panel open, picked team / class / preset / part per slot, and the two option filters.</summary>
+  public bool KitbashOpen { get; set; }
+  public string? KitbashTeam { get; set; }
+  public string? KitbashClass { get; set; }
+  public string? KitbashPreset { get; set; }
+  public Dictionary<string, string>? KitbashSlots { get; set; }
+  public bool KitbashAllClasses { get; set; }
+  public bool KitbashShowMissing { get; set; }
 
   public static BrowserSettings Load()
   {

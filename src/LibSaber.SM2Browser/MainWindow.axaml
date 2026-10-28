@@ -185,7 +185,7 @@
         </Grid>
       </DockPanel>
       <GridSplitter Grid.Column="3" Width="4" Background="{DynamicResource FL.Border}" ResizeDirection="Columns" />
-      <Grid Grid.Column="4" ColumnDefinitions="*,6,240" MinWidth="320">
+      <Grid x:Name="ViewerColumns" Grid.Column="4" ColumnDefinitions="*,6,240" MinWidth="320">
       <DockPanel Grid.Column="0" Margin="8,8,4,8" MinWidth="280">
         <WrapPanel DockPanel.Dock="Top" Orientation="Horizontal">
           <WrapPanel.Styles>
@@ -270,7 +270,8 @@
             <ComboBoxItem Content="Covering demo: sphere (heuristic)" />
           </ComboBox>
         </WrapPanel>
-        <TextBlock x:Name="PreviewNote" DockPanel.Dock="Bottom" TextWrapping="Wrap" Margin="2,8,2,0" Foreground="{DynamicResource FL.TextDim}" FontSize="12" />
+        <TextBlock x:Name="PreviewNote" DockPanel.Dock="Bottom" TextWrapping="Wrap" MaxLines="5" TextTrimming="CharacterEllipsis" Margin="2,8,2,0" Foreground="{DynamicResource FL.TextDim}" FontSize="12"
+                   ToolTip.Tip="{Binding Text, RelativeSource={RelativeSource Self}}" />
         <Border x:Name="ViewBorder" Background="{DynamicResource FL.Viewport}" CornerRadius="4" BorderBrush="{DynamicResource FL.Border}" BorderThickness="1" ClipToBounds="True"
                 PointerPressed="ViewPressed" PointerMoved="ViewMoved" PointerReleased="ViewReleased" PointerWheelChanged="ViewWheel">
           <Grid>
@@ -289,7 +290,51 @@
       </DockPanel>
       <GridSplitter Grid.Column="1" Width="4" Background="{DynamicResource FL.Border}" ResizeDirection="Columns" />
       <DockPanel Grid.Column="2" Margin="4,8,8,8">
-        <TextBlock DockPanel.Dock="Top" Text="MESHES" Classes="header" Margin="4,0,0,4" />
+        <!-- ui-44: MESHES | KITBASH tabs share the right column. -->
+        <StackPanel DockPanel.Dock="Top" Orientation="Horizontal" Spacing="2" Margin="0,0,0,4">
+          <Button x:Name="MeshesTab" Classes="tab active" Content="Meshes" Click="MeshesTabClicked" ToolTip.Tip="Objects of the previewed model (check to show)" />
+          <Button x:Name="KitbashTab" Classes="tab" Content="⚒ Kitbash" Click="KitbashTabClicked"
+                  ToolTip.Tip="Kitbasher: pick a faction, class and preset, then one armor part per slot from the character customization library. Only the chosen parts show and export." />
+        </StackPanel>
+        <Grid>
+        <ScrollViewer x:Name="KitbashPanel" IsVisible="False" HorizontalScrollBarVisibility="Disabled" Background="{DynamicResource FL.PanelDeep}">
+          <StackPanel Margin="8,6,10,10" Spacing="6">
+            <TextBlock Text="KITBASHER" Classes="header" />
+            <TextBlock x:Name="KitbashIntro" FontSize="11" TextWrapping="Wrap" Foreground="{DynamicResource FL.TextDim}"
+                       Text="Parts from ssl/body/customization/character_customization_library.sso (class regions + shared outfit parts)." />
+            <Grid ColumnDefinitions="64,*" RowDefinitions="Auto,Auto,Auto" Margin="0,4,0,0">
+              <TextBlock Grid.Row="0" Text="Faction" Classes="kblabel" />
+              <ComboBox x:Name="KitbashTeamBox" Grid.Row="0" Grid.Column="1" HorizontalAlignment="Stretch" Margin="0,0,0,4" SelectionChanged="KitbashTeamChanged" />
+              <TextBlock Grid.Row="1" Text="Class" Classes="kblabel" />
+              <ComboBox x:Name="KitbashClassBox" Grid.Row="1" Grid.Column="1" HorizontalAlignment="Stretch" Margin="0,0,0,4" SelectionChanged="KitbashClassChanged" />
+              <TextBlock Grid.Row="2" Text="Preset" Classes="kblabel" />
+              <ComboBox x:Name="KitbashPresetBox" Grid.Row="2" Grid.Column="1" HorizontalAlignment="Stretch" SelectionChanged="KitbashPresetChanged" />
+            </Grid>
+            <Border Classes="kbcard">
+              <StackPanel Spacing="2">
+                <TextBlock x:Name="KitbashTemplate" FontSize="12" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" />
+                <TextBlock x:Name="KitbashModelState" FontSize="11" TextWrapping="Wrap" Foreground="{DynamicResource FL.TextDim}" />
+              </StackPanel>
+            </Border>
+            <WrapPanel>
+              <CheckBox x:Name="KitbashClassOnlyBox" Content="This class only" IsChecked="True" Click="KitbashFilterChanged" Margin="0,0,10,0"
+                        ToolTip.Tip="On: shared outfit parts only when they are for all characters or list this class in appearanceUids (PVE_PVP_X = PVP_X). Off: every shared part of the faction." />
+              <CheckBox x:Name="KitbashMissingBox" Content="Parts not in model" Click="KitbashFilterChanged"
+                        ToolTip.Tip="Also list parts whose objects are not in the loaded tpl (marked ⚠; they show nothing). Equipment actors such as combat shields are separate models." />
+            </WrapPanel>
+            <TextBlock Text="PARTS" Classes="section" Margin="0,4,0,0" />
+            <StackPanel x:Name="KitbashSlotsPanel" Spacing="4" />
+            <TextBlock x:Name="KitbashEmpty" FontSize="11" TextWrapping="Wrap" Foreground="{DynamicResource FL.TextDim}" IsVisible="False" />
+            <WrapPanel Margin="0,6,0,0">
+              <Button Content="Preset parts" Click="KitbashResetClicked" Margin="0,0,6,6" ToolTip.Tip="Back to the regions of the chosen preset" />
+              <Button Content="Randomize" Click="KitbashRandomClicked" Margin="0,0,6,6" ToolTip.Tip="One random part per slot from the listed options" />
+            </WrapPanel>
+            <Button x:Name="KitbashExportButton" Content="Export combination…" Classes="accent" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" Click="KitbashExportClicked"
+                    ToolTip.Tip="Exports the class tpl with exactly this combination (same ArmorVariant filter as the preview; --variant spec shown below)." />
+            <SelectableTextBlock x:Name="KitbashSpec" FontSize="10" TextWrapping="Wrap" Foreground="{DynamicResource FL.TextDim}" FontFamily="Consolas,Courier New,monospace" />
+            <TextBlock x:Name="KitbashNotes" FontSize="11" TextWrapping="Wrap" Foreground="#E0B060" />
+          </StackPanel>
+        </ScrollViewer>
         <TreeView x:Name="MeshList" Background="{DynamicResource FL.PanelDeep}">
           <TreeView.ItemTemplate>
             <TreeDataTemplate x:DataType="local:MeshToggle" ItemsSource="{Binding Children}">
@@ -299,6 +344,7 @@
             </TreeDataTemplate>
           </TreeView.ItemTemplate>
         </TreeView>
+        </Grid>
       </DockPanel>
       </Grid>
     </Grid>
