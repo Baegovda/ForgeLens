@@ -130,6 +130,20 @@ public sealed class VariantResult
   public int HiddenParts { get; set; }
   public int VisibleParts { get; set; }
   public List<string> Notes { get; } = new();
+  /// <summary>mtl1-46: weapon skin attachingActors (purity seals); <see cref="VariantAttachment.Merged"/> is set by the exporter.</summary>
+  public List<VariantAttachment> Attachments { get; } = new();
+}
+
+public sealed class VariantAttachment
+{
+  public string Slot { get; set; } = "";
+  public string Locator { get; set; } = "";
+  public string Actor { get; set; } = "";
+  public string Template { get; set; } = "";
+  public string Class { get; set; } = "";
+  public float Scale { get; set; } = 1f;
+  /// <summary>Parts merged into the exported mesh (0 = not merged; see the variant notes).</summary>
+  public int Merged { get; set; }
 }
 
 /// <summary>

@@ -593,10 +593,77 @@ public static class AssetExporter
 
     var result = WeaponVariant.Apply(mesh, lib, uid, request);
     result.AppearanceSource = "firearm mgs/" + uid;
+    MergeAttachments(catalog, store, template, mesh, result, settings, report);
     report.Messages.Add($"{template}: weapon skin {uid}/{result.Preset}: hid {result.HiddenParts} parts of {result.CustomizableObjects} customizable objects, {result.VisibleParts} visible.");
     foreach (var note in result.Notes.Take(8))
       report.Messages.Add(template + ": " + note);
     return result;
+  }
+
+  /// <summary>
+  ///   mtl1-46: weapon skin attachingActors (purity seals) — each actor's tpl is loaded and its LOD0 merged under the locator
+  ///   node with the actor's geom.scale (<see cref="MeshAttach"/>). <c>SM2_WPN_ATTACH=0</c> keeps the old mesh-only export.
+  ///   The attachment's paper cloth is not simulated (its *_sim shell follows the export's cloth-sim setting).
+  /// </summary>
+  private static void MergeAttachments(GameCatalog catalog, ArchiveStore store, string template, ExportedMesh mesh, VariantResult result, ExportSettings settings, ExportReport report)
+  {
+    if (result.Attachments.Count == 0)
+      return;
+    if (Environment.GetEnvironmentVariable("SM2_WPN_ATTACH") == "0")
+    {
+      result.Notes.Add("attachments not merged (SM2_WPN_ATTACH=0).");
+      return;
+    }
+
+    var cache = new Dictionary<string, ExportedMesh?>(StringComparer.OrdinalIgnoreCase);
+    foreach (var a in result.Attachments)
+    {
+      var node = MeshAttach.FindNode(mesh, a.Locator);
+      if (node < 0)
+      {
+        result.Notes.Add($"attachment {a.Actor}: locator {a.Locator} is not a node of {template}; skipped.");
+        continue;
+      }
+
+      if (a.Template.Length == 0)
+        continue;
+      if (!cache.TryGetValue(a.Template, out var part))
+      {
+        part = null;
+        var hits = catalog.FindByFileName(a.Template + ".tpl");
+        if (hits.Count > 0)
+        {
+          try
+          {
+            part = TemplateMeshReader.Load(catalog, store, hits[0]);
+            if (!settings.IncludeClothSim)
+              HideClothSim(part);
+            else
+              ShowClothSim(part);
+            part = part.VisibleGeometry(); // seal on LOD0, paper_rend on its own vertex pool (Index-visible), LODs/volumes dropped
+          }
+          catch (Exception ex)
+          {
+            result.Notes.Add($"attachment {a.Template}: {ex.Message}");
+            part = null;
+          }
+        }
+
+        cache[a.Template] = part;
+      }
+
+      if (part is null)
+      {
+        result.Notes.Add($"attachment {a.Actor}: {a.Template}.tpl not found; skipped.");
+        continue;
+      }
+
+      a.Merged = MeshAttach.Merge(mesh, part, node, a.Scale, a.Slot);
+    }
+
+    var merged = result.Attachments.Where(a => a.Merged > 0).ToList();
+    if (merged.Count > 0)
+      report.Messages.Add($"{template}: merged {merged.Count} skin attachments ({string.Join(", ", merged.Select(a => a.Locator + "=" + a.Template + " x" + a.Scale.ToString("0.##", System.Globalization.CultureInfo.InvariantCulture)))}).");
   }
 
   private static void WriteVariantSidecar(string path, VariantResult variant, ExportReport report)

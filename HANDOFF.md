@@ -2006,3 +2006,37 @@ Disassembly: /workspace/vfxsh_dis/{pc,pg,dx_pc_dx12_sfx,dx_pc_dx12_distort}, GLS
      - The import's post-process ABP (`ABP_*_SM2Phys`) was disabled per component, so the baked bones are what is seen.
 3. **Cadian finger curl:** `ue_sm2_finger_curl.py` skips fingers whose bind-curl gap is < 5° (`MIN_GAP`). This removes the titus regression from mtl1-43. The ~6° jog residual is clip-dependent; it is final, not fixable by a retarget-pose offset.
 4. Tests: SM2.Assets 253 pass.
+
+## Update mtl1-46 (2026-10-29 KST): weapon skin attachments (purity seals) merged into the export
+
+- **Data (ssl, REA-first):**
+  - `firearm_skins_library.sso` skin `attachingActors{ slot = AttachingActorDescription{ locator, actorName } }`.
+  - `ssl/geom_customizer/attaching_actors_library.sso`:
+    - `locators` purity_seal_1..6;
+    - `actors{ eagle_collision | demoskull_collision | skull_collision = IactorDesc{ type{ properties{ geom.nameTpl, prop_cloth_sim }, __type = "purity_seal_01" } } }`.
+  - `ssl/weapons/accessories/firearm_seals/purity_seal_01.cls` has `geom.scale = 0.7`.
+  - The type block overrides its `__type` class like ssl .cls inheritance (**HEURISTIC**), so the seals get scale 0.7 from the class.
+  - Skin usage: eagle 131, demoskull 129, skull 116. Firearm tpls carry `purity_seal_N` nodes (wpn_bolt_rifle_01: 1–3).
+- **Code:**
+  - `WeaponCustomization.AttachingActors` / `LoadAttachingActors` / `SkinAttachments`.
+  - `VariantResult.Attachments` [{Slot, Locator, Actor, Template, Class, Scale, Merged}] is written to `{model}.variant.json`.
+  - `Meshes/MeshAttach.Merge`:
+    - the attachment roots become children of the locator node with `Local * Scale`;
+    - vertices are placed by `Scale * LocatorWorld`;
+    - inverse binds are rebased (`Inverse(place) * IB`), so the bind pose is unchanged and the seal follows the locator when the weapon animates;
+    - skin joints and part nodes are offset, and bone names are prefixed by the slot (`purity_seal_1_eagle_root`).
+  - `AssetExporter.MergeAttachments` runs for firearm `--variant skin=...`:
+    - it loads each actor tpl;
+    - the cloth-sim setting picks paper_sim hidden or shown;
+    - it merges `VisibleGeometry()` (seal on LOD0, paper_rend on its own pool).
+  - `SM2_WPN_ATTACH=0` turns this off. A missing locator or tpl is a variant note.
+- **Limits:**
+  - The paper cloth is not simulated: paper_rend hangs straight in its bind pose (**APPROXIMATION**). The seal's prop_cloth_sim is not baked.
+  - The Forge Lens 3D preview still shows the weapon without seals; only the export merges them.
+  - The skin `material` (mastercrafted etc.) is still only noted.
+- **Evidence:** CLI `Bin\SM2Extractor_mtl46` on wpn_bolt_rifle_01:
+  - `skin=skin_03` merged 2 (seal_1 eagle, seal_3 skull);
+  - `skin=skin_04` merged 3 (seal_3 eagle, seal_2 demoskull, seal_1 skull);
+  - output in `Exports\mtl46\skin_0{3,4}`.
+  - Box renders (`tools/glb_preview.py`): `/workspace/mtl_fix/m45/skin_03_view.png`, `skin_04_view.png` show the seals on the receiver side and the paper strips hanging down.
+- Tests: `WeaponAttachTests` (class-scale inheritance, skin parse, merge placement + bind-pose preservation, missing locator). SM2.Assets 257 pass.
