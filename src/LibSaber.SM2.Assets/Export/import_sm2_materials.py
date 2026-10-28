@@ -338,9 +338,14 @@ def spec_layers(material, albedo, metal, rough, normal, emissive, albedo_raw=Non
 
 
 def chameleon(material, albedo, metal, normal_ts, x, y):
-    # glt.chameleon (UseChameleon): the glt PS (pc_dx12_glt.sdc, e.g. record 03558_0, CB_STATIC_GLT rows 10..15 =
-    # PS_REG_GLT_CHAMELEON_COLORS[4] / _OFFSETS[2]) does t = pow(saturate(N.V), r15.z), a 4-colour ramp with three
-    # thresholds/scales (r14.xy, r14.zw, r15.xy), then albedo *= lerp(ramp, 1, metalness).
+    # glt.chameleon (UseChameleon). mtl1-26, capture frame 68141 (PS 19112 GBUFFER / 22961 forward, FORMULA.md):
+    #   t = pow(saturate(N.V), fresnelPwr), N = normal-mapped tangent-space normal, V in (T, B, N)
+    #   c = lerp(C0, C1, sat((t - r14.x) * r14.y)); c = lerp(c, C2, sat((t - r14.z) * r14.w)); c = lerp(c, C3, sat((t - r15.x) * r15.y))
+    #   c = c + (1 - c) * metal
+    #   albedo_lin = sRGBtoLin_poly(inst.rgb * tex_srgb * c), poly(x) = x * (x * (0.305306 x + 0.682171) + 0.0125229)
+    # The ramp colours are the raw .td bytes / 255 (NOT linearised) and the product with the texture happens in sRGB.
+    # UE samples the sRGB texture linear, so the texture is re-encoded to sRGB here, multiplied, then linearised with
+    # the game's polynomial. inst.rgb (DYNAMIC_GLT[+0]) was (1,1,1) on every captured draw and is not exported.
     # Thresholds/scales packed like the CPU packer FUN_1423ba150, see chameleon_ramp().
     mel = unreal.MaterialEditingLibrary
     # N.V in tangent space like the PS (normal map normal . tangent-space view vector). PixelNormalWS cannot be
@@ -357,7 +362,8 @@ def chameleon(material, albedo, metal, normal_ts, x, y):
     for i, n in enumerate(["C0", "C1", "C2", "C3", "R0", "R1"]):
         p = expr(material, unreal.MaterialExpressionVectorParameter, x - 1400, y + 120 + i * 90)
         p.set_editor_property("parameter_name", "Chameleon" + n)
-        p.set_editor_property("default_value", unreal.LinearColor(1.0, 1.0, 1.0, 1.0) if n.startswith("C") else unreal.LinearColor(0.0, 1.0, 0.0, 1.0))
+        default = CHAMELEON_CAPTURE_DEFAULT_PARAMS["Chameleon" + n]
+        p.set_editor_property("default_value", unreal.LinearColor(default[0], default[1], default[2], default[3]))
         par[n] = p
     t = expr(material, unreal.MaterialExpressionPower, x - 1000, y)
     link(unary(material, unreal.MaterialExpressionSaturate, nv, x - 1100, y), "", t, "Base")
@@ -372,8 +378,71 @@ def chameleon(material, albedo, metal, normal_ts, x, y):
     c = step(c, "C2", mask(material, par["R0"], "b", x - 1000, y + 400), mask(material, par["R0"], "r", x - 1000, y + 460, "A"), y + 400)
     c = step(c, "C3", mask(material, par["R1"], "r", x - 1000, y + 600), mask(material, par["R1"], "g", x - 1000, y + 660), y + 600)
     node = lerp(material, c, vec3(material, (1.0, 1.0, 1.0), x - 400, y + 700), unary(material, unreal.MaterialExpressionSaturate, metal, x - 400, y + 780), x - 300, y)
-    tinted = mul(material, albedo, node, x, y)
-    return switch(material, "UseChameleon", albedo, tinted, x + 160, y)
+    # tex_srgb = 1.055 * lin^(1/2.4) - 0.055 (clamped at 0; the linear toe below 0.0031308 is ignored).
+    enc = expr(material, unreal.MaterialExpressionPower, x - 300, y + 160)
+    link(unary(material, unreal.MaterialExpressionSaturate, albedo, x - 420, y + 160), "", enc, "Base")
+    link(const(material, 1.0 / 2.4, x - 420, y + 220), "", enc, "Exponent")
+    tex_s = expr(material, unreal.MaterialExpressionMax, x - 60, y + 160)
+    link(op(material, unreal.MaterialExpressionSubtract, mul(material, enc, const(material, 1.055, x - 300, y + 240), x - 180, y + 160), const(material, 0.055, x - 180, y + 240), x - 100, y + 200), "", tex_s, "A")
+    link(const(material, 0.0, x - 100, y + 280), "", tex_s, "B")
+    prod = mul(material, tex_s, node, x + 40, y + 60)
+    # Game polynomial sRGB -> linear: x * (x * (0.305306 x + 0.682171) + 0.0125229).
+    poly = add(material, mul(material, prod, const(material, 0.305306, x + 40, y + 140), x + 140, y + 100), const(material, 0.682171, x + 140, y + 180), x + 240, y + 100)
+    poly = add(material, mul(material, poly, prod, x + 340, y + 100), const(material, 0.0125229, x + 340, y + 180), x + 440, y + 100)
+    tinted = mul(material, poly, prod, x + 540, y + 60)
+    return switch(material, "UseChameleon", albedo, tinted, x + 700, y)
+
+
+# mtl1-26: capture defaults (frame 68141, CB_STATIC_GLT rows 10..15 of the Hellbrute chameleon draws, identical to its
+# .td glt.chameleon) used only when a sidecar chameleon block lacks a field. The exporter always writes every field
+# (the exe parser FUN_142576f30 defaults missing text values to 0), so these only cover old or partial sidecars.
+CHAMELEON_CAPTURE_DEFAULTS = {
+    "colors": [[0.0, 0.0, 0.0, 0.0], [0.0, 1.0, 1.0, 1.0], [0.137255, 0.631373, 0.745098, 1.0], [0.070588, 0.909804, 0.768627, 1.0]],
+    "offset1": 0.5,
+    "offset2": 0.9,
+    "fresnelPwr": 0.7,
+}
+
+
+def chameleon_params(cham):
+    """Material-instance vectors for a sidecar chameleon block: raw sRGB colours (rgb, alpha 1) and the packed ramp rows."""
+    cham = dict(cham or {})
+    colors = list(cham.get("colors") or [])
+    full = {}
+    for i in range(4):
+        c = colors[i] if i < len(colors) and colors[i] is not None else CHAMELEON_CAPTURE_DEFAULTS["colors"][i]
+        rgb = (list(c) + [1.0, 1.0, 1.0])[:3]
+        full["ChameleonC%d" % i] = (float(rgb[0]), float(rgb[1]), float(rgb[2]), 1.0)
+    for key in ("offset1", "offset2", "fresnelPwr"):
+        if cham.get(key) is None:
+            cham[key] = CHAMELEON_CAPTURE_DEFAULTS[key]
+    r0, r1 = chameleon_ramp(cham)
+    full["ChameleonR0"] = tuple(float(v) for v in r0)
+    full["ChameleonR1"] = tuple(float(v) for v in r1)
+    return full
+
+
+def srgb_to_linear_poly(x):
+    # The glt PS polynomial (PS 22961 lines 627-641).
+    return x * (x * (0.305306 * x + 0.682171) + 0.0125229)
+
+
+def chameleon_albedo_reference(tex_srgb, ndotv, cham, metal=0.0, inst=(1.0, 1.0, 1.0)):
+    """CPU reference of the game's chameleon albedo (linear RGB) for one pixel; mirrors chameleon() above."""
+    p = chameleon_params(cham)
+    r0, r1 = p["ChameleonR0"], p["ChameleonR1"]
+    col = [p["ChameleonC%d" % i][:3] for i in range(4)]
+    t = max(0.0, min(1.0, ndotv)) ** r1[2]
+    sat = lambda v: max(0.0, min(1.0, v))
+    out = []
+    for k in range(3):
+        c = col[0][k]
+        c = c + (col[1][k] - c) * sat((t - r0[0]) * r0[1])
+        c = c + (col[2][k] - c) * sat((t - r0[2]) * r0[3])
+        c = c + (col[3][k] - c) * sat((t - r1[0]) * r1[1])
+        c = c + (1.0 - c) * sat(metal)
+        out.append(srgb_to_linear_poly(inst[k] * tex_srgb[k] * c))
+    return out
 
 
 def chameleon_ramp(cham):
@@ -384,6 +453,9 @@ def chameleon_ramp(cham):
         o2 = o1 + eps
     o1 = min(max(o1, 0.0), 1.0); o2 = min(max(o2, 0.0), 1.0)
     return (0.0, 1.0 / (o1 + eps), o1, 1.0 / (o2 - o1 + eps)), (o2, 1.0 / (1.0 - o2 + eps), float(cham.get("fresnelPwr", 0.0)), 0.0)
+
+
+CHAMELEON_CAPTURE_DEFAULT_PARAMS = chameleon_params({})
 
 
 def make_master(folder, asset_name="M_SM2", translucent=False):
@@ -527,6 +599,22 @@ def make_master(folder, asset_name="M_SM2", translucent=False):
     tint.set_editor_property("default_value", unreal.LinearColor(1.0, 1.0, 1.0, 1.0))
     # glt.metalness / glt.roughness {scale, bias} (sidecar baseLayer): base metal/rough = saturate(packed * scale + bias)
     # (PS 00004_1 cb6 rows 8.xy / 9.xy). glt.metallicTint: albedo *= lerp(albedo_tint, metallicTint, metal) (lines 455-457).
+    # UseSpecMap (default on). mtl1-26: on the captured chameleon draws (PS 19112/22961) the spec-map channel flags
+    # OBJ_MTLBLEND_LAYER_CONST[15].x are 0, so the PS replaces the packed metal with 0 and the packed roughness with 1
+    # (PS 22961 lines 615-625): metal = saturate(bias), roughness = saturate(scale + bias). The importer turns it off
+    # for chameleon slots (HEURISTIC generalisation: 7/7 chameleon draws; the flag writer was not located).
+    use_spec = expr(material, unreal.MaterialExpressionStaticSwitchParameter, -160, 300)
+    use_spec.set_editor_property("parameter_name", "UseSpecMap")
+    use_spec.set_editor_property("default_value", True)
+    link(const(material, 0.0, -280, 240), "", use_spec, "False")
+    link(metal, "", use_spec, "True")
+    use_spec_r = expr(material, unreal.MaterialExpressionStaticSwitchParameter, -160, 460)
+    use_spec_r.set_editor_property("parameter_name", "UseSpecMap")
+    use_spec_r.set_editor_property("default_value", True)
+    link(const(material, 1.0, -280, 520), "", use_spec_r, "False")
+    link(rough_switch, "", use_spec_r, "True")
+    metal = use_spec
+    rough_switch = use_spec_r
     metal_b = scale_bias(material, metal, "MetalnessScale", 1.0, "MetalnessBias", 0.0, -40, -620)
     rough_b = scale_bias(material, rough_switch, "RoughnessScale", 1.0, "RoughnessBias", 0.0, -40, -440)
     metal_tint = expr(material, unreal.MaterialExpressionVectorParameter, -500, -500)
@@ -534,8 +622,9 @@ def make_master(folder, asset_name="M_SM2", translucent=False):
     metal_tint.set_editor_property("default_value", unreal.LinearColor(1.0, 1.0, 1.0, 1.0))
     tint_mix = lerp(material, mask(material, tint, "rgb", -360, -320), mask(material, metal_tint, "rgb", -360, -500), metal_b, -200, -400)
     albedo_rgb = mask(material, diffuse, "rgb", -360, -200, "RGB")
-    tinted = mul(material, albedo_rgb, tint_mix, -200, -260)
-    tinted = chameleon(material, tinted, metal_b, detail_switch, -200, -900)
+    # Chameleon first (it works on the raw texture in sRGB, then linearises), then the albedo / metallic tint.
+    cham_rgb = chameleon(material, albedo_rgb, metal_b, detail_switch, -200, -900)
+    tinted = mul(material, cham_rgb, tint_mix, -200, -260)
     front = spec_layers(material, tinted, metal_b, rough_b, detail_switch, emit_mul, albedo_rgb, metal, rough_switch, ao_source)
     if translucent:
         # Substrate translucency: coverage = diffuse alpha.
@@ -638,14 +727,12 @@ def apply_spec_layers(instance, slot, texture_for):
     mel = unreal.MaterialEditingLibrary
     cham = slot.get("chameleon")
     mel.set_material_instance_static_switch_parameter_value(instance, "UseChameleon", bool(cham))
+    # mtl1-26: chameleon slots shade without the spec map (see UseSpecMap in make_master).
+    mel.set_material_instance_static_switch_parameter_value(instance, "UseSpecMap", not cham)
     if cham:
-        for i, c in enumerate((cham.get("colors") or [])[:4]):
-            # Colour bytes are scaled by 1/255 in FUN_142576f30; linearised like albedo_tint (HEURISTIC: sRGB).
-            lin = [srgb_to_linear(v) for v in (list(c) + [1, 1, 1])[:3]]
-            mel.set_material_instance_vector_parameter_value(instance, "ChameleonC%d" % i, unreal.LinearColor(lin[0], lin[1], lin[2], 1.0))
-        r0, r1 = chameleon_ramp(cham)
-        mel.set_material_instance_vector_parameter_value(instance, "ChameleonR0", unreal.LinearColor(*r0))
-        mel.set_material_instance_vector_parameter_value(instance, "ChameleonR1", unreal.LinearColor(*r1))
+        # Raw .td colours (bytes / 255, sRGB space; the PS multiplies them with the sRGB texture before linearising).
+        for name, value in chameleon_params(cham).items():
+            mel.set_material_instance_vector_parameter_value(instance, name, unreal.LinearColor(*value))
     second = slot.get("secondSpec")
     aniso = slot.get("anisotropicSpec")
     mel.set_material_instance_static_switch_parameter_value(instance, "UseSecondSpec", bool(second))

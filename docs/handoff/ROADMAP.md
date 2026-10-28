@@ -42,6 +42,7 @@ Pushed so far: sockets/bone attach, anim-event cues and stop cues, distortion, d
 ## Leads from the mtl1-23 captures
 - Armory per-instance customization colours (LWI_INST_DATA_BUF, see HANDOFF mtl1-23): map slots +21..23 / +28..30 to the _cc mask channels (HEURISTIC today) and apply in UE/browser.
 - Hellbrute: sections -> draws **done** (mtl1-24: 31/31 by index count, variants already correct, no exporter change). Open: dump DYNAMIC_GLT_BUFFER rgb and the chameleon draw CBs (eids 3419-3452, PS 22961) in the next capture; compare M_SM2 chameleon/aniso response under matched lighting.
+- Chameleon **done** (mtl1-26, capture formula, generic). Open: locate the writer of OBJ_MTLBLEND_LAYER_CONST[15].x (UseSpecMap rule is HEURISTIC); DYNAMIC_GLT inst.rgb export (1 on all captured draws); matched-lighting UE vs game comparison.
 - Mod Tools (appid 3856330): click Install in Steam, then ilspycmd the managed DLLs for TD/material (chameleon, aniso, second spec, colorization, DYNAMIC_GLT), .sani, cloth, sfx. Then multi-layer material export (layers[].blending weights) and cloth coverage rule (rigid if SIM does not cover REND).
 - Trails and sparks are not drawn by the browser GPU renderer yet; blend rules are ready in VfxBlendRules.
 

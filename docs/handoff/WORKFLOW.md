@@ -79,6 +79,7 @@ dotnet test test/LibSaber.SM2.Assets.Tests      -c Release -m:1
 dotnet test test/LibSaber.SM2Extractor.Tests    -c Release -m:1
 dotnet test test/LibSaber.Tests                 -c Release -m:1
 # HaloCEA tests: out of scope (they fail).
+python3 test/python/test_chameleon.py         # UE importer material math (unreal stubbed, stdlib only)
 ```
 - Build serially (`-m:1`). Several workers share the box, and parallel builds hit MSB3883 (file in use).
 - Windows builds for the PC, self-contained single-file:
