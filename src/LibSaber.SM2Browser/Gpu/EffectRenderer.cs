@@ -107,11 +107,10 @@ internal sealed unsafe class EffectRenderer : IDisposable
   /// </summary>
   public static bool CaptureTonemapOn { get; set; } = Environment.GetEnvironmentVariable("SM2_VFX_TONEMAP") != "exp";
   /// <summary>
-  ///   mtl1-23: sfx meshes blend One/One (alpha Zero/One) as in plasma 101917 (CB_DYNAMIC_SFX draws) instead of premultiplied
-  ///   over. mtl1-38: the state per sfx define is PROVEN from the static PSO table (SFX_BLEND_ADD_NO_ALPHA = One/One, alpha
-  ///   Zero/One; SFX_ALPHA_BLEND = SrcAlpha/InvSrcAlpha; neither = SrcAlpha/InvSrcAlpha, alpha Zero/Zero). Which sfx
-  ///   material sets which define (define table 0x142450650) is not traced, so ADD_NO_ALPHA for every sfx mesh stays
-  ///   capture-based (HEURISTIC). SM2_VFX_SFX_ADD=0 restores the premultiplied blend.
+  ///   mtl1-23: sfx meshes blend One/One (alpha Zero/One) as in plasma 101917 (CB_DYNAMIC_SFX draws). mtl1-44: the selector is
+  ///   PROVEN per material (<see cref="LibSaber.SM2.Assets.Effects.SfxBlend"/>: blendMode add → SFX_BLEND_ADD_NO_ALPHA One/One;
+  ///   blend → SFX_ALPHA_BLEND SrcAlpha/InvSrcAlpha; premul_a → no define, One/InvSrcAlpha). Only a .td without blendMode stays
+  ///   additive (HEURISTIC, preset default not on disk). SM2_VFX_SFX_ADD=0 draws every sfx mesh premultiplied over.
   /// </summary>
   public static bool SfxAdditive { get; set; } = Environment.GetEnvironmentVariable("SM2_VFX_SFX_ADD") != "0";
   /// <summary>
@@ -534,6 +533,19 @@ internal sealed unsafe class EffectRenderer : IDisposable
   }
 
   /// <summary>
+  ///   mtl1-44: per-material sfx blend (PROVEN selector, <see cref="LibSaber.SM2.Assets.Effects.SfxBlend"/>): add → One/One with
+  ///   alpha kept (shader writes rgb·a, a = 0); blend / premul_a → premultiplied over (rgb·a, One/InvSrcAlpha), which composites the
+  ///   same as the game's SrcAlpha/InvSrcAlpha (straight) and One/InvSrcAlpha (premultiplied) PSOs. SM2_VFX_SFX_ADD=0 forces over.
+  /// </summary>
+  private void SetSfxBlend(LibSaber.SM2.Assets.Effects.SfxBlendMode mode)
+  {
+    var add = SfxAdditive && LibSaber.SM2.Assets.Effects.SfxBlend.IsAdditive(mode);
+    _gl.Uniform1(_gl.GetUniformLocation(_mesh, "uSfxAdd"), add ? 1 : 0);
+    if (add) _gl.BlendFuncSeparate(BlendingFactor.One, BlendingFactor.One, BlendingFactor.Zero, BlendingFactor.One);
+    else _gl.BlendFuncSeparate(BlendingFactor.One, BlendingFactor.OneMinusSrcAlpha, BlendingFactor.One, BlendingFactor.OneMinusSrcAlpha);
+  }
+
+  /// <summary>
   ///   Mesh particles: each instance draws its template sub-object (<c>typeInst</c>) with the template's material.
   ///   Opaque materials write depth and are lit by a key light plus the effect's lights; <c>preset "sfx"</c>
   ///   materials blend premultiplied with their tint. <c>sfxMtlOverrides</c> colour/transparency multiply, and
@@ -548,7 +560,6 @@ internal sealed unsafe class EffectRenderer : IDisposable
     // mtl1-23: sfx (translucent) emissive is exposure-compensated, lerp(1, avgLum, k) (plasma PS s33060, SfxExposure).
     _gl.Uniform1(_gl.GetUniformLocation(_mesh, "uExposure"), translucent ? SfxExposure.Exposure(layer.Exposure, ReferenceExposure, SfxLumK) : layer.Exposure);
     _gl.Uniform1(_gl.GetUniformLocation(_mesh, "uTonemap"), CaptureTonemapOn ? 1 : 0);
-    _gl.Uniform1(_gl.GetUniformLocation(_mesh, "uSfxAdd"), translucent && SfxAdditive ? 1 : 0);
     _gl.Uniform3(_gl.GetUniformLocation(_mesh, "uEye"), eye.X, eye.Y, eye.Z);
     _gl.Uniform1(_gl.GetUniformLocation(_mesh, "uLightCount"), lights.Length);
     for (var i = 0; i < lights.Length; i++)
@@ -581,11 +592,7 @@ internal sealed unsafe class EffectRenderer : IDisposable
     if (translucent)
     {
       _gl.Enable(EnableCap.Blend);
-      // mtl1-23: VfxBlendRules.For(SfxMesh) = One/One, alpha Zero/One (plasma 101917 CB_DYNAMIC_SFX draws).
-      if (SfxAdditive)
-        _gl.BlendFuncSeparate(BlendingFactor.One, BlendingFactor.One, BlendingFactor.Zero, BlendingFactor.One);
-      else
-        _gl.BlendFuncSeparate(BlendingFactor.One, BlendingFactor.OneMinusSrcAlpha, BlendingFactor.One, BlendingFactor.OneMinusSrcAlpha);
+      SetSfxBlend(LibSaber.SM2.Assets.Effects.SfxBlendMode.Unspecified);
     }
     else _gl.Disable(EnableCap.Blend);
 
@@ -633,6 +640,7 @@ internal sealed unsafe class EffectRenderer : IDisposable
           _gl.Uniform1(fresnel, material.SoftFresnel);
           _gl.Uniform2(scrollLoc, material.Scroll.X, material.Scroll.Y);
           _gl.Uniform1(bloomWLoc, Math.Min(1f, material.Bloom * BloomGain));
+          if (translucent) SetSfxBlend(material.SfxBlend);
           _gl.DrawElements(PrimitiveType.Triangles, (uint)count, DrawElementsType.UnsignedInt, (void*)(start * 4));
         }
       }

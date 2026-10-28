@@ -50,7 +50,9 @@ hdr lut distort distort_postproc particles particles_gpu sfx trail combine_mater
      dither (PS 47): n = fract(sin(uv.y·543.31 + uv.x)·493013)·2−1 ; out += (sign(n) − sign(n)·sqrt(1−|n|))/255
    CB_PASS_HDR registers: [0] vignette flags,intensity,invWH; [1].x innerRadius; [4].z EXPOSURE, .w WHITEPOINT; [8].z RANGE, .w GREY.
 2. SFX blend (PROVEN from psos): SFX_BLEND_ADD_NO_ALPHA perms ⇒ preset 5 One/One (alpha Zero/One keep);
-   SFX_ALPHA_BLEND ⇒ 3 SrcAlpha/InvSrcAlpha; neither ⇒ 3 with alpha Zero/Zero. RT1 SURFBUF_HEIGHT copies RT0;
+   SFX_ALPHA_BLEND ⇒ 3 SrcAlpha/InvSrcAlpha (alpha Zero/One); neither ⇒ colour pass One/InvSrcAlpha alpha One/Zero
+   (premul_a, PS 201 premultiplied), DUDV pass SrcAlpha/InvSrcAlpha alpha Zero/Zero. Selector PROVEN (mtl1-44): td blendMode
+   blend→ALPHA_BLEND, add→ADD_NO_ALPHA, premul_a→neither (FUN_1425fd580 → FUN_142451840). RT1 SURFBUF_HEIGHT copies RT0;
    RT2 TRANSPARENT_BLOOM_MASK One/One, alpha One/Zero.
 3. Particles: all particle PSOs are premultiplied One/InvSrcAlpha (preset 7, alpha 6/0) on COLOR_FP16_0, Max on the
    mask RTs; blend mode is in-shader (PS 281, shared[3].x flags):

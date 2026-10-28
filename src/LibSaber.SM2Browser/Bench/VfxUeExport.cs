@@ -250,7 +250,7 @@ internal static class VfxUeExport
       foreach (var (material, g) in groups)
         if (g.I.Count >= 3)
           result.Add(VfxFrameExport.TriangleBatch(batch.Emitter.Name, batch.Emitter.Path, material.Translucent, material.Texture, material.Translucent ? material.Clip : 0f, g.V, g.I,
-            $"mesh {batch.Geom.Template}, {batch.Instances.Count} instances"));
+            $"mesh {batch.Geom.Template}, {batch.Instances.Count} instances", material.SfxBlend));
     }
     missingTemplates = missing.Distinct(StringComparer.OrdinalIgnoreCase).ToList();
     note = $"mesh particles: {list.Count} emitters, {result.Count} batches; missing templates [{string.Join(", ", missing.Distinct())}]{(vat > 0 ? $"; {vat} VAT parts drawn in rest pose" : "")}";

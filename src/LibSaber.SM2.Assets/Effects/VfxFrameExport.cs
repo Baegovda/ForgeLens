@@ -71,7 +71,7 @@ public static class VfxFrameExport
       ["CpuParticle"] = VfxBlendRules.For(VfxDrawKind.CpuParticle).ToString(),
       ["Trail"] = VfxBlendRules.For(VfxDrawKind.Trail).ToString(),
       ["Spark"] = VfxBlendRules.For(VfxDrawKind.Spark).ToString(),
-      ["SfxMesh"] = VfxBlendRules.For(VfxDrawKind.SfxMesh).ToString(),
+      ["SfxMesh"] = VfxBlendRules.For(VfxDrawKind.SfxMesh).ToString() + " (blendMode add / no blendMode; per batch: see captureBlend, mtl1-44)",
       ["sparkAlphaTest"] = VfxDrawKinds.SparkAlphaTest,
     },
   };
@@ -147,7 +147,8 @@ public static class VfxFrameExport
   }
 
   /// <summary>Triangle batch (mesh particles): <paramref name="vertices"/> in the sprite stride, <paramref name="indices"/> triangles.</summary>
-  public static JsonObject TriangleBatch(string emitter, string path, bool sfx, string texture, float clip, IReadOnlyList<float> vertices, IReadOnlyList<int> indices, string note)
+  public static JsonObject TriangleBatch(string emitter, string path, bool sfx, string texture, float clip, IReadOnlyList<float> vertices, IReadOnlyList<int> indices, string note,
+    SfxBlendMode sfxBlend = SfxBlendMode.Unspecified)
   {
     var verts = new JsonArray();
     foreach (var v in vertices) verts.Add(R(v));
@@ -156,9 +157,12 @@ public static class VfxFrameExport
     return new JsonObject
     {
       ["emitter"] = emitter, ["path"] = path, ["kind"] = sfx ? VfxDrawKind.SfxMesh.ToString() : "LitMesh", ["distortion"] = false,
-      // sfx preset meshes: capture One/One (VfxBlendRules SfxMesh); lit combine_material meshes: opaque, lighting baked per vertex.
-      ["ueBlend"] = sfx ? UeBlend(VfxDrawKind.SfxMesh, false) : "Solid",
-      ["captureBlend"] = sfx ? VfxBlendRules.For(VfxDrawKind.SfxMesh).ToString() : "opaque (lit combine_material, depth write)",
+      // sfx preset meshes: mtl1-44 PROVEN per-material selector (SfxBlend: add One/One, blend/premul_a over; no blendMode in the
+      // .td = capture One/One, HEURISTIC); lit combine_material meshes: opaque, lighting baked per vertex.
+      ["ueBlend"] = sfx ? SfxBlend.UeBlend(sfxBlend) : "Solid",
+      ["captureBlend"] = sfx ? SfxBlend.State(sfxBlend).ToString() : "opaque (lit combine_material, depth write)",
+      ["sfxBlendMode"] = sfx ? sfxBlend.ToString() : null,
+      ["sfxDefine"] = sfx ? SfxBlend.Define(SfxBlend.Effective(sfxBlend)) : null,
       ["texture"] = texture, ["alphaMask"] = "", ["frames"] = new JsonArray(1, 1), ["flags"] = 0u,
       ["rgbTexAlpha"] = 1, ["outAlpha"] = 1, ["textureTint"] = 1f, ["softDepth"] = 0f, ["contrast"] = 0f,
       ["contrastKey"] = new JsonArray(0f, 0f, 0f), ["clip"] = R(clip),

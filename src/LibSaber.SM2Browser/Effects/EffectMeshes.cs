@@ -17,6 +17,8 @@ internal sealed record EffectMeshMaterial(string Texture, bool Translucent, Vect
   public Vector2 Scroll { get; init; }
   /// <summary>vfx3y: sfx <c>emissive.bloomIntensity</c>; drives the opt-in bench bloom (SM2_VFX_BLOOM=1, HEURISTIC).</summary>
   public float Bloom { get; init; }
+  /// <summary>mtl1-44 PROVEN: sfx <c>blendMode</c> (FUN_1425fd580 → FUN_142451840 define bits; see <see cref="LibSaber.SM2.Assets.Effects.SfxBlend"/>).</summary>
+  public LibSaber.SM2.Assets.Effects.SfxBlendMode SfxBlend { get; init; } = LibSaber.SM2.Assets.Effects.SfxBlendMode.Unspecified;
 }
 
 /// <summary>A geometry template flattened for the effect pass: pos(3) normal(3) uv(2) uv1(2) per vertex; sub-objects by node order.</summary>
@@ -167,6 +169,7 @@ internal sealed class EffectMeshes
       SoftFresnel = named && fres.Success ? float.Parse(fres.Groups[1].Value, CultureInfo.InvariantCulture) : 0f,
       Scroll = named && Regex.Match(body, @"overrideAffixScroll\s*=\s*\{\s*override\s*=\s*true\s*speedX\s*=\s*(-?[\d.]+)\s*speedY\s*=\s*(-?[\d.]+)") is { Success: true } sc
         ? new Vector2(float.Parse(sc.Groups[1].Value, CultureInfo.InvariantCulture), float.Parse(sc.Groups[2].Value, CultureInfo.InvariantCulture)) : Vector2.Zero,
+      SfxBlend = sfx ? LibSaber.SM2.Assets.Effects.SfxBlend.FromTd(body) : LibSaber.SM2.Assets.Effects.SfxBlendMode.Unspecified,
       Bloom = sfx && Regex.Match(body, @"bloomIntensity\s*=\s*([\d.]+)") is { Success: true } bl ? float.Parse(bl.Groups[1].Value, CultureInfo.InvariantCulture) : 0f,
     };
   }

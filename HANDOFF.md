@@ -1958,3 +1958,24 @@ Disassembly: /workspace/vfxsh_dis/{pc,pg,dx_pc_dx12_sfx,dx_pc_dx12_distort}, GLS
    - Define table FUN_142450650 (static init FUN_142332e80): SFX define group bits SFX_ALPHA_BLEND = bit0, SFX_BLEND_ADD_NO_ALPHA = bit1, SFX_IS_DECAL = bit2, SFX_USE_INVERTED_DECAL_TEST next (PROVEN slot order). The code that maps blendMode → these bits was not found (FUN_14243eb20 is a generic shader-type key builder, not it). Selector stays HEURISTIC.
    - UseSpecMap spec-flag writer, 0x400 vertex-alpha path, auto-exposure, UE falloff approximation: no new evidence this pass; still HEURISTIC.
    - New script `/workspace/rea/scripts/InsScanR.java` (range-limited instruction pattern scan) and `RangeDecomp.java`.
+
+## Update mtl1-44 (2026-10-28 KST): SFX blend selector PROVEN (static RE) and applied per material
+
+1. **Selector PROVEN** (sm2_retail.exe, Ghidra `/workspace/rea/ghidra_proj3` read-only; outputs `/workspace/rea/m44_*`):
+   - td `shaders.sfx` loader **FUN_1425fd580** (0x1425fd76a / 0x1425fd77b): `blendMode` is matched with `_stricmp` against table **0x144cccd38** = {"blend"=0, "add"=1, "premul_a"=2}. The index is stored as a byte at desc+0. An unknown string fails the load; a missing key logs "Can't load %s!". modtools `sfx_sdr_desc.ps` has the same enum order.
+   - Reflection **FUN_142605c60** (vtable slot 19; serializer FUN_142604070 is slot 18) fixes the layout: blendMode @0, isUseForPortals @1, alphaKillSmooth @4, softZ @0x110 (near @0x118), softFreshnel @0x128, writeDepth 0x460, zTest 0x461, noCull 0x462, particle 0x463, disable_fog 0x464, brightness 0x465, finalColor @0x568.
+   - SFX key builder **FUN_142451840** (sfx shader-type vtable 0x1437f0670 slot 1, define table FUN_142450650). In the colour pass (`*pass == 0`): blendMode 0 sets bit0 **SFX_ALPHA_BLEND**; 1 sets bit1 **SFX_BLEND_ADD_NO_ALPHA**; premul_a sets neither. The bit order is cross-checked by bit2 IS_DECAL ← (flags & 0x100) && !particle, bit5 SOFT_Z ← softZ && !writeDepth, bit6 ← 0x111, bit7 ← 0x118, and bit16 SOFT_FRESNEL ← 0x128.
+   - PSOs (`psos_sfx`, rt0; matched PS triples 173/256/201 and 588/743/631):
+     - ADD_NO_ALPHA: One/One, alpha Zero/One.
+     - ALPHA_BLEND: SrcAlpha/InvSrcAlpha, alpha Zero/One.
+     - neither (non-DUDV): One/InvSrcAlpha, alpha One/Zero. PS 201 writes premultiplied rgb.
+     - Correction to mtl1-38/SHADERS: "neither ⇒ SrcAlpha/InvSrcAlpha, alpha Zero/Zero" is only the DUDV/distortion pass (874 perms). There `*pass != 0`, so no blend bit is set.
+   - Correction to mtl1-39/43: FUN_1426212d0 is the **game_material** pass-0x38 parser (none/add/blend/premul_a). It is not the td sfx loader.
+2. **Code (generic rule):** `LibSaber.SM2.Assets.Effects.SfxBlend` (enum `SfxBlendMode`, `FromTd` reads only the sfx block's top-level blendMode, `State` / `Define` / `UeBlend` / `Composite`).
+   - `EffectMeshMaterial.SfxBlend` is parsed per material.
+   - The browser's `EffectRenderer` sets the blend per material: add → One/One; blend/premul_a → premultiplied over, which composites the same as both game PSOs.
+   - The UE export `TriangleBatch` writes `ueBlend` (Additive / Translucent), `captureBlend` (the game PSO state), `sfxBlendMode` and `sfxDefine` per batch.
+   - **HEURISTIC (final):** a .td with no blendMode stays additive. 66 of 107 extracted sfx blocks are like this; their value comes from the unextracted "sfx" preset. The capture shows One/One sfx draws. Explicit data: blend 30, premul_a 11, add 0.
+   - `SM2_VFX_SFX_BLEND=0` restores "all sfx additive". `SM2_VFX_SFX_ADD=0` still forces over.
+3. **Other VFX HEURISTICs: final, not pursued further.** UseSpecMap spec-flag writer, particle 0x400 vertex alpha, auto-exposure, and UE light falloff exponent 1 (APPROXIMATION) are left as documented in STATUS mtl1-38/39.
+4. Tests: SM2.Assets 253 pass (new `SfxBlendTests`). Browser builds.
