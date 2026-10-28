@@ -14,6 +14,7 @@
 9. Unreal export test without Niagara (meshes/textures/materials of the compared effects → `/Game/SM2_Work/VfxExport`): **done** (2026-10-27, vfx4-2).
 10. Browser viewer polish (asset search, preview, export button): **done (vfx4-3)**.
 11. Context playback (user, 2026-10-29): effect ↔ character model + triggering animation + held weapon, props/effects toggles: **done (mtl1-49)**. Open: proven Shoot → muzzle link (exe RE of the Shoot track consumer), exact-tpl class for cc_rubric_marine.
+12. RE map (user, 2026-10-29): `docs/RE_MAP/` + `tools/re_map/build_re_map.py`: **done (mtl1-49)**. Keep it current: every new RE result goes into RE_NOTES/HANDOFF with a status word, then rerun the generator.
 
 ## Next: VFX3 remaining (do in this order unless the user says otherwise)
 Pushed so far: sockets/bone attach, anim-event cues and stop cues, distortion, degNear on sprites, missing-texture skip, bolter proxies, in-place fix, coverings, textureTintControl (grenade smoke). The remaining items:

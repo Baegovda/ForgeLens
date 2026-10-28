@@ -17,7 +17,7 @@
 2. `docs/handoff/STATUS.md`: what is done, partial or todo (with %), commits, tests and open limitations.
 3. `docs/handoff/ROADMAP.md`: the approved work order and the exact next steps.
 4. `docs/handoff/WORKFLOW.md`: where work runs (box vs the user's PC), build/test, push via the cloud agent, captures, PC paths, and the 20-minute report routine.
-5. `docs/handoff/RE_NOTES.md`: index of every sm2_retail.exe address and string used as evidence.
+5. `docs/RE_MAP/INDEX.md` (the RE "genome map": per-domain overviews + `index.tsv` of every known exe symbol) — **grep it before starting new RE**; `docs/handoff/RE_NOTES.md` holds the long-form evidence tables.
 6. `docs/handoff/FORMATS.md`: SM2 formats, and which source file parses each one.
 7. `HANDOFF.md`: the long chronological log of every stage, with full details. Read the **newest sections at the bottom** first.
    - Its top "bootstrap" block is older. Where it conflicts with this file (owner name, push method, "next step"), **this file and docs/handoff win**.

@@ -627,3 +627,4 @@ Evidence: box /workspace/rdc/NOTES.md and /workspace/rdc/<scene>/{nightly,deep} 
 - Bolt rifle vs auto-bolt fixed by a generic uid rule; colour-scheme picker with game names and swatches (bddd777).
 - Context playback both directions (ContextIndex / ContextResolver): effect → character + clip + held weapon + socket + event time; model + clip → held weapon (picker) + event effects + Shoot → muzzle (slot picker). Toggles "Show props/weapons" / "Show effects". Verified in the GUI on the PC (Sorcerer stave ray prep, rubric marine bolter shoot, toggles off).
 - Tests: SM2.Assets 278 pass.
+- RE map: `docs/RE_MAP/` (INDEX.md, 11 domains, index.tsv, 727 symbols), generator `tools/re_map/build_re_map.py`.

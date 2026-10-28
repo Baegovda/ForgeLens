@@ -1,5 +1,7 @@
 # RE_NOTES — sm2_retail.exe evidence index
 
+> Quick lookup: `docs/RE_MAP/index.tsv` / `docs/RE_MAP/INDEX.md` (generated from this file, HANDOFF and the box Ghidra dumps).
+
 All addresses are virtual addresses in `sm2_retail.exe` (retail Steam build, 81 MB; box copy `/workspace/rea/sm2_retail.exe`, Ghidra project `/workspace/rea/ghidra_proj2.gpr`, program `sm2_retail.exe` since the 2026-10-27 box rebuild; older notes said `sm2`).
 - Conversions used: rdata VA = file offset + 0x140001200; .text VA = file offset + 0x140000a00; for `strings`-style offsets, VA = offset + 0x140000000.
 - `FUN_xxxxxxxx` = Ghidra function. `@0x...` = string address. Plain `0x...` = instruction, table or constant.
