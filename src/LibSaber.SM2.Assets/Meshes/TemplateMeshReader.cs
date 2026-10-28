@@ -675,6 +675,43 @@ public static class TemplateMeshReader
     return data.UV0;
   }
 
+  /// <summary>The material's non-empty layers (a texName or a mtlName) for the sidecar's layers[].</summary>
+  internal static IEnumerable<MaterialLayerInfo> LayerInfos(SaberMaterial? material)
+  {
+    if (material is null)
+      yield break;
+    var layers = new[] { material.Layer0, material.Layer1, material.Layer2, material.Layer3 };
+    for (var i = 0; i < layers.Length; i++)
+    {
+      var layer = layers[i];
+      if (layer is null || (string.IsNullOrWhiteSpace(layer.TextureName) && string.IsNullOrWhiteSpace(layer.MaterialName)))
+        continue;
+      var blend = layer.Blending;
+      yield return new MaterialLayerInfo
+      {
+        Index = i,
+        Texture = EmptyToNull(layer.TextureName),
+        SubMaterial = EmptyToNull(layer.MaterialName),
+        Tint = layer.Tint is { Length: > 0 } tint ? tint : null,
+        VcSet = layer.VcSet,
+        UvSet = layer.UvSetIndex,
+        TilingU = layer.TilingU,
+        TilingV = layer.TilingV,
+        BlendMethod = EmptyToNull(blend?.Method),
+        UseLayerAlpha = blend?.UseLayerAlpha ?? false,
+        UseHeightMap = blend?.UseHeightMap ?? false,
+        BlendNormalAdd = blend?.BlendNormalAdd ?? false,
+        WeightMultiplier = blend?.WeightMultiplier ?? 0f,
+        HeightMapSoftness = blend?.HeightMapSoftness ?? 0f,
+        TexChannelBlendMask = blend?.TexChannelBlendMask ?? 0,
+        WeightsColorSet = blend?.Weights?.ColorSetIndex ?? -1,
+        HeightMapColorSet = blend?.HeightMap?.ColorSetIndex ?? -1,
+        HeightMapInvert = blend?.HeightMap?.Invert ?? false,
+        HeightMapOverride = EmptyToNull(blend?.HeightMapOverride),
+      };
+    }
+  }
+
   private static MaterialLayer? DiffuseLayer(SaberMaterial? material)
   {
     if (material is null)
@@ -821,6 +858,7 @@ public static class TemplateMeshReader
         HideReason = hideReason,
         Node = node,
       });
+      target.Parts[^1].Layers.AddRange(LayerInfos(material));
     }
 
     if (material is not null)

@@ -1075,6 +1075,32 @@ public static class AssetExporter
         offset2 = cham.Offset2,
         fresnelPwr = cham.FresnelPower,
       } : null,
+      // Saber material layer0..3 (non-empty only). layers[0] is the base; later layers blend over it by
+      // blending.method/weights (vertex colour set weightsColorSet, or layer alpha / heightmap). Not shaded yet.
+      layers = slot.Part.Layers.Select(layer => new
+      {
+        index = layer.Index,
+        texture = layer.Texture,
+        subMaterial = layer.SubMaterial,
+        tint = layer.Tint,
+        vcSet = layer.VcSet,
+        uvSet = layer.UvSet,
+        tiling = new[] { layer.TilingU, layer.TilingV },
+        blending = new
+        {
+          method = layer.BlendMethod,
+          useLayerAlpha = layer.UseLayerAlpha,
+          useHeightmap = layer.UseHeightMap,
+          blendNormalAdd = layer.BlendNormalAdd,
+          weightMultiplier = layer.WeightMultiplier,
+          heightmapSoftness = layer.HeightMapSoftness,
+          texChannelBlendMask = layer.TexChannelBlendMask,
+          weightsColorSet = layer.WeightsColorSet,
+          heightmapColorSet = layer.HeightMapColorSet,
+          heightmapInvert = layer.HeightMapInvert,
+          heightmapOverride = layer.HeightMapOverride,
+        },
+      }),
       maps = slot.Part.Maps.Select(map => new
       {
         role = map.Role,

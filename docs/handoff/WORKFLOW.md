@@ -165,3 +165,5 @@ The user wants automatic interim reports. Create a recurring routine (see the bo
 - **stay quiet if nothing changed** since the last report. Never send a stale or duplicate report, and never say "nothing is running" while an executor is active;
 - Niagara is off the roadmap (possible future development only); never start it unprompted.
 Delete or pause the routine when the user says to stop, or when all approved work is done.
+
+- mtl1-27: python tests `cd test/python && python3 -m unittest` (unreal stubbed). Material-layer check: export with the new extractor, then read `slots[].layers` from the materials.json (PowerShell ConvertFrom-Json one-liner, see STATUS mtl1-27).

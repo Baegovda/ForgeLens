@@ -71,6 +71,12 @@ public sealed class MeshPart
   public int Node { get; set; } = -1;
   public List<MaterialMap> Maps { get; } = new();
 
+  /// <summary>
+  ///   The Saber material's layer0..3 (texName, mtlName, tint, vcSet, tiling, uvSetIdx, blending) in order, empty
+  ///   layers skipped. The exe parses these per layer (FUN_14217b180, see RE_NOTES "material layers").
+  /// </summary>
+  public List<MaterialLayerInfo> Layers { get; } = new();
+
   public MeshPart Copy(int indexStart, int indexCount)
   {
     var copy = new MeshPart
@@ -96,6 +102,7 @@ public sealed class MeshPart
       Node = Node,
     };
     copy.Maps.AddRange(Maps);
+    copy.Layers.AddRange(Layers);
     return copy;
   }
 }
@@ -463,4 +470,28 @@ public static class AxisConvert
     }
   }
 
+}
+
+/// <summary>One Saber material layer as written to the .materials.json sidecar.</summary>
+public sealed record MaterialLayerInfo
+{
+  public int Index { get; init; }
+  public string? Texture { get; init; }
+  public string? SubMaterial { get; init; }
+  public float[]? Tint { get; init; }
+  public int VcSet { get; init; }
+  public int UvSet { get; init; }
+  public float TilingU { get; init; } = 1f;
+  public float TilingV { get; init; } = 1f;
+  public string? BlendMethod { get; init; }
+  public bool UseLayerAlpha { get; init; }
+  public bool UseHeightMap { get; init; }
+  public bool BlendNormalAdd { get; init; }
+  public float WeightMultiplier { get; init; }
+  public float HeightMapSoftness { get; init; }
+  public int TexChannelBlendMask { get; init; }
+  public int WeightsColorSet { get; init; } = -1;
+  public int HeightMapColorSet { get; init; } = -1;
+  public bool HeightMapInvert { get; init; }
+  public string? HeightMapOverride { get; init; }
 }

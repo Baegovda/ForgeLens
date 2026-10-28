@@ -337,7 +337,43 @@ def spec_layers(material, albedo, metal, rough, normal, emissive, albedo_raw=Non
 
 
 
-def chameleon(material, albedo, metal, normal_ts, x, y):
+def srgb_encode(material, lin, x, y):
+    # tex_srgb = 1.055 * lin^(1/2.4) - 0.055 (clamped at 0; the linear toe below 0.0031308 is ignored).
+    enc = expr(material, unreal.MaterialExpressionPower, x, y)
+    link(unary(material, unreal.MaterialExpressionSaturate, lin, x - 120, y), "", enc, "Base")
+    link(const(material, 1.0 / 2.4, x - 120, y + 60), "", enc, "Exponent")
+    out = expr(material, unreal.MaterialExpressionMax, x + 360, y)
+    link(op(material, unreal.MaterialExpressionSubtract, mul(material, enc, const(material, 1.055, x + 120, y + 80), x + 240, y), const(material, 0.055, x + 240, y + 80), x + 300, y + 40), "", out, "A")
+    link(const(material, 0.0, x + 300, y + 120), "", out, "B")
+    return out
+
+
+def srgb_poly(material, v, x, y):
+    # Game polynomial sRGB -> linear: x * (x * (0.305306 x + 0.682171) + 0.0125229).
+    poly = add(material, mul(material, v, const(material, 0.305306, x, y + 80), x + 100, y), const(material, 0.682171, x + 100, y + 80), x + 200, y)
+    poly = add(material, mul(material, poly, v, x + 300, y), const(material, 0.0125229, x + 300, y + 80), x + 400, y)
+    return mul(material, poly, v, x + 500, y)
+
+
+def instance_tint_param(material, x, y):
+    p = expr(material, unreal.MaterialExpressionVectorParameter, x, y)
+    p.set_editor_property("parameter_name", "InstanceTint")
+    p.set_editor_property("default_value", unreal.LinearColor(1.0, 1.0, 1.0, 1.0))
+    return mask(material, p, "rgb", x + 150, y)
+
+
+def instance_tint(material, albedo, x, y):
+    # mtl1-27: DYNAMIC_GLT per-instance tint (record +0, inst.rgb). Exe writer FUN_1423bb1e0 (glt vtable 0x1437edb20):
+    # rgb = bytes of the runtime object's packed colour (obj+0x74: R = bits 16-23, G = 8-15, B = 0-7) / 255, default
+    # (1,1,1); optionally * byte(obj+0x7c) / 255, and * 10 when object flag 0x200 is set. The PS (22961, 29540)
+    # does albedo_lin = poly(inst.rgb * tex_srgb [* chameleon]). The colour is per spawned object at runtime (no
+    # static source in the .tpl/.td; 1 on every captured draw), so the sidecar may carry instanceTint only as an
+    # override. UseInstanceTint (default off) keeps the default path bit-exact with UE's own sRGB decode.
+    tinted = srgb_poly(material, mul(material, srgb_encode(material, albedo, x - 600, y), instance_tint_param(material, x - 600, y + 200), x - 160, y), x - 100, y)
+    return switch(material, "UseInstanceTint", albedo, tinted, x + 500, y)
+
+
+def chameleon(material, albedo, plain, metal, normal_ts, x, y):
     # glt.chameleon (UseChameleon). mtl1-26, capture frame 68141 (PS 19112 GBUFFER / 22961 forward, FORMULA.md):
     #   t = pow(saturate(N.V), fresnelPwr), N = normal-mapped tangent-space normal, V in (T, B, N)
     #   c = lerp(C0, C1, sat((t - r14.x) * r14.y)); c = lerp(c, C2, sat((t - r14.z) * r14.w)); c = lerp(c, C3, sat((t - r15.x) * r15.y))
@@ -345,7 +381,8 @@ def chameleon(material, albedo, metal, normal_ts, x, y):
     #   albedo_lin = sRGBtoLin_poly(inst.rgb * tex_srgb * c), poly(x) = x * (x * (0.305306 x + 0.682171) + 0.0125229)
     # The ramp colours are the raw .td bytes / 255 (NOT linearised) and the product with the texture happens in sRGB.
     # UE samples the sRGB texture linear, so the texture is re-encoded to sRGB here, multiplied, then linearised with
-    # the game's polynomial. inst.rgb (DYNAMIC_GLT[+0]) was (1,1,1) on every captured draw and is not exported.
+    # the game's polynomial. inst.rgb (DYNAMIC_GLT[+0]) is the InstanceTint parameter (see instance_tint). plain is the
+    # UseChameleon=False result.
     # Thresholds/scales packed like the CPU packer FUN_1423ba150, see chameleon_ramp().
     mel = unreal.MaterialEditingLibrary
     # N.V in tangent space like the PS (normal map normal . tangent-space view vector). PixelNormalWS cannot be
@@ -378,19 +415,10 @@ def chameleon(material, albedo, metal, normal_ts, x, y):
     c = step(c, "C2", mask(material, par["R0"], "b", x - 1000, y + 400), mask(material, par["R0"], "r", x - 1000, y + 460, "A"), y + 400)
     c = step(c, "C3", mask(material, par["R1"], "r", x - 1000, y + 600), mask(material, par["R1"], "g", x - 1000, y + 660), y + 600)
     node = lerp(material, c, vec3(material, (1.0, 1.0, 1.0), x - 400, y + 700), unary(material, unreal.MaterialExpressionSaturate, metal, x - 400, y + 780), x - 300, y)
-    # tex_srgb = 1.055 * lin^(1/2.4) - 0.055 (clamped at 0; the linear toe below 0.0031308 is ignored).
-    enc = expr(material, unreal.MaterialExpressionPower, x - 300, y + 160)
-    link(unary(material, unreal.MaterialExpressionSaturate, albedo, x - 420, y + 160), "", enc, "Base")
-    link(const(material, 1.0 / 2.4, x - 420, y + 220), "", enc, "Exponent")
-    tex_s = expr(material, unreal.MaterialExpressionMax, x - 60, y + 160)
-    link(op(material, unreal.MaterialExpressionSubtract, mul(material, enc, const(material, 1.055, x - 300, y + 240), x - 180, y + 160), const(material, 0.055, x - 180, y + 240), x - 100, y + 200), "", tex_s, "A")
-    link(const(material, 0.0, x - 100, y + 280), "", tex_s, "B")
-    prod = mul(material, tex_s, node, x + 40, y + 60)
-    # Game polynomial sRGB -> linear: x * (x * (0.305306 x + 0.682171) + 0.0125229).
-    poly = add(material, mul(material, prod, const(material, 0.305306, x + 40, y + 140), x + 140, y + 100), const(material, 0.682171, x + 140, y + 180), x + 240, y + 100)
-    poly = add(material, mul(material, poly, prod, x + 340, y + 100), const(material, 0.0125229, x + 340, y + 180), x + 440, y + 100)
-    tinted = mul(material, poly, prod, x + 540, y + 60)
-    return switch(material, "UseChameleon", albedo, tinted, x + 700, y)
+    tex_s = srgb_encode(material, albedo, x - 420, y + 160)
+    prod = mul(material, mul(material, tex_s, node, x + 40, y + 60), instance_tint_param(material, x - 100, y + 340), x + 100, y + 60)
+    tinted = srgb_poly(material, prod, x + 140, y + 100)
+    return switch(material, "UseChameleon", plain, tinted, x + 700, y)
 
 
 # mtl1-26: capture defaults (frame 68141, CB_STATIC_GLT rows 10..15 of the Hellbrute chameleon draws, identical to its
@@ -623,7 +651,8 @@ def make_master(folder, asset_name="M_SM2", translucent=False):
     tint_mix = lerp(material, mask(material, tint, "rgb", -360, -320), mask(material, metal_tint, "rgb", -360, -500), metal_b, -200, -400)
     albedo_rgb = mask(material, diffuse, "rgb", -360, -200, "RGB")
     # Chameleon first (it works on the raw texture in sRGB, then linearises), then the albedo / metallic tint.
-    cham_rgb = chameleon(material, albedo_rgb, metal_b, detail_switch, -200, -900)
+    plain_rgb = instance_tint(material, albedo_rgb, -200, -1500)
+    cham_rgb = chameleon(material, albedo_rgb, plain_rgb, metal_b, detail_switch, -200, -900)
     tinted = mul(material, cham_rgb, tint_mix, -200, -260)
     front = spec_layers(material, tinted, metal_b, rough_b, detail_switch, emit_mul, albedo_rgb, metal, rough_switch, ao_source)
     if translucent:
@@ -719,6 +748,29 @@ def make_hidden(folder):
     return material
 
 
+def decode_instance_color(packed, scale_byte=None, boost=False):
+    # FUN_1423bb1e0: rgb = ((packed >> 16) & 255, (packed >> 8) & 255, packed & 255) / 255; * scale_byte / 255 when the
+    # glt mode at +0x12 is 2; * 10 when object flag 0x200 is set. For a runtime value read from the game.
+    rgb = [((packed >> 16) & 255) / 255.0, ((packed >> 8) & 255) / 255.0, (packed & 255) / 255.0]
+    if scale_byte is not None:
+        rgb = [c * (scale_byte & 255) / 255.0 for c in rgb]
+    if boost:
+        rgb = [c * 10.0 for c in rgb]
+    return rgb
+
+
+def instance_tint_value(slot):
+    # Optional sidecar override instanceTint [r, g, b] (0..1, sRGB space like the game's obj+0x74 bytes / 255).
+    # None (no override, or white) leaves the exact default path.
+    v = slot.get("instanceTint")
+    if not v or len(v) < 3:
+        return None
+    rgb = [max(0.0, float(c)) for c in v[:3]]
+    if all(abs(c - 1.0) < 1e-6 for c in rgb):
+        return None
+    return (rgb[0], rgb[1], rgb[2], 1.0)
+
+
 def srgb_to_linear(c):
     return pow(max(0.0, min(1.0, float(c))), 2.2)
 
@@ -727,6 +779,10 @@ def apply_spec_layers(instance, slot, texture_for):
     mel = unreal.MaterialEditingLibrary
     cham = slot.get("chameleon")
     mel.set_material_instance_static_switch_parameter_value(instance, "UseChameleon", bool(cham))
+    inst = instance_tint_value(slot)
+    mel.set_material_instance_static_switch_parameter_value(instance, "UseInstanceTint", inst is not None and not cham)
+    if inst is not None:
+        mel.set_material_instance_vector_parameter_value(instance, "InstanceTint", unreal.LinearColor(*inst))
     # mtl1-26: chameleon slots shade without the spec map (see UseSpecMap in make_master).
     mel.set_material_instance_static_switch_parameter_value(instance, "UseSpecMap", not cham)
     if cham:

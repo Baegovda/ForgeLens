@@ -21,6 +21,7 @@ Paths are relative to `src/`. "A" means `LibSaber.SM2.Assets/`. RE evidence for 
 ## Export outputs (ours)
 - `fbx-unreal`: Z-up cm, facing +Y; ROOT is bone 0 and carries root motion; baked physics; helper bones `{SIM}_physNN`.
 - `gltf`: Y-up m.
+- `{model}.materials.json` slots carry `layers[]` (mtl1-27: Saber layer0..3, texture/subMaterial/tint/vcSet/uvSet/tiling/blending) and an optional hand-written `instanceTint [r,g,b]` override (sRGB 0..1).
 - Sidecars next to the model: `{model}.materials.json`, `{model}.physics.json`, `{model}.variant.json`, `{fbx}.rebase.json` (cinematic placement).
 - Scripts next to the model: `import_sm2_materials.py`, `ue_import_anim.py`, `ue_sm2_physics.py`.
 - Clip files: `{model}__{clip}.fbx`, `__ADD.fbx` (additive).
