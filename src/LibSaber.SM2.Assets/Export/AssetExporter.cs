@@ -253,6 +253,10 @@ public static class AssetExporter
         physics = PhysicsLocator.Find(catalog, store, file.Path);
         if (physics is { IsEmpty: false })
         {
+          // mtl1-37: CDT shape bones are link_tpl_obj names; tpl_markup locators are part of that object list.
+          var resolvedCdt = CdtObjectResolver.Apply(physics, exportMesh.Bones, TplMarkup.Find(catalog, store, index));
+          if (resolvedCdt > 0)
+            report.Messages.Add($"{file.Path}: {resolvedCdt} CDT shape bone(s) resolved via tpl_markup locators.");
           // Helper bones are deterministic (same tpl + cls -> same names and order), so --anim-only clips key the
           // same bones the model export added; a skeleton imported without them just ignores those tracks.
           if (physics.Cloths.Count > 0)

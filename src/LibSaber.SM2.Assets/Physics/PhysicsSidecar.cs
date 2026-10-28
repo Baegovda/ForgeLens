@@ -25,6 +25,8 @@ public static class PhysicsSidecar
     // mtl1-11: positions as UE shows the imported FBX mesh. Measured in UE 5.7: the imported sections sit at (-x, y, z) of Ue(p)
     // (calgar ribbon_02_L sec centre 18.7 vs sidecar -18.7, same extents), so the X axis is mirrored here.
     static float[] UeMesh(Vector3 v) { var a = Ue(v); a[0] = -a[0]; return a; }
+    // mtl1-37: box edge directions in the UE bone frame, in sizeCm order (source X, Z, Y); null when unrotated.
+    static float[][]? BoxAxes(Quaternion q) => q.IsIdentity ? null : new[] { Vector3.UnitX, Vector3.UnitZ, Vector3.UnitY }.Select(a => V(AxisConvert.Direction(Vector3.Transform(a, q), false))).ToArray();
     var bones = mesh.Bones;
     string BoneName(int i) => i >= 0 && i < bones.Count ? bones[i].Name : "";
 
@@ -89,6 +91,9 @@ public static class PhysicsSidecar
         c.RenderMeshes,
         c.MaxInfluenceDist,
         c.DistanceRemapPower,
+        c.UseTopologicalDistance,
+        // mtl1-37: authored value only; retail ignores it (no string in the exe).
+        c.MaxInfluenceVert,
         simVertices = shell?.Positions.Count ?? 0,
         // mtl1-28: false when the _SIM shell was left out of the FBX (no --include-cloth-sim). CreateChaosCloth then uses the
         // primary render section as its own sim mesh (render-as-sim fallback, HEURISTIC) instead of converting 0 cloths.
@@ -128,13 +133,13 @@ public static class PhysicsSidecar
             windSpace = "ueMesh", // component-space vector: X-mirrored like simPositionsUeCm
             collision = new
             {
-              note = "PhysicsAsset bodies for the cloth: capsules as tapered capsules (Chaos Cloth only) when radii differ, spheres, boxes (size is the full extent).",
+              note = "PhysicsAsset bodies for the cloth: capsules as tapered capsules (Chaos Cloth only) when radii differ, spheres, boxes (size is the full extent). ResolvedFrom: the shape named a tpl_markup locator, now expressed on the locator's parent bone (mtl1-37).",
               source = cfg.SharedShapesAdded == 0 ? "config" : cfg.CollisionFromShared ? "sharedCDT (HEURISTIC)" : "config+sharedCDT (HEURISTIC)",
               sharedShapesAdded = cfg.SharedShapesAdded,
               space = "boneLocal", // mtl1-14d: bone-local offsets are NOT mirrored (imported bone frames absorb the X reflection; mirroring blew up the sorcerer cloak). Plugin also shrinks shapes off free rest particles.
-              capsules = cfg.Capsules.Select(k => new { k.Name, k.BoneFirst, radiusFirstCm = k.RadiusFirst * 100f, offsetFirstCm = Ue(k.BoneFirstOffset), k.BoneSecond, radiusSecondCm = k.RadiusSecond * 100f, offsetSecondCm = Ue(k.BoneSecondOffset) }),
-              spheres = cfg.Spheres.Select(k => new { k.Name, k.Bone, radiusCm = k.Radius * 100f, offsetCm = Ue(k.BoneOffset) }),
-              boxes = cfg.Boxes.Select(k => new { k.Name, k.Bone, sizeCm = V(new Vector3(k.Size.X, k.Size.Z, k.Size.Y) * 100f), offsetCm = Ue(k.BoneOffset) }),
+              capsules = cfg.Capsules.Select(k => new { k.Name, k.ResolvedFrom, k.BoneFirst, radiusFirstCm = k.RadiusFirst * 100f, offsetFirstCm = Ue(k.BoneFirstOffset), k.BoneSecond, radiusSecondCm = k.RadiusSecond * 100f, offsetSecondCm = Ue(k.BoneSecondOffset) }),
+              spheres = cfg.Spheres.Select(k => new { k.Name, k.ResolvedFrom, k.Bone, radiusCm = k.Radius * 100f, offsetCm = Ue(k.BoneOffset) }),
+              boxes = cfg.Boxes.Select(k => new { k.Name, k.ResolvedFrom, k.Bone, sizeCm = V(new Vector3(k.Size.X, k.Size.Z, k.Size.Y) * 100f), offsetCm = Ue(k.BoneOffset), axesUe = BoxAxes(k.Rotation) }),
             },
           },
         },

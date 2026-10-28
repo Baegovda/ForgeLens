@@ -60,6 +60,8 @@ public sealed class ClothCapsule
   public string BoneSecond { get; set; } = "";
   public float RadiusSecond { get; set; }
   public Vector3 BoneSecondOffset { get; set; }
+  /// <summary>mtl1-37: set when a bone name was a tpl_markup locator (see <see cref="CdtObjectResolver"/>), e.g. "BoneFirst=Backpack_CDT_L".</summary>
+  public string ResolvedFrom { get; set; } = "";
 }
 
 public sealed class ClothSphere
@@ -68,6 +70,8 @@ public sealed class ClothSphere
   public string Bone { get; set; } = "";
   public float Radius { get; set; }
   public Vector3 BoneOffset { get; set; }
+  /// <summary>mtl1-37: see <see cref="ClothCapsule.ResolvedFrom"/>.</summary>
+  public string ResolvedFrom { get; set; } = "";
 }
 
 public sealed class ClothBox
@@ -77,6 +81,10 @@ public sealed class ClothBox
   /// <summary>Full edge lengths in the bone frame (treated as full size, centred on the bone plus offset).</summary>
   public Vector3 Size { get; set; }
   public Vector3 BoneOffset { get; set; }
+  /// <summary>mtl1-37: box orientation in the bone frame (identity unless it came from a rotated tpl_markup locator).</summary>
+  public Quaternion Rotation { get; set; } = Quaternion.Identity;
+  /// <summary>mtl1-37: see <see cref="ClothCapsule.ResolvedFrom"/>.</summary>
+  public string ResolvedFrom { get; set; } = "";
 }
 
 /// <summary>
@@ -168,9 +176,18 @@ public sealed class ClothEntry
     return i > 0 && i + 4 < name.Length && name[(i + 4)..].All(char.IsDigit) ? name[..i] : name;
   }
 
-  public float MaxInfluenceDist { get; set; } = 0.05f;
-  public float DistanceRemapPower { get; set; } = 1f;
+  // mtl1-37: simRemapConfig defaults from the retail ClothEntry constructor 0x141093260 (exe evidence):
+  //   +0x18 maxInfluenceDist = 0x3e19999a (0.15) at 0x14109326c, +0x1c distanceRemapPower = 0x40a00000 (5) at 0x141093273,
+  //   +0x20 useTopologicalDistance = false at 0x14109327a. (Previously 0.05 / 1 without a citation; meta_desc says 0.15 / 10.)
+  public float MaxInfluenceDist { get; set; } = 0.15f;
+  public float DistanceRemapPower { get; set; } = 5f;
   public bool UseTopologicalDistance { get; set; }
+  /// <summary>
+  ///   mtl1-37: <c>simRemapConfig.maxInfluenceVert</c> as authored (null when absent). Informational only: the retail exe has
+  ///   no "maxInfluenceVert" string and its simRemapConfig serializers (0x141092850 / 0x141093480) read only the three fields
+  ///   above, so the engine ignores it (stale schema field, value 4 in all 61 occurrences of the mtl31 cls set).
+  /// </summary>
+  public int? MaxInfluenceVert { get; set; }
   public ClothConfig Config { get; set; } = new();
 }
 

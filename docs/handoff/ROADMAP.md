@@ -8,7 +8,7 @@
 5. Bulk validation (37 assets): **done**, which led to:
    - 5a. Constructor fix (`--variant`, `--tex-formats`): **done + UE verified**
    - 5b. UE folder cleanup (approved deletions only): **done**
-6. Secondary physics (user request: purity seals and cloth should move as in-game in the browser and carry over to Unreal): **done + UE verified**
+6. Secondary physics (user request: purity seals and cloth should move as in-game in the browser and carry over to Unreal): **done + UE verified** (mtl1-37: CDT bones resolved via tpl_markup locators; retail simRemap defaults 0.15/5)
 7. Browser VFX (the user said go at 02:32 KST, "일단 냅두고 그담거해봐"): **in progress, ~94 %** (mtl1-36: light units calibrated from capture CB, missing-asset loop, half-float clamp; mtl1-35: lights, mesh particles, soft depth, grading LUT; mtl1-34: UE frozen-frame export with capture blend/tonemap/distortion rules, verified; engine VFX defaults; browser BGRA fix)
 8. In-game side-by-side comparison (VFX, physics, materials): **todo**. It needs the PC free and in-game captures.
 9. Unreal export test without Niagara (meshes/textures/materials of the compared effects → `/Game/SM2_Work/VfxExport`): **done** (2026-10-27, vfx4-2).

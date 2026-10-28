@@ -23,7 +23,7 @@ public sealed class ClothInstance
   private readonly (int Particle, int Anchor, float Length)[] _tethers;
   private readonly (int Bone, float Radius, Vector3 Offset, int Bone2, float Radius2, Vector3 Offset2)[] _capsules;
   private readonly (int Bone, float Radius, Vector3 Offset)[] _spheres;
-  private readonly (int Bone, Vector3 Half, Vector3 Offset)[] _boxes;
+  private readonly (int Bone, Vector3 Half, Vector3 Offset, Quaternion Rotation)[] _boxes;
   private Vector3[] _current;
   private Vector3[] _previous;
   private Vector3[] _skinned;
@@ -68,7 +68,7 @@ public sealed class ClothInstance
       .Where(c => c.Item1 >= 0 && c.Item4 >= 0)
       .ToArray();
     _spheres = entry.Config.Spheres.Select(s => (Find(s.Bone), s.Radius, s.BoneOffset)).Where(s => s.Item1 >= 0).ToArray();
-    _boxes = entry.Config.Boxes.Select(b => (Find(b.Bone), b.Size * 0.5f, b.BoneOffset)).Where(b => b.Item1 >= 0).ToArray();
+    _boxes = entry.Config.Boxes.Select(b => (Find(b.Bone), b.Size * 0.5f, b.BoneOffset, b.Rotation)).Where(b => b.Item1 >= 0).ToArray();
     _current = (Vector3[])_bind.Clone();
     _previous = (Vector3[])_bind.Clone();
     _skinned = (Vector3[])_bind.Clone();
@@ -331,8 +331,9 @@ public sealed class ClothInstance
     {
       if (b.Bone >= worlds.Length)
         continue;
-      var frame = Normalized(worlds[b.Bone]);
-      var centre = Vector3.Transform(b.Offset, frame);
+      var bone = Normalized(worlds[b.Bone]);
+      var centre = Vector3.Transform(b.Offset, bone);
+      var frame = b.Rotation.IsIdentity ? bone : Matrix4x4.CreateFromQuaternion(b.Rotation) * bone; // mtl1-37: rotated locator boxes
       frame.Translation = centre;
       list.Add(new Collider(1, centre, centre, 0, 0, frame, b.Half));
     }

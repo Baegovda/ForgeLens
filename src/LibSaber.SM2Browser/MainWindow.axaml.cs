@@ -1072,6 +1072,7 @@ public partial class MainWindow : Window
     _suppressAnim = false;
     var modelPath = _previewFileIndex >= 0 ? catalog.GetFile(_previewFileIndex).Path : key;
     var physicsMesh = _mesh;
+    var previewIndex = _previewFileIndex;
     var (choices, owner) = await Task.Run(() =>
     {
       _clipHeaders ??= SaniIndex.ReadHeaders(catalog, store);
@@ -1080,6 +1081,8 @@ public partial class MainWindow : Window
         try
         {
           physicsMesh.Physics = PhysicsLocator.Find(catalog, store, modelPath) ?? new PhysicsSetup();
+          if (previewIndex >= 0 && !physicsMesh.Physics.IsEmpty)
+            CdtObjectResolver.Apply(physicsMesh.Physics, physicsMesh.Bones, TplMarkup.Find(catalog, store, previewIndex)); // mtl1-37
         }
         catch (Exception exception)
         {

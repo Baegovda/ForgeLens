@@ -55,6 +55,8 @@ public static class PhysicsParser
         entry.MaxInfluenceDist = Num(remap, "maxInfluenceDist", entry.MaxInfluenceDist);
         entry.DistanceRemapPower = Num(remap, "distanceRemapPower", entry.DistanceRemapPower);
         entry.UseTopologicalDistance = Bool(remap, "useTopologicalDistance", false);
+        if (remap["maxInfluenceVert"] is not null)
+          entry.MaxInfluenceVert = (int)Math.Round(Num(remap, "maxInfluenceVert", 4f));
       }
 
       if (Child(item, "config") is JsonObject config)

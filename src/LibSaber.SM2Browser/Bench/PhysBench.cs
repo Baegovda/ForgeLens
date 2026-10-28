@@ -43,6 +43,9 @@ internal static class PhysBench
     var clip = SaniReader.FromBytes(File.ReadAllBytes(saniPath),
       File.Exists(saniPath + "_data") ? File.ReadAllBytes(saniPath + "_data") : null, Path.GetFileNameWithoutExtension(saniPath));
     mesh.Physics = PhysicsLocator.Find(new PhysicsLocator.DirectorySource(clsRoot), stem + ".tpl");
+    var markup = Path.Combine(dir, stem + ".tpl_markup");
+    if (mesh.Physics is not null && File.Exists(markup))
+      CdtObjectResolver.Apply(mesh.Physics, mesh.Bones, TplMarkup.Locators(File.ReadAllText(markup))); // mtl1-37
     Line($"physbench {DateTime.Now:yyyy-MM-dd HH:mm:ss} {stem}: verts {mesh.Positions.Count} bones {mesh.Bones.Count} sims {mesh.ClothSims.Count}; clip {clip.Name} {clip.Duration:0.00}s tracks {clip.Tracks.Count}");
     Line($"class {mesh.Physics?.SourceClass}: cloths {mesh.Physics?.Cloths.Count} jiggles {mesh.Physics?.Jiggles.Count}");
     var runtime = MeshPreview.PhysicsFor(mesh);

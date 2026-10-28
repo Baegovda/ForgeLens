@@ -440,7 +440,7 @@ int32 AddCollision(UPhysicsAsset* PA, const TSharedPtr<FJsonObject>& Coll, const
   FString Space;
   Coll->TryGetStringField(TEXT("space"), Space);
   const bool bMirror = Space == TEXT("ueMesh"); // un-negate extractor-mirrored offsets -> raw bone-local
-  int32 N = 0, Missing = 0, Remapped = 0, BoxRestInside = 0;
+  int32 N = 0, Missing = 0, Remapped = 0, BoxRestInside = 0, FromLocator = 0;
   // mtl1-33: generic missing-bone handling. Shared CDT shapes are defined per prop and can name bones the model does not
   // have (calgar: box on Backpack_CDT_L). Rule (HEURISTIC, sidecar collision.missingBoneRemap=false -> skip only):
   // split names into lower-case tokens at '_' / case changes are NOT split; side tokens l/r/left/right and "cdt" are qualifiers,
@@ -504,6 +504,15 @@ int32 AddCollision(UPhysicsAsset* PA, const TSharedPtr<FJsonObject>& Coll, const
     return true;
   };
   const TArray<TSharedPtr<FJsonValue>>* Arr = nullptr;
+  // mtl1-37: shapes whose bone was a tpl_markup locator arrive already on the locator's parent bone (exporter, ResolvedFrom).
+  static const TCHAR* ShapeArrays[] = { TEXT("capsules"), TEXT("spheres"), TEXT("boxes") };
+  for (const TCHAR* F : ShapeArrays)
+    if (Coll->TryGetArrayField(F, Arr))
+      for (const TSharedPtr<FJsonValue>& V : *Arr)
+      {
+        FString RF;
+        if (V->AsObject().IsValid() && V->AsObject()->TryGetStringField(TEXT("ResolvedFrom"), RF) && !RF.IsEmpty()) ++FromLocator;
+      }
   if (Coll->TryGetArrayField(TEXT("capsules"), Arr))
     for (const TSharedPtr<FJsonValue>& V : *Arr)
     {
@@ -579,12 +588,25 @@ int32 AddCollision(UPhysicsAsset* PA, const TSharedPtr<FJsonObject>& Coll, const
       const FVector Sz = JVec(K, TEXT("sizeCm"), false);
       FKBoxElem E(Sz.X, Sz.Y, Sz.Z);
       E.Center = JVec(K, TEXT("offsetCm"), bMirror);
+      // mtl1-37: a box resolved from a rotated tpl_markup locator carries its edge directions (sizeCm order) in the bone frame.
+      const TArray<TSharedPtr<FJsonValue>>* Ax = nullptr;
+      if (K->TryGetArrayField(TEXT("axesUe"), Ax) && Ax->Num() == 3)
+      {
+        FVector A[3];
+        for (int32 J = 0; J < 3; ++J)
+        {
+          const TArray<TSharedPtr<FJsonValue>>& C = (*Ax)[J]->AsArray();
+          A[J] = C.Num() >= 3 ? FVector(C[0]->AsNumber(), C[1]->AsNumber(), C[2]->AsNumber()).GetSafeNormal() : FVector::ZeroVector;
+        }
+        if (FVector::DotProduct(FVector::CrossProduct(A[0], A[1]), A[2]) < 0) A[0] = -A[0]; // the axis convert mirrors X; a box is symmetric
+        E.Rotation = FMatrix(A[0], A[1], A[2], FVector::ZeroVector).Rotator();
+      }
       int32 In = 0;
       if (RestPV) // mtl1-33: boxes are not rest-fitted; count free rest particles that start inside (logged)
         for (int32 I = 0; I < RestPV->Num(); ++I)
         {
           if (RestMaxDist && RestMaxDist->IsValidIndex(I) && (*RestMaxDist)[I] <= 0.1f) continue;
-          const FVector Q = (T.InverseTransformPosition(FVector((*RestPV)[I])) - E.Center).GetAbs() - FVector(Sz.X, Sz.Y, Sz.Z) * 0.5;
+          const FVector Q = E.Rotation.Quaternion().UnrotateVector(T.InverseTransformPosition(FVector((*RestPV)[I])) - E.Center).GetAbs() - FVector(Sz.X, Sz.Y, Sz.Z) * 0.5;
           In += (Q.X < 0 && Q.Y < 0 && Q.Z < 0) ? 1 : 0;
         }
       if (RejectRemap(K->GetStringField(TEXT("Bone")), BN, K->HasField(TEXT("Name")) ? K->GetStringField(TEXT("Name")) : BN.ToString(), In > 0)) continue;
@@ -592,7 +614,7 @@ int32 AddCollision(UPhysicsAsset* PA, const TSharedPtr<FJsonObject>& Coll, const
       CollBody(PA, BN)->AggGeom.BoxElems.Add(E);
       ++N;
     }
-  Log.Add(FString::Printf(TEXT("%s: collision shapes=%d missingBones=%d remapped=%d remapRejected=%d unnegated=%d restFitted=%d minRadiusScale=%.2f boxRestInside=%d"), *Who, N, Missing, Remapped, Rejected, bMirror ? 1 : 0, Fitted, MinScale, BoxRestInside));
+  Log.Add(FString::Printf(TEXT("%s: collision shapes=%d missingBones=%d remapped=%d remapRejected=%d unnegated=%d restFitted=%d minRadiusScale=%.2f boxRestInside=%d tplLocator=%d"), *Who, N, Missing, Remapped, Rejected, bMirror ? 1 : 0, Fitted, MinScale, BoxRestInside, FromLocator));
   if (RemapLog.Num()) Log.Add(FString::Printf(TEXT("%s: collision remap (HEURISTIC) %s"), *Who, *FString::Join(RemapLog, TEXT(" "))));
   if (MissLog.Num()) Log.Add(FString::Printf(TEXT("%s: collision skipped (bone not in mesh) %s"), *Who, *FString::Join(MissLog, TEXT(" "))));
   return N;

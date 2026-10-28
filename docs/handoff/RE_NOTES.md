@@ -162,3 +162,7 @@ All addresses are virtual addresses in `sm2_retail.exe` (retail Steam build, 81 
 | 1 | r 3.82 | - | unmatched |
 
 - Raw (non-decoded) colour does not fit; ColorMultCtrl always spline [0,10], ignored. Adaptive scaling by avgLum HEURISTIC (one light).
+
+## mtl1-37 tpl_markup locators / cloth remap defaults
+- `.tpl_markup` `objectInfos[]` = per template object {objectId.name, animationRole, entities[]}; `tpl_markup_locator` entity = {name, localTransform{position m, rotation euler°}} parented to that object. Calgar: Backpack_CDT_L@powerplant_backpack (0.203,0,-0.593), fx_loc_chest@BACKup, fx_muzzle_l@ARM2L (0,90,0), fx_loc_hit_l@HANDL, fx_muzzle_r@ARM2R, fx_loc_hit_r@HANDR, fx_loc_hit@ROOT. sorcerer_exalted: none.
+- ClothEntry layout (serializer 0x141093480): +0 simMeshName, +8 renderMeshes, +0x18 simRemapConfig {maxInfluenceDist f32, +0x1c distanceRemapPower f32, +0x20 useTopologicalDistance u8}, +0x28 config (ctor 0x14108ef40). ClothEntry ctor 0x141093260: 0.15 / 5 / false. No `maxInfluenceVert` string in the retail exe.
