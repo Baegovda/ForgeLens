@@ -9,10 +9,19 @@ W = r"C:/Users/Revaptor_FX/Desktop/SM2_Work"; folder = "/Game/SM2_Work/Tests/%s/
 pj = W + "/Exports/%s/%s/tpl/%s.tpl/%s.physics.json" % (SET, name, name, name)
 EAL = unreal.EditorAssetLibrary; lib = unreal.SM2PhysicsSetupLibrary
 src = folder + "/" + name; dst = folder + "/" + name + "_ChaosCloth"
+def fix_redirector(p):
+    # The redirector's referencers (e.g. a test level) keep the path; deleting the redirector and recreating the mesh at the
+    # same path makes them load the NEW mesh (AssetTools fix-up is not exposed to Python in 5.7).
+    if not EAL.does_asset_exist(p) or str(EAL.find_asset_data(p).asset_class_path.asset_name) != "ObjectRedirector": return
+    print("CHAOS redirector deleted", p, EAL.find_package_referencers_for_asset(p, False), EAL.delete_asset(p))
+# earlier run's redirector
+fix_redirector(dst)
 if EAL.does_asset_exist(dst):
     n = 1
     while EAL.does_asset_exist(dst + "_bak%d" % n): n += 1
     EAL.rename_asset(dst, dst + "_bak%d" % n); EAL.save_asset(dst + "_bak%d" % n, only_if_is_dirty=False)
+# mtl1-22: a referenced mesh leaves an ObjectRedirector at dst after the rename; remove it so dst is free for the new mesh.
+fix_redirector(dst)
 mesh = EAL.duplicate_asset(src, dst)
 r = lib.create_chaos_cloth(mesh, pj)
 if isinstance(r, tuple) and len(r) == 3: ok, conv, rep = r

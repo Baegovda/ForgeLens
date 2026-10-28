@@ -806,6 +806,40 @@ bool USM2PhysicsSetupLibrary::CreateChaosCloth(USkeletalMesh* Mesh, const FStrin
       Mask.Values[I] = Cm;
       Pinned += Cm <= 0.0f;
     }
+    const TArray<float> MaxCm = Mask.Values; // Mask ref is invalidated by the AddDefaulted below
+    // 4b. mtl1-22: backstop (HEURISTIC, generic; not from the game). A free particle may sink at most BackstopCm behind its
+    // skinned position along the animated normal (non-legacy Chaos backstop: sphere surface at Distance behind, radius R).
+    // R = clamp(2 x MaxDistance, 5, 50) cm approximates a plane locally; pinned particles get 0 (off).
+    // Sidecar ue.chaosCloth.backstopCm overrides the 1 cm default; < 0 disables.
+    {
+      const TSharedPtr<FJsonObject>* UeB = nullptr;
+      const TSharedPtr<FJsonObject>* CCB = nullptr;
+      double BackCm = 1.0;
+      if (Cloth->TryGetObjectField(TEXT("ue"), UeB) && (*UeB)->TryGetObjectField(TEXT("chaosCloth"), CCB))
+        (*CCB)->TryGetNumberField(TEXT("backstopCm"), BackCm);
+      if (BackCm >= 0.0)
+      {
+        const TArray<float> MDv = MaxCm;
+        CLod.PointWeightMaps.AddDefaulted(2);
+        FPointWeightMap& BD = CLod.PointWeightMaps[CLod.PointWeightMaps.Num() - 2];
+        BD.Initialize(PV.Num());
+        BD.Name = TEXT("SM2_BackstopDistance");
+        BD.CurrentTarget = (uint8)EWeightMapTargetCommon::BackstopDistance;
+        BD.bEnabled = true;
+        FPointWeightMap& BR = CLod.PointWeightMaps.Last();
+        BR.Initialize(PV.Num());
+        BR.Name = TEXT("SM2_BackstopRadius");
+        BR.CurrentTarget = (uint8)EWeightMapTargetCommon::BackstopRadius;
+        BR.bEnabled = true;
+        for (int32 I = 0; I < PV.Num(); ++I)
+        {
+          const bool bFree = MDv[I] > 0.0f;
+          BD.Values[I] = bFree ? (float)BackCm : 0.0f;
+          BR.Values[I] = bFree ? FMath::Clamp(2.0f * MDv[I], 5.0f, 50.0f) : 0.0f;
+        }
+        Log.Add(FString::Printf(TEXT("%s: backstop %.2fcm on %d free particles"), *SimName, BackCm, PV.Num() - Pinned));
+      }
+    }
     Asset->ApplyParameterMasks(true);
 
     // 5. ChaosClothConfig from ue.chaosCloth (copied; see PhysicsSidecar note). Velocity clamps are HEURISTIC (root-motion dashes).
@@ -864,7 +898,7 @@ bool USM2PhysicsSetupLibrary::CreateChaosCloth(USkeletalMesh* Mesh, const FStrin
       TSharedPtr<FJsonObject> Coll;
       if (CC.IsValid() && CC->TryGetObjectField(TEXT("collision"), CO))
         Coll = *CO;
-      if (AddCollision(CollPA, Coll, Mesh->GetRefSkeleton(), RefCS, Log, SimName, &PV, &Mask.Values, FMath::Max(2.0f, (float)Num(CC, TEXT("collisionThicknessCm"), 1))) > 0 || CollPA->SkeletalBodySetups.Num() > 0)
+      if (AddCollision(CollPA, Coll, Mesh->GetRefSkeleton(), RefCS, Log, SimName, &PV, &MaxCm, FMath::Max(2.0f, (float)Num(CC, TEXT("collisionThicknessCm"), 1))) > 0 || CollPA->SkeletalBodySetups.Num() > 0)
       {
         Asset->PhysicsAsset = CollPA;
         Asset->RefreshBoneMapping(Mesh);

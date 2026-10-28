@@ -190,10 +190,7 @@ public static class AssetExporter
       var pixels = document.Decode(0, 0, out var width, out var height, out var note);
       if (document.Format == SpaceMarine2.Enumerations.SM2TextureFormat.DXN && !TextureInfo.IsNormalName(file.Path))
       {
-        // BC5 masks (MetGray(r)+Roughness(a)) store two channels. B is not a normal Z here.
-        // Decode returns BGRA, so blue is byte 0. (Byte 2 is red = metalness; zeroing it made every spec mask non-metal.)
-        for (var i = 0; i < pixels.Length; i += 4)
-          pixels[i] = 0;
+        FixBc5MaskPixels(pixels);
       }
       if (note.Length > 0)
         report.Messages.Add(file.Path + ": " + note);
@@ -1133,6 +1130,16 @@ public static class AssetExporter
       notes = material.Notes,
     }, JsonOptions));
     report.Written++;
+  }
+
+  /// <summary>
+  /// BC5 masks (MetGray(r)+Roughness(a)) store two channels. B is not a normal Z here.
+  /// Decode returns BGRA, so blue is byte 0. (Byte 2 is red = metalness; zeroing it made every spec mask non-metal.)
+  /// </summary>
+  public static void FixBc5MaskPixels(byte[] pixels)
+  {
+    for (var i = 0; i < pixels.Length; i += 4)
+      pixels[i] = 0;
   }
 
   private static string Destination(string outputDirectory, string relative, string extension, IReadOnlyList<string> batch)

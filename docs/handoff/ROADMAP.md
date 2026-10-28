@@ -48,3 +48,4 @@ Pushed so far: sockets/bone attach, anim-event cues and stop cues, distortion, d
 
 ## Possible future development (not on the roadmap)
 - Niagara conversion (`.sfx` → UE Niagara). Removed from the roadmap by the user (2026-10-27). Only start if the user asks for it again.
+- UE multi-game extraction (generic Unreal Engine `.pak`/IoStore extraction for other games, beyond SM2/Swarm). Added by the user (2026-10-28) as a possible future item only; not started.
