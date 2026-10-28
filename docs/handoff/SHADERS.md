@@ -65,7 +65,8 @@ hdr lut distort distort_postproc particles particles_gpu sfx trail combine_mater
      alpha = sat((tex.a·vc.a − e)/(1 − e/2)), e = erosion (TEXCOORD_2.y, 0 when flag 0x400).
 5. glt spec-map flags OBJ_MTLBLEND_LAYER_CONST[15].x (CB_OBJ_MATERIAL_DATA reg 21): 5,414 glt PS read it, all test the
    same bits {2,4,32..32768}; the 164 GLT_IS_DECAL perms omit bit 512. No permutation hard-codes it ⇒ it is a pure
-   CPU per-material value; the UseSpecMap writer cannot be settled from shaders.
+   CPU per-material value; the UseSpecMap writer cannot be settled from shaders. mtl1-39: exe light RE (usage table
+   0x144ccee10, parser FUN_14267baf0) did not find the writer either; still HEURISTIC.
 6. Clustered light falloff (particles PS 214/215 PASS_LIGHT_ATLAS_DRAW, CB_COMMON_LIGHTNG light i = regs 4i+1..4i+3):
      k = sat(P.w·400); L = P.xyz − k·x; d2 = |L|²; win = sat(1 − (k·d2)²·C1.w)²; spot = sat(dot(−L̂, D.xyz)·S + D.w)²
      I = spot·win·((1−k)+P.w)·C1.rgb  (no 1/d² in the point path; area/tube branch uses 1/(d²+P.w)·0.25).

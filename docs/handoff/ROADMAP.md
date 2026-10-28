@@ -20,6 +20,7 @@ Pushed so far: sockets/bone attach, anim-event cues and stop cues, distortion, d
 2. **[checked mtl1-19: opt-in SM2_VFX_TRAIL_TC=1; in-game shots also show no visible trail]** **Bolter smoke trail:** faint by data (see HANDOFF vfx3 part 3); not a bug. Optional: apply `tcIn` scale on trails; confirm visually in-game.
 3. **[mtl1-23: RenderDoc captures resolved blend PSOs (particles/trails/sparks/sfx meshes), distortion strength (0.08, ±0.02), tonemap + exposure (key ~0.11/avgLum) - see STATUS mtl1-23; still open: ratio*, blend_add vs blend in-game split, size radius, sfx[560].w td source]** [mtl1-20 retry: still PARTIAL] **REA of the guessed values:**
    - `ratioDependency` / `ratioXY`;
+   - sfx blendMode enum (none 0/add 1/blend 2/premul_a 3) and define slots PROVEN mtl1-39; enum → define consumer still HEURISTIC.
    - `blend_add` semantics: **PROVEN mtl1-38** (no flag bit ⇒ same as blend);
    - exposure 1/250 and light ×100 scale;
    - size radius vs half-width on meshes/trails;
@@ -52,7 +53,7 @@ Pushed so far: sockets/bone attach, anim-event cues and stop cues, distortion, d
 ## Leads from the mtl1-23 captures
 - Armory per-instance customization colours (LWI_INST_DATA_BUF, see HANDOFF mtl1-23): map slots +21..23 / +28..30 to the _cc mask channels (HEURISTIC today) and apply in UE/browser.
 - Hellbrute: sections -> draws **done** (mtl1-24: 31/31 by index count, variants already correct, no exporter change). Open: dump DYNAMIC_GLT_BUFFER rgb and the chameleon draw CBs (eids 3419-3452, PS 22961) in the next capture; compare M_SM2 chameleon/aniso response under matched lighting.
-- Chameleon **done** (mtl1-26). InstanceTint param + sidecar layers[] **done** (mtl1-27). Open: writer of OBJ_MTLBLEND_LAYER_CONST[15].x (flags 0 on 16/16 Hellbrute draws; needs a non-Hellbrute capture, UseSpecMap still HEURISTIC); importer shading of layers[] (dirt / dirt_no_spec AO layers, vertex-colour weights); Calgar cape stripe source (not a material layer); matched-lighting UE vs game comparison.
+- Chameleon **done** (mtl1-26). InstanceTint param + sidecar layers[] **done** (mtl1-27). Open: writer of OBJ_MTLBLEND_LAYER_CONST[15].x (mtl1-39 light RE: usage table/parser found, writer not; flags 0 on 16/16 Hellbrute draws; needs a non-Hellbrute capture, UseSpecMap still HEURISTIC); importer shading of layers[] (dirt / dirt_no_spec AO layers, vertex-colour weights); Calgar cape stripe source (not a material layer); matched-lighting UE vs game comparison.
 - Mod Tools (appid 3856330): click Install in Steam, then ilspycmd the managed DLLs for TD/material (chameleon, aniso, second spec, colorization, DYNAMIC_GLT), .sani, cloth, sfx. Then multi-layer material export (layers[].blending weights) and cloth coverage rule (rigid if SIM does not cover REND).
 - Trails and sparks are not drawn by the browser GPU renderer yet; blend rules are ready in VfxBlendRules.
 

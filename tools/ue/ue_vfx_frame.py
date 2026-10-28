@@ -118,6 +118,11 @@ def import_textures(files, folder, linear_names):
         elif lin or name.startswith("sm2r_"):
             tex.set_editor_property("compression_settings", unreal.TextureCompressionSettings.TC_VECTOR_DISPLACEMENTMAP)
             tex.set_editor_property("mip_gen_settings", unreal.TextureMipGenSettings.TMGS_NO_MIPMAPS)
+        elif os.environ.get("SM2_UE_TEX_BC") != "1":
+            # mtl1-39: the PNGs are already decoded game BCn data; re-encoding to BC1/3 adds a second block error that
+            # additionalContrast (boost up to 1+41x near the key colour) amplifies (cine_bomb fireball blue +11/255).
+            # Keep them uncompressed RGBA8 (sRGB kept, mips kept). SM2_UE_TEX_BC=1 restores the default compression.
+            tex.set_editor_property("compression_settings", unreal.TextureCompressionSettings.TC_EDITOR_ICON)
         tex.set_editor_property("lod_group", unreal.TextureGroup.TEXTUREGROUP_EFFECTS)
         tex.set_editor_property("never_stream", True)
         EAL.save_loaded_asset(tex)
