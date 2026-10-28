@@ -41,7 +41,7 @@ Pushed so far: sockets/bone attach, anim-event cues and stop cues, distortion, d
 
 ## Leads from the mtl1-23 captures
 - Armory per-instance customization colours (LWI_INST_DATA_BUF, see HANDOFF mtl1-23): map slots +21..23 / +28..30 to the _cc mask channels (HEURISTIC today) and apply in UE/browser.
-- Hellbrute: which tpl/visibility the game draws (frame 68141 has no armor_01/arm_01/legs_02 draws, armor_02 drawn with the default variant only); needs the .pak archives on the box to map our sections to draws. DYNAMIC_GLT_BUFFER per-instance albedo rgb was not dumped (next capture).
+- Hellbrute: sections -> draws **done** (mtl1-24: 31/31 by index count, variants already correct, no exporter change). Open: dump DYNAMIC_GLT_BUFFER rgb and the chameleon draw CBs (eids 3419-3452, PS 22961) in the next capture; compare M_SM2 chameleon/aniso response under matched lighting.
 - Trails and sparks are not drawn by the browser GPU renderer yet; blend rules are ready in VfxBlendRules.
 
 ## Later / backlog
