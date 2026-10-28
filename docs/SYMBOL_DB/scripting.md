@@ -1,4 +1,4 @@
-# RE map — scripting and data links (SSL classes, blueprints, resources)
+# symbol DB — scripting and data links (SSL classes, blueprints, resources)
 
 **Scope:** how game data links classes, models, animations, weapons and effects. Mostly data-level RE (text SSL + resource YAML), which is why few exe addresses appear here.
 

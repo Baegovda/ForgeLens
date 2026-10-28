@@ -1,12 +1,12 @@
-# RE map ("genome map") of sm2_retail.exe and the SM2 game data
+# symbol DB ("genome map") of sm2_retail.exe and the SM2 game data
 
 One place to look up what is already reverse-engineered, so new work starts from the map instead of re-running Ghidra.
 
 ## How to use
-1. `grep -i <word or address> docs/RE_MAP/index.tsv` (columns: symbol | address | domain | purpose | status | doc | dump | strings).
+1. `grep -i <word or address> docs/SYMBOL_DB/index.tsv` (columns: symbol | address | domain | purpose | status | doc | dump | strings).
 2. Open the domain file below for the overview (entry points, data links, code that implements it, open questions).
 3. Only if the map has nothing: run new RE (Ghidra headless, see RE_NOTES.md header), write the result into RE_NOTES / HANDOFF with a status word, and regenerate the map:
-   `python3 tools/re_map/build_re_map.py` (repo root; default dump dirs `/workspace/rea`, `/workspace/mtl_fix/m48` on the box).
+   `python3 tools/symbol_db/build_symbol_db.py` (repo root; default dump dirs `/workspace/rea`, `/workspace/mtl_fix/m48` on the box).
 
 ## Domains
 | Domain | File | What it covers |
