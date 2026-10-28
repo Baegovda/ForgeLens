@@ -8,7 +8,8 @@ namespace LibSaber.SM2.Assets.Customization;
 /// <summary>
 ///   <c>--variant</c> request. Tokens are separated by <c>,</c> or <c>;</c>:
 ///   <c>default</c> (PREDEFINED_PRESET_1 of the template's appearance), <c>all</c> (no filter, every armor piece),
-///   <c>preset=N</c>, <c>appearance=TEAM/UID</c>, <c>SECTION=regionUid</c> (for example <c>HELMET=helmet_tank_common_01</c>),
+///   <c>preset=N</c>, <c>appearance=TEAM/UID</c>, <c>SECTION=regionUid</c> (for example <c>HELMET=helmet_tank_common_01</c>;
+///   <c>SECTION=none</c> empties the slot),
 ///   <c>+object</c> to force an object on and <c>-object</c> to force it off.
 /// </summary>
 public sealed class VariantRequest
@@ -379,6 +380,13 @@ public static class ArmorVariant
 
     foreach (var (section, uid) in request.Regions)
     {
+      if (uid.Equals(KitbashLibrary.NoneUid, StringComparison.OrdinalIgnoreCase))
+      {
+        // ui-44 Kitbasher: SLOT=none leaves the slot empty (every region of it hides).
+        result.Regions.Remove(section);
+        continue;
+      }
+
       if (library.Region(team, appearance, section, uid) is null)
       {
         var known = result.AvailableRegions.TryGetValue(section, out var list) ? string.Join(", ", list.Take(6)) + (list.Count > 6 ? ", ..." : "") : "none";
@@ -402,6 +410,8 @@ public static class ArmorVariant
 
       foreach (var name in SslText.Strings(region.GetValueOrDefault("meshes")))
       {
+        if (name.Length == 0)
+          continue; // the library has a few empty mesh entries (CHAOS engineer left pauldron)
         if (!byName.ContainsKey(name))
           result.Notes.Add($"{section}={uid}: object {name} is not in {mesh.Name}.");
         AddSubtree(name, shown);

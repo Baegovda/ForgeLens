@@ -6,7 +6,7 @@ namespace LibSaber.SM2.Assets.Tests;
 public class ArmorVariantTests
 {
   // Shape of ssl/body/customization/character_customization_library.sso (text SSL).
-  private const string Library = """
+  internal const string Library = """
 appearancesByTeams   =   {
    LOYALIST   =   {
       customizationPresets   =   {
@@ -92,7 +92,7 @@ appearancesByTeams   =   {
 }
 """;
 
-  private static ExportedMesh Tank()
+  internal static ExportedMesh Tank()
   {
     var mesh = new ExportedMesh { Name = "cc_sm_constructor_tank" };
     void Add(string name, int parent, bool part = true)
@@ -117,7 +117,7 @@ appearancesByTeams   =   {
     return mesh;
   }
 
-  private static HashSet<string> Visible(ExportedMesh mesh)
+  internal static HashSet<string> Visible(ExportedMesh mesh)
     => mesh.Parts.Where(part => part.Visible).Select(part => part.Name).ToHashSet();
 
   [Fact]
