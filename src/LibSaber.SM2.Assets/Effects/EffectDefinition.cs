@@ -10,7 +10,10 @@ public enum EffectBlend { Blend = 0, Add = 1, BlendAdd = 2 }
 ///   Particle blend as REA'd (vfx3m). FUN_1417e1e50 packs per-emitter flags into PART_EMITTERS_SHARED_DATA row 3.x
 ///   (CPU table 0x14400c7ec, 0x60 B per emitter, uploaded by FUN_1418541b0 to t8,space2):
 ///   bit 0x20 = blendType==add (emitter+0x48c), bit 0x400 = !(isBlendAlphaMultiply (+0x490) &amp;&amp; blendType!=add).
-///   particles.sdc PS 00000_0: rgb = col*vertexAlpha*(bit0x400 ? 1 : texAlpha'), outAlpha = bit0x20 ? 0 : vertexAlpha*texAlpha'.
+///   Shader side PROVEN (mtl1-38, static particles PS 281 GLSL: _208 = bit0x400, _1019 = bit0x20, lines 127-131, 788-790,
+///   1077-1091): ac = sat((texA*vertexA - clip)/(1 - 0.5*clip)), clip = bit0x400 ? 0 : TEXCOORD_2.y;
+///   rgb *= sat(ac + bit0x400); outAlpha = bit0x20 ? 0 : ac. The vertexAlpha on rgb below for bit0x400 is HEURISTIC
+///   (CPU fold of the age alpha into the vertex colour not traced).
 ///   Output alpha 0 for add implies a premultiplied ONE/INV_SRC_ALPHA PSO (capture-verified mtl1-23:
   ///   RenderDoc smoke 88302 / outdoor 137266 CPU particle draws, PS 101818 = One/InvSrcAlpha; see VfxBlendRules).
 ///   blend_add has no bit of its own, so it renders exactly like blend. Default ON since vfx3u (in-game frag grenade

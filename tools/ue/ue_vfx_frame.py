@@ -38,9 +38,9 @@ LINEAR = ("_lin", "sm2r_ramp", "sm2r_nrm")
 
 PARTICLE = """float a = T.a * (HasMask > 0.5 ? M.a : 1.0);
 a = Clip > 0.0 ? saturate((a - Clip) / max(1.0 - Clip, 1e-4)) : a;
-float3 tx = lerp(dot(T.rgb, float3(0.299, 0.587, 0.114)).xxx, T.rgb, Tint);
-tx *= 1.0 + Contrast * saturate(1.0 - length(Key.rgb - tx));
-float3 hdr = C.rgb * tx;
+// PROVEN particles PS 281 (mtl1-38): boost = 1 + Contrast*sat(1 - |Key - tex|); hdr = lerp(tex*C*boost, Tint*C*tex.a, Tint)
+float3 c0 = T.rgb * C.rgb * (1.0 + Contrast * saturate(1.0 - length(Key.rgb - T.rgb)));
+float3 hdr = lerp(c0, Tint * C.rgb * T.a, Tint);
 float va = saturate(C.a);
 """
 CODE = {
@@ -63,7 +63,7 @@ return float3(clamp(0.08 * m * o, -0.02, 0.02), 0.0);"""
 TONEMAP = """float3 x = max(S.rgb * Exposure, 0.0);
 if (LutOn > 0.5)
 {
-  // CaptureLut strip (1024x32: x = r + 32*b, y = g), coordinate = inverse of the s1996 bake input (HEURISTIC)
+  // CaptureLut strip (1024x32: x = r + 32*b, y = g), coordinate = inverse of the s1996 bake input (PROVEN hdr PS 44/47)
   const float c0 = 0.18 * exp2(-0.43 * 14.0);
   float3 t = saturate(0.43 + log2((x + c0) / 0.18) / 14.0) * 31.0;
   float b0 = min(floor(t.b), 30.0); float fb = t.b - b0;
@@ -343,7 +343,10 @@ elif mode == "render":
         lc.set_editor_property("intensity", mx * S.SURFACE)
         lc.set_light_color(unreal.LinearColor(l["color"][0] / mx, l["color"][1] / mx, l["color"][2] / mx, 1.0))
         lc.set_editor_property("attenuation_radius", l["radius"] * 100.0)
-        lc.set_editor_property("use_inverse_squared_falloff", False); lc.set_editor_property("light_falloff_exponent", 4.0)  # approx sat(1-(d/r)^4)^2
+        lc.set_editor_property("use_inverse_squared_falloff", False); lc.set_editor_property("light_falloff_exponent", 1.0)
+        # SM2 window sat(1-(d/r)^4)^2 is PROVEN (particles PS 214); UE non-inverse-square falloff is (1-(d/r)^2)^n
+        # (Engine DynamicLightingCommon.ush RadialAttenuation), which cannot express it. n = 1 is the best fit
+        # (max error 0.13 vs 0.59 for the previous n = 4): APPROXIMATION.
     drawn = 0
     for i, b in enumerate(batches):
         mi = unreal.load_asset(f"{dest}/MI/{mi_key(b)}") if b["texture"] else None

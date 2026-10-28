@@ -92,9 +92,10 @@ public sealed class GradingLut
 ///   t = sRGB(sat(Hable(x) * WHITEPOINT_SCALE)); out = lerp(PREV(t*sP+oP), NEXT(t*sN+oN), INTERPOLATION_WEIGHT).
 ///   Captures: weight 1.0 (= NEXT). smoke/plasma NEXT = runtime COLOR_GRADING_0x 16^3 (contents not dumped: identity
 ///   is HEURISTIC); outdoor NEXT = content texture story_tower_lut (32^3, exact).
-///   The apply side (final PS 1209 / 1159 samples TONEMAP_LUT) was not disassembled: the HDR -> uvw mapping used here,
-///   the inverse of the bake (u = GREY + log2((x + c0)/0.18)/RANGE, c0 = 0.18*2^(-GREY*RANGE)) with texel-centre
-///   scale/offset, is HEURISTIC.
+///   Apply side PROVEN (mtl1-38, static hdr PS 44/47, docs/handoff/SHADERS.md): c = EXPOSURE*(min(scene,64512) +
+///   min(bloom,64512)); uvw = sat(0.43 + log2((c + c0)/0.18)/14)*31/32 + 1/64, c0 = 0.18*2^(-0.43*14), i.e. exactly
+///   <see cref="Coordinate"/> followed by the texel-centre scale/offset of <see cref="GradingLut.Lookup"/>. PS 47 adds a
+///   triangular dither (not modelled); output alpha 0.
 /// </summary>
 public static class CaptureLut
 {
@@ -107,7 +108,7 @@ public static class CaptureLut
     return MathF.Max(0f, 0.18f * MathF.Pow(2f, (u - grey) * range)) - MathF.Max(0f, 0.18f * MathF.Pow(2f, -grey * range));
   }
 
-  /// <summary>Inverse of <see cref="Input"/> (HEURISTIC apply-side mapping), clamped to 0..1.</summary>
+  /// <summary>Inverse of <see cref="Input"/>, clamped to 0..1: the PROVEN apply-side mapping (hdr PS 44/47).</summary>
   public static float Coordinate(float exposed)
   {
     const float grey = CaptureTonemap.LutGreyPoint, range = CaptureTonemap.LutRangeLog;

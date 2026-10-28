@@ -86,10 +86,11 @@ for b in batches:
             shift[yy, xx] += np.clip(0.08 * mk * o, -0.02, 0.02); continue
         a = t[:, 3] * (sample(M, A[:, 11], A[:, 12])[:, 3] if M is not None else 1)
         clip = A[:, 9]; a = np.where(clip > 0, np.clip((a - clip) / np.maximum(1 - clip, 1e-4), 0, 1), a)
-        lum = (t[:, :3] @ np.array([0.299, 0.587, 0.114], np.float32))[:, None]
-        tx = lum + (t[:, :3] - lum) * b["textureTint"]
-        tx = tx * (1 + b["contrast"] * np.clip(1 - np.linalg.norm(np.array(b["contrastKey"]) - tx, axis=1, keepdims=True), 0, 1))
-        c = A[:, 5:8] * tx; va = np.clip(A[:, 8], 0, 1); dst = hdr[yy, xx]
+        # PROVEN particles PS 281 (mtl1-38): c0 = tex*V*boost, boost = 1 + contrast*sat(1 - |key - tex|); c = mix(c0, t*V*tex.a, t)
+        tt = b["textureTint"]
+        boost = 1 + b["contrast"] * np.clip(1 - np.linalg.norm(np.array(b["contrastKey"]) - t[:, :3], axis=1, keepdims=True), 0, 1)
+        c0 = A[:, 5:8] * t[:, :3] * boost
+        c = c0 + tt * (tt * A[:, 5:8] * t[:, 3:4] - c0); va = np.clip(A[:, 8], 0, 1); dst = hdr[yy, xx]
         if soft > 0: va = va * np.clip((zbuf[yy, xx] - z) / soft, 0, 1)
         if kind == "AlphaComposite":
             k = va * a if b["rgbTexAlpha"] else va; ao = va * a if b["outAlpha"] else 0 * va
@@ -104,7 +105,7 @@ if np.abs(shift).max() > 0:
 x = np.maximum(hdr * E, 0)
 strip = (fr.get("grading") or {}).get("strip")
 if use_lut and strip:
-    # TONEMAP_LUT (CaptureLut.Bake, s1996) sampled with the HEURISTIC inverse-bake mapping, trilinear (strip x = r + 32*b, y = g).
+    # TONEMAP_LUT (CaptureLut.Bake, s1996) sampled with the PROVEN inverse-bake mapping (hdr PS 44/47), trilinear (strip x = r + 32*b, y = g).
     lut = np.asarray(Image.open(os.path.join(root, "textures", strip + ".png")).convert("RGB")).astype(np.float32) / 255
     N = lut.shape[0]; c0 = 0.18 * 2 ** (-0.43 * 14)
     u = np.clip(0.43 + np.log2((x + c0) / 0.18) / 14, 0, 1) * (N - 1)

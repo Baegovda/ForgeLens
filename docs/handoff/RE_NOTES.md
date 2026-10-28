@@ -166,3 +166,13 @@ All addresses are virtual addresses in `sm2_retail.exe` (retail Steam build, 81 
 ## mtl1-37 tpl_markup locators / cloth remap defaults
 - `.tpl_markup` `objectInfos[]` = per template object {objectId.name, animationRole, entities[]}; `tpl_markup_locator` entity = {name, localTransform{position m, rotation euler°}} parented to that object. Calgar: Backpack_CDT_L@powerplant_backpack (0.203,0,-0.593), fx_loc_chest@BACKup, fx_muzzle_l@ARM2L (0,90,0), fx_loc_hit_l@HANDL, fx_muzzle_r@ARM2R, fx_loc_hit_r@HANDR, fx_loc_hit@ROOT. sorcerer_exalted: none.
 - ClothEntry layout (serializer 0x141093480): +0 simMeshName, +8 renderMeshes, +0x18 simRemapConfig {maxInfluenceDist f32, +0x1c distanceRemapPower f32, +0x20 useTopologicalDistance u8}, +0x28 config (ctor 0x14108ef40). ClothEntry ctor 0x141093260: 0.15 / 5 / false. No `maxInfluenceVert` string in the retail exe.
+
+## Shader bundles (.sdc) — static (2026-10-28 KST, see SHADERS.md)
+- Format PROVEN (loader FUN_1420b4ce0): header + crc32-keyed groups + zlib streams; 80 files, 48,828 DXIL binaries; permutation defines from `filenamespreload`; DXIL HASH == RenderDoc shader hash.
+- Final PS 1209/1159 = hdr PS 44/47: uvw = sat(0.43 + log2((c + 0.18·2^(−0.43·14))/0.18)/14)·31/32 + 1/64, c = EXPOSURE·(scene + bloom). The mtl1-35 LUT-apply HEURISTIC is now PROVEN (PS 47 adds ±1/255 triangular dither; alpha 0).
+- SFX blend PROVEN via `psos`: SFX_BLEND_ADD_NO_ALPHA = One/One (alpha keep), SFX_ALPHA_BLEND = SrcAlpha/InvSrcAlpha.
+- Particles: single premultiplied One/InvSrcAlpha PSO; flag 0x20 (add) writes alpha 0; flag 0x400 (unless isBlendAlphaMultiply) skips colour×alpha; blend_add has no bit ⇒ identical to blend (shader side PROVEN).
+- textureTintControl t = shared[0].z: rgb = mix(tex·vc·boost, t·vc·tex.a, t); boost = 1 + sat(1 − |key/255 − tex|)·additionalContrast (shared[1]).
+- OBJ_MTLBLEND_LAYER_CONST[15].x: same bit tests in all 5,414 glt PS (decals omit 512) ⇒ CPU-only; UseSpecMap stays HEURISTIC.
+- Clustered light window (particles PS 214): sat(1 − d⁴·C1.w)² · spot², no 1/d² in the point path.
+- mtl1-38: PS 281 colour factor = sat(ac + flag0x400) (no vertex alpha with 0x400; vertex alpha only via ac); VS 248 TEXCOORD.rgb = COLOR_1.bgr·TEXCOORD_1.w·CB_COMMON[22].y, TEXCOORD.w = vertex alpha. SFX define table built at 0x142450650 (SFX_ALPHA_BLEND / SFX_BLEND_ADD_NO_ALPHA / SFX_IS_DECAL bits at +0x1028); the material → define selector is not found yet.

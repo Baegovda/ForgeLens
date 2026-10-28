@@ -96,7 +96,7 @@ def triangles(b):
 
 
 def lut_coord(x):
-    """HEURISTIC apply mapping (inverse of the s1996 bake input): exposed HDR -> LUT coordinate 0..1."""
+    """PROVEN apply mapping (hdr PS 44/47, mtl1-38; inverse of the s1996 bake input): exposed HDR -> LUT coordinate 0..1."""
     grey, rng = 0.43, 14.0
     c0 = 0.18 * 2.0 ** (-grey * rng)
     return min(max(grey + math.log2((max(x, 0.0) + c0) / 0.18) / rng, 0.0), 1.0)

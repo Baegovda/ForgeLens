@@ -34,7 +34,8 @@ public static class VfxBlendRules
     VfxDrawKind.Trail => new(true, "SrcAlpha", "InvSrcAlpha", "Zero", "One"),
     // eid 2086 (NOTES 12:10 blend list): blending disabled (opaque / alpha-tested), writes the VELOCITY target.
     VfxDrawKind.Spark => new(false, "One", "Zero", "One", "Zero"),
-    // plasma 101917 SFX meshes: additive, destination alpha kept.
+    // plasma 101917 SFX meshes: additive, destination alpha kept = SFX_BLEND_ADD_NO_ALPHA PSO (PROVEN state, mtl1-38 psos);
+    // material -> define selection not traced (HEURISTIC: every sfx mesh).
     VfxDrawKind.SfxMesh => new(true, "One", "One", "Zero", "One"),
     _ => throw new ArgumentOutOfRangeException(nameof(kind))
   };

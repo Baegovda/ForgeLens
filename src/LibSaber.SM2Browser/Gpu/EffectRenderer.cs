@@ -35,7 +35,8 @@ internal sealed class EffectLayer
 ///   GPU particle pass: a ground plane with grid lines lit by the effect's <c>sfx_light</c>s, then one draw per
 ///   emitter batch from far to near with that emitter's blend state. Colours are HDR (<c>colorIntensity</c> runs into
 ///   the hundreds for muzzle flashes), so each fragment is exposed and tonemapped (1 - e^-x) before blending.
-///   blend: premultiplied over (ONE, 1-SRC_ALPHA); add: ONE, ONE; blend_add: unmultiplied colour with alpha occlusion.
+///   All particle blends are premultiplied ONE/INV_SRC_ALPHA (PROVEN psos, PS 281): add writes alpha 0; blend_add has no
+///   flag bit of its own and renders exactly like blend (EffectBlendRea).
 ///   Soft particles fade with <c>softDepth</c> @0x143645530 metres above the ground plane.
 /// </summary>
 internal sealed unsafe class EffectRenderer : IDisposable
@@ -68,13 +69,13 @@ internal sealed unsafe class EffectRenderer : IDisposable
   public int DistortionQuads { get; private set; }
   /// <summary>Mesh parts drawn with the blood-splash VAT path (SM2_VFX_VAT=1).</summary>
   public int VatDraws { get; private set; }
-  /// <summary><c>SM2_VFX_CONTRAST=1</c> turns on the additionalContrast boost (formula from particles.sdc 00114_2; not yet compared in-game).</summary>
   /// <summary>
-  ///   <c>SM2_VFX_TINT_EXACT=1</c>: the particles.sdc PS tint blend <c>rgb = c + t*(t*V.rgb*tex.a - c)</c> with
-  ///   t = shared[0].z, which the CPU packer FUN_1417e1e50 fills from emitter desc +0x4e8 (0x1417e21d1/0x1417e21d7) =
-  ///   typeParams+0x140 = textureTintControl. Off: the older luminance heuristic (texture as intensity at tint 0).
+  ///   mtl1-38 PROVEN (static shader, particles PS 281 GLSL lines 468-472, 834; docs/handoff/SHADERS.md): tint blend
+  ///   <c>rgb = mix(tex*V.rgb*boost, t*V.rgb*tex.a, t)</c> = <c>c + t*(t*V.rgb*tex.a - c)</c> with t = shared[0].z, which the
+  ///   CPU packer FUN_1417e1e50 fills from emitter desc +0x4e8 (0x1417e21d1/0x1417e21d7) = typeParams+0x140 =
+  ///   textureTintControl. Default ON since mtl1-38; <c>SM2_VFX_TINT_EXACT=0</c> restores the old luminance heuristic.
   /// </summary>
-  public static bool TintExact { get; set; } = Environment.GetEnvironmentVariable("SM2_VFX_TINT_EXACT") == "1";
+  public static bool TintExact { get; set; } = Environment.GetEnvironmentVariable("SM2_VFX_TINT_EXACT") != "0";
   /// <summary>vfx3x: tonemap premultiplied blend sprites (opt-in SM2_VFX_HDR_PREMUL=1; over-brightens flame_cross_4). HEURISTIC approximation of HDR blending.</summary>
   public static bool HdrPremul { get; set; } = Environment.GetEnvironmentVariable("SM2_VFX_HDR_PREMUL") == "1";
   /// <summary>vfx3x: particles.sdc alpha-clip math (vertex alpha inside the clip, 1-0.5*clip, no clip with flag 0x400). SM2_VFX_CLIP_EXACT=0 disables.</summary>
@@ -107,7 +108,10 @@ internal sealed unsafe class EffectRenderer : IDisposable
   public static bool CaptureTonemapOn { get; set; } = Environment.GetEnvironmentVariable("SM2_VFX_TONEMAP") != "exp";
   /// <summary>
   ///   mtl1-23: sfx meshes blend One/One (alpha Zero/One) as in plasma 101917 (CB_DYNAMIC_SFX draws) instead of premultiplied
-  ///   over. SM2_VFX_SFX_ADD=0 restores the premultiplied blend.
+  ///   over. mtl1-38: the state per sfx define is PROVEN from the static PSO table (SFX_BLEND_ADD_NO_ALPHA = One/One, alpha
+  ///   Zero/One; SFX_ALPHA_BLEND = SrcAlpha/InvSrcAlpha; neither = SrcAlpha/InvSrcAlpha, alpha Zero/Zero). Which sfx
+  ///   material sets which define (define table 0x142450650) is not traced, so ADD_NO_ALPHA for every sfx mesh stays
+  ///   capture-based (HEURISTIC). SM2_VFX_SFX_ADD=0 restores the premultiplied blend.
   /// </summary>
   public static bool SfxAdditive { get; set; } = Environment.GetEnvironmentVariable("SM2_VFX_SFX_ADD") != "0";
   /// <summary>
@@ -126,7 +130,12 @@ internal sealed unsafe class EffectRenderer : IDisposable
   internal static System.Numerics.Vector3 GroundLight(LightSample l, float exposure) => Rel(l, exposure) * (0.6f * CaptureLightUnits.SurfaceScale);
   internal static System.Numerics.Vector3 CoverLight(LightSample l, float exposure) => Rel(l, exposure) * (0.25f * CaptureLightUnits.SurfaceScale);
   public static float BloomGain { get; set; } = float.TryParse(Environment.GetEnvironmentVariable("SM2_VFX_BLOOM_GAIN"), System.Globalization.CultureInfo.InvariantCulture, out var bg) ? bg : 0.01f;
-  public static bool ContrastEnabled { get; set; } = Environment.GetEnvironmentVariable("SM2_VFX_CONTRAST") == "1";
+  /// <summary>
+  ///   mtl1-38 PROVEN (particles PS 281 GLSL line ~468): additionalContrast boost
+  ///   <c>1 + sat(1 - length(key/255 - tex.rgb)) * additionalContrast</c> (Euclidean length, multiplies tex*V.rgb before the
+  ///   tint mix). Default ON since mtl1-38; <c>SM2_VFX_CONTRAST=0</c> disables.
+  /// </summary>
+  public static bool ContrastEnabled { get; set; } = Environment.GetEnvironmentVariable("SM2_VFX_CONTRAST") != "0";
   private readonly Dictionary<string, (uint Vao, uint Vbo, uint Ibo)?> _meshes = new(StringComparer.OrdinalIgnoreCase);
   private readonly uint _vao, _vbo, _ibo, _groundVao, _groundVbo;
   private readonly Dictionary<string, uint> _textures = new(StringComparer.OrdinalIgnoreCase);
@@ -396,7 +405,7 @@ internal sealed unsafe class EffectRenderer : IDisposable
       if (kind == VfxDrawKind.Spark) SparkBatches++;
       _gl.Uniform1(modeLoc, (int)batch.Emitter.Blend);
       _gl.Uniform1(tintLoc, batch.Emitter.TextureTint);
-      // additionalContrast / contrastColorKey (particles.sdc 00114_2, shared[1]); opt-in until checked against the grenade.
+      // additionalContrast / contrastColorKey (shared[1]); PROVEN PS 281 boost, default on (mtl1-38).
       var key = batch.Emitter.ContrastColorKey / 255f;
       _gl.Uniform3(keyLoc, key.X, key.Y, key.Z);
       _gl.Uniform1(contrastLoc, ContrastEnabled ? batch.Emitter.AdditionalContrast : 0f);
@@ -722,7 +731,7 @@ internal sealed unsafe class EffectRenderer : IDisposable
       vec3 hdr;
       if (uTintExact == 1)
       {
-        // particles.sdc PS: c = tex*V*boost; rgb = c + t*(t*V*tex.a - c), t = textureTintControl (FUN_1417e1e50 -> shared[0].z).
+        // PROVEN (PS 281): c = tex*V*boost; rgb = mix(c, t*V*tex.a, t), t = textureTintControl (FUN_1417e1e50 -> shared[0].z).
         vec3 c0 = t.rgb * (1.0 + uContrast * clamp(1.0 - length(uKey - t.rgb), 0.0, 1.0)) * vColor.rgb;
         hdr = c0 + uTint * (uTint * vColor.rgb * t.a - c0);
       }
@@ -749,15 +758,18 @@ internal sealed unsafe class EffectRenderer : IDisposable
         // HDR and the frame is tonemapped later. Per-fragment 1-exp() saturated hdr ~12000 to white, then *alpha 0.08 = grey.
         // Approximation (HEURISTIC): tonemap the premultiplied contribution instead, keeping ONE/INV_SRC_ALPHA.
         float va = clamp(vColor.a, 0.0, 1.0);
-        float k = uBlendRea == 1 ? va * (uAlphaMul == 1 ? a : 1.0) : (uMode == 2 ? a : alpha);
+        float k = uBlendRea == 1 ? va * (uAlphaMul == 1 ? a : 1.0) : alpha;
         float ao = uBlendRea == 1 ? va * a : alpha;
         outColor = vec4(toGamma(sm2Tonemap(hdr * uExposure * k)), ao);
       }
       else if (uBlendRea == 1 && uClipExact == 1)
       {
-        // vfx3x: particles.sdc 00000_0 (vfxsh_glsl/pc lines 118-122, 466, 873-876): clip = flag0x400 ? 0 : TEXCOORD_2.y;
+        // PROVEN (PS 281 GLSL 127-131, 788-790, 1077, 1091): clip = flag0x400 ? 0 : TEXCOORD_2.y;
         // ac = sat((tex.a*vertexA - clip) / (1 - 0.5*clip)); rgb *= sat(ac + flag0x400); SV_Target.w = add ? 0 : ac*mask.
         // Vertex alpha is inside the clip, so low-alpha alphaClip-by-age sprites (flame_cross_4/6/8, va ~0.08) burn out.
+        // HEURISTIC: with flag 0x400 the shader colour factor is 1 (vertex alpha only in SV_Target.w); va is kept on rgb
+        // here because whether the CPU also folds the age alpha into the colour/intensity (VS TEXCOORD.rgb =
+        // COLOR_1*TEXCOORD_1.w*exposure, VS 248) is not traced.
         float va = clamp(vColor.a, 0.0, 1.0);
         float m = uHasMask == 1 ? texture(uMask, vMask).a : 1.0;
         float ta = texture(uTex, uv).a;
@@ -774,8 +786,7 @@ internal sealed unsafe class EffectRenderer : IDisposable
         outColor = vec4(c * va * (uAlphaMul == 1 ? a : 1.0), uMode == 1 ? 0.0 : va * a);
       }
       else if (uMode == 1) outColor = vec4(c * alpha, 0.0);          // add
-      else if (uMode == 2) outColor = vec4(c * a, alpha);        // blend_add
-      else outColor = vec4(c * alpha, alpha);                    // blend
+      else outColor = vec4(c * alpha, alpha);                    // blend; blend_add has no flag bit = blend (PROVEN, mtl1-38)
     }
     """;
 

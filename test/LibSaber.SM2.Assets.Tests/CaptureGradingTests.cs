@@ -91,4 +91,19 @@ public class CaptureGradingTests
     var e = VfxRuleScene.Build()["expect"]!.AsArray().ToDictionary(x => (string)x!["id"]!, x => (float)x!["value"]!);
     Assert.True(e["soft0"] < e["soft1"] && e["soft1"] < e["soft2"]);
   }
+
+  [Theory]
+  [InlineData(0f)]
+  [InlineData(0.01f)]
+  [InlineData(0.18f)]
+  [InlineData(1f)]
+  [InlineData(37f)]
+  [InlineData(5000f)]
+  public void CoordinateMatchesHdrPs44Uvw(float c)
+  {
+    // mtl1-38 PROVEN hdr PS 44/47: uvw = sat(0.43 + log2((c + 0.18*2^(-0.43*14))/0.18)/14) * 31/32 + 1/64.
+    var ps = Math.Clamp(0.43 + Math.Log2((c + 0.18 * Math.Pow(2, -0.43 * 14)) / 0.18) / 14, 0, 1) * 31.0 / 32 + 1.0 / 64;
+    var ours = CaptureLut.Coordinate(c) * (CaptureLut.Size - 1f) / CaptureLut.Size + 0.5f / CaptureLut.Size;
+    Assert.Equal(ps, (double)ours, 1e-5);
+  }
 }
