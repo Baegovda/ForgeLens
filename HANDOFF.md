@@ -2046,7 +2046,7 @@ Disassembly: /workspace/vfxsh_dis/{pc,pg,dx_pc_dx12_sfx,dx_pc_dx12_distort}, GLS
 - **Skin material (data):**
   - Melee (`melee_skins_library.sso`) and firearm (`firearm_skins_library.sso`) skins carry `material` = mastercrafted | red | blue | white | yellow | green | violet | twitch | chaos.
   - Most material skins also switch actor: melee `meleeActorOverride`, firearm `overridedActorName` (e.g. chainsword 01_red → chainsword_01_artificer_01; bolt rifle 01_red → arifle_bolt_rifle_artificer_01).
-  - The textures exist as `<base>_<material>{,_nm,_spec,_em}` siblings (`td/wpn_chainsword_01_artificer_01_01_red{,_nm,_spec}`). Blue/white/violet/yellow ship the diffuse only.
+  - The textures exist as `<base>_<material>{,_nm,_spec,_em}` siblings (`td/wpn_chainsword_01_artificer_01_01_red{,_nm,_spec}`). Blue/white/violet/yellow ship the diffuse only (mtl1-48: they reuse the red/green NM/spec through the td `materials` block).
   - Melee actors list `excludeObjectsToApplyMaterial` (VFX helpers, `body` on some).
 - **Code:**
   - `SkinMaterial.Candidate` (`base_nm` → `base_mat_nm`, else `base_mat`) and `SkinMaterial.Apply`:
@@ -2081,3 +2081,27 @@ Disassembly: /workspace/vfxsh_dis/{pc,pg,dx_pc_dx12_sfx,dx_pc_dx12_distort}, GLS
   - `mastercrafted` on melee is a damage modifier in melee_modifiers_library; visually it uses `_mastercrafted` siblings where they exist.
   - The browser part-picker preset list for artificer tpls is not extended.
 - Tests: `SkinMaterialTests` (candidate, apply, exclude, melee override, firearm override, hand hide, no-fist keep). SM2.Assets 267 pass.
+
+## Update mtl1-48 (2026-10-29 KST): in-game comparison by static RE (no captures); skin materials now follow the td `materials` block
+
+- **Skin material, PROVEN path (static RE of sm2_retail.exe, Ghidra):**
+  - ssl native `ApplyMaterialSuffix` (registered in FUN_14143e030 with SetMaterialByRegion, ChangeMaterial, GetAppliedMaterialSuffix(ByRegion)) → FUN_141342870 → FUN_141ef5170(obj, name, suffix, flag, recursive): empty name = root object, recursive walks the subtree. `ApplyMaterialSuffixByRegion` → FUN_141ef54b0.
+  - FUN_1420bfa40: per submesh, takes its material, FUN_14261c830(mat, …, suffix) looks the suffix up in the per-material variant list built by FUN_14261c000 from FUN_14261b0c0, sets it (FUN_1421dc890) and records the suffix (FUN_141d8ec60).
+  - The list comes from the diffuse texture's `.td` `materials` block (FUN_14262abb0 reads "materials"; warnings "No %s.td found for texture!", "No default material found for texture '%s'").
+  - Data: `td/wpn_chainsword_01_artificer_01_01.td` has `materials { default, red, blue, white, green, yellow, violet }`, each `shaders.glt.tex { diffOverride, NM, spec }`. The tpl layers already name `subMaterial = "default"`.
+  - The mtl1-47 naming rule was wrong for 4 of 6 colours: `blue`/`white` use the **red** NM/spec, `yellow`/`violet` use the **green** spec.
+- **Code:** `SkinMaterial.TdOverrides` / `ApplyTd` (diffOverride→diffuse, NM→normal, spec→specular, em→emissive; other keys reported). `ApplySkinMaterial` uses the td block first (`VariantResult.MaterialSource = "td"`) and falls back to the mtl1-47 sibling naming (`"naming"`, HEURISTIC) only when no part's diffuse td has the block. material.json slot textures follow the swap.
+- **Evidence:** CLI `Bin\SM2Extractor_mtl48`, `Exports\mtl48\`: chainsword artificer blue 100 parts / 300 refs (blue diffuse + red_nm + red_spec), red 300, yellow 200 (yellow + green_spec); bolt rifle artificer red 148 parts / 296. Box `/workspace/mtl_fix/m48/m48_td_material_textures.png`.
+- **VFX vs the user's in-game photos (bench rerun at c95af37 vs the 10-28 16:45 run before mtl1-44):** `/workspace/mtl_fix/m48/sheets/oldnew_*.png`, PC `Captures\mtl_fix\mtl48\`. The blend selector removes the blue/white cast on the bolter muzzle (mean abs diff 7.1) and the grenade early frames (5.7) and moves both toward the in-game orange; smoke/trail/blood nearly unchanged (<1.1).
+- **Comparison table (static, no in-game captures per the user's rule):**
+
+| Track | In-game evidence | Export | Verdict |
+|---|---|---|---|
+| VFX blend | 6 user photos (bolter muzzle, grenade, smoke, trail, blood) + FUN_142451840 | blend selector on | closer; grenade core still brighter than in-game (exposure HEURISTIC) |
+| Skin material | ApplyMaterialSuffix → td materials (above) | td variant | PROVEN data path |
+| Power fist hand | prop `visibilityUnchangableMeshes`, SetRightHandVisibility | RIGHT_GAUNTLET hide | section constant HEURISTIC |
+| Purity seals | skin attachingActors + locators | merged, scale 0.7 | static data; paper not simulated |
+| Physics | jiggle loop 0x14147e5b5 port | JiggleSolver | proven port; no in-game motion reference |
+
+- **Limits:** the Forge Lens preview still does not swap materials; td variants that set non-texture shader params are not applied (only tex keys).
+- Tests: `SkinMaterialTests` + TdOverrides / ApplyTd. SM2.Assets 269 pass.

@@ -581,7 +581,7 @@ public static class AssetExporter
     {
       var m = MeleeVariant.Apply(mesh, melee, template, request);
       m.AppearanceSource = MeleeCustomization.SkinsPath + "/" + m.Appearance;
-      ApplySkinMaterial(catalog, template, mesh, m);
+      ApplySkinMaterial(catalog, store, template, mesh, m);
       report.Messages.Add($"{template}: melee skin {m.Preset}: hid {m.HiddenParts} parts of {m.CustomizableObjects} customizable objects, {m.VisibleParts} visible.");
       foreach (var note in m.Notes.Take(8))
         report.Messages.Add(template + ": " + note);
@@ -599,7 +599,7 @@ public static class AssetExporter
       result.Notes.Insert(0, $"skin {uid}/{request.Skin} switches to this tpl (overridedActorName); its regions, attachments and material apply here.");
     result.AppearanceSource = "firearm mgs/" + uid;
     MergeAttachments(catalog, store, template, mesh, result, settings, report);
-    ApplySkinMaterial(catalog, template, mesh, result);
+    ApplySkinMaterial(catalog, store, template, mesh, result);
     report.Messages.Add($"{template}: weapon skin {uid}/{result.Preset}: hid {result.HiddenParts} parts of {result.CustomizableObjects} customizable objects, {result.VisibleParts} visible.");
     foreach (var note in result.Notes.Take(8))
       report.Messages.Add(template + ": " + note);
@@ -673,7 +673,7 @@ public static class AssetExporter
   }
 
   /// <summary>mtl1-47: swaps textures to their <c>_&lt;material&gt;</c> siblings (<see cref="SkinMaterial"/>). <c>SM2_SKIN_MATERIAL=0</c> turns it off.</summary>
-  private static void ApplySkinMaterial(GameCatalog catalog, string template, ExportedMesh mesh, VariantResult result)
+  private static void ApplySkinMaterial(GameCatalog catalog, ArchiveStore store, string template, ExportedMesh mesh, VariantResult result)
   {
     if (result.Material.Length == 0)
       return;
@@ -683,10 +683,53 @@ public static class AssetExporter
       return;
     }
 
+    // mtl1-48: the game's ApplyMaterialSuffix picks the diffuse td's materials.<suffix> variant (PROVEN, see SkinMaterial)
+    var unknown = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+    var renamed = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+    var (tdSwaps, tdParts) = SkinMaterial.ApplyTd(mesh, result.Material, name => TdText(catalog, store, name), result.MaterialExclude, unknown, renamed);
+    if (tdParts > 0)
+    {
+      if (mesh.Material is { } doc)
+      {
+        foreach (var slot in doc.Slots)
+          if (renamed.TryGetValue(slot.Texture, out var to))
+            slot.Texture = to;
+        doc.Notes.Add($"skin material {result.Material}: slot textures follow the td materials.{result.Material} variant (mtl1-48).");
+      }
+
+      result.MaterialSwaps = tdSwaps;
+      result.MaterialSource = "td";
+      result.Notes.Add($"skin material {result.Material}: {tdParts} parts use their diffuse td materials.{result.Material} variant ({tdSwaps} texture references)"
+        + (unknown.Count > 0 ? $"; tex keys not mapped: {string.Join(", ", unknown)}" : "") + ".");
+      return;
+    }
+
     result.MaterialSwaps = SkinMaterial.Apply(mesh, result.Material, name => TemplateMeshReader.ResolveTexture(catalog, -1, name) >= 0, result.MaterialExclude);
+    result.MaterialSource = result.MaterialSwaps > 0 ? "naming" : "";
     result.Notes.Add(result.MaterialSwaps > 0
-      ? $"skin material {result.Material}: {result.MaterialSwaps} texture references swapped to their _{result.Material} siblings."
-      : $"skin material {result.Material}: {template} has no _{result.Material} texture siblings (the skin may switch to another tpl in game); base textures kept.");
+      ? $"skin material {result.Material}: no td materials.{result.Material} block; {result.MaterialSwaps} texture references swapped to _{result.Material} siblings (HEURISTIC naming)."
+      : $"skin material {result.Material}: {template} has no td materials.{result.Material} variant nor _{result.Material} siblings (the skin may switch to another tpl in game); base textures kept.");
+  }
+
+  /// <summary>Text of <c>td/&lt;name&gt;.td</c> (null when absent or binary).</summary>
+  private static string? TdText(GameCatalog catalog, ArchiveStore store, string name)
+  {
+    foreach (var candidate in new[] { "td/" + name + ".td", name + ".td" })
+    {
+      if (!catalog.TryGetByPath(candidate, out var index))
+        continue;
+      try
+      {
+        var text = Encoding.UTF8.GetString(store.Read(index));
+        return text.Contains("materials", StringComparison.Ordinal) ? text : null;
+      }
+      catch (Exception)
+      {
+        return null;
+      }
+    }
+
+    return null;
   }
 
   private static void WriteVariantSidecar(string path, VariantResult variant, ExportReport report)

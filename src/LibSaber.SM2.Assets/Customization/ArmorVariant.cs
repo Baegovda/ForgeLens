@@ -143,6 +143,8 @@ public sealed class VariantResult
   /// <summary>mtl1-47: skin material (mastercrafted, red, ...); <see cref="MaterialSwaps"/> texture names swapped by the exporter.</summary>
   public string Material { get; set; } = "";
   public int MaterialSwaps { get; set; }
+  /// <summary>mtl1-48: "td" (diffuse td materials.&lt;material&gt; block, the game's path) or "naming" (fallback HEURISTIC).</summary>
+  public string MaterialSource { get; set; } = "";
   /// <summary>Objects (and their subtrees) the skin material does not apply to (melee excludeObjectsToApplyMaterial).</summary>
   public HashSet<string> MaterialExclude { get; } = new(StringComparer.OrdinalIgnoreCase);
 }

@@ -339,7 +339,13 @@ public static class WeaponVariant
 
 /// <summary>
 ///   mtl1-47: skin <c>material</c> (firearm and melee skins: mastercrafted, red, blue, white, yellow, green, violet, twitch, chaos).
-///   HEURISTIC (naming, the native consumer is not decoded): every material value has textures named
+///   mtl1-48 PROVEN path (static RE): the ssl binding <c>ApplyMaterialSuffix</c> (native FUN_141342870 → FUN_141ef5170) walks the
+///   object (optionally its subtree) and FUN_1420bfa40 swaps each submesh material to the variant FUN_14261c830 finds by suffix in
+///   the material list built from the diffuse texture's <c>.td</c> <c>materials</c> block (FUN_14261b0c0 / FUN_14262abb0,
+///   "No default material found for texture '%s'"). So the data is
+///   <c>td/&lt;diffuse&gt;.td materials.&lt;material&gt;.shaders.glt.tex { diffOverride, NM, spec, ... }</c>, used by <see cref="TdOverrides"/>
+///   / <see cref="ApplyTd"/>; e.g. chainsword artificer <c>blue</c> = blue diffuse + the <b>red</b> NM/spec.
+///   Fallback HEURISTIC (naming, when no diffuse td has the block): textures named
 ///   <c>&lt;base&gt;_&lt;material&gt;</c> beside the base ones, with optional <c>_nm</c> / <c>_spec</c> / <c>_em</c> siblings
 ///   (td/wpn_chainsword_01_mastercrafted{,_nm,_spec,_em}, wpn_bolt_rifle_01_artificer_01_01_red{,_spec}; blue has only the diffuse).
 ///   Each map whose material sibling exists is swapped. Maps without a sibling keep the base texture.
@@ -347,6 +353,107 @@ public static class WeaponVariant
 public static class SkinMaterial
 {
   private static readonly string[] Suffixes = { "_nm", "_spec", "_em" };
+
+  /// <summary>mtl1-48: <c>materials.&lt;material&gt;.shaders.glt.tex</c> of a diffuse .td (key → texture name); null when absent.</summary>
+  public static Dictionary<string, string>? TdOverrides(string tdText, string material)
+  {
+    var root = SslText.Parse(tdText);
+    if (SslText.Obj(root, "materials", material) is not { } m)
+      return null;
+    var map = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+    if (SslText.Obj(m, "shaders") is { } shaders)
+    {
+      foreach (var (_, sh) in shaders)
+      {
+        if (SslText.Obj(sh, "tex") is not { } tex)
+          continue;
+        foreach (var (key, value) in tex)
+        {
+          if (value is string name && name.Length > 0)
+            map.TryAdd(key, name);
+        }
+      }
+    }
+
+    return map;
+  }
+
+  /// <summary>Role of a td material tex key: diffuse / normal / specular / emissive, else null (kept as an unknown key).</summary>
+  public static string? Role(string key) => key.ToLowerInvariant() switch
+  {
+    "diffoverride" or "diff" or "md" or "diffuse" => "diffuse",
+    "nm" or "normal" => "normal",
+    "spec" or "specular" => "specular",
+    "em" or "emissive" or "emis" => "emissive",
+    _ => null,
+  };
+
+  /// <summary>
+  ///   Applies the td material variant to every part whose diffuse td has <c>materials.&lt;material&gt;</c>. Returns
+  ///   (texture references swapped, parts matched); <paramref name="unknown"/> collects tex keys with no role.
+  /// </summary>
+  public static (int Swaps, int Parts) ApplyTd(ExportedMesh mesh, string material, Func<string, string?> tdText, ICollection<string>? exclude, ISet<string>? unknown = null, IDictionary<string, string>? renamed = null)
+  {
+    var skip = Excluded(mesh, exclude);
+    var cache = new Dictionary<string, Dictionary<string, string>?>(StringComparer.OrdinalIgnoreCase);
+    int swaps = 0, parts = 0;
+    foreach (var part in mesh.Parts.Concat(mesh.Levels.SelectMany(level => level.Parts)))
+    {
+      if (string.IsNullOrWhiteSpace(part.Texture) || skip.Contains(part.Node) || (exclude?.Contains(part.Name ?? "") ?? false))
+        continue;
+      if (!cache.TryGetValue(part.Texture, out var ov))
+        cache[part.Texture] = ov = tdText(part.Texture) is { } text ? TdOverrides(text, material) : null;
+      if (ov is null)
+        continue;
+      parts++;
+      var renames = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+      foreach (var (key, name) in ov)
+      {
+        string? old;
+        switch (Role(key))
+        {
+          case "diffuse": old = part.Texture; part.Texture = name; break;
+          case "normal": old = part.Normal; part.Normal = name; break;
+          case "specular": old = part.Specular; part.Specular = name; break;
+          case "emissive": old = part.Emissive; part.Emissive = name; break;
+          default: unknown?.Add(key); continue;
+        }
+
+        swaps++;
+        if (!string.IsNullOrEmpty(old))
+        {
+          renames[old] = name;
+          renamed?.TryAdd(old, name);
+        }
+      }
+
+      foreach (var map in part.Maps)
+        if (renames.TryGetValue(map.Name, out var newName))
+          map.Name = newName;
+    }
+
+    return (swaps, parts);
+  }
+
+  private static HashSet<int> Excluded(ExportedMesh mesh, ICollection<string>? exclude)
+  {
+    var skip = new HashSet<int>();
+    if (exclude is not { Count: > 0 })
+      return skip;
+    for (var i = 0; i < mesh.Bones.Count; i++)
+    {
+      for (var b = i; b >= 0 && b < mesh.Bones.Count; b = mesh.Bones[b].Parent)
+      {
+        if (exclude.Contains(mesh.Bones[b].Name) || exclude.Contains(mesh.Bones[b].SourceName ?? ""))
+        {
+          skip.Add(i);
+          break;
+        }
+      }
+    }
+
+    return skip;
+  }
 
   /// <summary><c>base_nm</c> -> <c>base_red_nm</c>; <c>base</c> -> <c>base_red</c>.</summary>
   public static string Candidate(string name, string material)
@@ -363,22 +470,7 @@ public static class SkinMaterial
   /// <summary>Returns the number of map names swapped (diffuse, normal, specular, emissive and the material maps of every part).</summary>
   public static int Apply(ExportedMesh mesh, string material, Func<string, bool> exists, ICollection<string>? exclude = null)
   {
-    var skip = new HashSet<int>();
-    if (exclude is { Count: > 0 })
-    {
-      for (var i = 0; i < mesh.Bones.Count; i++)
-      {
-        for (var b = i; b >= 0 && b < mesh.Bones.Count; b = mesh.Bones[b].Parent)
-        {
-          if (exclude.Contains(mesh.Bones[b].Name) || exclude.Contains(mesh.Bones[b].SourceName ?? ""))
-          {
-            skip.Add(i);
-            break;
-          }
-        }
-      }
-    }
-
+    var skip = Excluded(mesh, exclude);
     var cache = new Dictionary<string, string?>(StringComparer.OrdinalIgnoreCase);
     var swapped = 0;
     string? Swap(string? name)

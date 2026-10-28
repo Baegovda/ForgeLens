@@ -121,4 +121,52 @@ skinsGroups   =   [
     Assert.Equal("arifle_bolt_rifle", lib.OverrideUidFor("wpn_bolt_rifle_01_artificer_01", "01_red"));
     Assert.Null(lib.OverrideUidFor("wpn_bolt_rifle_01_artificer_01", "01"));
   }
+
+  private const string ArtificerTd = """
+materials = {
+   default = {
+      preset = "default"
+      __type_id = "material_templ"
+   }
+   blue = {
+      preset = "default"
+      shaders = {
+         glt = {
+            tex = {
+               NM = "cs_red_nm"
+               spec = "cs_red_spec"
+               diffOverride = "cs_blue"
+            }
+            __type_id = "glt_sh_templ"
+         }
+      }
+      __type_id = "material_templ"
+   }
+}
+usage = "MD"
+""";
+
+  [Fact]
+  public void TdOverrides_reads_the_materials_block()
+  {
+    var ov = SkinMaterial.TdOverrides(ArtificerTd, "blue")!;
+    Assert.Equal("cs_blue", ov["diffOverride"]);
+    Assert.Equal("cs_red_nm", ov["NM"]);
+    Assert.Null(SkinMaterial.TdOverrides(ArtificerTd, "violet"));
+  }
+
+  [Fact]
+  public void ApplyTd_uses_the_td_variant_not_naming()
+  {
+    var mesh = new ExportedMesh();
+    var part = new MeshPart { Texture = "cs", Normal = "cs_nm", Specular = "cs_spec" };
+    part.Maps.Add(new MaterialMap { Role = "normal", Name = "cs_nm" });
+    mesh.Parts.Add(part);
+    var (swaps, parts) = SkinMaterial.ApplyTd(mesh, "blue", n => n == "cs" ? ArtificerTd : null, null);
+    Assert.Equal((3, 1), (swaps, parts));
+    Assert.Equal("cs_blue", part.Texture);
+    Assert.Equal("cs_red_nm", part.Normal);
+    Assert.Equal("cs_red_spec", part.Specular);
+    Assert.Equal("cs_red_nm", part.Maps[0].Name);
+  }
 }

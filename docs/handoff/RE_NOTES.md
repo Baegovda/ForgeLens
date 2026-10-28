@@ -52,6 +52,7 @@ All addresses are virtual addresses in `sm2_retail.exe` (retail Steam build, 81 
 | FUN_14133e750 → name lookup FUN_141d912a0, flags node+0x18 → **FUN_142216790**(tree,node,0x140000,hide) walking FUN_14225c680, bits node+0x1c; pattern FUN_142781420/890, FUN_141d99490 | hiding is recursive over the subtree (group hide hides children) | proven | ArmorVariant |
 | `SetActivePresetToDefault` + `"PREDEFINED_PRESET_1"` in `character_customization_outfit_state_release.sslbin` | default look = preset 1 | data | `--variant default` |
 | `customizable_character_dummy_*.cls` (`team`, `masteryType`) | team/class per constructor | data | `CharacterFromDummyClass` |
+| `ApplyMaterialSuffix` native (reg FUN_14143e030) → FUN_141342870 → FUN_141ef5170 → per submesh FUN_1420bfa40 → FUN_14261c830 variant lookup (list FUN_14261c000/FUN_14261b0c0 from td `materials`, FUN_14262abb0) → FUN_1421dc890 | skin material = diffuse td `materials.<suffix>` variant | proven | `SkinMaterial.ApplyTd` |
 
 ## Physics
 | Evidence | What it proves | Status | Code |

@@ -3,6 +3,8 @@
 Branch `cursor/sm2-pck-extractor-4420`, PR #1. Always confirm the current state with `git fetch && git log --oneline -30 origin/cursor/sm2-pck-extractor-4420`.
 Percentages are the previous agent's estimates of how complete each track is against the "looks exactly like in-game" goal.
 
+## mtl1-48 (2026-10-29 KST): in-game comparison done statically (no captures). ApplyMaterialSuffix PROVEN → diffuse td `materials.<suffix>` variant; skin materials now use it (blue/white = red NM/spec, yellow/violet = green spec), naming fallback HEURISTIC. VFX bench rerun vs the 6 in-game photos: muzzle/grenade closer after mtl1-44 (HANDOFF "Update mtl1-48")
+
 ## mtl1-47 (2026-10-29 KST): skin materials applied (texture _<material> siblings, melee/firearm override skins resolve to their artificer tpl, excludeObjectsToApplyMaterial honored; SM2_SKIN_MATERIAL=0 disables). powerfist=KEY hides the RIGHT_GAUNTLET hand region except visibilityUnchangableMeshes (HEURISTIC section). Preview unchanged (HANDOFF "Update mtl1-47")
 
 ## mtl1-46 (2026-10-29 KST): weapon skin attachingActors (purity seals) merged into firearm exports under their purity_seal_N locator with the purity_seal_01 class scale 0.7. Paper not simulated; preview unchanged; SM2_WPN_ATTACH=0 disables (HANDOFF "Update mtl1-46")
@@ -39,7 +41,7 @@ Percentages are the previous agent's estimates of how complete each track is aga
 | Browser VFX (`.sfx` sprites, meshes, trails, lights, distortion, sockets, anim-event cues) | in progress | ~85 | see ROADMAP "VFX3 remaining" |
 | Bulk validation (37 assets) | done | 100 | PASS 31 / WARN 3 / FAIL 3 → constructors fixed afterwards |
 | UE verification of constructors + physics | done (first pass) | 100 / 85 | open issues below |
-| In-game side-by-side comparison | todo | 0 | needs the PC free + in-game captures |
+| In-game side-by-side comparison | done (static, mtl1-48) | 70 | VFX vs 6 user photos + static RE per track; no motion/physics reference (no captures allowed) |
 | Unreal export test (no Niagara) | done (preview materials) | 100 | `/Game/SM2_Work/VfxExport`: 20 textures, 2 meshes, 2 masters + 20 MIs; capture `Captures\ue_export\ue_export_board.png` |
 | Browser viewer polish → **Forge Lens** (rename + dark theme, mtl1-6) | done | 90 | ForgeLens.exe; theme is visual-only (App.axaml); ui_before/after.png |
 
