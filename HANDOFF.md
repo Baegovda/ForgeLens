@@ -1979,3 +1979,30 @@ Disassembly: /workspace/vfxsh_dis/{pc,pg,dx_pc_dx12_sfx,dx_pc_dx12_distort}, GLS
    - `SM2_VFX_SFX_BLEND=0` restores "all sfx additive". `SM2_VFX_SFX_ADD=0` still forces over.
 3. **Other VFX HEURISTICs: final, not pursued further.** UseSpecMap spec-flag writer, particle 0x400 vertex alpha, auto-exposure, and UE light falloff exponent 1 (APPROXIMATION) are left as documented in STATUS mtl1-38/39.
 4. Tests: SM2.Assets 253 pass (new `SfxBlendTests`). Browser builds.
+
+## Update mtl1-45 (2026-10-29 KST): hem spike fix (rotation-step cap), UE visual check of the cloth bakes, finger-curl min gap
+
+1. **Hem spikes (generic, `PhysicsBake.cs` / `ClothSolver.cs`).** The remaining fast-run spikes were rotation-fit flips: the polar-decomposition fit of a cluster jumps to the other solution between frames.
+   - FitCluster now caps the per-frame rotation step of every non-first fit at `SM2_PHYS_FIT_MAXSTEP` degrees (default 30, `0` = off; **APPROXIMATION**). It slerps from the previous rotation and recomputes the translation around the fit-particle bind centroid (`Fit0`), so the cluster does not swing about its centre.
+   - ClothSolver lerps colliders between the previous and current frame across the sub-iterations (`SM2_PHYS_COLLIDER_LERP`, default on). The last iteration always uses the current colliders. `Reset` / `Translate` keep the previous-collider cache consistent.
+   - tacticus_shield_run_fwd_intercessor on cc_calgar (box harness `/workspace/mtl_fix/m44/loop`):
+
+     | Variant | steps > 30° | steps > 90° | max step |
+     |---|---|---|---|
+     | before | 217 | 12 | 144.7° |
+     | lerp only | 185 | 12 | 170° |
+     | cap only | 160 | 0 | 33.8° |
+     | cap + lerp (default) | 139 | 0 | 33.2° |
+
+     The loop seam stays at 0.06°. FitPrior 1 / 4 were rejected: the cloak freezes.
+2. **UE visual check (mtl1-43 + the step above).** The CLI (`Bin\SM2Extractor_mtl44`) exported cc_calgar + the run clip twice: `Exports\mtl44\old` (FIT_MAXSTEP=0, COLLIDER_LERP=0) and `Exports\mtl44\new`. Both were imported to `/Game/SM2_Work/Tests/mtl44/{old,new}/cc_calgar` (untextured).
+   - Captures at frames 0/6/8/26/30/34/55 (back + side) were made with `tools/ue/ue_sm2_pose_compare.py` in Simulate-In-Editor.
+   - PC: `Captures\mtl_fix\mtl44\phys`. Box: `/workspace/mtl_fix/m44/m44_phys_sheet.png`, `m44_phys_spikes.png` (f26/f30/f34).
+   - Result: old shows folded/twisted hem patches near the leg at f26 and f34; new is a smooth sheet at the same frames. The loop frames 0/55 match in both.
+   - UE notes:
+     - Editor-world SkeletalMesh/PoseableMesh components do not re-evaluate from the uemcp bridge (they stay in the ref pose). Use SIE.
+     - EditorAssetLibrary errors in play mode, so resolve assets first.
+     - Re-point SceneCapture ShowOnly at the PIE actor.
+     - The import's post-process ABP (`ABP_*_SM2Phys`) was disabled per component, so the baked bones are what is seen.
+3. **Cadian finger curl:** `ue_sm2_finger_curl.py` skips fingers whose bind-curl gap is < 5° (`MIN_GAP`). This removes the titus regression from mtl1-43. The ~6° jog residual is clip-dependent; it is final, not fixable by a retarget-pose offset.
+4. Tests: SM2.Assets 253 pass.

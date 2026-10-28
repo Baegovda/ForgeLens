@@ -10,6 +10,9 @@ sys.path.insert(0, r"C:\Users\Revaptor_FX\Desktop\SM2_Work\Scripts")
 import importlib, ue_sm2_retarget as R
 X = unreal.AnimPoseExtensions; WS = unreal.AnimPoseSpaces.WORLD; EAL = unreal.EditorAssetLibrary
 FING = ((2, "index"), (3, "middle"), (4, "ring"), (5, "pinky"))
+# mtl1-44: fingers whose bind curl is already within MIN_GAP deg of Manny are left alone (titus: gap < 5 deg, applying it
+# made the jog worse 5.8 -> 10.3). The remaining ~6 deg jog residual is clip-dependent (a pose offset cannot remove it).
+MIN_GAP = 5.0
 def P(pose, b): return X.get_bone_pose(pose, b, WS)
 def sub(a, b): return unreal.Vector(a.x - b.x, a.y - b.y, a.z - b.z)
 def ang(u, v):
@@ -31,6 +34,7 @@ def apply(c, skel, gain=1.0):
     T = R.enum("RetargetSourceOrTarget", "TARGET")
     for side, n, f, cm, cs, sb, ax, pose in curls(skel):
         g = (cm - cs) * gain
+        if abs(cm - cs) < MIN_GAP: print("SKIP small gap %s%d %s %.1f deg" % (side, n, f, cm - cs)); continue
         if ax.length() < 1e-6: print("SKIP straight", sb[1]); continue
         ax = ax * (1.0 / ax.length())
         for b in sb[1:3]:

@@ -89,7 +89,11 @@ public sealed class ClothInstance
   public int ParticleCount => _bind.Length;
   public int PinnedCount => _invMass.Count(w => w == 0);
 
-  public void Reset() => _started = false;
+  public void Reset()
+  {
+    _started = false;
+    _prevColliders = null;
+  }
 
   public void Translate(Vector3 delta)
   {
@@ -98,6 +102,43 @@ public sealed class ClothInstance
       _current[i] += delta;
       _previous[i] += delta;
     }
+
+    if (_prevColliders != null)
+      _prevColliders = _prevColliders.Select(c => Shift(c, delta)).ToList();
+  }
+
+  /// <summary>
+  ///   mtl1-44 (fast-run hem spikes): colliders move with the pose across the solver iterations (NvCloth lerps its
+  ///   collision shapes from the previous to the current frame per iteration) instead of jumping to the end-of-frame
+  ///   pose at every iteration. A thigh capsule that swept ~10 cm through a belt in one 60 Hz frame used to push the
+  ///   particles out on the far side (radial projection from the new axis), flipping the helper 100-145 deg.
+  ///   SM2_PHYS_COLLIDER_LERP=0 restores the old end-pose collision.
+  /// </summary>
+  public static bool ColliderLerp { get; set; } = Environment.GetEnvironmentVariable("SM2_PHYS_COLLIDER_LERP") != "0";
+
+  private List<Collider>? _prevColliders;
+
+  private static Collider Shift(Collider c, Vector3 d)
+  {
+    var frame = c.Frame;
+    if (c.Kind == 1)
+      frame.Translation += d;
+    return c with { A = c.A + d, B = c.B + d, Frame = frame };
+  }
+
+  private static List<Collider> Lerp(List<Collider> from, List<Collider> to, float f)
+  {
+    var list = new List<Collider>(to.Count);
+    for (var i = 0; i < to.Count; i++)
+    {
+      var (a, b) = (from[i], to[i]);
+      var frame = b.Frame;
+      if (b.Kind == 1)
+        frame.Translation = Vector3.Lerp(a.Frame.Translation, b.Frame.Translation, f);
+      list.Add(b with { A = Vector3.Lerp(a.A, b.A, f), B = Vector3.Lerp(a.B, b.B, f), Frame = frame });
+    }
+
+    return list;
   }
 
   /// <summary>Advance by <paramref name="dt"/> seconds against the posed skeleton.</summary>
@@ -110,6 +151,7 @@ public sealed class ClothInstance
       Array.Copy(_skinned, _current, _current.Length);
       Array.Copy(_skinned, _previous, _previous.Length);
       _started = true;
+      _prevColliders = Colliders(worlds);
       if (dt <= 0)
         return;
     }
@@ -128,6 +170,8 @@ public sealed class ClothInstance
       .ToArray();
     var gravity = cfg.Gravity * (h * h);
     var colliders = Colliders(worlds);
+    var fromColliders = ColliderLerp && _prevColliders is { } pc && pc.Count == colliders.Count && pc.Select(c => c.Kind).SequenceEqual(colliders.Select(c => c.Kind)) ? pc : null;
+    _prevColliders = colliders;
     var startSkinned = (Vector3[])_prevSkinnedOrSkinned.Clone();
     for (var it = 0; it < iterations; it++)
     {
@@ -187,7 +231,7 @@ public sealed class ClothInstance
         }
       }
 
-      Collide(colliders, cfg.CollisionThickness);
+      Collide(fromColliders == null || it == iterations - 1 ? colliders : Lerp(fromColliders, colliders, f), cfg.CollisionThickness);
     }
 
     _prevSkinnedOrSkinned = (Vector3[])_skinned.Clone();

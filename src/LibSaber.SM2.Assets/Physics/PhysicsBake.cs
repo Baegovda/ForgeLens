@@ -233,7 +233,23 @@ public static class PhysicsBake
             m = Fit(cloth.BindPositions, cloth.Positions, particles, c.BindCenter, q, out q, out _);
         }
         else
-          m = Fit(cloth.BindPositions, cloth.Positions, particles, c.BindCenter, rotation[c.Bone], out q, out _, FitPrior);
+        {
+          var before = rotation[c.Bone];
+          m = Fit(cloth.BindPositions, cloth.Positions, particles, c.BindCenter, before, out q, out _, FitPrior);
+          // mtl1-44 fast-run hem spikes: the prior still let a crumpled ring flip a helper 100-170 deg in one 60 Hz frame
+          // (calgar shield run: 12 helpers > 90 deg). Cap the per-frame rotation step and re-place the bone about the
+          // bind center with the capped rotation (centroid kept, so translation is unchanged).
+          if (MaxFitStepDegrees > 0 && Angle(Quaternion.Normalize(before), Quaternion.Normalize(q)) > MaxFitStepDegrees)
+          {
+            var b = Quaternion.Normalize(before);
+            var n = Quaternion.Normalize(q);
+            if (Quaternion.Dot(b, n) < 0) n = -n;
+            var capped = Quaternion.Normalize(Quaternion.Slerp(b, n, MaxFitStepDegrees / Angle(b, n)));
+            // m = R(q) about the bind center then translated: keep the bind-center image, swap the rotation.
+            m = Matrix4x4.CreateFromQuaternion(capped) * Matrix4x4.CreateTranslation(m.Translation + Vector3.Transform(Fit0(cloth, particles, c.BindCenter), q) - Vector3.Transform(Fit0(cloth, particles, c.BindCenter), capped));
+            q = capped;
+          }
+        }
 
         rotation[c.Bone] = q;
         return m;
@@ -337,6 +353,22 @@ public static class PhysicsBake
     }
 
     return report;
+  }
+
+  /// <summary>
+  ///   mtl1-44: largest helper rotation step per baked frame (60 Hz). 30 deg = 1800 deg/s; the titus/calgar runs only exceed
+  ///   it in the fit flips. APPROXIMATION (generic); SM2_PHYS_FIT_MAXSTEP overrides, 0 = no cap.
+  /// </summary>
+  public static readonly float MaxFitStepDegrees = float.TryParse(Environment.GetEnvironmentVariable("SM2_PHYS_FIT_MAXSTEP"),
+    System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out var step) ? step : 30f;
+
+  /// <summary>Fit-particle bind centroid relative to the bind center (the point the fit keeps on the simulated centroid).</summary>
+  private static Vector3 Fit0(ClothInstance cloth, int[] particles, Vector3 bindCenter)
+  {
+    var cb = Vector3.Zero;
+    foreach (var i in particles)
+      cb += cloth.BindPositions[i];
+    return cb / particles.Length - bindCenter;
   }
 
   /// <summary>Warm-up cycles of a loop bake (mtl1-43). Two cycles bring the calgar_run cloak seam under 1 degree.</summary>
