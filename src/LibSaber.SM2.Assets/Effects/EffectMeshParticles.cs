@@ -30,6 +30,14 @@ public sealed class MeshParticleDef
   }
   public Curve1? Emissive { get; init; }
   public Curve1? Transparency { get; init; }
+  /// <summary><c>combineMtlAnimControl.animStage</c> (string @0x143645878): lwiGeom desc +0x178 (FUN_1417a1ef0) holds the
+  ///   combineMtlAnimControl group (FUN_14179fdd0: animStage +0x00, worldOffsetX/Y/Z +0x20/+0x40/+0x60,
+  ///   translucencyMultByMask +0x80 - curves, same reader FUN_14179ea80; startColor/endColor +0xa0/+0xc0). In data it is
+  ///   a <c>splineOverride</c> (190x) or <c>withoutOverride</c> (8x). Evaluated over normalised particle age like the
+  ///   sfxMtlOverrides curves (x-domain = age, by analogy; the runtime evaluator is GPU-side). Null = no override.</summary>
+  public Curve1? AnimStage { get; init; }
+  /// <summary>VAT stage for normalised age <paramref name="n"/>: the animStage curve when overridden, else n (HEURISTIC fallback).</summary>
+  public float StageAt(float n) => AnimStage is null ? n : Math.Clamp(AnimStage.Evaluate(n), 0f, 1f);
 
   public static MeshParticleDef? Parse(JsonObject? body)
   {
@@ -60,6 +68,7 @@ public sealed class MeshParticleDef
       Color = ov.Obj("color") is { } c && SslRead.UnionKind(c) == "color" ? SslRead.Color(c.Obj("color")) : null,
       Emissive = Override(ov.Obj("emissiveIntensity")),
       Transparency = Override(ov.Obj("colorTransparency")),
+      AnimStage = Override(body.Obj("combineMtlAnimControl").Obj("animStage")),
     };
   }
 
@@ -72,7 +81,7 @@ public sealed class MeshParticleDef
 }
 
 /// <summary>One mesh-particle instance ready to draw.</summary>
-/// <param name="Stage">Normalised particle age, fed to the VAT shader as combineMtlAnimControl.animStage (HEURISTIC).</param>
+/// <param name="Stage">combineMtlAnimControl.animStage at the particle age (<see cref="MeshParticleDef.StageAt"/>), fed to the VAT shader.</param>
 public readonly record struct MeshInstance(Matrix4x4 World, Vector4 Color, float Emissive, int Variant, float Stage = 0);
 
 public sealed class MeshBatch
@@ -113,7 +122,7 @@ public static class EffectMeshParticles
         var c = geom.ColorAt(n);
         var alpha = c.W * (geom.Transparency?.Evaluate(n) ?? 1f) * alphaK;
         var world = Matrix4x4.CreateScale(size) * rot * Matrix4x4.CreateTranslation(p.Position);
-        batch.Instances.Add(new MeshInstance(world, new Vector4(c.X * intensK, c.Y * intensK, c.Z * intensK, alpha), (geom.Emissive?.Evaluate(n) ?? 0f) * intensK, p.Variant, n));
+        batch.Instances.Add(new MeshInstance(world, new Vector4(c.X * intensK, c.Y * intensK, c.Z * intensK, alpha), (geom.Emissive?.Evaluate(n) ?? 0f) * intensK, p.Variant, geom.StageAt(n)));
       }
 
       if (batch.Instances.Count > 0) batches.Add(batch);

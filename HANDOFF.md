@@ -1804,3 +1804,4 @@ Disassembly: /workspace/vfxsh_dis/{pc,pg,dx_pc_dx12_sfx,dx_pc_dx12_distort}, GLS
 - 2026-10-28 KST mtl1-18: chameleon CPU path REA'd (parser defaults 0 -> unset colours black; packer FUN_1423ba150 = our thresholds, now exact via ChameleonSpec.Ramp). Hellbrute only darkens at rims; in-game navy is not a material constant -> per-instance _783 or viewer lighting. See STATUS "mtl1-18".
 
 - mtl1-19 (2026-10-28): browser SELF_DISTORTION render (heuristic K=0.04, env SM2_VFX_SELF_DISTORT/_K); genOnFly runtime REA (matches current model); ROADMAP 1/2 checked, 3/5/6 skipped. Details: docs/handoff/STATUS.md "mtl1-19".
+- mtl1-20 (2026-10-28): VAT animStage = combineMtlAnimControl.animStage spline over age (desc +0x178, FUN_14179fdd0) implemented; flesh covering classified (host-surface mask, not drawable standalone); blend_add/ratio/exposure/distortion still need a runtime GPU capture. Details: docs/handoff/STATUS.md "mtl1-20".

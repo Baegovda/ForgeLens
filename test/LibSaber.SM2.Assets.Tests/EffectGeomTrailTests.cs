@@ -57,6 +57,21 @@ public class EffectGeomTrailTests
                       __type   =   "local__color"
                    }
                 }
+                combineMtlAnimControl   =   {
+                   animStage   =   {
+                      splineOverride   =   {
+                         spline   =   [
+                            0,
+                            0,
+                            0.25,
+                            1,
+                            1,
+                            1
+                         ]
+                      }
+                      __type   =   "local__splineOverride"
+                   }
+                }
                 transforms   =   {
                    initRotAxises   =   {
                       random   =   {
@@ -136,6 +151,16 @@ public class EffectGeomTrailTests
     Assert.True(c.X > c.Y && c.Y > c.Z);
     Assert.Equal(10f, g.Emissive!.Evaluate(0), 0.001f);
     Assert.Equal(5f, g.Emissive.Evaluate(0.5f), 0.001f);
+  }
+
+  [Fact]
+  public void AnimStageCurveDrivesVatStage()
+  {
+    var g = Assert.IsType<MeshParticleDef>(Assert.Single(Load("geom").Emitters).Geom);
+    Assert.NotNull(g.AnimStage);
+    Assert.Equal(0.5f, g.StageAt(0.125f), 0.001f);
+    Assert.Equal(1f, g.StageAt(0.6f), 0.001f);
+    Assert.Equal(0.3f, new MeshParticleDef { Template = "x" }.StageAt(0.3f), 0.001f);
   }
 
   [Fact]
