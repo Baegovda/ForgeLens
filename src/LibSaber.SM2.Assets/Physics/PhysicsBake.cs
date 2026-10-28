@@ -35,6 +35,13 @@ public sealed class PhysicsBakeReport
   public float MaxJiggleDegrees { get; set; }
   public float MaxClusterFitError { get; set; }
   public double MeanStepMs { get; set; }
+  /// <summary>mtl1-43: the clip's first and last poses match (<see cref="PhysicsBake.IsLoop"/>), so it was baked loop-seamless.</summary>
+  public bool Loop { get; set; }
+  /// <summary>Full clip cycles simulated before recording (loop clips only).</summary>
+  public int WarmupCycles { get; set; }
+  /// <summary>Largest last-vs-first frame mismatch of a baked bone before the seam correction, degrees / cm.</summary>
+  public float SeamDegrees { get; set; }
+  public float SeamCm { get; set; }
 }
 
 /// <summary>
@@ -207,6 +214,31 @@ public static class PhysicsBake
       var cloths = runtime.Cloths.ToDictionary(c => c.Name, StringComparer.OrdinalIgnoreCase);
       var rotation = clusters.ToDictionary(c => c.Bone, _ => Quaternion.Identity);
 
+      // mtl1-43 hem spikes: a one-particle cluster's rotation is fitted on its 3..7-particle one-ring, which the cloth
+      // crumples by ~1 cm on a 3 cm ring in a run, so the unregularised fit hopped up to 180 deg between frames (titus
+      // run: 330 of 956 helpers stepped > 90 deg in one frame) and swung the re-skinned _REND vertices into spikes.
+      // The first fit of a cluster converges without a prior (no identity bias); every later fit adds FitPrior x the
+      // ring's bind energy of the previous rotation to the covariance (a temporal prior, Müller 2016 warm start + damping).
+      var fitted = new HashSet<int>();
+      Matrix4x4 FitCluster(ClothBoneCluster c, ClothInstance cloth)
+      {
+        var particles = c.FitParticles ?? c.Particles;
+        Matrix4x4 m;
+        Quaternion q;
+        if (fitted.Add(c.Bone))
+        {
+          q = rotation[c.Bone];
+          m = Matrix4x4.Identity;
+          for (var pass = 0; pass < 8; pass++)
+            m = Fit(cloth.BindPositions, cloth.Positions, particles, c.BindCenter, q, out q, out _);
+        }
+        else
+          m = Fit(cloth.BindPositions, cloth.Positions, particles, c.BindCenter, rotation[c.Bone], out q, out _, FitPrior);
+
+        rotation[c.Bone] = q;
+        return m;
+      }
+
       var first = MeshPreview.BoneWorlds(mesh, 0);
       // Preroll: hold frame 0's pose so the springs and cloth settle, then play the clip right after it.
       var prerollSteps = (int)MathF.Round(Math.Max(0, preroll) * Rate);
@@ -218,6 +250,37 @@ public static class PhysicsBake
       }
 
       var start = prerollSteps / Rate;
+      // mtl1-43 loop-seamless bake: a looping clip (first pose == last pose) is played WarmupCycles times before the
+      // recorded cycle, each warm-up pass offset by the clip's root delta so it ends exactly where the next pass starts
+      // (no teleport), so the recorded cycle begins in the periodic state instead of the settled frame-0 state. The small
+      // remaining last-vs-first mismatch is then distributed linearly over the cycle (see SeamCorrect).
+      var loop = Environment.GetEnvironmentVariable("SM2_PHYS_LOOP") switch { "0" => false, "1" => true, _ => IsLoop(mesh, clip) };
+      report.Loop = loop;
+      if (loop && frames > 2)
+      {
+        var end = MeshPreview.BoneWorlds(mesh, duration);
+        var rootBone = MeshPreview.RootMotionBone(mesh) is >= 0 and var rm ? rm : RootBone(bones);
+        Matrix4x4.Invert(end[rootBone], out var endInverse);
+        var offset = endInverse * first[rootBone];
+        for (var cycle = 0; cycle < WarmupCycles; cycle++)
+        {
+          for (var f = 0; f < frames - 1; f++)
+          {
+            var worlds = MeshPreview.BoneWorlds(mesh, times[f]);
+            for (var b = 0; b < worlds.Length; b++)
+              worlds[b] *= offset;
+            runtime.Step(worlds, start + times[f], 0);
+            total += runtime.LastStepMs;
+            foreach (var c in clusters)
+              if (cloths.TryGetValue(c.Cloth, out var cloth))
+                FitCluster(c, cloth);
+          }
+
+          start += duration;
+        }
+
+        report.WarmupCycles = WarmupCycles;
+      }
 
       for (var f = 0; f < frames; f++)
       {
@@ -241,7 +304,7 @@ public static class PhysicsBake
             continue;
           }
 
-          var fit = Fit(cloth.BindPositions, cloth.Positions, c.FitParticles ?? c.Particles, c.BindCenter, rotation[c.Bone], out var q, out _);
+          var fit = FitCluster(c, cloth);
           // Land the cluster's own centroid exactly on its simulated centroid (the ring only steers the rotation).
           var centroid = Vector3.Zero;
           foreach (var i in c.Particles)
@@ -251,7 +314,6 @@ public static class PhysicsBake
           var error = 0f;
           foreach (var i in c.Particles)
             error = Math.Max(error, Vector3.Distance(Vector3.Transform(cloth.BindPositions[i] - c.BindCenter, fit), cloth.Positions[i]));
-          rotation[c.Bone] = q;
           report.MaxClusterFitError = Math.Max(report.MaxClusterFitError, error);
           var parentWorld = c.Parent >= 0 ? worlds[c.Parent] : Matrix4x4.Identity;
           Matrix4x4.Invert(parentWorld, out var parentInverse);
@@ -259,10 +321,12 @@ public static class PhysicsBake
         }
       }
 
+      if (loop && frames > 2)
+        SeamCorrect(tracks.Values, report);
       report.Frames = frames;
       report.JiggleBones = jiggleBones.Length;
       report.ClothBones = clusters.Count;
-      report.MeanStepMs = total / Math.Max(1, frames + (int)(Preroll * Rate) + 1);
+      report.MeanStepMs = total / Math.Max(1, frames + prerollSteps + report.WarmupCycles * (frames - 1));
       foreach (var (bone, frameLocals) in tracks)
         baked.Local[bones[bone].Name] = frameLocals;
       clip.Baked = baked;
@@ -273,6 +337,106 @@ public static class PhysicsBake
     }
 
     return report;
+  }
+
+  /// <summary>Warm-up cycles of a loop bake (mtl1-43). Two cycles bring the calgar_run cloak seam under 1 degree.</summary>
+  public const int WarmupCycles = 2;
+  /// <summary>
+  ///   Temporal prior weight of the cluster rotation fit (mtl1-43). 0.25 cut the titus run helpers stepping > 90 deg per
+  ///   frame 330 -> 7 (> 30 deg 645 -> 228) for +0.25 cm mean ring fit RMS (0.76 -> 1.00 cm). APPROXIMATION: the game skins
+  ///   _REND to the sim triangles directly; SM2_PHYS_FITPRIOR overrides (0 = the old unregularised fit).
+  /// </summary>
+  public static readonly float FitPrior = float.TryParse(Environment.GetEnvironmentVariable("SM2_PHYS_FITPRIOR"),
+    System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out var prior) ? prior : 0.25f;
+  /// <summary>Loop test tolerances: non-root bone locals at t = duration within this of t = 0 (up to 2 % of them may be off by &lt;= 30 deg / 5 cm).</summary>
+  public const float LoopDegrees = 3f;
+  public const float LoopMeters = 0.01f;
+
+  /// <summary>
+  ///   mtl1-43: a clip is a loop when every animated non-root bone's local transform at the end equals the one at the
+  ///   start (within <see cref="LoopDegrees"/> / <see cref="LoopMeters"/>). Root motion is excluded (a run cycle moves).
+  ///   HEURISTIC: the .sani has no loop flag we decode, so the pose match stands in for it. SM2_PHYS_LOOP=0/1 overrides.
+  /// </summary>
+  public static bool IsLoop(ExportedMesh mesh, AnimationClip clip)
+  {
+    if (clip.Duration <= 2f / Rate || !clip.HasCurves)
+      return false;
+    var previous = mesh.Clip;
+    mesh.Clip = clip;
+    try
+    {
+      var a = MeshPreview.BoneWorlds(mesh, 0);
+      var b = MeshPreview.BoneWorlds(mesh, clip.Duration);
+      var bones = mesh.Bones;
+      var names = new HashSet<string>(clip.Tracks.Where(t => t.Rotation.Count + t.Translation.Count > 1).Select(t => t.BoneName), StringComparer.OrdinalIgnoreCase);
+      var animated = new HashSet<int>(Enumerable.Range(0, bones.Count).Where(i => names.Contains(bones[i].Name)));
+      int checkedBones = 0, off = 0;
+      for (var i = 0; i < bones.Count && i < a.Length; i++)
+      {
+        var parent = bones[i].Parent;
+        if (parent < 0 || !animated.Contains(i))
+          continue;
+        var la = LocalOf(a, bones, i);
+        var lb = LocalOf(b, bones, i);
+        var degrees = Angle(Rotation(la), Rotation(lb));
+        var meters = Vector3.Distance(la.Translation, lb.Translation);
+        checkedBones++;
+        if (degrees <= LoopDegrees && meters <= LoopMeters)
+          continue;
+        // A few prop/IK helpers (tacticus_run_fwd: GUN_L/GUN_R 10 deg, 1.3 cm) do not close; the body does.
+        if (degrees > 30f || meters > 0.05f)
+          return false;
+        off++;
+      }
+
+      return checkedBones > 0 && off <= Math.Max(1, checkedBones / 50);
+    }
+    finally
+    {
+      mesh.Clip = previous;
+    }
+  }
+
+  private static int RootBone(List<Bone> bones)
+  {
+    var root = bones.FindIndex(b => b.Parent < 0);
+    return root < 0 ? 0 : root;
+  }
+
+  private static float Angle(Quaternion a, Quaternion b)
+    => 2 * MathF.Acos(Math.Min(1f, MathF.Abs(Quaternion.Dot(a, b)))) * 180 / MathF.PI;
+
+  /// <summary>
+  ///   Makes the last baked frame equal the first: the last-vs-first delta (rotation and translation) is ramped in
+  ///   linearly over the cycle, w = f / (n - 1), so no frame moves by more than the residual over the cycle length.
+  /// </summary>
+  internal static void SeamCorrect(IEnumerable<Matrix4x4[]> tracks, PhysicsBakeReport report)
+  {
+    foreach (var track in tracks)
+    {
+      var n = track.Length;
+      if (n < 3)
+        continue;
+      Matrix4x4.Decompose(track[0], out _, out var q0, out var t0);
+      Matrix4x4.Decompose(track[n - 1], out _, out var q1, out var t1);
+      q0 = Quaternion.Normalize(q0);
+      q1 = Quaternion.Normalize(q1);
+      if (Quaternion.Dot(q0, q1) < 0)
+        q0 = -q0;
+      report.SeamDegrees = Math.Max(report.SeamDegrees, Angle(q0, q1));
+      report.SeamCm = Math.Max(report.SeamCm, Vector3.Distance(t0, t1) * 100);
+      var correction = Quaternion.Normalize(Quaternion.Concatenate(Quaternion.Inverse(q1), q0));
+      var shift = t0 - t1;
+      for (var f = 1; f < n; f++)
+      {
+        var w = f / (float)(n - 1);
+        Matrix4x4.Decompose(track[f], out var scale, out var q, out var t);
+        q = Quaternion.Normalize(Quaternion.Concatenate(Quaternion.Normalize(q), Quaternion.Slerp(Quaternion.Identity, correction, w)));
+        track[f] = Matrix4x4.CreateScale(scale) * Matrix4x4.CreateFromQuaternion(q) * Matrix4x4.CreateTranslation(t + shift * w);
+      }
+
+      track[n - 1] = track[0];
+    }
   }
 
   private static Quaternion Rotation(Matrix4x4 m)
@@ -295,7 +459,7 @@ public static class PhysicsBake
   ///   covariance (Müller et al. 2016, iterative, warm-started from the last frame), translation = particle centroid.
   ///   Returns the helper bone's world matrix (bind world = translation to <paramref name="bindCenter"/>).
   /// </summary>
-  internal static Matrix4x4 Fit(Vector3[] bind, Vector3[] current, int[] particles, Vector3 bindCenter, Quaternion start, out Quaternion q, out float error)
+  internal static Matrix4x4 Fit(Vector3[] bind, Vector3[] current, int[] particles, Vector3 bindCenter, Quaternion start, out Quaternion q, out float error, float prior = 0f)
   {
     var cb = Vector3.Zero;
     var cx = Vector3.Zero;
@@ -318,6 +482,18 @@ public static class PhysicsBake
       a0 += x * b.X;
       a1 += x * b.Y;
       a2 += x * b.Z;
+    }
+
+    if (prior > 0)
+    {
+      // Temporal prior: maximise tr(R^T (A + k R_start)), k = prior x sum |b - cb|^2 (scale-free weight).
+      var energy = 0f;
+      foreach (var i in particles)
+        energy += (bind[i] - cb).LengthSquared();
+      var k = prior * energy;
+      a0 += Vector3.Transform(Vector3.UnitX, start) * k;
+      a1 += Vector3.Transform(Vector3.UnitY, start) * k;
+      a2 += Vector3.Transform(Vector3.UnitZ, start) * k;
     }
 
     q = start;
