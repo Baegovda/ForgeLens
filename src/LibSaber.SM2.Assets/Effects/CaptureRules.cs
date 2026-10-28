@@ -61,6 +61,35 @@ public static class VfxDrawKinds
 
   /// <summary>Spark alpha test (blending is off): texture coverage below this is discarded. HEURISTIC 0.5.</summary>
   public const float SparkAlphaTest = 0.5f;
+
+  /// <summary>
+  ///   mtl1-42 (HEURISTIC, fixes the black squares): the spark state is opaque with an alpha test on the TEXTURE alpha, so it
+  ///   only makes sense for a texture that has alpha coverage. Glow textures that keep their shape in RGB with alpha = 1
+  ///   everywhere (part_rs_glow_01: alpha 254..255 over the whole 256x256; fx_mgs_zoanthrop_charging GPU_EMITTER_3a,
+  ///   add, streaks.ratio 0.6) passed the test on every texel and drew an opaque black quad with a green centre. No
+  ///   shipped effect can look like that in game, so such a batch falls back to the particle blend (premultiplied
+  ///   One/InvSrcAlpha with the per-emitter 0x20/0x400 flags; for a GPU add emitter = pure additive).
+  ///   <c>SM2_VFX_SPARK_ALPHA=0</c> restores the old behaviour.
+  /// </summary>
+  public static bool SparkNeedsAlpha { get; set; } = Environment.GetEnvironmentVariable("SM2_VFX_SPARK_ALPHA") != "0";
+
+  /// <summary>Minimum fraction of texels below <see cref="SparkAlphaTest"/> for a texture to count as having alpha coverage.</summary>
+  public const float AlphaCoverageMinFraction = 0.01f;
+
+  /// <summary>True when at least 1% of the texels (RGBA or BGRA, alpha = byte 3) have alpha below the spark alpha test.</summary>
+  public static bool HasAlphaCoverage(ReadOnlySpan<byte> pixels4)
+  {
+    var n = pixels4.Length / 4;
+    if (n == 0) return false;
+    var below = 0;
+    var cut = (byte)(SparkAlphaTest * 255f);
+    for (var i = 3; i < pixels4.Length; i += 4) if (pixels4[i] < cut) below++;
+    return below >= AlphaCoverageMinFraction * n;
+  }
+
+  /// <summary>Draw kind after the texture is known: a spark whose texture has no alpha coverage draws as a particle.</summary>
+  public static VfxDrawKind Resolve(VfxDrawKind kind, bool? textureHasAlpha)
+    => kind == VfxDrawKind.Spark && SparkNeedsAlpha && textureHasAlpha == false ? VfxDrawKind.CpuParticle : kind;
 }
 
 /// <summary>

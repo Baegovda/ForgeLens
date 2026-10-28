@@ -74,8 +74,59 @@
     <Style Selector="GridSplitter">
       <Setter Property="Background" Value="{DynamicResource FL.Border}" />
     </Style>
+    <Style Selector="GridSplitter:pointerover">
+      <Setter Property="Background" Value="{DynamicResource FL.Accent}" />
+    </Style>
+    <!-- mtl1-42: file list header splitters: a thin centred rule, accent on hover. -->
+    <Style Selector="GridSplitter.column">
+      <Setter Property="Background" Value="Transparent" />
+      <Setter Property="Cursor" Value="SizeWestEast" />
+      <Setter Property="Template">
+        <ControlTemplate>
+          <Border Background="{TemplateBinding Background}">
+            <Border Width="1" Margin="0,3" Background="{DynamicResource FL.Border}" HorizontalAlignment="Center" />
+          </Border>
+        </ControlTemplate>
+      </Setter>
+    </Style>
+    <Style Selector="GridSplitter.column:pointerover">
+      <Setter Property="Background" Value="{DynamicResource FL.AccentSoft}" />
+    </Style>
+    <!-- Files / Recent: flat tabs with an accent underline on the active one. -->
+    <Style Selector="Button.tab">
+      <Setter Property="Background" Value="Transparent" />
+      <Setter Property="BorderThickness" Value="0,0,0,2" />
+      <Setter Property="BorderBrush" Value="Transparent" />
+      <Setter Property="CornerRadius" Value="0" />
+      <Setter Property="Foreground" Value="{DynamicResource FL.TextDim}" />
+      <Setter Property="Padding" Value="12,4" />
+    </Style>
+    <Style Selector="Button.tab:pointerover /template/ ContentPresenter">
+      <Setter Property="Background" Value="{DynamicResource FL.Control}" />
+      <Setter Property="BorderBrush" Value="{DynamicResource FL.Border}" />
+      <Setter Property="Foreground" Value="{DynamicResource FL.Text}" />
+    </Style>
+    <Style Selector="Button.tab.active">
+      <Setter Property="BorderBrush" Value="{DynamicResource FL.Accent}" />
+      <Setter Property="Foreground" Value="{DynamicResource FL.Text}" />
+      <Setter Property="FontWeight" Value="SemiBold" />
+    </Style>
+    <Style Selector="Button.tab.active:pointerover /template/ ContentPresenter">
+      <Setter Property="BorderBrush" Value="{DynamicResource FL.Accent}" />
+    </Style>
+    <!-- Section label at the start of a viewer toolbar row (VFX, Anim, ...). -->
+    <Style Selector="TextBlock.section">
+      <Setter Property="Foreground" Value="{DynamicResource FL.TextDim}" />
+      <Setter Property="FontWeight" Value="SemiBold" />
+      <Setter Property="FontSize" Value="11" />
+      <Setter Property="VerticalAlignment" Value="Center" />
+      <Setter Property="MinWidth" Value="40" />
+    </Style>
     <Style Selector="CheckBox">
       <Setter Property="MinHeight" Value="24" />
+    </Style>
+    <Style Selector="ToolTip">
+      <Setter Property="MaxWidth" Value="720" />
     </Style>
     <Style Selector="TextBlock.header">
       <Setter Property="Foreground" Value="{DynamicResource FL.TextDim}" />

@@ -571,6 +571,16 @@ public static class TemplateMeshReader
       var nodeName = NodeName(graph, sub.NodeId);
       var partName = nodeName.Length > 0 ? nodeName : PartName(graph, sub, slice.MeshIndex);
       var hidden = IndexMeshVisibility.Hidden(nodeName, lodNames, volumeNames, out var hideReason);
+      // mtl1-42: *_SIM cloth simulation shells (tbrd_01_frnt_SIM_02, stamp_R_01_SIM) are never drawn by the game
+      // (PropClothSim simMeshName only skins the *_REND meshes, InitSimToRenderSkinning) and carry __default_material__.
+      // Index leaves them checked, so the Models view at LOD0 / all parts drew cc_titus' tabard shells untextured WHITE
+      // over the textured _REND tabard (they sit in the LOD5 pool, so LOD1+ never showed them). Hidden by default now;
+      // the part list can still turn them on, and export --include-cloth-sim still keeps them.
+      if (!hidden && Export.AssetExporter.IsClothSim(partName))
+      {
+        hidden = true;
+        hideReason = "clothSim";
+      }
       // An unskinned part is stored in its node's space (NodeMatrix above), so the node drives it: bind it
       // rigidly to that node so an animated node (v3 tpl animNmb tracks, ClipBinding) moves the part.
       var rigid = !skinned && graph.objects is { Count: > 0 } objects ? ((uint)sub.NodeId < (uint)objects.Count ? sub.NodeId : 0) : -1;

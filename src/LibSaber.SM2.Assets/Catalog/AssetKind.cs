@@ -86,6 +86,14 @@ public static class AssetClassification
     }
   }
 
+  /// <summary>
+  ///   mtl1-42: extensions the browser preview draws (texture, model, animation clip, effect). The default file list shows
+  ///   only these; "Show all files" lists the auxiliary payloads (.tpl_data, .tpl_markup, .lods_base, .geom_dbg,
+  ///   .tpl.resource, .pct_mip, .sani_data, ...) and text again.
+  /// </summary>
+  public static bool IsPreviewable(string extension)
+    => extension is ".pct.resource" or ".pct" or ".tpl" or ".sani" or ".sfx";
+
   public static bool Matches(AssetFilter filter, AssetKind kind)
   {
     return filter switch

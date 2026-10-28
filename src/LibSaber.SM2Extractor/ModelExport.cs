@@ -197,6 +197,7 @@ public static class ModelExport
       Lod = options.Lod,
       Clips = clips,
       RootMotion = options.RootMotion,
+      InPlace = options.InPlace,
       UnrealRootBone = options.UnrealRootBone,
       AnimationOnly = options.AnimationOnly,
       RebaseFirstFrame = options.RebaseFirstFrame,

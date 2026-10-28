@@ -136,7 +136,10 @@ public sealed class EffectInstance
   /// </summary>
   public static Func<float, Matrix4x4>? StandaloneMotion(EffectDefinition def, Matrix4x4 root, float speed = 40f, float span = 5f)
   {
-    if (def.Trails.Count == 0) return null;
+    // mtl1-42: only root/socket trails need the fly-by. Trails attached to particles (emitter trails.partATTACHED_TRAIL)
+    // move with their particles; flying the root for them made the whole effect (lights, sprites) jump 10 m back every
+    // 0.4 s period (fx_mgs_zoanthrop_lightnings: trail piece and green light pool swinging left/right).
+    if (!def.RootTrails.Any() || StandaloneMotionDisabled) return null;
     var axis = Vector3.TransformNormal(Vector3.UnitY, root);
     if (axis.LengthSquared() < 1e-8f) axis = Vector3.UnitX;
     axis = Vector3.Normalize(axis);
@@ -147,6 +150,9 @@ public sealed class EffectInstance
       return root * Matrix4x4.CreateTranslation(axis * x);
     };
   }
+
+  /// <summary>SM2_VFX_FLYBY=0 keeps every standalone effect still.</summary>
+  public static bool StandaloneMotionDisabled { get; set; } = Environment.GetEnvironmentVariable("SM2_VFX_FLYBY") == "0";
 
   /// <summary>An instance placed for previewing without a host (<see cref="StandaloneRoot"/> plus <see cref="StandaloneMotion"/>).</summary>
   public static EffectInstance Standalone(EffectDefinition def, ulong seed = 1, float trailSpeed = 40f)

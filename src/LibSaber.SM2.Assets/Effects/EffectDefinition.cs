@@ -273,6 +273,14 @@ public sealed class EffectDefinition
   public List<EmitterDef> Emitters { get; } = [];
   public List<LightDef> Lights { get; } = [];
   public List<TrailDef> Trails { get; } = [];
+  /// <summary>
+  ///   mtl1-42: trail names referenced by an emitter's <c>trails.partATTACHED_TRAIL.name</c> (204 sfx files). These ribbons
+  ///   follow the emitter's particles in game, not the effect root (fx_mgs_zoanthrop_lightnings: trail_sorcerer_smoke_* on
+  ///   CPU_EMITTER particles). INFERRED from the data (key name), the exe binding was not traced.
+  /// </summary>
+  public HashSet<string> ParticleAttachedTrails { get; } = new(StringComparer.OrdinalIgnoreCase);
+  /// <summary>Trails driven by the effect root / a socket (not attached to particles).</summary>
+  public IEnumerable<TrailDef> RootTrails => Trails.Where(t => !ParticleAttachedTrails.Contains(t.Name));
   /// <summary>Every drawable render state: sprite emitters and trail ribbons.</summary>
   public IEnumerable<EmitterDef> Drawables => Emitters.Where(e => e.IsSprite).Concat(Trails.Select(t => t.Render));
   public IEnumerable<string?> Textures => Emitters.Select(e => e.Texture).Concat(Emitters.Select(e => e.AlphaMask)).Concat(Trails.Select(t => t.Render.Texture));
@@ -359,7 +367,12 @@ public sealed class EffectDefinition
                 if (CoveringDef.TryParse(eo, en, path + "/" + en, nameParent) is { } covering)
                   def.Coverings.Add(covering);
                 else if (et is "CPU_EMITTER" or "GPU_EMITTER")
+                {
                   def.Emitters.Add(Emitter(eo, en, path + "/" + en, world, nameParent, partScale, duration, partTimeScale));
+                  if (eo["trails"] is JsonObject pt)
+                    foreach (var (_, tr) in pt)
+                      if (tr is JsonObject to && to.Str("name") is { Length: > 0 } tn) def.ParticleAttachedTrails.Add(tn);
+                }
                 else if (eo.Count > 0)
                   def.Unsupported.Add((path + "/" + en, et.Length > 0 ? et : "emitter?"));
               }

@@ -18,6 +18,7 @@ public sealed class MeshToggle : INotifyPropertyChanged
     {
       "LOD" => $"{texture} · {tris:N0} tris · Index hides this LOD",
       "volume" => $"{texture} · {tris:N0} tris · Index hides this collision volume",
+      "clothSim" => $"{texture} · {tris:N0} tris · cloth simulation shell (the game never draws it)",
       _ => $"{texture} · {tris:N0} tris",
     };
   }

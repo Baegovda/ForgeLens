@@ -16,6 +16,20 @@ internal static class VfxEmitterDump
   {
     var library = new EffectLibrary(new DirectoryEffectSource(args[1]));
     var all = new JsonArray();
+    // mtl1-42: SM2_VFX_TEXROOT=<raw root> adds the texture's alpha coverage and the resolved draw kind (spark fallback).
+    var texFiles = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+    if (Environment.GetEnvironmentVariable("SM2_VFX_TEXROOT") is { Length: > 0 } texRoot)
+      foreach (var f in Directory.EnumerateFiles(texRoot, "*.pct.resource", SearchOption.AllDirectories))
+        texFiles.TryAdd(Path.GetFileName(f)[..^".pct.resource".Length], f);
+    var coverage = new Dictionary<string, bool?>(StringComparer.OrdinalIgnoreCase);
+    bool? Coverage(string? t)
+    {
+      if (t is null || texFiles.Count == 0) return null;
+      if (coverage.TryGetValue(t, out var c)) return c;
+      try { c = texFiles.TryGetValue(t, out var p) ? VfxDrawKinds.HasAlphaCoverage(LibSaber.SM2.Assets.Textures.TextureLoader.LoadLoose(p).Decode(0, 0, out _, out _, out _)) : null; }
+      catch { c = null; }
+      return coverage[t] = c;
+    }
     var unresolved = new List<string>(); var failed = new List<string>(); var empty = new List<string>();
     foreach (var name in library.Names)
     {
@@ -27,6 +41,15 @@ internal static class VfxEmitterDump
       }
       catch (Exception ex) { failed.Add($"{name}: {ex.GetType().Name}: {ex.Message}"); continue; }
       if (def.Emitters.Count == 0) empty.Add(name);
+      // mtl1-42: trails too (kind Trail, texture alpha coverage, particle-attached flag).
+      if (texFiles.Count > 0)
+        foreach (var t in def.Trails)
+          all.Add(new JsonObject
+          {
+            ["effect"] = name, ["emitter"] = t.Name, ["gpu"] = false, ["type"] = "trail", ["blend"] = t.Render.Blend.ToString(),
+            ["texture"] = t.Render.Texture, ["kind"] = "Trail", ["texAlpha"] = Coverage(t.Render.Texture),
+            ["particleAttached"] = def.ParticleAttachedTrails.Contains(t.Name),
+          });
       foreach (var e in def.Emitters)
         all.Add(new JsonObject
         {
@@ -35,6 +58,8 @@ internal static class VfxEmitterDump
           ["key"] = new JsonArray(e.ContrastColorKey.X, e.ContrastColorKey.Y, e.ContrastColorKey.Z),
           ["blend"] = e.Blend.ToString(), ["alphaMul"] = e.BlendAlphaMultiply, ["texture"] = e.Texture,
           ["alphaKill"] = e.AlphaKill, ["screenSpace"] = e.ScreenSpace, ["flags"] = EffectBlendRea.Flags(e),
+          ["kind"] = VfxDrawKinds.ForEmitter(e).ToString(), ["texAlpha"] = Coverage(e.Texture),
+          ["resolvedKind"] = VfxDrawKinds.Resolve(VfxDrawKinds.ForEmitter(e), Coverage(e.Texture)).ToString(),
         });
     }
     File.WriteAllText(args[2], all.ToJsonString());

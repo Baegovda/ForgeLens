@@ -77,6 +77,17 @@ public sealed class AnimationClip
   /// </summary>
   public bool RebaseFirstFrame { get; set; }
 
+  /// <summary>
+  ///   mtl1-42 export option "In place" (<c>--anim-root in-place</c>, Export window "Animation root: In place"). After
+  ///   root motion and the first-frame rebase, the horizontal (source XZ) travel of the <c>ROOT</c> bone since frame 0 is
+  ///   subtracted from every parentless bone, exactly what the Models preview's In place toggle does
+  ///   (<see cref="LibSaber.SM2.Assets.Meshes.MeshPreview.RemoveRootMotion"/>). Height and root rotation (turns) are kept.
+  ///   False (default) = "Root motion": ROOT keeps its travel (UE EnableRootMotion extracts it from bone 0).
+  /// </summary>
+  public bool InPlace { get; set; }
+  internal object? InPlaceKey;
+  internal Vector3 InPlaceStart;
+
   /// <summary>Set by the exporter when <see cref="RebaseFirstFrame"/> moved the clip: source meters and degrees removed.</summary>
   public Vector3 RebaseOffset { get; internal set; }
   public float RebaseYawDegrees { get; internal set; }

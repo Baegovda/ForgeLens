@@ -114,6 +114,7 @@ public partial class MainWindow
 
   private async Task<bool> ShowEffectAsync(string name, int generation)
   {
+    var aspect = VfxViewAspect();
     var built = await Task.Run(() =>
     {
       if (_vfxLibrary!.Resolve(name) is not { } tree) return null;
@@ -122,7 +123,8 @@ public partial class MainWindow
       _vfxTextures!.Prefetch(def.Textures);
       _vfxMeshes.Prefetch(def.Emitters.Select(e => e.Geom?.Template));
       var instance = EffectInstance.Standalone(def, 1);
-      var camera = EffectCamera.Fit(instance, Math.Min(def.Duration, 3f));
+      // mtl1-42: frame the whole effect (first run, up to 6 s) instead of the bench's dense-core fit.
+      var camera = EffectCamera.FitAll(instance, Math.Min(def.Duration, 6f), aspect);
       return new VfxState { Definition = def, Instance = instance, Camera = camera };
     });
     if (generation != _previewGeneration || built is null) return false;
@@ -158,7 +160,7 @@ public partial class MainWindow
       notes.Add("Distortion backdrop (DEMO): the plane/sphere host is drawn as a checker so the refraction (capture formula uv += dudv*0.04-0.02, max ±0.02) is visible; nothing is painted.");
     if (def.Coverings.Count > 0)
       notes.Add("Covering demo host (DEMO / HEURISTIC preview, not game-accurate): a built-in plane or sphere whose mask is painted where particles land; the game paints the hit character's own covering layer.");
-    notes.Add("Standalone view on a ground grid; socketed emitters sit 1.2 m up, pointing +X; effects with trails fly along +X at 40 m/s. Drag to orbit, wheel to zoom, Space plays.");
+    notes.Add("Standalone view on a ground grid; socketed emitters sit 1.2 m up, pointing +X; effects with root trails fly along +X at 40 m/s (particle-attached trails stay put). Drag to orbit, wheel to zoom, Space plays.");
     PreviewNote.Text = string.Join(" ", notes);
     PreviewText.Text = "";
     PreviewText.IsVisible = false;
@@ -267,6 +269,27 @@ public partial class MainWindow
     }
 
     GpuView.ShowEffect(GpuView.Effect);
+  }
+
+  private float VfxViewAspect()
+    => GpuView is { Bounds: { Width: > 1, Height: > 1 } b } ? (float)(b.Width / b.Height) : 16f / 9f;
+
+  /// <summary>mtl1-42: Fit button / F key: re-frame the whole effect (keeps the current orbit angles).</summary>
+  private void VfxFitClicked(object? sender, RoutedEventArgs e) => VfxFit();
+
+  private bool VfxFit()
+  {
+    if (_fx is not { } fx) return false;
+    var aspect = VfxViewAspect();
+    lock (fx)
+    {
+      // Pre-simulate on a fresh instance so the playing one keeps its time and particles.
+      var probe = EffectInstance.Standalone(fx.Definition, 1);
+      var cam = EffectCamera.FitAll(probe, Math.Min(fx.Definition.Duration, 6f), aspect, fx.Camera.Yaw, fx.Camera.Pitch);
+      fx.Camera = cam;
+    }
+    GpuView.ShowEffect(GpuView.Effect);
+    return true;
   }
 
   private void VfxCoveringChanged(object? sender, SelectionChangedEventArgs e)

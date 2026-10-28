@@ -85,9 +85,10 @@ public static class VfxFrameExport
   }
 
   /// <summary>One batch: material description plus its quads (4 vertices of <see cref="SpriteBatch.Stride"/> floats each).</summary>
-  public static JsonObject Batch(SpriteBatch b, string? texture = null)
+  public static JsonObject Batch(SpriteBatch b, string? texture = null, VfxDrawKind? kindOverride = null)
   {
     var e = b.Emitter;
+    var kind = kindOverride ?? b.Kind;
     var flags = EffectBlendRea.Flags(e);
     var tex = texture ?? (b.Distortion ? e.DistortTexture : e.Texture);
     var verts = new JsonArray();
@@ -96,10 +97,10 @@ public static class VfxFrameExport
     {
       ["emitter"] = e.Name,
       ["path"] = e.Path,
-      ["kind"] = b.Kind.ToString(),
+      ["kind"] = kind.ToString(),
       ["distortion"] = b.Distortion,
-      ["ueBlend"] = UeBlend(b.Kind, b.Distortion),
-      ["captureBlend"] = b.Distortion ? "DUDV One/InvSrcAlpha (refraction buffer)" : VfxBlendRules.For(b.Kind).ToString(),
+      ["ueBlend"] = UeBlend(kind, b.Distortion),
+      ["captureBlend"] = b.Distortion ? "DUDV One/InvSrcAlpha (refraction buffer)" : VfxBlendRules.For(kind).ToString(),
       ["texture"] = tex ?? "",
       ["alphaMask"] = b.Distortion ? "" : e.AlphaMask ?? "",
       ["frames"] = new JsonArray(b.Frames.FramesX, b.Frames.FramesY),

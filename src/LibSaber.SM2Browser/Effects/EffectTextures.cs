@@ -154,6 +154,64 @@ internal readonly record struct EffectCamera(Vector3 Center, float Yaw, float Pi
     return new EffectCamera(center, 0.6f, 0.22f, distance);
   }
 
+  /// <summary>
+  ///   mtl1-42: browser auto-frame. Pre-simulates the effect over its first run (<paramref name="seconds"/>, 48 samples)
+  ///   and frames everything it draws: sprite and mesh particles (position +- their size), trail points (+- width) and
+  ///   light centres, so the whole effect is on screen. Only the 1 % tails per axis are dropped (one stray spark or a
+  ///   debris chunk flying 35 m must not shrink the effect to a dot) and debris below y = -0.5 is ignored (the preview
+  ///   has a ground). The bounding sphere is fitted to the narrower of the vertical/horizontal FOV with a 10 % margin.
+  ///   The bench keeps <see cref="Fit"/> (its sheets and UE references are framed with it).
+  /// </summary>
+  public static EffectCamera FitAll(LibSaber.SM2.Assets.Effects.EffectInstance instance, float seconds, float aspect, float yaw = 0.6f, float pitch = 0.22f)
+  {
+    var lo = new List<Vector3>(); var hi = new List<Vector3>();
+    void Add(Vector3 p, float r)
+    {
+      if (p.Y < -0.5f || !float.IsFinite(p.X + p.Y + p.Z)) return;
+      r = float.IsFinite(r) ? Math.Clamp(r, 0f, 20f) : 0f;
+      lo.Add(p - new Vector3(r)); hi.Add(p + new Vector3(r));
+    }
+    const int samples = 48;
+    for (var i = 1; i <= samples; i++)
+    {
+      instance.Seek(Math.Max(seconds, 0.05f) * i / samples);
+      foreach (var e in instance.Emitters)
+        foreach (var p in e.Particles)
+        {
+          var size = e.Def.Size.Sample(Math.Clamp(p.Age / Math.Max(p.Life, 1e-4f), 0, 1), 0.5f) * e.Def.Scale;
+          Add(p.Position, (e.Def.IsSprite ? 0.5f : 1f) * size);
+        }
+      foreach (var t in instance.Trails)
+        foreach (var p in t.Points) Add(p.Position, t.Def.Width.Max * t.Def.Scale * 0.5f);
+      foreach (var l in instance.Lights()) Add(l.Position, 0f);
+    }
+    instance.Reset();
+    if (lo.Count == 0) return new EffectCamera(new Vector3(0, 0.5f, 0), yaw, pitch, 4f);
+    static float Q(List<float> v, float q) { v.Sort(); return v[(int)Math.Clamp(MathF.Round(q * (v.Count - 1)), 0, v.Count - 1)]; }
+    var tail = lo.Count >= 200 ? 0.01f : 0f;
+    var min = new Vector3(Q(lo.Select(v => v.X).ToList(), tail), Q(lo.Select(v => v.Y).ToList(), tail), Q(lo.Select(v => v.Z).ToList(), tail));
+    var max = new Vector3(Q(hi.Select(v => v.X).ToList(), 1 - tail), Q(hi.Select(v => v.Y).ToList(), 1 - tail), Q(hi.Select(v => v.Z).ToList(), 1 - tail));
+    return FitBox(min, max, aspect, yaw, pitch, NearFadeClear(instance));
+  }
+
+  /// <summary>Camera that keeps the box [min, max] fully inside a perspective view of the given aspect (10 % margin).</summary>
+  public static EffectCamera FitBox(Vector3 min, Vector3 max, float aspect, float yaw = 0.6f, float pitch = 0.22f, float nearClear = 0f, float fov = MathF.PI / 4f)
+  {
+    var center = (min + max) * 0.5f;
+    var radius = Math.Max((max - min).Length() * 0.5f, 0.05f);
+    var halfV = fov * 0.5f;
+    var halfH = MathF.Atan(MathF.Tan(halfV) * Math.Max(aspect, 0.1f));
+    var half = Math.Min(halfV, halfH);
+    var distance = Math.Clamp(radius / MathF.Sin(half) * 1.1f, 0.15f, 190f);
+    if (nearClear > distance)
+    {
+      // degNear fades sprites close to the eye: stay at the clear distance and narrow the lens (as Fit does).
+      var narrow = 2f * MathF.Atan(radius * 1.1f / nearClear / Math.Min(1f, Math.Max(aspect, 0.1f)));
+      return new EffectCamera(center, yaw, pitch, nearClear, Math.Clamp(narrow, 0.05f, fov));
+    }
+    return new EffectCamera(center, yaw, pitch, distance, fov);
+  }
+
   /// <summary>Smallest camera distance at which no sprite emitter's <c>degNear</c> reduces size/intensity/alpha
   /// (Amount = 0 at radStart for a start &gt; end ramp). Capped at 20 m.</summary>
   public static float NearFadeClear(LibSaber.SM2.Assets.Effects.EffectInstance instance)

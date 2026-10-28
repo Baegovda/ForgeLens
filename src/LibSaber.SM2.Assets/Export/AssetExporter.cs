@@ -33,6 +33,13 @@ public sealed class ExportSettings
   /// <summary>Adds the clip's 0xF4 track to the skeleton root translation. The extractor's <c>--no-root-motion</c> turns this off.</summary>
   public bool RootMotion { get; init; } = true;
   /// <summary>
+  ///   mtl1-42: animation root mode. False (default, unchanged) = Root motion: ROOT keeps its travel and the 0xF4 track
+  ///   (<see cref="RootMotion"/>), ready for UE EnableRootMotion. True = In place: the ROOT's horizontal travel is
+  ///   removed like the Models preview's In place (<see cref="AnimationClip.InPlace"/>). Applies to the bind-skeleton
+  ///   clips, the Anim Only (Manny) clips and the physics bake (which samples the same pose).
+  /// </summary>
+  public bool InPlace { get; init; }
+  /// <summary>
   ///   Unreal FBX: make <c>ROOT</c> the hierarchy root (skeleton bone 0, carries root motion) and drop the
   ///   <c>{mesh}_Skeleton</c> Null. The extractor's <c>--fbx-armature-null</c> turns this off (old hierarchy).
   /// </summary>
@@ -229,6 +236,8 @@ public static class AssetExporter
       visibility.Apply(mesh);
     if (!settings.IncludeClothSim)
       HideClothSim(mesh);
+    else
+      ShowClothSim(mesh);
     var variant = settings.AnimationOnly ? null : ApplyVariant(catalog, store, file, mesh, settings, report);
     var exportMesh = SelectExportGeometry(mesh, settings.Lod);
     if (!settings.AnimationOnly)
@@ -302,6 +311,8 @@ public static class AssetExporter
     {
       clip.RootMotion = settings.RootMotion;
       clip.RebaseFirstFrame = settings.RebaseFirstFrame;
+      clip.InPlace = settings.InPlace;
+      clip.InPlaceKey = null;
       if (!clip.HasCurves || exportMesh.Bones.Count == 0)
         continue;
       // __ADD marks a clip with the 0xF3/0xF7 additive slot (clip+0x68). ue_import_anim.py makes it a
@@ -373,6 +384,8 @@ public static class AssetExporter
       var unbound = clip.Tracks.Where((_, i) => i < binding.Length && binding[i] < 0).Select(track => track.BoneName).ToList();
       var unboundNote = unbound.Count == 0 ? "" : $" Unmatched: {string.Join(", ", unbound.Take(8))}{(unbound.Count > 8 ? $" (+{unbound.Count - 8})" : "")}.";
       report.Messages.Add($"{clip.Name}: {bound} of {clip.Tracks.Count} tracks match {exportMesh.Name}{by}, {clip.Duration:0.###}s at {clip.SampleRate:0.###} fps.{unboundNote}");
+      if (clip.InPlace)
+        report.Messages.Add($"{clip.Name}: In place: ROOT horizontal travel removed (height and turns kept), like the Models preview. Use Root motion for UE EnableRootMotion.");
       if (clip.RootMotion && clip.HasRootRotation)
       {
         var turn = clip.RootRotation.Max(key => 2 * MathF.Acos(Math.Min(1f, MathF.Abs(key.Value.W)))) * 180 / MathF.PI;
@@ -382,7 +395,12 @@ public static class AssetExporter
 
     exportMesh.Clip = null;
     foreach (var clip in settings.Clips)
+    {
       clip.Baked = null;
+      // The browser hands its preview clips in; the preview applies its own In place, so do not leave the export's on.
+      clip.InPlace = false;
+      clip.InPlaceKey = null;
+    }
     if (physics is not null)
     {
       var physicsPath = Destination(outputDirectory, file.Path, ".physics.json", batch);
@@ -553,6 +571,17 @@ public static class AssetExporter
       foreach (var part in level.Parts)
         Hide(part);
     }
+  }
+
+  /// <summary>--include-cloth-sim: the reader hides *_SIM shells by default (mtl1-42), so turn them back on.</summary>
+  internal static void ShowClothSim(ExportedMesh mesh)
+  {
+    foreach (var part in mesh.Parts.Concat(mesh.Levels.SelectMany(level => level.Parts)))
+      if (IsClothSim(part.Name))
+      {
+        part.Visible = true;
+        part.HideReason = null;
+      }
   }
 
   internal static ExportedMesh SelectExportGeometry(ExportedMesh mesh, int lod)

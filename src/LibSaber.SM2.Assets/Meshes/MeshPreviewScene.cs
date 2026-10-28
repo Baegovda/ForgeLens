@@ -109,7 +109,6 @@ public static partial class MeshPreview
     var physics = settings?.Physics == true ? PhysicsFor(mesh) : null;
     var clipActive = mesh.Bones.Count > 0 && (mesh.Clip is { HasCurves: true } || physics is not null);
     Matrix4x4[]? worlds = clipActive || showSkeleton ? BoneWorlds(mesh, timeSeconds) : null;
-    physics?.Step(worlds!, timeSeconds, mesh.Clip?.Duration ?? 0);
     var rebase = Matrix4x4.Identity;
     if (clipActive && settings?.InPlace == true && mesh.Clip is { HasCurves: true })
     {
@@ -118,6 +117,12 @@ public static partial class MeshPreview
         worlds[i] *= rebase;
       RemoveRootMotion(mesh, worlds, rebase);
     }
+    // mtl1-42: physics runs AFTER the in-place rebase / root-motion removal, in the same space the body is drawn in.
+    // It used to step on the raw clip worlds: jiggle bones were rebased afterwards with the body, but cloth particles
+    // (ClothInstance positions, drawn as-is) stayed in root-motion space, so with In place on the tabard and purity seals
+    // slid away from the body as the clip's ROOT travelled (cc_titus + titus_radar_intro_intercessor). The sim also no
+    // longer reacts to locomotion the preview has removed.
+    physics?.Step(worlds!, timeSeconds, mesh.Clip?.Duration ?? 0);
 
     var batches = new List<PreviewBatch>(slices.Count);
     var visibilityKey = new System.Text.StringBuilder();

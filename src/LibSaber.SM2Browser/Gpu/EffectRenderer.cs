@@ -221,6 +221,14 @@ internal sealed unsafe class EffectRenderer : IDisposable
   }
   public double LastMs { get; private set; }
 
+  /// <summary>mtl1-42: texture name -> has alpha coverage (VfxDrawKinds.HasAlphaCoverage), filled on upload.</summary>
+  private readonly Dictionary<string, bool> _alphaCoverage = new(StringComparer.OrdinalIgnoreCase);
+
+  /// <summary>Batch draw kind after the texture check (a spark with an alpha-less texture draws as a particle).</summary>
+  private VfxDrawKind ResolveKind(SpriteBatch batch) => VfxDrawKinds.Resolve(batch.Kind, TextureHasAlpha(batch.Emitter.Texture));
+
+  private bool? TextureHasAlpha(string? name) => name is not null && _alphaCoverage.TryGetValue(name, out var c) ? c : null;
+
   private uint Upload(EffectImage image, bool linear = false)
   {
     var id = _gl.GenTexture();
@@ -255,6 +263,7 @@ internal sealed unsafe class EffectRenderer : IDisposable
     }
 
     id = image.Width > 0 ? Upload(image) : uint.MaxValue;
+    if (image.Width > 0) _alphaCoverage[name] = VfxDrawKinds.HasAlphaCoverage(image.Rgba);
     _textures[name] = id;
     if (id == uint.MaxValue) { MissingTextures.Add(name); return missingWhite ? _white : 0; }
     return id;
@@ -356,7 +365,7 @@ internal sealed unsafe class EffectRenderer : IDisposable
     var kindLoc = _gl.GetUniformLocation(_sprite, "uKind");
     SparkBatches = TrailBatches = 0;
     // mtl1-28: opaque sparks first (depth-written), then the blended batches far to near.
-    foreach (var batch in layer.Batches.OrderBy(b => VfxDrawKinds.Enabled && b.Kind == VfxDrawKind.Spark ? 0 : 1))
+    foreach (var batch in layer.Batches.OrderBy(b => VfxDrawKinds.Enabled && ResolveKind(b) == VfxDrawKind.Spark ? 0 : 1))
     {
       if (batch.Distortion) continue;
       var tex = Texture(layer, batch.Emitter.Texture);
@@ -398,7 +407,7 @@ internal sealed unsafe class EffectRenderer : IDisposable
           break;
       }
 
-      var kind = VfxDrawKinds.Enabled ? batch.Kind : VfxDrawKind.CpuParticle;
+      var kind = VfxDrawKinds.Enabled ? ResolveKind(batch) : VfxDrawKind.CpuParticle;
       _gl.Uniform1(kindLoc, kind switch { VfxDrawKind.Trail => 1, VfxDrawKind.Spark => 2, _ => 0 });
       ApplyKindState(kind);
       if (kind == VfxDrawKind.Trail) TrailBatches++;

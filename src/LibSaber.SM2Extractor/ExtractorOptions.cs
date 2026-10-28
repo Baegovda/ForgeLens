@@ -10,7 +10,7 @@ LibSaber.SM2Extractor — list and extract Warhammer 40,000: Space Marine 2 arch
 Usage:
   LibSaber.SM2Extractor list <archive-or-folder> [options]
   LibSaber.SM2Extractor extract <archive-or-folder> --output <folder> [options]
-  LibSaber.SM2Extractor export <game-folder> --asset <path> --format <fbx-unreal|gltf|both> --output <folder> [--lod <n>] [--anim <name|all>]... [--anim-only] [--anim-only-manny] [--anim-mannequin <json>] [--anim-rebase <first-frame|none>] [--no-root-motion] [--include-cloth-sim] [--no-physics] [--variant <spec>] [--tex-formats <list>]
+  LibSaber.SM2Extractor export <game-folder> --asset <path> --format <fbx-unreal|gltf|both> --output <folder> [--lod <n>] [--anim <name|all>]... [--anim-only] [--anim-only-manny] [--anim-mannequin <json>] [--anim-rebase <first-frame|none>] [--no-root-motion] [--anim-root <motion|in-place>] [--include-cloth-sim] [--no-physics] [--variant <spec>] [--tex-formats <list>]
 
 The game ships .pak archives with a sibling cache of the same name plus ".cache"
 (client_pc\something.pak and client_pc\something.pak.cache). .pck files with a
@@ -55,6 +55,10 @@ Options:
                           start at the bind are unchanged. none keeps level space.
   --no-root-motion        Leave that root translation off. The bone curves are unchanged.
                           export only.
+  --anim-root <mode>      motion (default): ROOT keeps its travel, for UE EnableRootMotion.
+                          in-place: remove the ROOT's horizontal travel from every frame
+                          (height and turns kept), like the Models preview's In place.
+                          Also applies to --anim-only-manny. export only.
   --fbx-armature-null     Old FBX hierarchy: a {model}_Skeleton Null above the tpl root object.
                           Default for fbx-unreal: ROOT is the hierarchy root (Unreal bone 0)
                           and carries the root motion. export only.
@@ -107,6 +111,7 @@ Examples:
   public int Lod { get; private init; }
   public string? Animation { get; private init; }
   public bool RootMotion { get; private init; } = true;
+  public bool InPlace { get; private init; }
   public bool UnrealRootBone { get; private init; } = true;
   public bool AnimationOnly { get; private init; }
   public bool RebaseFirstFrame { get; private init; } = true;
@@ -159,6 +164,8 @@ Examples:
     var overwrite = true;
     var quiet = false;
     var rootMotion = true;
+    var inPlace = false;
+    var inPlaceSet = false;
     var unrealRootBone = true;
     var animationOnly = false;
     string? mannequin = null;
@@ -292,6 +299,25 @@ Examples:
 
         rebase = rebaseValue == "first-frame";
         rebaseSet = true;
+        continue;
+      }
+
+      if (TryTakeValue(args, ref i, arg, "--anim-root", "--anim-root", out var rootValue))
+      {
+        if (inPlaceSet)
+        {
+          error = "--anim-root specified more than once.";
+          return false;
+        }
+
+        if (rootValue is not ("motion" or "in-place"))
+        {
+          error = "--anim-root takes motion or in-place.";
+          return false;
+        }
+
+        inPlace = rootValue == "in-place";
+        inPlaceSet = true;
         continue;
       }
 
@@ -469,9 +495,9 @@ Examples:
       return false;
     }
 
-    if (verb != ExtractorVerb.Export && (asset is not null || format is not null || lodSet || animation is not null || rootMotionSet || includeClothSim || !physics || !unrealRootBone || animationOnly || rebaseSet || variant is not null || texFormats is not null))
+    if (verb != ExtractorVerb.Export && (asset is not null || format is not null || lodSet || animation is not null || rootMotionSet || inPlaceSet || includeClothSim || !physics || !unrealRootBone || animationOnly || rebaseSet || variant is not null || texFormats is not null))
     {
-      error = "--asset, --format, --lod, --anim, --anim-only, --anim-rebase, --no-root-motion, --fbx-armature-null, --include-cloth-sim, --no-physics, --variant, and --tex-formats are only valid with export.";
+      error = "--asset, --format, --lod, --anim, --anim-only, --anim-rebase, --no-root-motion, --anim-root, --fbx-armature-null, --include-cloth-sim, --no-physics, --variant, and --tex-formats are only valid with export.";
       return false;
     }
 
@@ -527,6 +553,7 @@ Examples:
       Lod = lod,
       Animation = animation,
       RootMotion = rootMotion,
+      InPlace = inPlace,
       UnrealRootBone = unrealRootBone,
       AnimationOnly = animationOnly,
       RebaseFirstFrame = rebase,

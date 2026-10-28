@@ -398,4 +398,16 @@ public class ExtractorTests
     return memory.ToArray();
   }
 
+
+  [Fact]
+  public void Export_anim_root_mode()
+  {
+    Assert.True(ExtractorOptions.TryParse(new[] { "export", "game", "--asset", "tpl/hero.tpl", "--format", "fbx-unreal", "--anim", "run", "-o", "out" }, out var options, out _));
+    Assert.False(options.InPlace); // default: root motion (unchanged)
+    Assert.True(ExtractorOptions.TryParse(new[] { "export", "game", "--asset", "tpl/hero.tpl", "--format", "fbx-unreal", "--anim", "run", "--anim-root", "in-place", "-o", "out" }, out options, out _));
+    Assert.True(options.InPlace);
+    Assert.False(ExtractorOptions.TryParse(new[] { "export", "game", "--asset", "tpl/hero.tpl", "--format", "fbx-unreal", "--anim-root", "sideways", "-o", "out" }, out _, out var error));
+    Assert.Contains("--anim-root", error);
+    Assert.False(ExtractorOptions.TryParse(new[] { "list", "game", "--anim-root", "in-place" }, out _, out error));
+  }
 }

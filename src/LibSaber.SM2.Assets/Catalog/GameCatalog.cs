@@ -107,7 +107,15 @@ public sealed class GameCatalog
   }
 
   public FileQuery Query(CatalogDirectory? directory, string? nameContains, AssetFilter filter, bool includeSubfolders = false)
+    => Query(directory, nameContains, filter, includeSubfolders, previewableOnly: false, out _);
+
+  /// <summary>
+  ///   mtl1-42: <paramref name="previewableOnly"/> keeps only files the browser preview renders
+  ///   (<see cref="AssetClassification.IsPreviewable"/>); <paramref name="hidden"/> counts the matches it left out.
+  /// </summary>
+  public FileQuery Query(CatalogDirectory? directory, string? nameContains, AssetFilter filter, bool includeSubfolders, bool previewableOnly, out int hidden)
   {
+    hidden = 0;
     var text = string.IsNullOrWhiteSpace(nameContains) ? null : nameContains.Trim();
     // vfx4-3: several words (space separated) must all occur in the path, in any order ("bolter muzzle").
     var words = text?.Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries) ?? Array.Empty<string>();
@@ -115,8 +123,16 @@ public sealed class GameCatalog
     var span = directory is null
       ? 0
       : includeSubfolders ? directory.SubtreeFileCount : directory.FileCount;
-    if (!global && filter == AssetFilter.All && directory is not null)
+    if (!global && filter == AssetFilter.All && directory is not null && !previewableOnly)
       return new FileQuery(directory.FirstFile, span, null);
+    var hiddenCount = 0;
+    bool Keep(int i)
+    {
+      if (!previewableOnly || AssetClassification.IsPreviewable(_extensions[_files[i].ExtensionId]))
+        return true;
+      hiddenCount++;
+      return false;
+    }
 
     var matches = new List<int>();
     if (!global && directory is not null)
@@ -124,7 +140,7 @@ public sealed class GameCatalog
       var end = directory.FirstFile + span;
       for (var i = directory.FirstFile; i < end; i++)
       {
-        if (AssetClassification.Matches(filter, KindOf(i)))
+        if (AssetClassification.Matches(filter, KindOf(i)) && Keep(i))
           matches.Add(i);
       }
     }
@@ -136,10 +152,12 @@ public sealed class GameCatalog
           continue;
         if (text is not null && !MatchesAll(_paths[_files[i].PathId], words))
           continue;
-        matches.Add(i);
+        if (Keep(i))
+          matches.Add(i);
       }
     }
 
+    hidden = hiddenCount;
     return new FileQuery(0, matches.Count, matches.ToArray());
   }
 

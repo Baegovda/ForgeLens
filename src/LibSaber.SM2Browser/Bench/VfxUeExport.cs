@@ -34,6 +34,7 @@ internal static class VfxUeExport
     var library = new EffectLibrary(new DirectoryEffectSource(args[1]));
     var aliases = PartAliases.Load(args[2]);
     var files = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+    var alphaCoverage = new Dictionary<string, bool>(StringComparer.OrdinalIgnoreCase);
     foreach (var f in Directory.EnumerateFiles(args[3], "*.pct.resource", SearchOption.AllDirectories))
       files.TryAdd(Path.GetFileName(f)[..^".pct.resource".Length], f);
     var output = args[4];
@@ -80,21 +81,26 @@ internal static class VfxUeExport
       foreach (var b in batches)
       {
         var j = VfxFrameExport.Batch(b);
-        written.Add(j);
         foreach (var t in new[] { (string?)j["texture"], (string?)j["alphaMask"] })
         {
           if (string.IsNullOrEmpty(t)) continue;
           var png = Path.Combine(texDir, t.ToLowerInvariant() + ".png");
-          if (File.Exists(png)) continue;
+          if (File.Exists(png) && alphaCoverage.ContainsKey(t)) continue;
           try
           {
             if (!files.TryGetValue(t, out var path)) { missing.Add(t); continue; }
             var doc = TextureLoader.LoadLoose(path);
             var bgra = doc.Decode(0, 0, out var w, out var h, out _);
-            ImageWriters.WritePng(png, bgra, w, h);
+            alphaCoverage[t] = VfxDrawKinds.HasAlphaCoverage(bgra);
+            if (!File.Exists(png)) ImageWriters.WritePng(png, bgra, w, h);
           }
           catch (Exception e) { missing.Add($"{t} ({e.Message})"); }
         }
+        // mtl1-42: same spark -> particle fallback as the browser renderer (VfxDrawKinds.Resolve).
+        var tn = (string?)j["texture"];
+        var resolved = VfxDrawKinds.Resolve(b.Kind, !b.Distortion && tn is { Length: > 0 } && alphaCoverage.TryGetValue(tn, out var cov) ? cov : null);
+        if (resolved != b.Kind) j = VfxFrameExport.Batch(b, kindOverride: resolved);
+        written.Add(j);
       }
 
       var lights = instance.Lights().ToList();

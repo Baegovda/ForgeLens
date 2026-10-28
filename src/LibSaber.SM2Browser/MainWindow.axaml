@@ -13,13 +13,13 @@
     <Border DockPanel.Dock="Top" Padding="10,8" Background="{DynamicResource FL.Toolbar}" BorderBrush="{DynamicResource FL.Border}" BorderThickness="0,0,0,1">
       <Grid ColumnDefinitions="Auto,*,Auto,220,140,Auto">
         <Button x:Name="OpenButton" Content="Open game folder" Click="OpenClicked" Margin="0,0,8,0" ToolTip.Tip="The game root or client_pc. Caches are found in subfolders." />
-        <TextBlock x:Name="FolderText" Grid.Column="1" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" Margin="0,0,8,0" />
+        <TextBlock x:Name="FolderText" Grid.Column="1" VerticalAlignment="Center" TextTrimming="PrefixCharacterEllipsis" Margin="4,0,12,0" Foreground="{DynamicResource FL.TextDim}" ToolTip.Tip="{Binding Text, RelativeSource={RelativeSource Self}}" />
         <StackPanel Grid.Column="2" Orientation="Horizontal" Margin="0,0,8,0">
           <TextBox x:Name="SearchBox" Watermark="Search (Ctrl+F), e.g. bolter muzzle" Width="240" TextChanged="SearchChanged" KeyDown="SearchKeyDown"
                    ToolTip.Tip="Words separated by spaces must all match the path. Enter previews the first result, Down moves into the list, Esc clears." />
           <Button x:Name="SearchClear" Content="✕" Click="SearchClearClicked" IsVisible="False" Padding="6,2" Margin="2,0,0,0" ToolTip.Tip="Clear search (Esc)" />
         </StackPanel>
-        <ComboBox x:Name="FilterBox" Grid.Column="3" SelectedIndex="0" SelectionChanged="FilterChanged">
+        <ComboBox x:Name="FilterBox" Grid.Column="3" SelectedIndex="0" SelectionChanged="FilterChanged" HorizontalAlignment="Stretch" ToolTip.Tip="Show only this file type">
           <ComboBoxItem Content="All types" />
           <ComboBoxItem Content="Textures" />
           <ComboBoxItem Content="Models" />
@@ -32,34 +32,46 @@
       </Grid>
     </Border>
     <Border DockPanel.Dock="Bottom" Padding="10,5" Background="{DynamicResource FL.Toolbar}" BorderBrush="{DynamicResource FL.Border}" BorderThickness="0,1,0,0">
-      <TextBlock x:Name="StatusText" Text="Open the game folder (the one that contains the .pak files)." />
+      <TextBlock x:Name="StatusText" Foreground="{DynamicResource FL.TextDim}" FontSize="12" TextTrimming="CharacterEllipsis" Text="Open the game folder (the one that contains the .pak files)." />
     </Border>
-    <Grid ColumnDefinitions="240,6,*,6,2*">
+    <Grid x:Name="MainColumns" ColumnDefinitions="230,6,1.35*,6,2*">
       <tdg:TreeDataGrid x:Name="FolderTree" Grid.Column="0" MinWidth="160" Background="{DynamicResource FL.PanelDeep}" />
       <GridSplitter Grid.Column="1" Width="4" Background="{DynamicResource FL.Border}" ResizeDirection="Columns" />
       <DockPanel Grid.Column="2" MinWidth="220">
-        <StackPanel DockPanel.Dock="Top" Orientation="Horizontal" Spacing="6" Margin="8,4,8,0">
-          <Button x:Name="FilesTab" Content="Files" Click="FilesTabClicked" />
-          <Button x:Name="RecentTab" Content="Recent" Click="RecentTabClicked" />
+        <StackPanel DockPanel.Dock="Top" Orientation="Horizontal" Spacing="2" Margin="8,6,8,0">
+          <Button x:Name="FilesTab" Classes="tab" Content="Files" Click="FilesTabClicked" />
+          <Button x:Name="RecentTab" Classes="tab" Content="Recent" Click="RecentTabClicked" />
         </StackPanel>
-        <StackPanel x:Name="FileHeader" DockPanel.Dock="Top" Margin="8,4">
-          <CheckBox x:Name="SubfoldersBox" Content="Include subfolders" Click="SubfoldersChanged" ToolTip.Tip="List every file under the selected folder." />
-          <Grid ColumnDefinitions="*,100,70,170" Margin="0,4,0,0">
+        <StackPanel x:Name="FileHeader" DockPanel.Dock="Top" Margin="0,4,0,0">
+          <StackPanel Orientation="Horizontal" Spacing="16" Margin="8,0">
+            <CheckBox x:Name="SubfoldersBox" Content="Include subfolders" Click="SubfoldersChanged" ToolTip.Tip="List every file under the selected folder." />
+            <CheckBox x:Name="ShowAllBox" Content="Show all files" Click="ShowAllChanged"
+                      ToolTip.Tip="Off: only assets the preview can show (.tpl models, textures, .sani clips, .sfx effects). On: also .tpl_data, .tpl_markup, .lods_base, .geom_dbg, .resource, mips and text. A type filter other than All types always lists that whole type." />
+          </StackPanel>
+          <!-- mtl1-42: drag the header splitters to resize; PATH takes the rest. Widths are remembered across runs. -->
+          <Grid x:Name="FileColumnHeader" ColumnDefinitions="*,6,72,6,64,6,112" Margin="8,6,8,2" Height="22">
             <TextBlock Text="PATH" Classes="header" VerticalAlignment="Center" />
-            <TextBlock Grid.Column="1" Text="TYPE" Classes="header" VerticalAlignment="Center" />
-            <TextBlock Grid.Column="2" Text="SIZE" Classes="header" VerticalAlignment="Center" />
-            <TextBlock Grid.Column="3" Text="ARCHIVE" Classes="header" VerticalAlignment="Center" />
+            <GridSplitter Grid.Column="1" Classes="column" ResizeDirection="Columns" ToolTip.Tip="Drag to resize" />
+            <TextBlock Grid.Column="2" Text="TYPE" Classes="header" VerticalAlignment="Center" />
+            <GridSplitter Grid.Column="3" Classes="column" ResizeDirection="Columns" ToolTip.Tip="Drag to resize" />
+            <TextBlock Grid.Column="4" Text="SIZE" Classes="header" VerticalAlignment="Center" />
+            <GridSplitter Grid.Column="5" Classes="column" ResizeDirection="Columns" ToolTip.Tip="Drag to resize" />
+            <TextBlock Grid.Column="6" Text="ARCHIVE" Classes="header" VerticalAlignment="Center" />
           </Grid>
         </StackPanel>
         <Grid>
         <ListBox x:Name="FileList" SelectionMode="Multiple" SelectionChanged="FileSelectionChanged">
           <ListBox.ItemTemplate>
             <DataTemplate x:DataType="local:FileRow">
-              <Grid ColumnDefinitions="*,100,70,170">
-                <TextBlock Text="{Binding Path}" TextTrimming="CharacterEllipsis" />
-                <TextBlock Grid.Column="1" Text="{Binding Extension}" />
-                <TextBlock Grid.Column="2" Text="{Binding SizeText}" />
-                <TextBlock Grid.Column="3" Text="{Binding Archive}" TextTrimming="CharacterEllipsis" ToolTip.Tip="{Binding Archive}" />
+              <Grid ColumnDefinitions="*,6,Auto,6,Auto,6,Auto">
+                <!-- Middle ellipsis: folders in the middle collapse first, the file name stays readable. Full path on hover. -->
+                <TextBlock Text="{Binding Path}" TextTrimming="PrefixCharacterEllipsis" ToolTip.Tip="{Binding Path}" />
+                <TextBlock Grid.Column="2" Text="{Binding Extension}" Foreground="{DynamicResource FL.TextDim}" TextTrimming="CharacterEllipsis"
+                           Width="{ReflectionBinding TypeWidth, Source={x:Static local:FileColumns.Shared}}" />
+                <TextBlock Grid.Column="4" Text="{Binding SizeText}" Foreground="{DynamicResource FL.TextDim}" TextAlignment="Right" Padding="0,0,8,0"
+                           Width="{ReflectionBinding SizeWidth, Source={x:Static local:FileColumns.Shared}}" />
+                <TextBlock Grid.Column="6" Text="{Binding Archive}" Foreground="{DynamicResource FL.TextDim}" TextTrimming="PrefixCharacterEllipsis" ToolTip.Tip="{Binding Archive}"
+                           Width="{ReflectionBinding ArchiveWidth, Source={x:Static local:FileColumns.Shared}}" />
               </Grid>
             </DataTemplate>
           </ListBox.ItemTemplate>
@@ -85,13 +97,13 @@
               <Setter Property="Margin" Value="0,0,6,4" />
             </Style>
           </WrapPanel.Styles>
-          <TextBlock Text="Mip" VerticalAlignment="Center" />
+          <TextBlock Text="Mip" VerticalAlignment="Center" Foreground="{DynamicResource FL.TextDim}" />
           <ComboBox x:Name="MipBox" Width="64" SelectionChanged="MipChanged" />
-          <TextBlock Text="Face" VerticalAlignment="Center" />
+          <TextBlock Text="Face" VerticalAlignment="Center" Foreground="{DynamicResource FL.TextDim}" />
           <ComboBox x:Name="FaceBox" Width="64" SelectionChanged="MipChanged" />
-          <TextBlock x:Name="LodLabel" Text="LOD" VerticalAlignment="Center" IsVisible="False" />
+          <TextBlock x:Name="LodLabel" Text="LOD" VerticalAlignment="Center" IsVisible="False" Foreground="{DynamicResource FL.TextDim}" />
           <ComboBox x:Name="LodBox" Width="150" IsVisible="False" SelectionChanged="LodChanged" />
-          <TextBlock x:Name="PartLabel" Text="Part" VerticalAlignment="Center" IsVisible="False" />
+          <TextBlock x:Name="PartLabel" Text="Part" VerticalAlignment="Center" IsVisible="False" Foreground="{DynamicResource FL.TextDim}" />
           <ComboBox x:Name="PartBox" Width="220" IsVisible="False" SelectionChanged="ViewChanged" />
           <ToggleButton x:Name="WireToggle" Content="Wireframe" IsChecked="False" IsVisible="False" Click="ViewChanged" />
           <ToggleButton x:Name="SkeletonToggle" Content="Skeleton" IsChecked="False" IsVisible="False" Click="ViewChanged" />
@@ -108,7 +120,7 @@
               <Setter Property="Margin" Value="0,0,6,4" />
             </Style>
           </WrapPanel.Styles>
-          <TextBlock Text="Anim" VerticalAlignment="Center" />
+          <TextBlock Text="ANIM" Classes="section" />
           <TextBox x:Name="AnimFilter" Width="180" Watermark="Filter clips" TextChanged="AnimFilterChanged"
                    ToolTip.Tip="Substring, case-insensitive. Clips named after this model are listed first." />
           <ComboBox x:Name="AnimBox" Width="360" SelectionChanged="AnimChanged" />
@@ -125,7 +137,7 @@
               <Setter Property="Margin" Value="0,0,6,4" />
             </Style>
           </WrapPanel.Styles>
-          <TextBlock Text="VFX on model" VerticalAlignment="Center" />
+          <TextBlock Text="VFX ON MODEL" Classes="section" />
           <TextBox x:Name="HostVfxName" Width="220" Watermark="effect, e.g. fx_bolter_muzzle_client"
                    ToolTip.Tip=".sfx name. Emitters, lights and trails go on their nameParent bone (tip, jet_big_l, sfx_*); the rest on the socket at the right." />
           <ComboBox x:Name="HostVfxSocket" Width="200" SelectionChanged="HostVfxOptionsChanged"
@@ -146,8 +158,9 @@
               <Setter Property="Margin" Value="0,0,6,4" />
             </Style>
           </WrapPanel.Styles>
-          <TextBlock Text="VFX" VerticalAlignment="Center" FontWeight="SemiBold" />
+          <TextBlock Text="VFX" Classes="section" />
           <Button Content="Restart" Focusable="False" Click="VfxRestartClicked" ToolTip.Tip="Replay from 0 s (same seed: every run is identical)" />
+          <Button Content="Fit" Focusable="False" Click="VfxFitClicked" ToolTip.Tip="Frame the whole effect (pre-simulated over its first run). Shortcut: F" />
           <Slider x:Name="VfxScrub" Width="220" Minimum="0" Maximum="1" ValueChanged="VfxScrubChanged"
                   ToolTip.Tip="Scrub: the fixed 60 Hz simulation replays deterministically to this time" />
           <TextBlock x:Name="VfxTime" VerticalAlignment="Center" Text="0.00s" />
@@ -160,7 +173,7 @@
             <ComboBoxItem Content="Covering demo: sphere (heuristic)" />
           </ComboBox>
         </WrapPanel>
-        <TextBlock x:Name="PreviewNote" DockPanel.Dock="Bottom" TextWrapping="Wrap" Margin="0,8,0,0" />
+        <TextBlock x:Name="PreviewNote" DockPanel.Dock="Bottom" TextWrapping="Wrap" Margin="2,8,2,0" Foreground="{DynamicResource FL.TextDim}" FontSize="12" />
         <Border x:Name="ViewBorder" Background="{DynamicResource FL.Viewport}" CornerRadius="4" BorderBrush="{DynamicResource FL.Border}" BorderThickness="1" ClipToBounds="True"
                 PointerPressed="ViewPressed" PointerMoved="ViewMoved" PointerReleased="ViewReleased" PointerWheelChanged="ViewWheel">
           <Grid>

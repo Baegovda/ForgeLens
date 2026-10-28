@@ -102,6 +102,7 @@ public partial class ExportWindow : Window
       Space = SpaceBox.SelectedIndex == 1 ? ExportSpace.Blender : ExportSpace.Unreal,
       IncludeClothSim = ClothBox.IsChecked == true,
       RootMotion = RootMotionBox.IsChecked == true,
+      InPlace = AnimRootBox.SelectedIndex == 1,
       MannequinReference = MannyBox.IsChecked == true ? "builtin" : null,
       AnimationOnly = MannyBox.IsChecked == true,
       Physics = MannyBox.IsChecked != true,

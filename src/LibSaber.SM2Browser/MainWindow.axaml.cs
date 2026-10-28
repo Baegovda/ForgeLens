@@ -77,10 +77,14 @@ public partial class MainWindow : Window
     InitializeComponent();
     InitHostVfx();
     RecentList.ItemsSource = _recent.Items;
-    // A closed, focused ComboBox steps its selection on the mouse wheel; on the clip list that silently
-    // loads a different (possibly 100 s cinematic) clip while the user is just scrolling the window.
+    InitLayoutMemory();
+    ShowAllBox.IsChecked = _settings.ShowAllFiles;
+    RestoreFilterState();
+    // mtl1-42: the wheel over a CLOSED clip / LOD / part box steps to the previous (wheel up) or next (wheel down) row of
+    // the current (filtered) list and loads it like a click would; the dropdown stays closed. The handler is on the box,
+    // so it only fires while the pointer is over it (scrolling elsewhere never changes the clip).
     foreach (var box in new ComboBox[] { AnimBox, LodBox, PartBox })
-      box.AddHandler(PointerWheelChangedEvent, (_, e) => { if (!box.IsDropDownOpen) e.Handled = true; }, RoutingStrategies.Tunnel);
+      box.AddHandler(PointerWheelChangedEvent, (_, e) => ComboWheel(box, e), RoutingStrategies.Tunnel);
     ShowFiles();
     _searchTimer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(250) };
     _searchTimer.Tick += (_, _) =>
@@ -195,11 +199,15 @@ public partial class MainWindow : Window
       _directory = directory;
       RefreshFiles();
     };
+    source.RowExpanded += (_, e) => _expanded.Add(e.Row.Model.Path);
+    source.RowCollapsed += (_, e) => _expanded.Remove(e.Row.Model.Path);
     FolderTree.Source = source;
     _tree = source;
     _directory = catalog.Root;
     var root = new IndexPath(0);
     source.Expand(root);
+    if (RestoreTreeState(catalog))
+      return;
     source.RowSelection.Select(root);
     RefreshFiles();
   }
@@ -249,6 +257,13 @@ public partial class MainWindow : Window
   /// <summary>Ctrl+F focuses the search box, Ctrl+E opens export for the selection.</summary>
   private void ShortcutKeyDown(object? sender, KeyEventArgs e)
   {
+    // mtl1-42: F (no modifier) re-frames the effect preview, unless a text box has focus.
+    if (e.Key == Key.F && e.KeyModifiers == KeyModifiers.None && _fx is not null
+        && FocusManager?.GetFocusedElement() is not TextBox && e.Source is not TextBox)
+    {
+      if (VfxFit()) e.Handled = true;
+      return;
+    }
     if (e.KeyModifiers != KeyModifiers.Control)
       return;
     if (e.Key == Key.F)
@@ -307,9 +322,12 @@ public partial class MainWindow : Window
     var scoped = string.IsNullOrWhiteSpace(search) ? directory : null;
     var generation = ++_listGeneration;
     FileQuery query;
+    var auxHidden = 0;
     try
     {
-      query = await Task.Run(() => catalog.Query(scoped, search, filter, includeSubfolders && scoped is not null));
+      // mtl1-42: All types lists only previewable assets unless Show all files is on; an explicit type filter lists the whole type.
+      var previewableOnly = ShowAllBox?.IsChecked != true && filter == AssetFilter.All;
+      query = await Task.Run(() => catalog.Query(scoped, search, filter, includeSubfolders && scoped is not null, previewableOnly, out auxHidden));
     }
     catch (Exception ex)
     {
@@ -333,21 +351,28 @@ public partial class MainWindow : Window
       ? ""
       : $" {catalog.DuplicatesCollapsed:N0} duplicate paths hidden; the later archive is shown.";
     var skipped = catalog.ArchivesSkipped == 0 ? "" : $" {catalog.ArchivesSkipped} caches skipped.";
+    var aux = auxHidden == 0 ? "" : $" {auxHidden:N0} auxiliary files hidden (Show all files).";
     if (query.Length == 0 && !string.IsNullOrWhiteSpace(search))
     {
-      StatusText.Text = $"Nothing matches '{search.Trim()}'. Try fewer words, or set the type filter to All types.";
+      StatusText.Text = auxHidden > 0
+        ? $"No previewable asset matches '{search.Trim()}'; {auxHidden:N0} auxiliary files do (tick Show all files)."
+        : $"Nothing matches '{search.Trim()}'. Try fewer words, or set the type filter to All types.";
       ApplyPendingFile();
       return;
     }
-    StatusText.Text = $"{query.Length:N0} shown in {scope}. {directory.Children.Length:N0} subfolders here. {catalog.FileCount:N0} files in {catalog.Archives.Count} archives.{hidden}{skipped}";
+    StatusText.Text = $"{query.Length:N0} shown in {scope}. {directory.Children.Length:N0} subfolders here. {catalog.FileCount:N0} files in {catalog.Archives.Count} archives.{aux}{hidden}{skipped}";
     ApplyPendingFile();
   }
 
   private async void FileSelectionChanged(object? sender, SelectionChangedEventArgs e)
   {
     UpdateExportButton();
+    // mtl1-42: a click / arrow key previews the row it just selected (Ctrl/Shift-adding rows previews the newest one).
+    _previewRow = e.AddedItems?.OfType<FileRow>().LastOrDefault();
     await PreviewSelectionAsync();
   }
+
+  private FileRow? _previewRow;
 
   private async void MipChanged(object? sender, SelectionChangedEventArgs e)
   {
@@ -360,7 +385,9 @@ public partial class MainWindow : Window
   {
     if (_catalog is null || _store is null)
       return;
-    if (FileList.SelectedItem is not FileRow row)
+    var row = _previewRow is { } added && FileList.SelectedItems?.Contains(added) == true ? added : FileList.SelectedItem as FileRow;
+    _previewRow = null;
+    if (row is null)
       return;
 
     var generation = ++_previewGeneration;
@@ -1214,6 +1241,15 @@ public partial class MainWindow : Window
       StatusText.Text = $"{rows.Count - 1:N0} of {_animAll.Count:N0} animations match '{text}'.";
   }
 
+  private static void ComboWheel(ComboBox box, PointerWheelEventArgs e)
+  {
+    if (box.IsDropDownOpen) return;
+    e.Handled = true;
+    if (!box.IsEnabled || e.Delta.Y == 0 || box.ItemCount == 0) return;
+    var next = Math.Clamp(box.SelectedIndex + (e.Delta.Y > 0 ? -1 : 1), 0, box.ItemCount - 1);
+    if (next != box.SelectedIndex) box.SelectedIndex = next;
+  }
+
   private static readonly AnimChoice BindChoice = new() { Label = "Bind pose", Index = -1 };
 
   /// <summary>The model's own name, for example <c>titus</c> from <c>cc_titus.tpl</c>.</summary>
@@ -1317,6 +1353,13 @@ public partial class MainWindow : Window
     DrawMesh(true);
   }
 
+  private void ShowAllChanged(object? sender, RoutedEventArgs e)
+  {
+    _settings.ShowAllFiles = ShowAllBox.IsChecked == true;
+    try { _settings.Save(); } catch { /* best effort */ }
+    RefreshFiles();
+  }
+
   private void FilesTabClicked(object? sender, RoutedEventArgs e)
     => ShowFiles();
 
@@ -1328,8 +1371,8 @@ public partial class MainWindow : Window
     FileList.IsVisible = true;
     FileHeader.IsVisible = true;
     RecentList.IsVisible = false;
-    FilesTab.FontWeight = FontWeight.SemiBold;
-    RecentTab.FontWeight = FontWeight.Normal;
+    FilesTab.Classes.Set("active", true);
+    RecentTab.Classes.Set("active", false);
   }
 
   private void ShowRecent()
@@ -1337,8 +1380,8 @@ public partial class MainWindow : Window
     FileList.IsVisible = false;
     FileHeader.IsVisible = false;
     RecentList.IsVisible = true;
-    FilesTab.FontWeight = FontWeight.Normal;
-    RecentTab.FontWeight = FontWeight.SemiBold;
+    FilesTab.Classes.Set("active", false);
+    RecentTab.Classes.Set("active", true);
   }
 
   private void RecentSelectionChanged(object? sender, SelectionChangedEventArgs e)
@@ -1399,7 +1442,23 @@ public partial class MainWindow : Window
   {
     if (_catalog is null || _tree is null)
       return false;
+    if (FindDirectory(directoryPath) is not var (indices, node))
+      return false;
 
+    for (var depth = 1; depth < indices.Count; depth++)
+      _tree.Expand(new IndexPath(indices.GetRange(0, depth)));
+    var already = _directory is not null && string.Equals(_directory.Path, node.Path, StringComparison.OrdinalIgnoreCase);
+    _tree.RowSelection!.Select(new IndexPath(indices));
+    if (already)
+      RefreshFiles();
+    return true;
+  }
+
+  /// <summary>Tree index path (root = 0) and node of a catalog directory path ("a/b/c"), or null.</summary>
+  private (List<int> Indices, CatalogDirectory Node)? FindDirectory(string directoryPath)
+  {
+    if (_catalog is null)
+      return null;
     var indices = new List<int> { 0 };
     var node = _catalog.Root;
     if (directoryPath.Length > 0)
@@ -1424,19 +1483,12 @@ public partial class MainWindow : Window
         }
 
         if (found < 0)
-          return false;
+          return null;
         indices.Add(found);
         node = node.Children[found];
       }
     }
-
-    for (var depth = 1; depth < indices.Count; depth++)
-      _tree.Expand(new IndexPath(indices.GetRange(0, depth)));
-    var already = _directory is not null && string.Equals(_directory.Path, node.Path, StringComparison.OrdinalIgnoreCase);
-    _tree.RowSelection!.Select(new IndexPath(indices));
-    if (already)
-      RefreshFiles();
-    return true;
+    return (indices, node);
   }
 
   private void ApplyPendingFile()
@@ -1450,12 +1502,15 @@ public partial class MainWindow : Window
     var row = rows.RowForCatalogIndex(pending);
     if (row < 0)
     {
-      StatusText.Text = "The recent file is not visible in the current list.";
+      StatusText.Text = ShowAllBox.IsChecked == true
+        ? "The recent file is not visible in the current list."
+        : "The recent file is not visible in the current list (auxiliary files are hidden: tick Show all files).";
       return;
     }
 
     FileList.SelectedIndex = row;
     FileList.ScrollIntoView(rows[row]);
+    RestoreScroll();
   }
 
   private static string ParentPath(string filePath)
@@ -1536,8 +1591,184 @@ public partial class MainWindow : Window
     }
   }
 
+  /// <summary>
+  ///   mtl1-42: file list columns follow the header splitters (<see cref="FileColumns"/>); column and pane widths are
+  ///   restored from / saved to settings.json.
+  /// </summary>
+  private void InitLayoutMemory()
+  {
+    var cols = FileColumnHeader.ColumnDefinitions;
+    var shared = FileColumns.Shared;
+    static bool Ok(double? v) => v is { } d && double.IsFinite(d) && d >= FileColumns.MinWidth && d < 4000;
+    if (Ok(_settings.FileTypeWidth)) shared.TypeWidth = _settings.FileTypeWidth!.Value;
+    if (Ok(_settings.FileSizeWidth)) shared.SizeWidth = _settings.FileSizeWidth!.Value;
+    if (Ok(_settings.FileArchiveWidth)) shared.ArchiveWidth = _settings.FileArchiveWidth!.Value;
+    cols[2].Width = new GridLength(shared.TypeWidth);
+    cols[4].Width = new GridLength(shared.SizeWidth);
+    cols[6].Width = new GridLength(shared.ArchiveWidth);
+    foreach (var c in new[] { cols[2], cols[4], cols[6] })
+      c.MinWidth = FileColumns.MinWidth;
+    void Sync()
+    {
+      // A splitter writes pixel widths; a star (PATH) side keeps taking the rest.
+      double W(ColumnDefinition c) => c.Width.IsAbsolute ? c.Width.Value : c.ActualWidth;
+      shared.TypeWidth = W(cols[2]);
+      shared.SizeWidth = W(cols[4]);
+      shared.ArchiveWidth = W(cols[6]);
+    }
+    foreach (var c in cols)
+      c.PropertyChanged += (_, e) =>
+      {
+        if (e.Property == ColumnDefinition.WidthProperty)
+          Sync();
+      };
+
+    var main = MainColumns.ColumnDefinitions;
+    if (_settings.FolderPaneWidth is { } folder && double.IsFinite(folder) && folder >= 120 && folder < 2000)
+      main[0].Width = new GridLength(folder);
+    if (_settings.FilePaneWidth is { } files && double.IsFinite(files) && files > 0.1 && files < 10)
+    {
+      main[2].Width = new GridLength(files, GridUnitType.Star);
+      main[4].Width = new GridLength(2, GridUnitType.Star);
+    }
+  }
+
+  private readonly HashSet<string> _expanded = new(StringComparer.OrdinalIgnoreCase);
+  private bool _restoring;
+
+  /// <summary>mtl1-42: search text, type filter and Include subfolders from the last run (before any folder loads).</summary>
+  private void RestoreFilterState()
+  {
+    _restoring = true;
+    try
+    {
+      if (_settings.FilterIndex is { } f && f >= 0 && f < FilterBox.ItemCount)
+        FilterBox.SelectedIndex = f;
+      SubfoldersBox.IsChecked = _settings.IncludeSubfolders;
+      if (!string.IsNullOrEmpty(_settings.SearchText))
+      {
+        _suppressSearch = true;
+        SearchBox.Text = _settings.SearchText;
+        _suppressSearch = false;
+      }
+    }
+    finally { _restoring = false; }
+  }
+
+  /// <summary>mtl1-42: expanded folders, selected folder and file, and the list scroll from the last run.</summary>
+  private bool RestoreTreeState(GameCatalog catalog)
+  {
+    if (_tree is null || _settings.SelectedFolder is null && _settings.ExpandedFolders is not { Count: > 0 })
+      return false;
+    _restoring = true;
+    try
+    {
+      foreach (var path in (_settings.ExpandedFolders ?? new()).OrderBy(p => p.Count(c => c == '/')).ThenBy(p => p.Length))
+        if (FindDirectory(path) is var (indices, _))
+          _tree.Expand(new IndexPath(indices));
+      if (_settings.SelectedFile is { } file)
+      {
+        var hits = catalog.FindByPath(file);
+        var index = hits.FirstOrDefault(h => string.Equals(catalog.GetFile(h).ArchiveName, _settings.SelectedFileArchive, StringComparison.OrdinalIgnoreCase), hits.Count > 0 ? hits[0] : -1);
+        if (index >= 0)
+        {
+          _pendingFileIndex = index;
+          _pendingDirectory = _settings.SelectedFolder ?? "";
+          _pendingScroll = _settings.FileScroll;
+        }
+      }
+      if (FindDirectory(_settings.SelectedFolder ?? "") is var (sel, node))
+      {
+        if (_directory is not null && string.Equals(_directory.Path, node.Path, StringComparison.OrdinalIgnoreCase))
+          _directory = null; // force the selection handler to run
+        _tree.RowSelection!.Select(new IndexPath(sel));
+        if (_directory is null)
+        {
+          _directory = node;
+          RefreshFiles();
+        }
+        return true;
+      }
+      _pendingFileIndex = -1;
+      return false;
+    }
+    finally { _restoring = false; }
+  }
+
+  private double? _pendingScroll;
+
+  private void RestoreScroll()
+  {
+    if (_pendingScroll is not { } y)
+      return;
+    _pendingScroll = null;
+    Dispatcher.UIThread.Post(() =>
+    {
+      if (FileList.Scroll is ScrollViewer viewer)
+        viewer.Offset = new Vector(viewer.Offset.X, Math.Min(y, Math.Max(0, viewer.Extent.Height - viewer.Viewport.Height)));
+      // The saved scroll wins as long as the selected file stays on screen.
+      Dispatcher.UIThread.Post(() =>
+      {
+        if (FileList.SelectedItem is { } selected)
+        {
+          FileList.ScrollIntoView(selected);
+          // Up/Down continue from the restored file straight away.
+          if (FileList.ContainerFromItem(selected) is { } item)
+            item.Focus(NavigationMethod.Directional);
+        }
+      }, DispatcherPriority.Background);
+    }, DispatcherPriority.Background);
+  }
+
+  private void SaveBrowserState()
+  {
+    _settings.SearchText = SearchBox.Text ?? "";
+    _settings.FilterIndex = FilterBox.SelectedIndex;
+    _settings.IncludeSubfolders = SubfoldersBox.IsChecked == true;
+    if (_catalog is null)
+      return;
+    // Keep only folders whose parents are expanded too (a collapsed parent hides them).
+    bool Visible(string p)
+    {
+      for (var slash = p.LastIndexOf('/'); slash > 0; slash = p.LastIndexOf('/', slash - 1))
+        if (!_expanded.Contains(p[..slash]))
+          return false;
+      return true;
+    }
+    _settings.ExpandedFolders = _expanded.Where(p => p.Length > 0 && Visible(p)).OrderBy(p => p, StringComparer.OrdinalIgnoreCase).ToList();
+    _settings.SelectedFolder = _directory?.Path ?? "";
+    if (FileList.SelectedItem is FileRow row)
+    {
+      var f = _catalog.GetFile(row.Index);
+      _settings.SelectedFile = f.Path;
+      _settings.SelectedFileArchive = f.ArchiveName;
+    }
+    else
+    {
+      _settings.SelectedFile = null;
+      _settings.SelectedFileArchive = null;
+    }
+    _settings.FileScroll = FileList.Scroll is ScrollViewer viewer ? viewer.Offset.Y : null;
+  }
+
+  private void SaveLayoutMemory()
+  {
+    try { SaveBrowserState(); } catch { /* best effort */ }
+    var shared = FileColumns.Shared;
+    _settings.FileTypeWidth = shared.TypeWidth;
+    _settings.FileSizeWidth = shared.SizeWidth;
+    _settings.FileArchiveWidth = shared.ArchiveWidth;
+    var main = MainColumns.ColumnDefinitions;
+    if (main[0].ActualWidth > 0)
+      _settings.FolderPaneWidth = Math.Round(main[0].ActualWidth);
+    if (main[2].ActualWidth > 0 && main[4].ActualWidth > 0)
+      _settings.FilePaneWidth = Math.Round(2 * main[2].ActualWidth / main[4].ActualWidth, 3);
+    try { _settings.Save(); } catch { /* settings are best effort */ }
+  }
+
   protected override void OnClosed(EventArgs e)
   {
+    SaveLayoutMemory();
     _load?.Cancel();
     _store?.Dispose();
     base.OnClosed(e);

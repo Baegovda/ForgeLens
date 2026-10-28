@@ -14,17 +14,9 @@ internal static class ClipPose
 
   public static void Apply(IReadOnlyList<Bone> bones, AnimationClip clip, float time, Matrix4x4[] local)
   {
-    ApplyRaw(bones, clip, time, local);
-    if (clip.RebaseFirstFrame)
-    {
-      if (!ReferenceEquals(clip.RebaseKey, bones))
-      {
-        Rebase(bones, clip);
-        clip.RebaseKey = bones;
-      }
-
-      ApplyRebase(bones, clip, local);
-    }
+    ApplyBase(bones, clip, time, local);
+    if (clip.InPlace)
+      RemoveTravel(bones, clip, local);
 
     // Baked secondary motion (jiggle bones, cloth helper bones) replaces those locals. Baked bones are never
     // parentless, so the rebase above does not touch them.
@@ -39,6 +31,60 @@ internal static class ClipPose
           local[bone] = value;
       }
     }
+  }
+
+  private static void ApplyBase(IReadOnlyList<Bone> bones, AnimationClip clip, float time, Matrix4x4[] local)
+  {
+    ApplyRaw(bones, clip, time, local);
+    if (!clip.RebaseFirstFrame)
+      return;
+    if (!ReferenceEquals(clip.RebaseKey, bones))
+    {
+      Rebase(bones, clip);
+      clip.RebaseKey = bones;
+    }
+
+    ApplyRebase(bones, clip, local);
+  }
+
+  /// <summary>The bone whose travel In place removes: <c>ROOT</c>, else the first parentless bone, else -1.</summary>
+  internal static int TravelBone(IReadOnlyList<Bone> bones)
+  {
+    for (var i = 0; i < bones.Count; i++)
+      if (string.Equals(bones[i].Name, "ROOT", StringComparison.OrdinalIgnoreCase))
+        return i;
+    for (var i = 0; i < bones.Count; i++)
+      if (bones[i].Parent < 0)
+        return i;
+    return -1;
+  }
+
+  /// <summary>
+  ///   <see cref="AnimationClip.InPlace"/>: subtract the travel bone's horizontal (source XZ, Y-up) world offset from frame 0.
+  ///   Same rule as <see cref="MeshPreview.RemoveRootMotion"/>; a parentless local is a world, so a post-translation of every
+  ///   parentless local shifts the whole skeleton.
+  /// </summary>
+  private static void RemoveTravel(IReadOnlyList<Bone> bones, AnimationClip clip, Matrix4x4[] local)
+  {
+    var root = TravelBone(bones);
+    if (root < 0 || root >= local.Length)
+      return;
+    if (!ReferenceEquals(clip.InPlaceKey, bones))
+    {
+      var first = new Matrix4x4[bones.Count];
+      ApplyBase(bones, clip, 0f, first);
+      clip.InPlaceStart = World(bones, first, root).Translation;
+      clip.InPlaceKey = bones;
+    }
+
+    var delta = World(bones, local, root).Translation - clip.InPlaceStart;
+    delta.Y = 0;
+    if (!float.IsFinite(delta.X) || !float.IsFinite(delta.Z) || delta.LengthSquared() < 1e-10f)
+      return;
+    var shift = Matrix4x4.CreateTranslation(-delta);
+    for (var i = 0; i < bones.Count; i++)
+      if (bones[i].Parent < 0)
+        local[i] *= shift;
   }
 
   private static void ApplyRebase(IReadOnlyList<Bone> bones, AnimationClip clip, Matrix4x4[] local)
