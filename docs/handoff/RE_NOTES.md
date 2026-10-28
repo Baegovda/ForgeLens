@@ -140,3 +140,11 @@ All addresses are virtual addresses in `sm2_retail.exe` (retail Steam build, 81 
   - Manual exposure, bias 0, physical camera off -> exposure scale exactly 1.
   - SceneColor (translucent) and RM_2D_OFFSET refraction return a constant inside the capture, so distortion is a separate shift pass + PostProcessInput0 resample (point sampled).
   - With capture_every_frame off, editor capture_scene() skips the PP material.
+
+## mtl1-35 grading LUT / soft depth
+- Content LUTs (client_pc, 22 `*_lut`, e.g. neutral_lut, story_tower_lut, trygon_lut): 32×32×32 BGRA8, `_0.pct_mip` 131072 B, linear_rgb=false. Texel (r,g,b) at ((b·32+g)·32+r)·4, BGRA. neutral_lut is the identity (texel 16 -> 132). Values are display-space.
+- TONEMAP_LUT bake = CS s1996 (smoke 88302 eid 3226, plasma 5994, outdoor 137266 eid 39915): u = i/31; x = max(0, 0.18·2^((u-0.43)·14)) - 0.18·2^(-0.43·14); t = sRGB(sat(Hable(x)·WP)); out = lerp(PREV, NEXT(t·(N-1)/N + 0.5/N), weight); captures weight 1. Outdoor NEXT = story_tower_lut, WP 1.343645; smoke/plasma NEXT = runtime 16³ COLOR_GRADING (not dumped).
+- Apply side (final PS 1209/1159) not on the box. HEURISTIC mapping: coordinate = 0.43 + log2((x + c0)/0.18)/14, texel u·31, trilinear. Identity bake through it is within 1 LSB of exact Hable.
+- `common_pc_dx12_lut.sdc` (4909 B shader cache) extracted with the LUTs; not inspected.
+- Soft depth (particles PS 101818, plasma nightly dis s101818 ~l.1426-1446): sceneZ = -(n·f)/((n-f)·(d - n/(n-f))) from PART_RENDER_DEPTH + COMMON_CAMERA_NEAR_FAR_Z; fade = sat(((sceneZ - TEXCOORD3.x)·(1/softDepth) - 0.5)·sign + 0.5), flag 512 -> sign -1; rgb and alpha *= fade.
+- Hellbrute pretonemap EXR vs final_331.png (E 0.030691): mean |d| ~78; not usable as tonemap evidence (earlier snapshot, 4K upscaled final).

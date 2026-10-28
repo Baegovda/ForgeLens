@@ -131,6 +131,7 @@ The box has no GitHub write login. Pushes go through a Cursor cloud agent with r
   3. `uerun.ps1 Scripts\mtl_fix\ue_vfx_frame.py import <dir> /Game/SM2_Work/VfxUe [fresh]`.
   4. For each frame, `render <json> /Game/SM2_Work/VfxUe [res] [backdrop_exposed]`, then `export <png>` as **a separate call**. PC wrapper: `mtl34_vfx\rr.ps1 <json> <png> @('512','0.06')`.
   5. Check on the box with `tools/vfx/check_rules.py <png> <rules json>` and `tools/vfx/vfxframe_ref.py <json> <png> 512 0.06` (CPU reference, same formulas).
+  - mtl1-35: export env `SM2_VFX_GRADING=<lut name>|identity` (default identity), `SM2_VFX_WHITEPOINT` (default 1.375385; outdoor 1.343645), `SM2_VFX_MESHES=<mesh dir>` (default `<raw>/mesh1`). `render` args: `[res] [backdrop_exposed] [exposure_scale=1] [ground_exposed=-1] [lut=1]`; wrapper `mtl35_vfx\rr.ps1 <json> <png> @('512','-1','1','0.06')`. CPU reference: `vfxframe_ref.py <json> <png> [res] [backdrop] [ground] [lut]`. `vfxframe_scene.py` must sit next to `ue_vfx_frame.py` on the PC (Scripts\mtl_fix).
   - Keep `capture_every_frame` True, otherwise the PP tonemap is skipped.
   - After a box restart: `export DOTNET_ROOT=/home/box/tools/dotnet PATH=/home/box/tools/dotnet:$PATH`.
 - Restarting the editor is allowed (save all first). Long imports run inside one editor tick; import big sets one asset at a time.

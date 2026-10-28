@@ -7,16 +7,23 @@ Input: *.vfxframe.json + textures/*.png written by ForgeLens --vfxue / --vfxue-r
   Masked          GPU sparks (HEURISTIC class)  blending off, alpha test 0.5
   Additive        sfx meshes                    One/One
   Distortion      scene colour offset           clamp(0.08*mask*o, +-0.02) screen UV, o = (tex.rg*2.007874-1.007874)*power*alpha
-  Tonemap         PP material replacing the tonemapper: sRGB(sat(Hable(x*Exposure)*1.375385)), LUT not applied
+  Solid           lit mesh particles (combine_material): opaque, browser shading baked per vertex (mtl1-35)
+  Soft depth      AlphaComposite/Translucent/Additive: va *= sat((SceneDepth - PixelDepth) / softDepth) (PS 101818)
+  Tonemap         PP material replacing the tonemapper: 32^3 TONEMAP_LUT strip (CaptureLut / CS s1996: Hable*whitepoint,
+                  sRGB, grading LUT) sampled at the HEURISTIC inverse-bake log coordinate; exact Hable when no strip
+  Lights          frame["lights"]: lit ground (vfxframe_scene.ground_batch, browser ground shading) + UE PointLights
 No Niagara, no per-effect names: one ProceduralMeshComponent per batch, sort priority = batch order (far -> near).
 
 usage (via uerun.ps1):
   import <frame dir> [dest=/Game/SM2_Work/VfxUe] [fresh]   textures + masters + one MI per unique parameter set
-  render <frame json> [dest] [res=1024] [backdrop_exposed=-1] [exposure_scale=1]   spawn SM2Cap actors + capture
+  render <frame json> [dest] [res=1024] [backdrop_exposed=-1] [exposure_scale=1] [ground_exposed=-1] [lut=1]
   export <out png>                                          write the capture, destroy SM2Cap actors
 """
 import builtins, glob, hashlib, json, os, struct, sys, zlib, math
 import unreal
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "vfx"))
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import vfxframe_scene as S
 
 EAL = unreal.EditorAssetLibrary
 MEL = unreal.MaterialEditingLibrary
@@ -44,22 +51,36 @@ CODE = {
     # One/One
     "Additive": PARTICLE + "return float4(hdr * va * a, 1.0);",
     "Opaque": "return float4(T.rgb * C.rgb, 1.0);",
+    "Solid": "return float4(T.rgb * C.rgb, 1.0);",
 }
+SOFT = ("AlphaComposite", "Translucent", "Additive")  # translucent masters can read SceneDepth
+SOFT_CODE = "va *= SoftDepth > 0.0 ? saturate((SD - PD) / (SoftDepth * 100.0)) : 1.0;\n"
 DISTORT = """float2 o = (T.rg * 2.007874 - 1.007874) * C.r * saturate(C.a) * (HasMask > 0.5 ? M.a : 1.0);
 float m = saturate(10.0 * (abs(o.x) + abs(o.y)));
 return float3(clamp(0.08 * m * o, -0.02, 0.02), 0.0);"""
 TONEMAP = """float3 x = max(S.rgb * Exposure, 0.0);
+if (LutOn > 0.5)
+{
+  // CaptureLut strip (1024x32: x = r + 32*b, y = g), coordinate = inverse of the s1996 bake input (HEURISTIC)
+  const float c0 = 0.18 * exp2(-0.43 * 14.0);
+  float3 t = saturate(0.43 + log2((x + c0) / 0.18) / 14.0) * 31.0;
+  float b0 = min(floor(t.b), 30.0); float fb = t.b - b0;
+  float2 uv0 = float2((b0 * 32.0 + t.r + 0.5) / 1024.0, (t.g + 0.5) / 32.0);
+  float3 s0 = Texture2DSampleLevel(L, LSampler, uv0, 0).rgb;
+  float3 s1 = Texture2DSampleLevel(L, LSampler, uv0 + float2(32.0 / 1024.0, 0.0), 0).rgb;
+  return lerp(s0, s1, fb);
+}
 const float A = 0.12, B = 0.05, Cc = 0.45, D = 0.2, E = 0.02, F = 0.08;
 float3 h = (x * (A * x + Cc * B) + D * E) / (x * (A * x + B) + D * F) - E / F;
-float3 l = saturate(h * 1.375385);
+float3 l = saturate(h * WhitePoint);
 float3 lo = 12.92 * l;
 float3 hi = 1.055 * pow(max(l, 1e-6), 1.0 / 2.4) - 0.055;
 return lerp(hi, lo, step(l, 0.0031308));"""
 MASTER = {"AlphaComposite": "M_SM2Vfx_Premul", "Translucent": "M_SM2Vfx_Trail", "Masked": "M_SM2Vfx_Spark",
-          "Additive": "M_SM2Vfx_Add", "Distortion": "M_SM2Vfx_Distort", "Opaque": "M_SM2Vfx_Backdrop"}
+          "Additive": "M_SM2Vfx_Add", "Distortion": "M_SM2Vfx_Distort", "Opaque": "M_SM2Vfx_Backdrop", "Solid": "M_SM2Vfx_Solid"}
 BLEND = {"AlphaComposite": unreal.BlendMode.BLEND_ALPHA_COMPOSITE, "Translucent": unreal.BlendMode.BLEND_TRANSLUCENT,
          "Masked": unreal.BlendMode.BLEND_MASKED, "Additive": unreal.BlendMode.BLEND_ADDITIVE,
-         "Distortion": unreal.BlendMode.BLEND_TRANSLUCENT, "Opaque": unreal.BlendMode.BLEND_OPAQUE}
+         "Distortion": unreal.BlendMode.BLEND_TRANSLUCENT, "Opaque": unreal.BlendMode.BLEND_OPAQUE, "Solid": unreal.BlendMode.BLEND_OPAQUE}
 
 
 def png(path, rgba, w=4, h=4):
@@ -87,7 +108,12 @@ def import_textures(files, folder, linear_names):
         if not tex: print("MISSING texture", name); continue
         lin = is_linear(name, linear_names)
         tex.set_editor_property("srgb", not lin)
-        if lin or name.startswith("sm2r_"):
+        if name.startswith("sm2lut_"):  # TONEMAP_LUT strip: raw 8-bit, bilinear, clamp, no mips (CaptureLut.Strip)
+            tex.set_editor_property("compression_settings", unreal.TextureCompressionSettings.TC_VECTOR_DISPLACEMENTMAP)
+            tex.set_editor_property("mip_gen_settings", unreal.TextureMipGenSettings.TMGS_NO_MIPMAPS)
+            tex.set_editor_property("address_x", unreal.TextureAddress.TA_CLAMP); tex.set_editor_property("address_y", unreal.TextureAddress.TA_CLAMP)
+            tex.set_editor_property("filter", unreal.TextureFilter.TF_BILINEAR)
+        elif lin or name.startswith("sm2r_"):
             tex.set_editor_property("compression_settings", unreal.TextureCompressionSettings.TC_VECTOR_DISPLACEMENTMAP)
             tex.set_editor_property("mip_gen_settings", unreal.TextureMipGenSettings.TMGS_NO_MIPMAPS)
         tex.set_editor_property("lod_group", unreal.TextureGroup.TEXTUREGROUP_EFFECTS)
@@ -149,6 +175,11 @@ def build_master(folder, kind, defaults):
     key = node(m, unreal.MaterialExpressionVectorParameter, -900, 700); key.set_editor_property("parameter_name", "Key")
     params = {"HasMask": scalar(m, "HasMask", 0.0, 350), "Tint": scalar(m, "Tint", 1.0, 420), "Contrast": scalar(m, "Contrast", 0.0, 490),
               "RgbTexAlpha": scalar(m, "RgbTexAlpha", 1.0, 560), "OutAlpha": scalar(m, "OutAlpha", 1.0, 630)}
+    soft = kind in SOFT
+    if soft:
+        params["SoftDepth"] = scalar(m, "SoftDepth", 0.0, 770)
+        params["SD"] = node(m, unreal.MaterialExpressionSceneDepth, -900, 840)
+        params["PD"] = node(m, unreal.MaterialExpressionPixelDepth, -900, 910)
     if kind == "Distortion":
         # Game: distortion particles accumulate a screen-UV shift, then the scene is resampled (CaptureRules distortion).
         # UE: same two-step structure. This master writes the shift (additive, float RT) in a show-only capture;
@@ -158,10 +189,11 @@ def build_master(folder, kind, defaults):
         c = custom(m, DISTORT, ["T", "M", "C", "HasMask"], unreal.CustomMaterialOutputType.CMOT_FLOAT3, -500, 0)
         MEL.connect_material_property(c, "", unreal.MaterialProperty.MP_EMISSIVE_COLOR)
     else:
-        c = custom(m, CODE[kind], ["T", "M", "C", "Clip", "Key"] + list(params), unreal.CustomMaterialOutputType.CMOT_FLOAT4, -500, 0)
+        code = CODE[kind].replace("float va = saturate(C.a);\n", "float va = saturate(C.a);\n" + SOFT_CODE) if soft else CODE[kind]
+        c = custom(m, code, ["T", "M", "C", "Clip", "Key"] + list(params), unreal.CustomMaterialOutputType.CMOT_FLOAT4, -500, 0)
         rgb = mask(m, c, (True, True, True, False), -250, 0)
         MEL.connect_material_property(rgb, "", unreal.MaterialProperty.MP_EMISSIVE_COLOR)
-        if kind != "Opaque":
+        if kind not in ("Opaque", "Solid"):
             a = mask(m, c, (False, False, False, True), -250, 150)
             MEL.connect_material_property(a, "", unreal.MaterialProperty.MP_OPACITY_MASK if kind == "Masked" else unreal.MaterialProperty.MP_OPACITY)
     MEL.connect_material_expressions(tex, "RGBA", c, "T"); MEL.connect_material_expressions(msk, "RGBA", c, "M")
@@ -192,8 +224,14 @@ def build_tonemap(folder, lin_default):
     st.set_editor_property("scene_texture_id", unreal.SceneTextureId.PPI_POST_PROCESS_INPUT0)
     MEL.connect_material_expressions(uv, "", st, "UVs")
     ex = scalar(m, "Exposure", 1.0 / 250.0, 200)
-    c = custom(m, TONEMAP, ["S", "Exposure"], unreal.CustomMaterialOutputType.CMOT_FLOAT3, -400, 0)
+    lon = scalar(m, "LutOn", 0.0, 500); wpt = scalar(m, "WhitePoint", 1.375385, 600)
+    lt = node(m, unreal.MaterialExpressionTextureObjectParameter, -900, 700)
+    lt.set_editor_property("parameter_name", "Lut"); lt.set_editor_property("sampler_type", unreal.MaterialSamplerType.SAMPLERTYPE_LINEAR_COLOR)
+    lt.set_editor_property("texture", lin_default)
+    c = custom(m, TONEMAP, ["S", "Exposure", "LutOn", "WhitePoint", "L"], unreal.CustomMaterialOutputType.CMOT_FLOAT3, -400, 0)
     MEL.connect_material_expressions(st, "Color", c, "S"); MEL.connect_material_expressions(ex, "", c, "Exposure")
+    MEL.connect_material_expressions(lon, "", c, "LutOn"); MEL.connect_material_expressions(wpt, "", c, "WhitePoint")
+    MEL.connect_material_expressions(lt, "", c, "L")
     MEL.connect_material_property(c, "", unreal.MaterialProperty.MP_EMISSIVE_COLOR)
     MEL.recompile_material(m); EAL.save_loaded_asset(m); return m
 
@@ -201,6 +239,7 @@ def build_tonemap(folder, lin_default):
 def mi_key(b):
     k = [b["ueBlend"], b["texture"], b.get("alphaMask") or "", round(b["textureTint"], 4), round(b["contrast"], 4),
          [round(v, 4) for v in b["contrastKey"]], b["rgbTexAlpha"], b["outAlpha"]]
+    if b.get("softDepth") and b["ueBlend"] in SOFT: k.append(round(b["softDepth"], 4))
     return f"MI_{b['ueBlend']}_{b['texture'] or 'none'}_" + hashlib.md5(json.dumps(k).encode()).hexdigest()[:6]
 
 
@@ -217,6 +256,7 @@ def ensure_mi(dest, b, masters):
             MEL.set_material_instance_scalar_parameter_value(mi, "HasMask", 1.0)
     for p, v in (("Tint", b["textureTint"]), ("Contrast", b["contrast"]), ("RgbTexAlpha", b["rgbTexAlpha"]), ("OutAlpha", b["outAlpha"])):
         MEL.set_material_instance_scalar_parameter_value(mi, p, float(v))
+    if b["ueBlend"] in SOFT: MEL.set_material_instance_scalar_parameter_value(mi, "SoftDepth", float(b.get("softDepth") or 0.0))
     k = b["contrastKey"]; MEL.set_material_instance_vector_parameter_value(mi, "Key", unreal.LinearColor(k[0], k[1], k[2], 1))
     EAL.save_loaded_asset(mi); return mi
 
@@ -243,13 +283,16 @@ if mode == "import":
     need = {b[k] for fr in frames for b in fr["batches"] for k in ("texture", "alphaMask") if b.get(k)}
     dist = {b["texture"] for fr in frames for b in fr["batches"] if b["distortion"]}
     files = [os.path.join(root, "textures", n.lower() + ".png") for n in sorted(need)]
+    strips = sorted({fr["grading"]["strip"] for fr in frames if fr.get("grading", {}).get("strip")})
+    files += [os.path.join(root, "textures", n + ".png") for n in strips]
+    dist |= set(strips)
     files = [f for f in files if os.path.exists(f) or print("MISSING png", f)]
     tmp = os.path.join(unreal.Paths.project_saved_dir(), "sm2vfx_defaults"); os.makedirs(tmp, exist_ok=True)
     png(os.path.join(tmp, "sm2d_white.png"), (255, 255, 255, 255)); png(os.path.join(tmp, "sm2d_white_lin.png"), (255, 255, 255, 255))
     import_textures([os.path.join(tmp, "sm2d_white.png"), os.path.join(tmp, "sm2d_white_lin.png")], f"{dest}/Materials", set())
     import_textures(files, f"{dest}/Textures", dist)
     defaults = {"srgb": unreal.load_asset(f"{dest}/Materials/sm2d_white"), "lin": unreal.load_asset(f"{dest}/Materials/sm2d_white_lin")}
-    kinds = {b["ueBlend"] for fr in frames for b in fr["batches"]}
+    kinds = {b["ueBlend"] for fr in frames for b in fr["batches"]} | {"Opaque"}
     masters = {k: build_master(f"{dest}/Materials", k, defaults) for k in sorted(kinds)}
     build_tonemap(f"{dest}/Materials", defaults["lin"])
     mis = {}
@@ -263,6 +306,8 @@ elif mode == "render":
     res = int(sys.argv[4]) if len(sys.argv) > 4 else int(fr.get("pixels", 1024))
     backdrop = float(sys.argv[5]) if len(sys.argv) > 5 else -1.0
     escale = float(sys.argv[6]) if len(sys.argv) > 6 else 1.0
+    ground = float(sys.argv[7]) if len(sys.argv) > 7 else -1.0
+    use_lut = (sys.argv[8] != "0") if len(sys.argv) > 8 else True
     w = unreal.get_editor_subsystem(unreal.UnrealEditorSubsystem).get_editor_world()
     eas = unreal.get_editor_subsystem(unreal.EditorActorSubsystem)
     sds = unreal.get_engine_subsystem(unreal.SubobjectDataSubsystem)
@@ -281,19 +326,25 @@ elif mode == "render":
 
     cam = fr["camera"]; eye = ue(cam["eye"]); tgt = ue(cam["target"]); fwd = (tgt - eye); dist_cm = fwd.length(); fwd = fwd.normal()
     batches = list(fr["batches"])
-    if backdrop >= 0:  # opaque grey card behind the effect, perpendicular to the view (HDR = exposed / exposure)
-        right = fwd.cross(unreal.Vector(0, 0, 1)).normal(); up = right.cross(fwd).normal()
-        ctr = tgt + fwd * dist_cm * 2.0; s = dist_cm * 4.0
-        corners = [ctr - right * s - up * s, ctr + right * s - up * s, ctr + right * s + up * s, ctr - right * s + up * s]
-        hdr = backdrop / fr["exposure"]; v = []
-        for p, (u, t) in zip(corners, [(0, 1), (1, 1), (1, 0), (0, 0)]):
-            q = p * 0.01; v += [q.x, q.z, q.y, u, t, hdr, hdr, hdr, 1, 0, 0, u, t]
-        batches.insert(0, {"ueBlend": "Opaque", "texture": "", "alphaMask": "", "textureTint": 1, "contrast": 0, "contrastKey": [0, 0, 0],
-                           "rgbTexAlpha": 1, "outAlpha": 1, "quads": 1, "vertices": v, "emitter": "backdrop"})
+    pre = []
+    if backdrop >= 0: pre.append(S.backdrop_batch(fr, backdrop))  # opaque grey card behind the effect (HDR = exposed / exposure)
+    if ground >= 0:  # opaque ground at groundY lit by the frame's lights (same vertices as the CPU reference)
+        g = S.ground_batch(fr, ground)
+        if g: pre.append(g)
+    batches = pre + batches
+    for li, l in enumerate(fr.get("lights", [])):  # UE point lights for scene use (unlit capture masters ignore them)
+        pl = eas.spawn_actor_from_class(unreal.PointLight, ue(l["position"], BASE)); pl.tags = tag
+        pl.set_actor_label(f"SM2Cap_light_{li}_{l.get('name', '')}")
+        lc = pl.point_light_component; mx = max(max(l["color"]), 1e-6)
+        lc.set_editor_property("intensity_units", unreal.LightUnits.UNITLESS)
+        lc.set_editor_property("intensity", mx * fr["exposure"] * 8.0)  # HEURISTIC: browser ground scale (E * 8)
+        lc.set_light_color(unreal.LinearColor(l["color"][0] / mx, l["color"][1] / mx, l["color"][2] / mx, 1.0))
+        lc.set_editor_property("attenuation_radius", l["radius"] * 100.0)
+        lc.set_editor_property("use_inverse_squared_falloff", False); lc.set_editor_property("light_falloff_exponent", 2.0)
     drawn = 0
     for i, b in enumerate(batches):
         mi = unreal.load_asset(f"{dest}/MI/{mi_key(b)}") if b["texture"] else None
-        if b["ueBlend"] == "Opaque" and not b["texture"]:
+        if b["ueBlend"] == "Opaque" and not b["texture"]:  # backdrop / ground
             mi = unreal.load_asset(f"{dest}/Materials/M_SM2Vfx_Backdrop")
             if mi:
                 mi = unreal.MaterialLibrary.create_dynamic_material_instance(w, mi)
@@ -307,8 +358,7 @@ elif mode == "render":
             uv1.append(unreal.Vector2D(vs[o + 5], vs[o + 6])); uv2.append(unreal.Vector2D(vs[o + 7], vs[o + 8]))
             uv3.append(unreal.Vector2D(vs[o + 11], vs[o + 12])); col.append(unreal.LinearColor(vs[o + 9], 0, 0, 1))
             nrm.append(fwd * -1.0)
-        for q in range(n // 4):
-            a = q * 4; tri += [a, a + 1, a + 2, a, a + 2, a + 3]
+        tri = list(S.triangles(b))
         pmc = add_pmc()
         pmc.create_mesh_section_linear_color(0, pos, tri, nrm, uv0, uv1, uv2, uv3, col, [], False)
         pmc.set_material(0, mi)
@@ -360,13 +410,20 @@ elif mode == "render":
     pps = c.get_editor_property("post_process_settings")
     pp = unreal.MaterialLibrary.create_dynamic_material_instance(w, unreal.load_asset(f"{dest}/Materials/PP_SM2Tonemap"))
     pp.set_scalar_parameter_value("Exposure", fr["exposure"] * escale)
+    gr = fr.get("grading") or {}
+    pp.set_scalar_parameter_value("WhitePoint", float(gr.get("whitePointScale", 1.375385)))
+    lut = unreal.load_asset(f"{dest}/Textures/{gr['strip']}") if use_lut and gr.get("strip") else None
+    pp.set_scalar_parameter_value("LutOn", 1.0 if lut else 0.0)
+    if lut: pp.set_texture_parameter_value("Lut", lut)
+    elif use_lut and gr.get("strip"): print("MISSING lut strip", gr["strip"])
     if rtd:
         pp.set_texture_parameter_value("Distort", rtd); pp.set_scalar_parameter_value("DistortOn", 1.0)
     wb = unreal.WeightedBlendables(); wb.set_editor_property("array", [unreal.WeightedBlendable(1.0, pp)])
     pps.set_editor_property("weighted_blendables", wb)
     c.set_editor_property("post_process_settings", pps); c.set_editor_property("post_process_blend_weight", 1.0)
     c.capture_scene(); builtins._sm2_vfxframe = (rt, pp, c, rtd)
-    print("captured", fr["effect"], fr["time"], "batches", drawn, "distortion", len(dist_comps), "res", res)
+    print("captured", fr["effect"], fr["time"], "batches", drawn, "distortion", len(dist_comps), "res", res, "lights", len(fr.get("lights", [])),
+          "lut", gr.get("strip") if lut else "off")
 
 elif mode == "export":
     out = sys.argv[2]; os.makedirs(os.path.dirname(out), exist_ok=True)

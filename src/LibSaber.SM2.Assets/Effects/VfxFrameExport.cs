@@ -45,7 +45,9 @@ public static class VfxFrameExport
     {
       ["A"] = CaptureTonemap.A, ["B"] = CaptureTonemap.B, ["C"] = CaptureTonemap.C, ["D"] = CaptureTonemap.D,
       ["E"] = CaptureTonemap.E, ["F"] = CaptureTonemap.F, ["whitePointScale"] = CaptureTonemap.WhitePointScale,
-      ["key"] = CaptureTonemap.Key, ["lut"] = "not applied (grading LUT contents not dumped)",
+      ["key"] = CaptureTonemap.Key,
+      ["lut"] = "mtl1-35: 32^3 TONEMAP_LUT baked per CaptureLut (CS s1996) from the frame's grading LUT; apply mapping HEURISTIC (final PS not disassembled)",
+      ["lutGreyPoint"] = CaptureTonemap.LutGreyPoint, ["lutRangeLog"] = CaptureTonemap.LutRangeLog,
       ["evidence"] = "CB_PASS_HDR, LUT bake CS s1996, all five RenderDoc captures (CaptureRules.CaptureTonemap)",
     },
     ["distortion"] = new JsonObject
@@ -53,6 +55,16 @@ public static class VfxFrameExport
       ["uvPerOffset"] = DistortionRules.UvPerOffset, ["maxShift"] = DistortionRules.MaxShift,
       ["normalScale"] = NormalScale, ["normalBias"] = NormalBias,
       ["evidence"] = "plasma 101917 PS 4996 (DUDV write) + PS 5160 (uv += dudv*0.04-0.02) (CaptureRules.DistortionRules)",
+    },
+    ["softDepth"] = new JsonObject
+    {
+      ["formula"] = "fade = sat((sceneLinearDepth - particleViewDepth) / softDepth); rgb and alpha *= fade",
+      ["evidence"] = "particles PS 101818 (plasma/armory/hellbrute): PART_RENDER_DEPTH linearised with COMMON_CAMERA_NEAR_FAR_Z, minus TEXCOORD3.x, times shared r0.y = 1/softDepth (vfx3o), flag 512 inverts",
+    },
+    ["lights"] = new JsonObject
+    {
+      ["formula"] = "lit surface hdr = albedo * (ambient + sum(color*intensity * sat(1 - d^2/r^2)^2 * max(n.l, 0)))",
+      ["evidence"] = "browser EffectRenderer mesh/ground shading (HEURISTIC: the game's light units and falloff were not traced)",
     },
     ["blend"] = new JsonObject
     {
@@ -96,11 +108,51 @@ public static class VfxFrameExport
       ["rgbTexAlpha"] = (flags & 0x400u) == 0 ? 1 : 0,
       ["outAlpha"] = (flags & 0x20u) == 0 ? 1 : 0,
       ["textureTint"] = R(e.TextureTint),
+      ["softDepth"] = R(e.SoftDepth),
       ["contrast"] = R(e.AdditionalContrast),
       ["contrastKey"] = Vec(e.ContrastColorKey / 255f),
       ["quads"] = b.QuadCount,
       ["stride"] = SpriteBatch.Stride,
       ["vertices"] = verts,
+    };
+  }
+
+  /// <summary>
+  ///   mtl1-35: effect lights (<c>sfx_light</c>, <see cref="EffectInstance"/> Lights()) at the frame time: position, HDR colour
+  ///   (colour * intensity, sprite HDR units like the browser's lit shading) and radius in metres.
+  /// </summary>
+  public static JsonArray Lights(IEnumerable<LightSample> lights)
+  {
+    var a = new JsonArray();
+    foreach (var l in lights)
+    {
+      if (l.Radius <= 0 || l.Intensity <= 0) continue;
+      a.Add(new JsonObject
+      {
+        ["name"] = l.Def.Name, ["position"] = Vec(l.Position), ["color"] = Vec(l.Color * l.Intensity), ["radius"] = R(l.Radius),
+      });
+    }
+    return a;
+  }
+
+  /// <summary>Triangle batch (mesh particles): <paramref name="vertices"/> in the sprite stride, <paramref name="indices"/> triangles.</summary>
+  public static JsonObject TriangleBatch(string emitter, string path, bool sfx, string texture, float clip, IReadOnlyList<float> vertices, IReadOnlyList<int> indices, string note)
+  {
+    var verts = new JsonArray();
+    foreach (var v in vertices) verts.Add(R(v));
+    var idx = new JsonArray();
+    foreach (var i in indices) idx.Add(i);
+    return new JsonObject
+    {
+      ["emitter"] = emitter, ["path"] = path, ["kind"] = sfx ? VfxDrawKind.SfxMesh.ToString() : "LitMesh", ["distortion"] = false,
+      // sfx preset meshes: capture One/One (VfxBlendRules SfxMesh); lit combine_material meshes: opaque, lighting baked per vertex.
+      ["ueBlend"] = sfx ? UeBlend(VfxDrawKind.SfxMesh, false) : "Solid",
+      ["captureBlend"] = sfx ? VfxBlendRules.For(VfxDrawKind.SfxMesh).ToString() : "opaque (lit combine_material, depth write)",
+      ["texture"] = texture, ["alphaMask"] = "", ["frames"] = new JsonArray(1, 1), ["flags"] = 0u,
+      ["rgbTexAlpha"] = 1, ["outAlpha"] = 1, ["textureTint"] = 1f, ["softDepth"] = 0f, ["contrast"] = 0f,
+      ["contrastKey"] = new JsonArray(0f, 0f, 0f), ["clip"] = R(clip),
+      ["quads"] = 0, ["triangles"] = indices.Count / 3, ["stride"] = SpriteBatch.Stride,
+      ["vertices"] = verts, ["indices"] = idx, ["note"] = note,
     };
   }
 

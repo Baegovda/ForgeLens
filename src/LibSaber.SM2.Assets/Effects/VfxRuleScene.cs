@@ -146,6 +146,19 @@ public static class VfxRuleScene
         p.Kind == VfxDrawKind.Trail ? "SrcAlpha/InvSrcAlpha" : "blending off, alpha test 0.5"));
     }
 
+    // Row 3b (y = -0.9, mtl1-35): soft depth. Premultiplied particles in front of the backdrop (z = -0.2) by gap g with
+    // softDepth 1 m -> fade = sat(g / 1) multiplies rgb and alpha (PS 101818), i.e. va * fade with the alpha-multiply flag.
+    float[] gaps = [0.25f, 0.5f, 1.5f];
+    for (var i = 0; i < gaps.Length; i++)
+    {
+      var at = new Vector2(-4.9f + i * 1.4f, -0.9f);
+      var def = new EmitterDef { Name = $"soft{i}", Path = $"rules/soft{i}", Texture = "sm2r_white", BlendAlphaMultiply = true, SoftDepth = 1f };
+      Add(Quad(def, VfxDrawKind.CpuParticle, false, at, new Vector2(Patch / 2), new Vector3(c), 1f, -0.2f + gaps[i]));
+      var fade = Math.Clamp(gaps[i] / 1f, 0f, 1f);
+      expect.Add(Expect($"soft{i}", at, "display", VfxFrameExport.Display(VfxFrameExport.Composite(VfxDrawKind.CpuParticle, c, fade, 1f, Backdrop, EffectBlendRea.Flags(EffectBlend.Blend, true)), Exposure),
+        $"soft depth: va *= sat({gaps[i]} / 1)"));
+    }
+
     // Row 4 (y = -4): distortion over the ramps. Normal texel r = 191, g = 128 -> o = (tex * 2.007874 - 1.007874) * power.
     float[] powers = [0.125f, 0.25f, 1.0f];
     for (var i = 0; i < powers.Length; i++)
