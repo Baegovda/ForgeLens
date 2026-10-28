@@ -1,4 +1,5 @@
 # ue_c28.py spawn|start|sample|sampleref|cap|exp <tag>|kick|stop|clean <name> <set>
+# sampleskin (mtl1-32): free particles behind the skinned body surface (non-cloth sections), nearest vertex within 10 cm.
 # sampleref (mtl1-31): penetration of every cloth vs a FIXED reference = the mesh's body PhysicsAsset (independent of the cloth colliders).: Chaos Cloth live check of the unsaved diag duplicate (ue_cdiag) vs the base mesh.
 import unreal, sys, math
 mode, name, SET = sys.argv[1], sys.argv[2], sys.argv[3]
@@ -7,6 +8,8 @@ les = unreal.get_editor_subsystem(unreal.LevelEditorSubsystem); ues = unreal.get
 eas = unreal.get_editor_subsystem(unreal.EditorActorSubsystem)
 base = unreal.load_asset("/Game/SM2_Work/Tests/%s/%s/%s" % (SET, name, name))
 diag = unreal.load_asset("/Game/SM2_Work/Tests/diag_unsaved/%s_diag" % name)
+if diag is None:  # mtl1-32: no diag duplicate -> check the SAVED <name>_ChaosCloth
+    diag = unreal.load_asset("/Game/SM2_Work/Tests/%s/%s/%s_ChaosCloth" % (SET, name, name))
 O = unreal.Vector(0, 60000, 0)
 def acts(world):
     return unreal.GameplayStatics.get_all_actors_with_tag(world, TAG)
@@ -39,6 +42,9 @@ else:
         ref = base.get_editor_property("physics_asset")
         r = unreal.SM2PhysicsSetupLibrary.measure_cloth_penetration(A["cloth"].skeletal_mesh_component, 1.0, ref)
         print("C28 clothREF", ref.get_name() if ref else None, r)
+    elif mode == "sampleskin":  # mtl1-32: vs the CPU-skinned body surface of the same mesh (HEURISTIC)
+        r = unreal.SM2PhysicsSetupLibrary.measure_cloth_skin_penetration(A["cloth"].skeletal_mesh_component, 1.0, 10.0)
+        print("C28 clothSKIN", r)
     elif mode == "kick":
         for lab in ("base", "cloth"): A[lab].add_actor_world_offset(unreal.Vector(0, 0, 80), False, False)
         print("C28 kicked +80z")

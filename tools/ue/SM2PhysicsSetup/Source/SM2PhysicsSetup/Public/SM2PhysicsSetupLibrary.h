@@ -72,4 +72,9 @@ public:
 
   UFUNCTION(BlueprintCallable, Category = "SM2")
   static int32 MeasureClothPenetration(USkeletalMeshComponent* Comp, float ThresholdCm, FString& Report, UPhysicsAsset* OverrideCollision = nullptr);
+
+  // mtl1-32: free cloth particles behind the CPU-skinned body surface (non-cloth, enabled sections of the same mesh) by more
+  // than ThresholdCm along the nearest body vertex normal, ignoring particles farther than MaxDistCm from any body vertex.
+  UFUNCTION(BlueprintCallable, Category = "SM2")
+  static int32 MeasureClothSkinPenetration(USkeletalMeshComponent* Comp, float ThresholdCm, float MaxDistCm, FString& Report);
 };
