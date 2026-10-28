@@ -3,6 +3,7 @@
 Branch `cursor/sm2-pck-extractor-4420`, PR #1. Always confirm the current state with `git fetch && git log --oneline -30 origin/cursor/sm2-pck-extractor-4420`.
 Percentages are the previous agent's estimates of how complete each track is against the "looks exactly like in-game" goal.
 
+## ui-45 (2026-10-28 KST): Forge Lens Kitbash Enemy/NPC mode — 75 inst_constructor templates (835/835 links), layer rules, weighted Randomize, 61 .cls presets, npc= --variant; melee region skins (skin=, Team MELEE) + armor power fist. Link/weight/model mapping HEURISTIC (HANDOFF "Update ui-45")
 ## ui-44 (2026-10-28 KST): Forge Lens Kitbasher — Kitbash tab: faction/class/preset + one part per slot from the customization .sso, live preview = export filter (ArmorVariant, SLOT=none), Export combination. Story/champion tpl mapping HEURISTIC (HANDOFF "Update ui-44")
 ## ui-43 (2026-10-28 KST): Forge Lens UE5-style Content Browser — Favorites / Folders|Categories / Collections, thumbnail grid + list, chips, hover-animated cached thumbnails; Anim wheel steps clips. Category name rules, effect splat and clay thumbnails are HEURISTIC (HANDOFF "Update ui-43")
 ## mtl1-42 physics/materials batch (2026-10-28 KST): Calgar cape stripe = detail tiling, 60 Hz Calgar clips, PA assign, cloth bone cap 4096, CDT sweep

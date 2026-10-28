@@ -1896,3 +1896,51 @@ Disassembly: /workspace/vfxsh_dis/{pc,pg,dx_pc_dx12_sfx,dx_pc_dx12_distort}, GLS
   - `04_random_combo.png`, `05_chest_empty.png`
   - `06_chaos_no_tpl.png`, `07_chaos_engineer.png`, `08_export_combination.png`
 - Tests: SM2.Assets 237, Extractor 43, LibSaber.Tests 5, python 8 — all pass. HaloCEA is still out of scope: it needs a Halo install path.
+
+## Update ui-45 (2026-10-28 KST): Forge Lens Kitbash — Enemy/NPC mode (inst_constructor) + melee region skins
+- **NPC data (`SM2.Assets/Customization/InstConstructor.cs`, `InstConstructorLibrary.Load(catalog, store)`, cached per catalog, ~0.3 s):**
+  - `ssl/inst_constructor/inst_constructor_templates.sso`: 75 templates. `bodyLayers` = slots; each `templateVariants[]` entry links `template.__type = InstConstructorMeshTemplatesXxx` and an optional `probability`.
+  - `inst_constructor_mesh_templates.ssolib`: 413 mesh templates → `geomObjNames`. A link resolves by dropping the `InstConstructorMeshTemplates` prefix and comparing lowercase without `_` (**HEURISTIC**): 835/835 links resolve. `EMPTY` is the only template with no objects.
+  - Weights (**HEURISTIC with evidence**): 397 layers have no probabilities, 47 mixed, 36 all set. `inst_constructor_mesh_template_variant_release.sslbin` stores float 1.0 right after the probability field (offset 0x26F), and the game names `GetElementIndexByDistribution` / `CreateProbabilityDistributionArray`. So a missing probability = weight 1.0, normalized by the sum (Cadian helmet [1.0, 0.2] → 83 % / 17 %). All-missing = equal weight.
+  - Rules (**HEURISTIC**): a layer is off when its `requiredLayer` is not filled (a non-empty mesh template in an active layer) or its `disabledByLayer` is filled. Resolved iteratively. Example: Cadian `helmet=none` turns `head`/`helmet_accessories` off and `headWithHair` on.
+  - Model: `.cls` `prop_inst_constructor_project.fixedTemplateId` votes first (37 ids in 212 constructor .cls). Then name candidates `cc_{n}`, `cc_constructor_{n}`, `cc_{n}_constructor`, trailing words dropped, gaunt→gant, underscore-insensitive against every tpl name (**HEURISTIC**). Then the model of the template this one extends (Space_Marine_* → cc_intercessor). Unmapped: SporeMine, ImpRaider.
+  - Presets: the 61 `prop_inst_constructor_custom_preset` loadouts (`customPreset` or `presetsDict … geomObjNames`; 51 have objects), offered for their `geom.nameTpl`. Preset tpls that no template uses get 21 "presets only" pseudo templates (cc_mark8, cine_*, wpn_* …).
+  - `--variant npc=TEMPLATE,layer=MeshTemplate|none,…` or `npc=TEMPLATE,npcpreset=NAME` (`NpcVariantFilter.Apply`, Team `NPC` in `*.variant.json`) shows only the subtrees of the picked objects (`X_LODn` counts as X). Every other visible part hides, including parts in no mesh template (noted, e.g. `cultist_caps`). Failsafe: if none of the picked objects is in the tpl, nothing hides and a "wrong model" note is added.
+- **Melee (`MeleeCustomization.cs`):** `ssl/melee/weapon_actors/melee_skins_library.sso` (actors → skins → `geomCustomizerRegions`) + `geom_customizer_preset_melee.sso` (region → meshes). Actor → tpl via `melee_actor_factory` `actorDescs.type.__type` .cls `nameTpl` (or `properties.geom.nameTpl`).
+  - A `wpn_` tpl without a firearm uid falls back to `MeleeVariant.Apply` (`skin=KEY` or `skin=ACTOR/KEY`, Team `MELEE`). Only the regions used by this tpl's actors' skins are touched, because generic names like `body`/`geom` must not hide parts elsewhere.
+  - Examples: tzaangor_sword skin 02 shows `sword_2` and hides 4. The chainsword has one region (`chainsword_geo`), so its 28 skins + melee_mod_1..5 differ only by material/actor override.
+  - `powerfist=KEY` on a constructor tpl (armor mode) force-shows the `power_fist_fake` skin's region objects (`ch_*` skipped on `cc_sm_`). Tank preset 1 + powerfist 03 shows 56 surfaces.
+  - The export dialog treats MELEE like WEAPON (skin + region picker).
+- **UI (`MainWindow.Npc.cs`, Kitbash tab):**
+  - **Mode**: Space Marine armor / Enemy / NPC. NPC mode has Template (model + mapping source in the status card), Preset ("(template layers)" or a .cls loadout) and one combo per layer.
+  - Badges: chance % (`*` = probability missing → weight 1.0), `requires X` / `disabled by Y`, `⚠ not in tpl`. An off layer is dimmed. "— empty —" is added when the layer has no EMPTY variant.
+  - Buttons: **Template default** (heaviest variant per layer) and **Randomize** (weighted draw). Export goes through the same `--variant` path.
+  - Armor mode adds a **Power fist** combo.
+  - Persisted: mode, NPC template, preset, per-template layer picks, power fist.
+- **Verified (box, dev pak `/workspace/kb_dev/game` with the enemy tpls incl. the extracted cc_cadian_shock_trooper_female):**
+  - NPC visible before → after:
+
+    | Tpl | Before | After |
+    |---|---|---|
+    | cultist | 39 | 15 |
+    | cadian | 87 | 19 |
+    | cadian `helmet=none` | — | 15 |
+    | female | 25 | 13 |
+    | wounded | 26 | 8 |
+    | termagant | 24 | 11 |
+    | hormagaunt | 26 | 11 |
+    | tzaangor | 85 | 34 |
+    | rubric | 77 | 28 |
+    | servitor | 43 | 19 |
+    | servo_skull | 14 | 5 |
+    | tech_priest | 41 | 26 |
+    | chaos_spawn | 31 | 12 |
+    | warrior_ranged | 31 | 14 |
+    | warrior_melee | 26 | 12 |
+
+  - CLI export `npc=Cadian_Shock_Trooper,helmet=none`: 15 visible, and the variant.json lists the off layers. `wpn_tzaangor_sword_01 skin=02`: 1 visible.
+- **Limits:** `materialModifier` and melee skin materials are noted, not applied. `meleeActorOverride` is noted, not followed. The power fist doesn't hide the hand it replaces. Hovering the mouse wheel over a part combo changes it (Avalonia ComboBox default).
+- **Screenshots:** `/workspace/browser_run_shots/ui45/`
+  - `01_npc_cultist.png`, `02_npc_cadian_rules.png`, `03_npc_cadian_female.png`
+  - `04_npc_cultist_preset.png`, `05_armor_powerfist.png`, `06_npc_randomize.png`, `07_melee_export_picker.png`
+- **Tests:** SM2.Assets 247 (+10 `InstConstructorTests`; the retail check runs when `LIBSABER_SM2_SSL` points at an extracted `ssl/`: 75/413/835/61), Extractor 43, LibSaber.Tests 5, python 15. All pass.
