@@ -337,7 +337,10 @@ internal sealed unsafe class EffectRenderer : IDisposable
     _gl.BindVertexArray(_vao);
     _gl.BindBuffer(BufferTargetARB.ArrayBuffer, _vbo);
     _gl.ActiveTexture(TextureUnit.Texture0);
-    foreach (var batch in layer.Batches)
+    var kindLoc = _gl.GetUniformLocation(_sprite, "uKind");
+    SparkBatches = TrailBatches = 0;
+    // mtl1-28: opaque sparks first (depth-written), then the blended batches far to near.
+    foreach (var batch in layer.Batches.OrderBy(b => VfxDrawKinds.Enabled && b.Kind == VfxDrawKind.Spark ? 0 : 1))
     {
       if (batch.Distortion) continue;
       var tex = Texture(layer, batch.Emitter.Texture);
@@ -379,6 +382,11 @@ internal sealed unsafe class EffectRenderer : IDisposable
           break;
       }
 
+      var kind = VfxDrawKinds.Enabled ? batch.Kind : VfxDrawKind.CpuParticle;
+      _gl.Uniform1(kindLoc, kind switch { VfxDrawKind.Trail => 1, VfxDrawKind.Spark => 2, _ => 0 });
+      ApplyKindState(kind);
+      if (kind == VfxDrawKind.Trail) TrailBatches++;
+      if (kind == VfxDrawKind.Spark) SparkBatches++;
       _gl.Uniform1(modeLoc, (int)batch.Emitter.Blend);
       _gl.Uniform1(tintLoc, batch.Emitter.TextureTint);
       // additionalContrast / contrastColorKey (particles.sdc 00114_2, shared[1]); opt-in until checked against the grenade.
@@ -390,6 +398,8 @@ internal sealed unsafe class EffectRenderer : IDisposable
       _gl.DrawElements(PrimitiveType.Triangles, (uint)(batch.QuadCount * 6), DrawElementsType.UnsignedInt, (void*)0);
     }
 
+    _gl.Enable(EnableCap.Blend);
+    _gl.DepthMask(false);
     DrawDistortion(layer, vp, grabScene, viewport);
     _gl.DepthMask(true);
     _gl.Disable(EnableCap.Blend);
@@ -403,6 +413,35 @@ internal sealed unsafe class EffectRenderer : IDisposable
   ///   re-draws the pixels under it from that copy, offset by its normal map (RG*2-1) x power x alpha, faded toward the
   ///   quad edge. Batches go far to near; each samples the same copy (one grab per frame, as one distortion buffer).
   /// </summary>
+  /// <summary>Batches drawn with the capture trail / spark state in the last frame (bench log).</summary>
+  public int TrailBatches { get; private set; }
+  public int SparkBatches { get; private set; }
+
+  /// <summary>
+  ///   mtl1-28: capture blend state per kind (<see cref="VfxBlendRules"/>). Trails: SrcAlpha/InvSrcAlpha, alpha Zero/One
+  ///   (CB_PASS_TRAIL), shader writes straight colour. Sparks: blending off, depth written, alpha-tested in the shader.
+  ///   CPU particles keep the per-emitter state set just before this call.
+  /// </summary>
+  private void ApplyKindState(VfxDrawKind kind)
+  {
+    switch (kind)
+    {
+      case VfxDrawKind.Trail:
+        _gl.Enable(EnableCap.Blend);
+        _gl.DepthMask(false);
+        _gl.BlendFuncSeparate(BlendingFactor.SrcAlpha, BlendingFactor.OneMinusSrcAlpha, BlendingFactor.Zero, BlendingFactor.One);
+        break;
+      case VfxDrawKind.Spark:
+        _gl.Disable(EnableCap.Blend);
+        _gl.DepthMask(true);
+        break;
+      default:
+        _gl.Enable(EnableCap.Blend);
+        _gl.DepthMask(false);
+        break;
+    }
+  }
+
   private void DrawDistortion(EffectLayer layer, Matrix4x4 vp, Func<uint>? grabScene, Vector2 viewport)
   {
     DistortionQuads = 0;
@@ -648,6 +687,7 @@ internal sealed unsafe class EffectRenderer : IDisposable
     uniform float uSelfPow;
     uniform vec2 uSelfScroll;
     uniform vec2 uSelfK;
+    uniform int uKind;
     out vec4 outColor;
     vec3 toGamma(vec3 c) { return mix(c * 12.92, 1.055 * pow(c, vec3(1.0 / 2.4)) - 0.055, step(0.0031308, c)); }
     vec2 SpriteUv()
@@ -687,6 +727,15 @@ internal sealed unsafe class EffectRenderer : IDisposable
       }
       vec3 c = toGamma(sm2Tonemap(hdr * uExposure));
       float alpha = clamp(vColor.a, 0.0, 1.0) * a;
+      // mtl1-28 capture blend per kind: trail = straight colour for SrcAlpha/InvSrcAlpha (CB_PASS_TRAIL);
+      // spark = blending off (smoke 88302 eid 2086): alpha test on texture coverage, vertex alpha scales brightness (HEURISTIC).
+      if (uKind == 1) { outColor = vec4(c, alpha); return; }
+      if (uKind == 2)
+      {
+        if (a < 0.5) discard;
+        outColor = vec4(toGamma(sm2Tonemap(hdr * uExposure * clamp(vColor.a, 0.0, 1.0))), 1.0);
+        return;
+      }
       if (uHdrPremul == 1 && uMode != 1)
       {
         // vfx3x: particles.sdc 00000_0 writes SV_Target = hdr*alpha unclamped (only a NaN/Inf guard), so blending happens in
@@ -938,6 +987,7 @@ internal sealed unsafe class EffectRenderer : IDisposable
     _gl.Uniform3(_gl.GetUniformLocation(_cover, "uEye"), eye.X, eye.Y, eye.Z);
     _gl.Uniform3(_gl.GetUniformLocation(_cover, "uCovAlbedo"), albedo.X, albedo.Y, albedo.Z);
     _gl.Uniform1(_gl.GetUniformLocation(_cover, "uCovGloss"), gloss);
+    _gl.Uniform1(_gl.GetUniformLocation(_cover, "uChecker"), demo.CheckerContrast);
     _gl.Uniform1(_gl.GetUniformLocation(_cover, "uExposure"), exposure);
     _gl.Uniform1(_gl.GetUniformLocation(_cover, "uLightCount"), lights.Length);
     for (var i = 0; i < lights.Length; i++)
@@ -982,6 +1032,7 @@ internal sealed unsafe class EffectRenderer : IDisposable
     uniform vec3 uEye;
     uniform vec3 uCovAlbedo;
     uniform float uCovGloss;
+    uniform float uChecker;
     uniform float uExposure;
     uniform int uLightCount;
     uniform vec4 uLightPos[8];
@@ -992,7 +1043,7 @@ internal sealed unsafe class EffectRenderer : IDisposable
     {
       float m = smoothstep(0.02, 0.6, texture(uMask, vUv).r);
       vec2 ck = floor(vUv * vec2(16.0, 16.0));
-      vec3 base = vec3(0.30, 0.30, 0.31) * (0.9 + 0.1 * mod(ck.x + ck.y, 2.0));
+      vec3 base = vec3(0.30, 0.30, 0.31) * (1.0 - uChecker + uChecker * mod(ck.x + ck.y, 2.0));
       vec3 albedo = mix(base, uCovAlbedo, m);
       float gloss = mix(0.15, uCovGloss, m);
       vec3 n = normalize(gl_FrontFacing ? vNormal : -vNormal);

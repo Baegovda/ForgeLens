@@ -757,6 +757,42 @@ bool USM2PhysicsSetupLibrary::CreateChaosCloth(USkeletalMesh* Mesh, const FStrin
             break;
           }
       }
+    // 2b. mtl1-28 GENERIC fallback: exports made without --include-cloth-sim have no _SIM section (mtl15 cc_sorcerer: 0 cloths,
+    // physics.json identical to mirr15). Use the primary render section (most vertices) as its own sim mesh when its vertices
+    // lie on the game's sim particles (>= 50% within 3 cm, HEURISTIC); MaxDistance still comes from the nearest sim particle.
+    // Sidecar ue.chaosCloth.renderAsSim = false disables it.
+    bool bRenderAsSim = false;
+    if (SimSection == INDEX_NONE && RenderSections.Num() > 0)
+    {
+      bool bAllow = true;
+      const TSharedPtr<FJsonObject>* UeR = nullptr;
+      const TSharedPtr<FJsonObject>* CCR = nullptr;
+      if (Cloth->TryGetObjectField(TEXT("ue"), UeR) && (*UeR)->TryGetObjectField(TEXT("chaosCloth"), CCR))
+        (*CCR)->TryGetBoolField(TEXT("renderAsSim"), bAllow);
+      int32 Best = INDEX_NONE;
+      for (int32 S : RenderSections)
+        if (Best == INDEX_NONE || Lod.Sections[S].SoftVertices.Num() > Lod.Sections[Best].SoftVertices.Num())
+          Best = S;
+      int32 Hit = 0;
+      const FSkelMeshSection& BS = Lod.Sections[Best];
+      for (const FSoftSkinVertex& V : BS.SoftVertices)
+      {
+        float D;
+        Nearest(V.Position, D);
+        Hit += D < 3.0f;
+      }
+      const float Ratio = BS.SoftVertices.Num() ? float(Hit) / BS.SoftVertices.Num() : 0.f;
+      Log.Add(FString::Printf(TEXT("%s: no _SIM section; render-as-sim candidate section %d verts=%d hit3cm=%.2f allow=%d"), *SimName, Best,
+        BS.SoftVertices.Num(), Ratio, bAllow ? 1 : 0));
+      if (bAllow && Ratio >= 0.5f)
+      {
+        SimSection = Best;
+        bRenderAsSim = true;
+        const FName PrimarySlot = Mesh->GetMaterials()[BS.MaterialIndex].MaterialSlotName;
+        RenderSections = {Best}; // bound to itself; other render slots stay bone-skinned (as with a _SIM source)
+        RenderSlots = {PrimarySlot};
+      }
+    }
     if (SimSection == INDEX_NONE || RenderSections.Num() == 0)
     {
       Log.Add(FString::Printf(TEXT("%s: sim section %d (slot hit %.2f), %d render sections -> stays bone-based"), *SimName, SimSection, SimHit, RenderSections.Num()));
@@ -767,6 +803,7 @@ bool USM2PhysicsSetupLibrary::CreateChaosCloth(USkeletalMesh* Mesh, const FStrin
     UClothingAssetCommon* Asset = nullptr;
     {
       FScopedSkeletalMeshPostEditChange Outer(Mesh);
+      if (!bRenderAsSim)
       {
         FScopedSkeletalMeshPostEditChange Inner(Mesh);
         Mesh->RemoveMeshSection(0, SimSection);
@@ -979,8 +1016,8 @@ bool USM2PhysicsSetupLibrary::CreateChaosCloth(USkeletalMesh* Mesh, const FStrin
     }
     if (Bound > 0)
       Converted.Add(SimName);
-    Log.Add(FString::Printf(TEXT("%s: simSection=%d particles=%d pinned=%d worstMatchCm=%.2f boundSections=%d/%d"), *SimName, SimSection, PV.Num(), Pinned,
-      WorstMatch, Bound, RenderSections.Num()));
+    Log.Add(FString::Printf(TEXT("%s: simSection=%d%s particles=%d pinned=%d worstMatchCm=%.2f boundSections=%d/%d"), *SimName, SimSection,
+      bRenderAsSim ? TEXT(" (render-as-sim)") : TEXT(""), PV.Num(), Pinned, WorstMatch, Bound, RenderSections.Num()));
   }
   if (BindRecs.Num() > 0)
   {

@@ -231,7 +231,7 @@ public static class EffectTrailSprites
         }
 
       if (quads == 0) continue;
-      yield return new SpriteBatch { Emitter = r, Frames = TextureFrames.Single, Vertices = verts.ToArray(), QuadCount = quads, Depth = depth / quads };
+      yield return new SpriteBatch { Emitter = r, Frames = TextureFrames.Single, Vertices = verts.ToArray(), QuadCount = quads, Depth = depth / quads, Kind = VfxDrawKind.Trail };
     }
   }
 }

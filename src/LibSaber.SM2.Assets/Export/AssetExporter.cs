@@ -259,6 +259,8 @@ public static class AssetExporter
             clothRig = PhysicsBake.AddClothBones(exportMesh, physics);
           report.Messages.Add($"{file.Path}: physics from {physics.SourceClass}: {physics.Cloths.Count} cloths, {physics.Jiggles.Count} jiggle bones" +
             (clothRig is null ? "" : $", {clothRig.Clusters.Count} cloth helper bones skinning {clothRig.SkinnedVertices} vertices") + ".");
+          if (!settings.IncludeClothSim && physics.Cloths.Count > 0)
+            report.Messages.Add($"{file.Path}: _SIM cloth shells not exported (--include-cloth-sim off): Chaos Cloth conversion uses the render-as-sim fallback.");
         }
         else
           physics = null;

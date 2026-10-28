@@ -47,10 +47,50 @@ public sealed class CoveringDemo
     TangentV = Vector3.Cross(Axis, TangentU);
     RadiusScale = def.Coverings.Count == 0 ? 1f : Math.Max(0.1f, def.Coverings.Max(c => c.RadiusScale));
     CoveringKind = def.Coverings.FirstOrDefault()?.Kind ?? "blood";
+    Paints = def.Coverings.Count > 0;
     for (var y = 0; y < Res; y++)
     for (var x = 0; x < Res; x++)
       _texel[y * Res + x] = SurfacePoint((x + 0.5f) / Res, (y + 0.5f) / Res);
   }
+
+  /// <summary>
+  ///   mtl1-28: false when the host is only a distortion backdrop (no <c>em_covering_*</c>): nothing is painted and the
+  ///   checker is stronger so the refraction shift (DistortionRules, post PS 5160 uv += dudv*0.04-0.02) is visible.
+  /// </summary>
+  public bool Paints { get; }
+
+  /// <summary>Checker contrast of the host surface (0.1 covering host, 0.6 distortion backdrop).</summary>
+  public float CheckerContrast => Paints ? 0.1f : 0.6f;
+
+  /// <summary>Effects that get the demo host: surface coverings, or distortion / self-distortion emitters (backdrop).</summary>
+  public static bool WantsHost(EffectDefinition def) => def.Coverings.Count > 0 || HasDistortion(def);
+
+  /// <summary>Distance the distortion backdrop sits behind the effect origin, away from the eye (m).</summary>
+  public const float BackdropOffset = 0.5f;
+
+  /// <summary>Eye the backdrop was oriented for (null for a covering host).</summary>
+  public Vector3? BackdropEye { get; private init; }
+
+  /// <summary>
+  ///   Host for <paramref name="def"/>: the covering host on the effect root, or (distortion only) a backdrop whose axis faces
+  ///   <paramref name="eye"/> and that sits <see cref="BackdropOffset"/> behind the origin, so the refracted checker is
+  ///   behind the distortion quads (a sphere's near pole / the plane).
+  /// </summary>
+  public static CoveringDemo For(CoveringHostKind kind, EffectDefinition def, Matrix4x4 root, Vector3 eye)
+  {
+    if (def.Coverings.Count > 0) return new CoveringDemo(kind, def, root);
+    var origin = root.Translation;
+    var y = eye - origin;
+    y = y.LengthSquared() < 1e-8f ? Vector3.UnitZ : Vector3.Normalize(y);
+    var x = Vector3.Normalize(Vector3.Cross(MathF.Abs(y.Y) > 0.9f ? Vector3.UnitX : Vector3.UnitY, y));
+    var z = Vector3.Cross(x, y);
+    var t = origin - y * BackdropOffset;
+    var m = new Matrix4x4(x.X, x.Y, x.Z, 0, y.X, y.Y, y.Z, 0, z.X, z.Y, z.Z, 0, t.X, t.Y, t.Z, 1);
+    return new CoveringDemo(kind, def, m) { BackdropEye = eye };
+  }
+
+  public static bool HasDistortion(EffectDefinition def) =>
+    def.Emitters.Any(e => e.DistortTexture is { Length: > 0 } || e.SelfDistortTexture is { Length: > 0 });
 
   /// <summary>World point of mask texel coordinate (u, v).</summary>
   public Vector3 SurfacePoint(float u, float v)
@@ -93,7 +133,7 @@ public sealed class CoveringDemo
   /// <summary>Paints for the instance's current time. Scrubbing backwards clears and restarts (forward play accumulates).</summary>
   public void Update(EffectInstance instance)
   {
-    if (Kind == CoveringHostKind.Off) return;
+    if (Kind == CoveringHostKind.Off || !Paints) return;
     var t = instance.Time;
     if (t < _last) Clear();
     var first = float.IsNegativeInfinity(_last);

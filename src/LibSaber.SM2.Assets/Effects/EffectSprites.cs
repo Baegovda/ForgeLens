@@ -15,6 +15,8 @@ public sealed class SpriteBatch
   public float Depth { get; set; }
   /// <summary>Refraction pass: <see cref="EmitterDef.DistortTexture"/> quads whose colour is (power, 0, 0, alpha).</summary>
   public bool Distortion { get; init; }
+  /// <summary>mtl1-28: which capture blend state draws this batch (<see cref="VfxBlendRules"/>, <see cref="VfxDrawKinds"/>).</summary>
+  public VfxDrawKind Kind { get; init; } = VfxDrawKind.CpuParticle;
 }
 
 /// <summary>
@@ -72,7 +74,7 @@ public static class EffectSprites
         if (Quad(def, frames, p, right, up, back, vertices, quads * 4 * SpriteBatch.Stride, distort, eye))
           quads++;
       if (quads == 0) continue;
-      batches.Add(new SpriteBatch { Emitter = def, Frames = frames, Vertices = vertices, QuadCount = quads, Depth = depthSum / list.Count, Distortion = distort });
+      batches.Add(new SpriteBatch { Emitter = def, Frames = frames, Vertices = vertices, QuadCount = quads, Depth = depthSum / list.Count, Distortion = distort, Kind = VfxDrawKinds.ForEmitter(def) });
       }
     }
 

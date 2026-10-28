@@ -23,6 +23,11 @@ if EAL.does_asset_exist(dst):
 # mtl1-22: a referenced mesh leaves an ObjectRedirector at dst after the rename; remove it so dst is free for the new mesh.
 fix_redirector(dst)
 mesh = EAL.duplicate_asset(src, dst)
+# mtl1-28: exports without --include-cloth-sim have no _SIM section; CreateChaosCloth then falls back to render-as-sim.
+try:
+    for c in json.load(open(pj, encoding="utf-8")).get("cloths", []):
+        if c.get("simSectionExported") is False: print("CHAOS note", c.get("SimMeshName"), "no _SIM section in export -> render-as-sim fallback")
+except Exception as e: print("CHAOS note json", e)
 r = lib.create_chaos_cloth(mesh, pj)
 if isinstance(r, tuple) and len(r) == 3: ok, conv, rep = r
 elif isinstance(r, tuple) and len(r) == 2: conv, rep = r; ok = len(conv) > 0  # UE drops the bool return when out params exist

@@ -153,7 +153,9 @@ public partial class MainWindow
     if (def.Coverings.Count > 0)
       notes.Add("Surface covering (paints the coveringMask of nearby surfaces, not a particle): "
         + string.Join(", ", def.Coverings.Select(c => $"{c.Kind} r×{c.RadiusScale:0.##}{(c.Visible ? "" : " (off)")}")) + ".");
-    VfxCoveringBox.IsVisible = def.Coverings.Count > 0;
+    VfxCoveringBox.IsVisible = CoveringDemo.WantsHost(def);
+    if (def.Coverings.Count == 0 && CoveringDemo.HasDistortion(def))
+      notes.Add("Distortion backdrop (DEMO): the plane/sphere host is drawn as a checker so the refraction (capture formula uv += dudv*0.04-0.02, max ±0.02) is visible; nothing is painted.");
     if (def.Coverings.Count > 0)
       notes.Add("Covering demo host (DEMO / HEURISTIC preview, not game-accurate): a built-in plane or sphere whose mask is painted where particles land; the game paints the hit character's own covering layer.");
     notes.Add("Standalone view on a ground grid; socketed emitters sit 1.2 m up, pointing +X; effects with trails fly along +X at 40 m/s. Drag to orbit, wheel to zoom, Space plays.");
@@ -209,11 +211,12 @@ public partial class MainWindow
       fx.Last = now;
       fx.Instance.Seek(fx.Time);
       var (view, projection, eye) = fx.Camera.Matrices(width, height);
-      var host = fx.Definition.Coverings.Count > 0 ? VfxCoveringHost : CoveringHostKind.Off;
+      var host = CoveringDemo.WantsHost(fx.Definition) ? VfxCoveringHost : CoveringHostKind.Off;
       if (host == CoveringHostKind.Off) fx.Cover = null;
       else
       {
-        if (fx.Cover?.Kind != host) fx.Cover = new CoveringDemo(host, fx.Definition, fx.Instance.Root);
+        if (fx.Cover?.Kind != host || fx.Cover.BackdropEye is { } be && System.Numerics.Vector3.DistanceSquared(be, eye) > 1e-6f)
+          fx.Cover = CoveringDemo.For(host, fx.Definition, fx.Instance.Root, eye);
         fx.Cover.Update(fx.Instance);
       }
 

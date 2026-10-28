@@ -13,6 +13,11 @@ public static class PhysicsSidecar
 {
   private static readonly JsonSerializerOptions Options = new() { WriteIndented = true, IncludeFields = true };
 
+  /// <summary>True when a visible part named like the cloth's sim mesh is in the export (the _SIM section CreateChaosCloth looks for).</summary>
+  public static bool SimSectionExported(ExportedMesh mesh, string? simMeshName) =>
+    !string.IsNullOrEmpty(simMeshName) &&
+    mesh.Parts.Any(p => p.Visible && string.Equals(p.Name, simMeshName, StringComparison.OrdinalIgnoreCase));
+
   public static string Serialize(ExportedMesh mesh, PhysicsSetup setup, ClothBoneRig? rig, IReadOnlyDictionary<string, PhysicsBakeReport> baked)
   {
     static float[] V(Vector3 v) => new[] { v.X, v.Y, v.Z };
@@ -85,6 +90,9 @@ public static class PhysicsSidecar
         c.MaxInfluenceDist,
         c.DistanceRemapPower,
         simVertices = shell?.Positions.Count ?? 0,
+        // mtl1-28: false when the _SIM shell was left out of the FBX (no --include-cloth-sim). CreateChaosCloth then uses the
+        // primary render section as its own sim mesh (render-as-sim fallback, HEURISTIC) instead of converting 0 cloths.
+        simSectionExported = SimSectionExported(mesh, c.SimMeshName),
         pinned = maxDistance.Count(m => m <= 1e-4f),
         maxDistanceMeters = maxDistance,
         // mtl1-9: sim particle bind positions in the Unreal FBX space (cm, Z-up), same order as maxDistanceMeters.

@@ -86,10 +86,10 @@ internal static class VfxBench
         var camera = EffectCamera.Fit(instance, seconds);
         // SM2_VFX_COVERING=plane|sphere: DEMO/HEURISTIC covering host for em_covering_* effects.
         var coverKind = Enum.TryParse<CoveringHostKind>(Environment.GetEnvironmentVariable("SM2_VFX_COVERING"), true, out var ck) ? ck : CoveringHostKind.Off;
-        var cover = coverKind != CoveringHostKind.Off && def.Coverings.Count > 0 ? new CoveringDemo(coverKind, def, instance.Root) : null;
         if (parts.Length > 2 && float.TryParse(parts[2], CultureInfo.InvariantCulture, out var distance))
           camera = camera with { Distance = distance };
         var (view, projection, eye) = camera.Matrices(Size, Size);
+        var cover = coverKind != CoveringHostKind.Off && CoveringDemo.WantsHost(def) ? CoveringDemo.For(coverKind, def, instance.Root, eye) : null;
         var sheet = new byte[Cols * Size * Rows * Size * 4];
         var simMs = new List<double>(); var buildMs = new List<double>(); var gpuMs = new List<double>();
         var peak = 0;
@@ -140,7 +140,7 @@ internal static class VfxBench
             Buffer.BlockCopy(pixels, y * Size * 4, sheet, ((oy + y) * Cols * Size + ox) * 4, Size * 4);
           if (Environment.GetEnvironmentVariable("SM2_VFX_FRAMES") == "1")
             PreviewBench.Png(Path.Combine(output, $"{name}_f{f}_{t:0.000}s.png"), pixels, Size, Size);
-          Line($"  t={t:0.000}s particles {instance.ParticleCount} quads {layer.Quads} meshes {layer.MeshInstances} batches {layer.Batches.Count} lights {layer.Lights.Count} distortion {gpu.DistortionQuads} vatDraws(cum) {gpu.VatDraws}{(cover is null ? "" : $" coverHits(cum) {cover.Hits} coverMax {cover.Mask.Max():0.00}")}");
+          Line($"  t={t:0.000}s particles {instance.ParticleCount} quads {layer.Quads} meshes {layer.MeshInstances} batches {layer.Batches.Count} (trail {layer.Batches.Count(b => b.Kind == VfxDrawKind.Trail)} spark {layer.Batches.Count(b => b.Kind == VfxDrawKind.Spark)}) lights {layer.Lights.Count} distortion {gpu.DistortionQuads} vatDraws(cum) {gpu.VatDraws}{(cover is null ? "" : $" coverHits(cum) {cover.Hits} coverMax {cover.Mask.Max():0.00}")}");
         }
 
         PreviewBench.Png(Path.Combine(output, name + "_sheet.png"), sheet, Cols * Size, Rows * Size);

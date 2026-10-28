@@ -41,6 +41,28 @@ public static class VfxBlendRules
 }
 
 /// <summary>
+///   mtl1-28: draw kind of an emitter's sprite batch. Trails are <see cref="VfxDrawKind.Trail"/> by construction
+///   (EffectTrailSprites). Sparks: the capture draw (smoke 88302 eid 2086, CB_PARTICLES, 228 instances, blending off,
+///   writes VELOCITY) has no sfx name, and the exe names a SPARKS pass ("SPARKS" @0x1436dceac, "SPARKS_BEGIN" @0x1436e16a0,
+///   data-table refs only). The sfx data has no opaque blendType (add 10841, blend 7150, blend_add 635), so the mapping
+///   to data is HEURISTIC: a GPU_EMITTER with <c>transforms.streaks.isEnabled</c> (velocity-stretched GPU points, the
+///   only GPU-only render feature, 1163 of 2000 GPU emitters) is a spark. <c>SM2_VFX_KIND_BLEND=0</c> draws everything
+///   with the particle blend as before.
+/// </summary>
+public static class VfxDrawKinds
+{
+  public static bool Enabled { get; set; } = Environment.GetEnvironmentVariable("SM2_VFX_KIND_BLEND") != "0";
+
+  public static VfxDrawKind ForEmitter(EmitterDef emitter) => Classify(emitter.IsGpu, emitter.StreakRatio);
+
+  public static VfxDrawKind Classify(bool isGpu, float streakRatio) =>
+    isGpu && streakRatio > 0f ? VfxDrawKind.Spark : VfxDrawKind.CpuParticle;
+
+  /// <summary>Spark alpha test (blending is off): texture coverage below this is discarded. HEURISTIC 0.5.</summary>
+  public const float SparkAlphaTest = 0.5f;
+}
+
+/// <summary>
 ///   SFX mesh emissive exposure compensation, plasma PS s33060 (disasm lines 514-517):
 ///   intensity *= lerp(1, COMMON_HDR_AVERAGE_LUMINANCE_CLAMPED, sfx[560].w). With the frame exposure = key / avgLum
 ///   (CaptureTonemap), k = 1 makes the emissive term scene-exposure independent. Which td field fills sfx[560].w
