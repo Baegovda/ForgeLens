@@ -52,6 +52,8 @@ public sealed class AnimEventVfxMap
   private static readonly HashSet<string> EndPins = new(StringComparer.Ordinal) { "OnDeactivate", "OnExit" };
 
   public IReadOnlyDictionary<string, List<EventVfx>> Events => _map;
+  private readonly HashSet<string> _sources = new(StringComparer.OrdinalIgnoreCase);
+  public bool HasSource(string source) => _sources.Contains(source);
   public int Files { get; private set; }
 
   public IReadOnlyList<EventVfx> For(string eventName) => _map.TryGetValue(eventName, out var list) ? list : [];
@@ -88,8 +90,18 @@ public sealed class AnimEventVfxMap
     JsonObject root;
     try { root = SslText.Parse(text); }
     catch { return; }
+    AddNodes(source, root);
+  }
+
+  /// <summary>
+  ///   mtl1-49: a blueprint graph already parsed — an <c>.sso</c> root, or one inline <c>prop_blueprints.blueprints.X</c>
+  ///   of a class (weapons wire their effects there, e.g. <c>BlueprintWpnMeleeEffects</c>).
+  /// </summary>
+  public void AddNodes(string source, JsonObject root)
+  {
     if (root.Obj("nodes") is not { } nodes) return;
     Files++;
+    _sources.Add(source);
 
     // Data pipes into a node: "Target/pin/cb" -> string default of the pipe.
     var pipes = new Dictionary<string, List<string>>(StringComparer.Ordinal);
@@ -182,7 +194,8 @@ public sealed class AnimEventVfxMap
   private void Add(string ev, EventVfx vfx)
   {
     if (!_map.TryGetValue(ev, out var list)) _map[ev] = list = [];
-    if (!list.Any(x => x.Effect.Equals(vfx.Effect, StringComparison.OrdinalIgnoreCase) && x.AtEnd == vfx.AtEnd)) list.Add(vfx);
+    // Same effect from another blueprint is kept: context playback filters by the blueprints a class owns.
+    if (!list.Any(x => x.Effect.Equals(vfx.Effect, StringComparison.OrdinalIgnoreCase) && x.AtEnd == vfx.AtEnd && x.Source.Equals(vfx.Source, StringComparison.OrdinalIgnoreCase))) list.Add(vfx);
   }
 
   private static IEnumerable<(string Pin, string Target)> Pins(JsonObject node)

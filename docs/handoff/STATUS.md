@@ -622,3 +622,8 @@ Evidence: box /workspace/rdc/NOTES.md and /workspace/rdc/<scene>/{nightly,deep} 
 - `KitbashLibrary` (Customization/Kitbash.cs) + right-column **Kitbash** tab. Preview and export share `ArmorVariant`. Tank preset 1 preview and export: 978 hidden / 54 shown. Kitbash spec export checked (996 / 36).
 - HEURISTIC: STORY_X → loyalist constructor; champion preset → `cc_*_champion_x_NN`; about half of the shared-part objects are not in a given constructor tpl (marked `⚠ not in tpl`).
 - Tests: SM2.Assets 237, Extractor 43, LibSaber.Tests 5, python 8 — all pass.
+
+## mtl1-49 (2026-10-29 KST): firearm uid rule, colour schemes, context playback
+- Bolt rifle vs auto-bolt fixed by a generic uid rule; colour-scheme picker with game names and swatches (bddd777).
+- Context playback both directions (ContextIndex / ContextResolver): effect → character + clip + held weapon + socket + event time; model + clip → held weapon (picker) + event effects + Shoot → muzzle (slot picker). Toggles "Show props/weapons" / "Show effects". Verified in the GUI on the PC (Sorcerer stave ray prep, rubric marine bolter shoot, toggles off).
+- Tests: SM2.Assets 278 pass.

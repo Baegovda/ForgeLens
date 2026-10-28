@@ -13,6 +13,7 @@
 8. In-game side-by-side comparison (VFX, physics, materials): **done statically (mtl1-48)**: VFX bench vs the 6 user photos, materials via ApplyMaterialSuffix RE; physics has no in-game motion reference (captures not allowed).
 9. Unreal export test without Niagara (meshes/textures/materials of the compared effects → `/Game/SM2_Work/VfxExport`): **done** (2026-10-27, vfx4-2).
 10. Browser viewer polish (asset search, preview, export button): **done (vfx4-3)**.
+11. Context playback (user, 2026-10-29): effect ↔ character model + triggering animation + held weapon, props/effects toggles: **done (mtl1-49)**. Open: proven Shoot → muzzle link (exe RE of the Shoot track consumer), exact-tpl class for cc_rubric_marine.
 
 ## Next: VFX3 remaining (do in this order unless the user says otherwise)
 Pushed so far: sockets/bone attach, anim-event cues and stop cues, distortion, degNear on sprites, missing-texture skip, bolter proxies, in-place fix, coverings, textureTintControl (grenade smoke). The remaining items:

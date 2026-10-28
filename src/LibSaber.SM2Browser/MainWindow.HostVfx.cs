@@ -198,6 +198,8 @@ public partial class MainWindow
       return;
     }
 
+    // mtl1-49: context playback keeps its events on while "Show effects" is on.
+    events |= vfx.Context is not null && CtxFxToggle.IsChecked == true && ContextBar.IsVisible;
     var socket = HostVfxSocket.SelectedIndex > 0 ? HostVfxSocket.SelectedItem as string ?? "" : "";
     var status = new List<string>();
     var single = await Task.Run(() => vfx.SetEffect(mesh, name, socket));

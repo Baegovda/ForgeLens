@@ -5,7 +5,7 @@ using LibSaber.SM2.Assets.Effects;
 
 namespace LibSaber.SM2.Assets.Tests;
 
-public class HostEffectTests
+public partial class HostEffectTests
 {
   private const string Part = """
     timeLife   =   1

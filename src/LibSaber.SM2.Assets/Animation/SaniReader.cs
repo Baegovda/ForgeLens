@@ -79,6 +79,31 @@ public static class SaniReader
   }
 
   /// <summary>Decode an ETNA .sani from raw bytes (and its .sani_data, when the clip is 0xF6). Used by bulk validation.</summary>
+  /// <summary>
+  ///   mtl1-49: only the morpheme event tracks (section 245) and the duration of an ETNA clip, without decoding curves
+  ///   (context playback scans a character's whole bundle for the event that starts an effect). Null when not ETNA.
+  /// </summary>
+  public static (float Duration, List<AnimEventTrack> Tracks)? ReadEvents(byte[] bytes)
+  {
+    if (bytes.Length < 36 || bytes[0] != (byte)'E' || bytes[1] != (byte)'T' || bytes[2] != (byte)'N' || bytes[3] != (byte)'A')
+      return null;
+    var stringEnd = BitConverter.ToInt32(bytes, 8);
+    var duration = BitConverter.ToSingle(bytes, 12);
+    if (stringEnd < 36 || stringEnd > bytes.Length) return null;
+    var tracks = new List<AnimEventTrack>();
+    var cursor = stringEnd;
+    while (cursor + 6 <= bytes.Length)
+    {
+      var id = BitConverter.ToUInt16(bytes, cursor);
+      var end = BitConverter.ToInt32(bytes, cursor + 2);
+      if (end <= cursor || end > bytes.Length) break;
+      if (id == 245) tracks.AddRange(AnimEvents.Parse(bytes.AsSpan(cursor + 6, end - (cursor + 6))));
+      cursor = end;
+    }
+
+    return (duration > 0 && !float.IsNaN(duration) ? duration : 0, tracks);
+  }
+
   public static AnimationClip FromBytes(byte[] sani, byte[]? data, string name = "clip")
   {
     var clip = new AnimationClip { Name = name };

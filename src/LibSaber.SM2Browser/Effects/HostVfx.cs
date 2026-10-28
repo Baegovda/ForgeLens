@@ -34,6 +34,8 @@ internal sealed class HostVfx
   public string Status { get; private set; } = "";
   /// <summary>Comma-separated substrings of blueprint paths to use for anim events ("" = all).</summary>
   public string SourceFilter { get; set; } = "";
+  /// <summary>mtl1-49 context playback rules (owned blueprints, sfx.list resolution, weapon socket scope, Shoot cues); used when <see cref="SourceFilter"/> is empty.</summary>
+  public HostVfxContext? Context { get; set; }
   public bool Active { get { lock (_gate) return _single is not null || (_eventsOn && _events is { Count: > 0 }); } }
   public EffectDefinition? Single { get { lock (_gate) return _single?.Definition; } }
   public AnimEventEffects? Events { get { lock (_gate) return _events; } }
@@ -64,7 +66,7 @@ internal sealed class HostVfx
     if (!ReferenceEquals(_mesh, mesh) || _host is null)
     {
       _mesh = mesh;
-      _host = new EffectHost(mesh.Bones.Select(b => b.Name).ToList());
+      _host = new EffectHost(mesh.Bones.Select(b => b.Name).ToList(), mesh.Bones.Select(b => b.SourceName).ToList());
       _bind = null;
       _events = null;
       _eventsFor = null;
@@ -112,8 +114,10 @@ internal sealed class HostVfx
     if (ReferenceEquals(_eventsFor, clip) && _events is not null) return "";
     _eventsFor = clip;
     var filters = SourceFilter.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+    var ctx = filters.Length == 0 ? Context : null;
     _events = new AnimEventEffects(clip, Map, Build, _host!,
-      filters.Length == 0 ? null : h => filters.Any(f => h.Source.Contains(f, StringComparison.OrdinalIgnoreCase)));
+      filters.Length > 0 ? h => filters.Any(f => h.Source.Contains(f, StringComparison.OrdinalIgnoreCase)) : ctx?.Include,
+      ctx?.Resolve, ctx?.Scope, ctx?.TrackCues);
     var tags = clip.EventTracks.Sum(t => t.Events.Count);
     return Status = tags == 0
       ? $"{clip.Name}: no morpheme events"
@@ -158,3 +162,10 @@ internal sealed class HostVfx
     }
   }
 }
+
+/// <summary>mtl1-49: how a context (character + held weapon) runs a clip's events. See <see cref="LibSaber.SM2.Assets.Context.ContextResolver"/>.</summary>
+internal sealed record HostVfxContext(
+  Func<EventVfx, bool>? Include,
+  Func<string, string>? Resolve,
+  Func<string, string, (string Prefix, string Root)?>? Scope,
+  IReadOnlyList<LibSaber.SM2.Assets.Context.TrackCue>? TrackCues);

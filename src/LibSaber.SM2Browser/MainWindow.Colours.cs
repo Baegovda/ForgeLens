@@ -271,7 +271,8 @@ public partial class MainWindow
   {
     if (Environment.GetEnvironmentVariable("SM2_OPEN") is not { Length: > 0 } path || _catalog is not { } catalog)
       return;
-    if (!catalog.TryGetByPath(path.Replace('\\', '/'), out var index))
+    if (!catalog.TryGetByPath(path.Replace('\\', '/'), out var index)
+        && !(!path.Contains('/') && !path.Contains('\\') && catalog.FindByFileName(path) is { Count: > 0 } byName && (index = byName[0]) >= 0))
     {
       StatusText.Text = "SM2_OPEN: not in the catalog: " + path;
       return;
@@ -297,5 +298,6 @@ public partial class MainWindow
 
     if (_mesh is not null)
       DrawMesh();
+    await OpenClipFromEnvironmentAsync();
   }
 }

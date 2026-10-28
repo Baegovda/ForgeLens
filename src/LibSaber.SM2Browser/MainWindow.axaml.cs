@@ -76,6 +76,7 @@ public partial class MainWindow : Window
   {
     InitializeComponent();
     InitHostVfx();
+    InitContext();
     RecentList.ItemsSource = _recent.Items;
     InitLayoutMemory();
     ShowAllBox.IsChecked = _settings.ShowAllFiles;
@@ -506,6 +507,7 @@ public partial class MainWindow : Window
         var mesh = loaded.decoded;
         _mesh = mesh;
         _previewFileIndex = index;
+        ContextModelLoaded(mesh);
         _modelKey = ModelKey(file.Path);
         SmoothToggle.IsVisible = mesh.HasTriangles;
         _albedo = loaded.Item2.Albedo;
@@ -575,6 +577,7 @@ public partial class MainWindow : Window
       if (file.Path.EndsWith(".sfx", StringComparison.OrdinalIgnoreCase) && await TryShowEffectAsync(index, file.Path, generation))
       {
         HideLoading(generation);
+        _ = Guard(AfterEffectShownAsync(Path.GetFileNameWithoutExtension(file.Path)));
         return;
       }
 
@@ -1311,7 +1314,8 @@ public partial class MainWindow : Window
 
     _suppressAnim = true;
     AnimBox.ItemsSource = rows;
-    AnimBox.SelectedIndex = selected is not null && rows.Contains(selected) ? rows.IndexOf(selected) : 0;
+    AnimBox.SelectedIndex = selected is not null && rows.Contains(selected) ? rows.IndexOf(selected)
+      : !keepSelection && _clipIndex >= 0 && rows.FindIndex(r => r.Index == _clipIndex) is var playing and > 0 ? playing : 0;
     _suppressAnim = false;
     if (text.Length > 0)
       StatusText.Text = $"{rows.Count - 1:N0} of {_animAll.Count:N0} animations match '{text}'.";
@@ -1337,6 +1341,8 @@ public partial class MainWindow : Window
     if (_mesh is not null)
       _mesh.Clip = clip.HasCurves ? clip : null;
     SyncScrub();
+    if (_ctxBase is not null && _mesh is not null)
+      _ = Guard(UpdateModelContextAsync()); // mtl1-49: held weapon + effects for this clip
   }
 
   private void ScrubChanged(object? sender, Avalonia.Controls.Primitives.RangeBaseValueChangedEventArgs e)

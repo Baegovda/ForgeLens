@@ -249,6 +249,28 @@
                    ToolTip.Tip="Comma-separated blueprint name filters (the weapon / character the clip belongs to). Empty = every blueprint." />
           <TextBlock x:Name="HostVfxStatus" VerticalAlignment="Center" Opacity="0.75" FontSize="11" MaxWidth="900" TextTrimming="CharacterEllipsis" />
         </WrapPanel>
+        <WrapPanel x:Name="ContextBar" DockPanel.Dock="Top" Orientation="Horizontal" Margin="0,2,0,0" IsVisible="False">
+          <WrapPanel.Styles>
+            <Style Selector="WrapPanel > :is(Control)">
+              <Setter Property="Margin" Value="0,0,6,4" />
+            </Style>
+          </WrapPanel.Styles>
+          <TextBlock Text="CONTEXT" Classes="section" />
+          <CheckBox x:Name="CtxPropsToggle" Content="Show props/weapons" IsChecked="True" Click="CtxOptionsChanged"
+                    ToolTip.Tip="Held weapon for this clip on the hand locator (prop_model_weapon_holds GUN_R / GUN_L). Off: model + animation only." />
+          <CheckBox x:Name="CtxFxToggle" Content="Show effects" IsChecked="True" Click="CtxOptionsChanged"
+                    ToolTip.Tip="Effects the clip starts: morpheme events through the blueprints the character / weapon own, and Shoot track -> weapon muzzle (HEURISTIC). Off: model + animation only." />
+          <ComboBox x:Name="CtxCharacterBox" Width="300" IsVisible="False" SelectionChanged="CtxCharacterChanged"
+                    ToolTip.Tip="Characters that own this effect (directly, through a held weapon or a spawned actor), best link first" />
+          <ComboBox x:Name="CtxClipBox" Width="360" IsVisible="False" SelectionChanged="CtxClipChanged"
+                    ToolTip.Tip="Clips of the character's morpheme bundle: PROVEN = an event track entry the blueprint maps to this effect; HEURISTIC = name tokens" />
+          <ComboBox x:Name="CtxWeaponBox" Width="280" SelectionChanged="CtxWeaponChanged"
+                    ToolTip.Tip="Held weapon: PROVEN = the character class inventory / effect owner; HEURISTIC = clip and weapon name tokens" />
+          <ComboBox x:Name="CtxSlotBox" Width="260" IsVisible="False" SelectionChanged="CtxSlotChanged"
+                    ToolTip.Tip="Effect for a slot with several candidates (e.g. the weapon's muzzle* sfx.list entries the Shoot track starts)" />
+          <Button x:Name="CtxBackButton" Content="Effect only" IsVisible="False" Click="CtxBackClicked" ToolTip.Tip="Back to the effect alone" />
+          <TextBlock x:Name="CtxStatus" VerticalAlignment="Center" Opacity="0.8" FontSize="11" MaxWidth="1100" TextTrimming="CharacterEllipsis" />
+        </WrapPanel>
         <WrapPanel x:Name="VfxBar" DockPanel.Dock="Top" Orientation="Horizontal" Margin="0,2,0,0" IsVisible="False">
           <WrapPanel.Styles>
             <Style Selector="WrapPanel > :is(Control)">
@@ -256,6 +278,11 @@
             </Style>
           </WrapPanel.Styles>
           <TextBlock Text="VFX" Classes="section" />
+          <ComboBox x:Name="VfxPlaybackBox" SelectedIndex="0" SelectionChanged="VfxPlaybackChanged" Focusable="False"
+                    ToolTip.Tip="mtl1-49 context playback. Effect only: the effect alone on the grid. With model + animation: the character that owns the effect (class sfx.list / cooked links), the clip whose morpheme event starts it (blueprint graph), the held weapon, and the effect on its socket at the event time.">
+            <ComboBoxItem Content="Effect only" />
+            <ComboBoxItem Content="With model + animation" />
+          </ComboBox>
           <Button Content="Restart" Focusable="False" Click="VfxRestartClicked" ToolTip.Tip="Replay from 0 s (same seed: every run is identical)" />
           <Button Content="Fit" Focusable="False" Click="VfxFitClicked" ToolTip.Tip="Frame the whole effect (pre-simulated over its first run). Shortcut: F" />
           <Slider x:Name="VfxScrub" Width="220" Minimum="0" Maximum="1" ValueChanged="VfxScrubChanged"
