@@ -62,6 +62,11 @@ public sealed class ClothInstance
 
     _phases = BuildPhases(_bind, _triangles);
     _tethers = BuildTethers(_bind, _triangles, _invMass, entry.Config.Tether.UseTopologicalDistance || entry.UseTopologicalDistance);
+    // mtl1-43 PROVEN (sm2_retail.exe FUN_14109f430/f5f0/f730 build the capsule/sphere/box tables: each bone name goes
+    // through the string pool (FUN_141c3fa90) and the model object lookup FUN_141d91470; a miss stores index 0xffff and
+    // FUN_14109c400/c6d0/d260 skip that shape every frame). So CDT shapes whose bone is not a model object (typos such
+    // as CENTREs / knee_LS / powerplant_backpack_OFF, host-skeleton bones on weapon tpls) are inactive in game too:
+    // dropping them is correct, no fuzzy name repair. Case sensitivity of the pool lookup is not verified (we ignore case).
     int Find(string name) => bones is null ? -1 : FindBone(bones, name);
     _capsules = entry.Config.Capsules
       .Select(c => (Find(c.BoneFirst), c.RadiusFirst, c.BoneFirstOffset, Find(c.BoneSecond.Length > 0 ? c.BoneSecond : c.BoneFirst), c.RadiusSecond, c.BoneSecondOffset))
