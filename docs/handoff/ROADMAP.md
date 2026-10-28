@@ -18,7 +18,7 @@
 Pushed so far: sockets/bone attach, anim-event cues and stop cues, distortion, degNear on sprites, missing-texture skip, bolter proxies, in-place fix, coverings, textureTintControl (grenade smoke). The remaining items:
 1. **[checked mtl1-19: keep TINT_EXACT/contrast opt-in; default grey matches in-game grey smoke]** **Smoke colour (follow-up):** the grenade smoke blue cast is fixed by `textureTintControl`. Check against an in-game capture. `additionalContrast` + `contrastColorKey` (hot-colour ramp, 2,969 non-zero uses) is not implemented: REA the GPU-side shader or approximate it, labelled as a heuristic.
 2. **[checked mtl1-19: opt-in SM2_VFX_TRAIL_TC=1; in-game shots also show no visible trail]** **Bolter smoke trail:** faint by data (see HANDOFF vfx3 part 3); not a bug. Optional: apply `tcIn` scale on trails; confirm visually in-game.
-3. **[mtl1-20 retry: still PARTIAL - blend_add PSO and ratio/exposure/distortion scalars need a runtime GPU capture, see STATUS mtl1-20]** **REA of the guessed values:**
+3. **[mtl1-23: RenderDoc captures resolved blend PSOs (particles/trails/sparks/sfx meshes), distortion strength (0.08, ±0.02), tonemap + exposure (key ~0.11/avgLum) - see STATUS mtl1-23; still open: ratio*, blend_add vs blend in-game split, size radius, sfx[560].w td source]** [mtl1-20 retry: still PARTIAL] **REA of the guessed values:**
    - `ratioDependency` / `ratioXY`;
    - `blend_add` semantics (blendType parser 0x141751cd0 gives only the enum; find the blend-state setup);
    - exposure 1/250 and light ×100 scale;
@@ -27,7 +27,7 @@ Pushed so far: sockets/bone attach, anim-event cues and stop cues, distortion, d
 4. **[REA'd mtl1-19: structure matches current model, see STATUS mtl1-19; time base of dynamic curve open]** **genOnFly** exact emission (currently a burst for explosion targets, per-parent rate for flow targets). Trace the `attached` runtime near the genOnFly string @0x143644b38.
 5. **[mtl1-21: DEMO host preview added (plane/sphere, heuristic)] [mtl1-20: classified, not drawable standalone - covering painter writes the host surface coveringMask; needs a host character + covering_simulation]** **Flesh emitter:** `part_mag_ee_bolter_flesh` untyped entry. It is now known to be an `em_covering_*` surface painter (blood r0.4 on HEAD), shown as a note. Optional: draw a decal-like covering on the model.
 6. **[mtl1-20: animStage source REA'd (spline over age) and implemented; rest of VAT was done in vfx3e-g]** **VAT blood splashes** (`splash_5_v2_anim_data*`, `shader_blood_splash`): the layout is still unknown, see the findings in HANDOFF vfx3 part 3. The pct is downsampled (2400×471, 8 bands). REA the vertex shader / `combineMtlAnimControl.animStage`.
-7. **SELF_DISTORTION** render: **done** (mtl1-19, heuristic scale K=0.04). degNear on trails and mesh particles: **done** (trails TRAIL_DEGR; mesh particles mtl1-17).
+7. **SELF_DISTORTION** render: **done** (mtl1-19; mtl1-23 uses the capture distortion formula 0.08·sat(10|off|)·off clamped ±0.02, quad-space use HEURISTIC). degNear on trails and mesh particles: **done** (trails TRAIL_DEGR; mesh particles mtl1-17).
 8. Then report VFX done (with %).
 
 ## UE verification — results so far (details in STATUS.md / HANDOFF "UE verification")
@@ -38,6 +38,11 @@ Pushed so far: sockets/bone attach, anim-event cues and stop cues, distortion, d
   3. Spiky cloak hem: raise `maxBonesPerCloth` above 1024 (Calgar has 1133 free particles), or regularise the polar fit on near-collinear one-rings.
   4. Loop-seamless bakes (blend the tail into frame 0 after settle).
   5. Optional: assign `PA_*_sm2` physics assets; the manual AnimDynamics/Chaos Cloth recipe comes from `physics.json` → `ue`.
+
+## Leads from the mtl1-23 captures
+- Armory per-instance customization colours (LWI_INST_DATA_BUF, see HANDOFF mtl1-23): map slots +21..23 / +28..30 to the _cc mask channels (HEURISTIC today) and apply in UE/browser.
+- Hellbrute: which tpl/visibility the game draws (frame 68141 has no armor_01/arm_01/legs_02 draws, armor_02 drawn with the default variant only); needs the .pak archives on the box to map our sections to draws. DYNAMIC_GLT_BUFFER per-instance albedo rgb was not dumped (next capture).
+- Trails and sparks are not drawn by the browser GPU renderer yet; blend rules are ready in VfxBlendRules.
 
 ## Later / backlog
 - In-game captures on the PC (when the user isn't playing) for: grenade/bolter VFX, Titus seals, Calgar cape, Calgar hair.

@@ -27,6 +27,14 @@ public sealed class PreviewPartDraw
   public bool SecondSpec { get; init; }
   /// <summary><c>glt.chameleon</c> view-dependent albedo ramp (null when disabled); see <see cref="ChameleonSpec"/>.</summary>
   public ChameleonSpec? Chameleon { get; init; }
+  /// <summary>
+  ///   glt base metalness/roughness {scale, bias}: metal = sat(spec.r * x + y), rough = sat(rough * z + w). mtl1-23 capture
+  ///   (hellbrute 68141, CB_OBJ_MATERIAL_DATA OBJ_MTLBLEND_LAYER_CONST rows 2/3 = td scale/bias, e.g. eid 2979 armor_02 default
+  ///   .988/0 and 1/.102); the glt PS feeds this metal into lerp(chameleon ramp, 1, metal) and the tint lerp.
+  /// </summary>
+  public Vector4 MetalRough { get; init; } = new(1f, 0f, 1f, 0f);
+  /// <summary>glt.metallicTint (sRGB 0..1): albedo *= lerp(albedoTint, metallicTint, metal) (PS 29540 MTLBLEND rows 0/1).</summary>
+  public Vector3 MetalTint { get; init; } = Vector3.One;
   /// <summary>Bind-pose centre of the part's triangles, for back-to-front sorting of translucent parts.</summary>
   public Vector3 Center { get; init; }
   public int IndexStart { get; init; }
@@ -147,6 +155,8 @@ public static partial class MeshPreview
           Aniso = part.AnisoSpec,
           SecondSpec = part.SecondSpec is not null,
           Chameleon = part.Chameleon,
+          MetalRough = part.BaseLayer is { } bl ? new Vector4(bl.MetalnessScale, bl.MetalnessBias, bl.RoughnessScale, bl.RoughnessBias) : new Vector4(1f, 0f, 1f, 0f),
+          MetalTint = part.BaseLayer?.MetallicTint is { Length: >= 3 } mt ? new Vector3(mt[0], mt[1], mt[2]) : Vector3.One,
           Center = PartCenter(prepared, start, end),
         });
       }

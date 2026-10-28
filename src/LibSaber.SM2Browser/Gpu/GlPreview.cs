@@ -44,6 +44,8 @@ internal sealed unsafe class GlPreview : IDisposable
 
   /// <summary>Bench "before" frames: every part in the opaque pass, as v3 drew them.</summary>
   public bool LegacyOpaque { get; set; }
+  /// <summary>mtl1-23: capture CB_PASS_HDR curve on the model preview (SM2_PREVIEW_TONEMAP=1; off by default).</summary>
+  public static bool CaptureTonemapOn { get; set; } = Environment.GetEnvironmentVariable("SM2_PREVIEW_TONEMAP") == "1";
 
   public int Samples { get; private set; }
   public float Anisotropy { get; private set; } = 1;
@@ -709,6 +711,12 @@ internal sealed unsafe class GlPreview : IDisposable
       _gl.Uniform1(U("uUseAlpha"), pass != PreviewBlend.Opaque && part.AlphaFromAlbedo ? 1 : 0);
       SetVec3("uSolid", part.Solid);
       SetVec3("uTint", part.Tint);
+      var metalRough = LegacyOpaque ? new Vector4(1f, 0f, 1f, 0f) : part.MetalRough;
+      var metalTint = LegacyOpaque ? Vector3.One : part.MetalTint;
+      _gl.Uniform4(U("uMetalRough"), metalRough.X, metalRough.Y, metalRough.Z, metalRough.W);
+      // Passed as given, like uTint (both td 0..1 values), so lerp(albedoTint, metallicTint, metal) mixes like with like.
+      _gl.Uniform3(U("uMetalTint"), metalTint.X, metalTint.Y, metalTint.Z);
+      _gl.Uniform1(U("uTonemap"), CaptureTonemapOn && !LegacyOpaque ? 1 : 0);
       var aniso = part.Aniso;
       if (LegacyOpaque)
         aniso = null;
@@ -892,7 +900,13 @@ internal sealed unsafe class GlPreview : IDisposable
     uniform vec3 uChamC[4];
     uniform vec4 uChamR0;
     uniform vec4 uChamR1;
+    uniform vec4 uMetalRough;
+    uniform vec3 uMetalTint;
+    uniform int uTonemap;
     out vec4 oColor;
+    // mtl1-23: CB_PASS_HDR curve from the RenderDoc captures (LibSaber.SM2.Assets.Effects.CaptureTonemap, LUT bake CS s1996).
+    float hable(float x) { x = max(x, 0.0); return (x * (0.12 * x + 0.0225) + 0.004) / (x * (0.12 * x + 0.05) + 0.016) - 0.25; }
+    vec3 captureTonemap(vec3 c) { return clamp(vec3(hable(c.r), hable(c.g), hable(c.b)) * 1.375385, 0.0, 1.0); }
     // Kajiya-Kay strand lobe: highlight where the half vector is perpendicular to the strand.
     float strand(vec3 T, vec3 H, float e)
     {
@@ -965,10 +979,13 @@ internal sealed unsafe class GlPreview : IDisposable
       if (uHasSpec == 1)
       {
         vec4 s = texture(uSpec, vUv);
-        metal = s.r;
-        rough = uRoughA == 1 ? s.a : s.g;
+        // mtl1-23: base metal/rough {scale, bias} (capture OBJ_MTLBLEND_LAYER_CONST rows 2/3; PS _580 = sat(spec * x + y)).
+        metal = clamp(s.r * uMetalRough.x + uMetalRough.y, 0.0, 1.0);
+        rough = clamp((uRoughA == 1 ? s.a : s.g) * uMetalRough.z + uMetalRough.w, 0.0, 1.0);
         ao = uAoB == 1 ? s.b : 1.0;
       }
+      // glt.metallicTint: albedo * lerp(albedoTint, metallicTint, metal) (PS 29540: lerp(MTLBLEND[0], MTLBLEND[1], metal)).
+      base = albedo.rgb * mix(uTint, uMetalTint, metal);
       if (uCham == 1)
       {
         // glt.chameleon (pc_dx12_glt.sdc PS 03558_0): t = pow(sat(N.V), r15.z); 3-step ramp C0..C3; albedo *= lerp(c, 1, metal).
@@ -1015,7 +1032,9 @@ internal sealed unsafe class GlPreview : IDisposable
         lit = base * pow(diffuse, 2.2) + (vec3(s1) + s2 * base * 2.0) * wrap * ao;
       }
       // Premultiplied output for the blended pass; alpha drives coverage in the masked pass.
-      vec3 encoded = toSrgb(lit);
+      // mtl1-23: optional capture tonemap at exposure 1 (game maps avg luminance to ~0.11 before the curve; the preview
+      // rig's mid-grey lands there too: HEURISTIC). SM2_PREVIEW_TONEMAP=1 enables; default stays the plain clamp.
+      vec3 encoded = toSrgb(uTonemap == 1 ? captureTonemap(lit) : lit);
       oColor = uBlend == 2 ? vec4(encoded * alpha, alpha) : vec4(encoded, uBlend == 1 ? alpha : 1.0);
     }
     """;

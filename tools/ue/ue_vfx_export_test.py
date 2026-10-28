@@ -7,6 +7,13 @@
 # Never deletes assets: an existing dest folder is renamed to <dest>_bakN first. /Game/SM2_Work/Original is not touched.
 # Blend per texture = what the browser bench resolved (SPRDBG "blend"), Add -> additive, else translucent. Preview only:
 # flipbooks show the whole sheet, no curves/tint (HEURISTIC preview, not the game's particle shader).
+# mtl1-23 capture blend rules (LibSaber.SM2.Assets.Effects.VfxBlendRules, RenderDoc nightly 1.47) -> UE blend mode:
+#   SFX meshes One/One (alpha Zero/One, plasma 101917)        -> BLEND_ADDITIVE (sfx_geom_muzzle uses the additive MI)
+#   CPU particles premultiplied One/InvSrcAlpha (PS 101818)   -> BLEND_TRANSLUCENT (UE has no premultiplied mode;
+#                                                                 BLEND_ALPHACOMPOSITE is the exact match, not wired yet)
+#   trails SrcAlpha/InvSrcAlpha (CB_PASS_TRAIL)               -> BLEND_TRANSLUCENT (trail_smoke_hard)
+#   sparks opaque, no blend (eid 2086 (NOTES 12:10 blend list))              -> BLEND_MASKED (the q_sparks textures here are sprite sheets,
+#                                                                 kept translucent: name-based spark mapping is HEURISTIC)
 import unreal, sys, os, glob, builtins
 EAL = unreal.EditorAssetLibrary; AT = unreal.AssetToolsHelpers.get_asset_tools(); MEL = unreal.MaterialEditingLibrary
 ADD = ["part_sparks_seq_b", "part_ashes_01", "part_radius_01", "candle_top", "part_sparks_basic", "part_muzzle_front_01",

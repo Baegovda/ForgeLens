@@ -11,7 +11,8 @@ public enum EffectBlend { Blend = 0, Add = 1, BlendAdd = 2 }
 ///   (CPU table 0x14400c7ec, 0x60 B per emitter, uploaded by FUN_1418541b0 to t8,space2):
 ///   bit 0x20 = blendType==add (emitter+0x48c), bit 0x400 = !(isBlendAlphaMultiply (+0x490) &amp;&amp; blendType!=add).
 ///   particles.sdc PS 00000_0: rgb = col*vertexAlpha*(bit0x400 ? 1 : texAlpha'), outAlpha = bit0x20 ? 0 : vertexAlpha*texAlpha'.
-///   Output alpha 0 for add implies a premultiplied ONE/INV_SRC_ALPHA PSO (heuristic: the PSO itself was not traced).
+///   Output alpha 0 for add implies a premultiplied ONE/INV_SRC_ALPHA PSO (capture-verified mtl1-23:
+  ///   RenderDoc smoke 88302 / outdoor 137266 CPU particle draws, PS 101818 = One/InvSrcAlpha; see VfxBlendRules).
 ///   blend_add has no bit of its own, so it renders exactly like blend. Default ON since vfx3u (in-game frag grenade
 ///   reference: bright additive core/sparks only match with it); <c>SM2_VFX_BLEND_REA=0</c> restores the legacy blend.
 /// </summary>

@@ -46,9 +46,12 @@ internal sealed unsafe class EffectRenderer : IDisposable
   private uint _coverVao, _coverVbo, _coverIbo, _coverTex;
   private int _coverIndexCount, _coverVersion = -1;
   private readonly Dictionary<string, uint> _linear = new(StringComparer.OrdinalIgnoreCase);
-  /// <summary>Screen offset (UV) at distortion power 1 and a full-strength normal; not REA'd (the refraction shader is in the GPU blob).</summary>
+  /// <summary>
+  ///   Screen-UV shift per unit particle offset. mtl1-23 capture (plasma 101917, PS 4996 + post PS 5160, see
+  ///   <see cref="DistortionRules"/>): 0.08, shift clamped to +-0.02 (was the 0.04 HEURISTIC). SM2_VFX_DISTORT overrides.
+  /// </summary>
   public static float DistortionStrength { get; set; } =
-    float.TryParse(Environment.GetEnvironmentVariable("SM2_VFX_DISTORT"), System.Globalization.CultureInfo.InvariantCulture, out var d) ? d : 0.04f;
+    float.TryParse(Environment.GetEnvironmentVariable("SM2_VFX_DISTORT"), System.Globalization.CultureInfo.InvariantCulture, out var d) ? d : DistortionRules.UvPerOffset;
   /// <summary>
   ///   vfx3z: particle distortion buffer math from particles.sdc 00005_1 (offset = normal * per-vertex scalar, mask =
   ///   sat(10*|offset|), no edge fade). The per-vertex scalar is V_TEXCOORD.w of the CPU vertex (VS 00001_1 l.1573
@@ -57,8 +60,8 @@ internal sealed unsafe class EffectRenderer : IDisposable
   ///   a 64-sample spline read at (age-start)*invRange or the constant at desc+0x250, scaled by 1.0 (DAT_143c844b4), and
   ///   only multiplied by the per-particle colour when colour mode desc+0x108 == 4. Matching shader define
   ///   "DISTORTION_SCALE_CONST_MUL_VC_ALPHA" @0x1437f5a40 (registered in FUN_14236e020). Our r*alpha product equals that
-  ///   for refraction-only emitters (alpha = alphaK). Resolve scale DistortionStrength (0.04) stays HEURISTIC: its CB
-  ///   "CB_PASS_DISTORTION_POSTPROC"/"DISTORT_POSTPROC_PARAMS" @0x1437133f8/0x143713418 (FUN_1421aa940) has no traced filler.
+  ///   for refraction-only emitters (alpha = alphaK). Resolve scale: mtl1-23 capture, post PS 5160 hardcodes
+  ///   uv += DUDV*0.04 - 0.02 (DISTORT_POSTPROC_PARAMS [1,1,1/w,1/h] only sizes the target) -> shift = 0.08*mask*offset, max 0.02.
   ///   Default on; SM2_VFX_DISTORT_EXACT=0 restores the radial-edge version.
   /// </summary>
   public static bool DistortExact { get; set; } = Environment.GetEnvironmentVariable("SM2_VFX_DISTORT_EXACT") != "0";
@@ -88,11 +91,33 @@ internal sealed unsafe class EffectRenderer : IDisposable
   ///   HEURISTIC. SM2_VFX_SURF_LIGHT overrides.
   /// </summary>
   public static float SurfLight { get; set; } = float.TryParse(Environment.GetEnvironmentVariable("SM2_VFX_SURF_LIGHT"), System.Globalization.CultureInfo.InvariantCulture, out var sl) ? sl : 60f;
-  /// <summary>SELF_DISTORTION sdr warps the sprite's own UVs (HEURISTIC, power at mid-life; SM2_VFX_SELF_DISTORT=0 disables).</summary>
+  /// <summary>SELF_DISTORTION sdr warps the sprite's own UVs (power at mid-life; SM2_VFX_SELF_DISTORT=0 disables).</summary>
   public static bool SelfDistortion { get; set; } = Environment.GetEnvironmentVariable("SM2_VFX_SELF_DISTORT") != "0";
-  /// <summary>Quad-UV offset at self-distortion power 1 (HEURISTIC, SM2_VFX_SELF_DISTORT_K, default 0.04 like the refraction scale).</summary>
+  /// <summary>
+  ///   Self-distortion shift per unit offset. mtl1-23: the capture distortion formula (<see cref="DistortionRules"/>:
+  ///   0.08 x sat(10|off|) x off, clamped to +-0.02) replaces the K = 0.04 heuristic. Applying the screen-space constants
+  ///   to the sprite's own quad UV is HEURISTIC (the self-distortion shader was not captured). SM2_VFX_SELF_DISTORT_K overrides.
+  /// </summary>
   public static float SelfDistortK { get; set; } =
-    float.TryParse(Environment.GetEnvironmentVariable("SM2_VFX_SELF_DISTORT_K"), System.Globalization.CultureInfo.InvariantCulture, out var sk) ? sk : 0.04f;
+    float.TryParse(Environment.GetEnvironmentVariable("SM2_VFX_SELF_DISTORT_K"), System.Globalization.CultureInfo.InvariantCulture, out var sk) ? sk : DistortionRules.UvPerOffset;
+  /// <summary>
+  ///   mtl1-23: CB_PASS_HDR tonemap curve from the captures (<see cref="CaptureTonemap"/>, LUT bake CS s1996) instead of
+  ///   per-fragment 1-exp(-x). SM2_VFX_TONEMAP=exp restores the old curve.
+  /// </summary>
+  public static bool CaptureTonemapOn { get; set; } = Environment.GetEnvironmentVariable("SM2_VFX_TONEMAP") != "exp";
+  /// <summary>
+  ///   mtl1-23: sfx meshes blend One/One (alpha Zero/One) as in plasma 101917 (CB_DYNAMIC_SFX draws) instead of premultiplied
+  ///   over. SM2_VFX_SFX_ADD=0 restores the premultiplied blend.
+  /// </summary>
+  public static bool SfxAdditive { get; set; } = Environment.GetEnvironmentVariable("SM2_VFX_SFX_ADD") != "0";
+  /// <summary>
+  ///   k of the SFX exposure compensation lerp(1, avgLum, k) (plasma PS s33060; k = sfx[560].w, td field not traced: HEURISTIC 1).
+  ///   SM2_VFX_SFX_LUM_K overrides.
+  /// </summary>
+  public static float SfxLumK { get; set; } =
+    float.TryParse(Environment.GetEnvironmentVariable("SM2_VFX_SFX_LUM_K"), System.Globalization.CultureInfo.InvariantCulture, out var lk) ? lk : 1f;
+  /// <summary>Bench exposure treated as average luminance 1 for <see cref="SfxExposure"/> (the EffectLayer default).</summary>
+  public const float ReferenceExposure = 1f / 250f;
   public static float BloomGain { get; set; } = float.TryParse(Environment.GetEnvironmentVariable("SM2_VFX_BLOOM_GAIN"), System.Globalization.CultureInfo.InvariantCulture, out var bg) ? bg : 0.01f;
   public static bool ContrastEnabled { get; set; } = Environment.GetEnvironmentVariable("SM2_VFX_CONTRAST") == "1";
   private readonly Dictionary<string, (uint Vao, uint Vbo, uint Ibo)?> _meshes = new(StringComparer.OrdinalIgnoreCase);
@@ -104,9 +129,9 @@ internal sealed unsafe class EffectRenderer : IDisposable
   public EffectRenderer(GL gl, string header)
   {
     _gl = gl;
-    _sprite = Link(header + SpriteVs, header + SpriteFs);
+    _sprite = Link(header + SpriteVs, header + CaptureTonemapGlsl.Source + SpriteFs);
     _ground = Link(header + GroundVs, header + GroundFs);
-    _mesh = Link(header + MeshVs, header + MeshFs);
+    _mesh = Link(header + MeshVs, header + CaptureTonemapGlsl.Source + MeshFs);
     _distort = Link(header + SpriteVs, header + DistortFs);
     _cover = Link(header + CoverVs, header + CoverFs);
     _vao = gl.GenVertexArray();
@@ -291,6 +316,7 @@ internal sealed unsafe class EffectRenderer : IDisposable
     _gl.Uniform1(_gl.GetUniformLocation(_sprite, "uMask"), 1);
     var hasMaskLoc = _gl.GetUniformLocation(_sprite, "uHasMask");
     _gl.Uniform1(_gl.GetUniformLocation(_sprite, "uExposure"), layer.Exposure);
+    _gl.Uniform1(_gl.GetUniformLocation(_sprite, "uTonemap"), CaptureTonemapOn ? 1 : 0);
     _gl.Uniform1(_gl.GetUniformLocation(_sprite, "uGround"), layer.Ground ? 1 : 0);
     _gl.Uniform1(_gl.GetUniformLocation(_sprite, "uGroundY"), layer.GroundY);
     var modeLoc = _gl.GetUniformLocation(_sprite, "uMode");
@@ -302,6 +328,7 @@ internal sealed unsafe class EffectRenderer : IDisposable
     var selfLoc = _gl.GetUniformLocation(_sprite, "uHasSelf");
     var selfPowLoc = _gl.GetUniformLocation(_sprite, "uSelfPow");
     var selfScrollLoc = _gl.GetUniformLocation(_sprite, "uSelfScroll");
+    var selfKLoc = _gl.GetUniformLocation(_sprite, "uSelfK");
     _gl.Uniform1(_gl.GetUniformLocation(_sprite, "uSelfTex"), 3);
     _gl.Uniform1(_gl.GetUniformLocation(_sprite, "uTintExact"), TintExact ? 1 : 0);
     _gl.Enable(EnableCap.DepthTest);
@@ -330,7 +357,8 @@ internal sealed unsafe class EffectRenderer : IDisposable
       _gl.Uniform1(selfLoc, self != 0 ? 1 : 0);
       if (self != 0)
       {
-        _gl.Uniform1(selfPowLoc, batch.Emitter.SelfDistortPower.Sample(0.5f, 0.5f) * SelfDistortK);
+        _gl.Uniform1(selfPowLoc, batch.Emitter.SelfDistortPower.Sample(0.5f, 0.5f));
+        _gl.Uniform2(selfKLoc, SelfDistortK, DistortionRules.MaxShift);
         var scroll = batch.Emitter.SelfDistortSpeed * layer.Time;
         _gl.Uniform2(selfScrollLoc, scroll.X - MathF.Floor(scroll.X), scroll.Y - MathF.Floor(scroll.Y));
       }
@@ -452,7 +480,10 @@ internal sealed unsafe class EffectRenderer : IDisposable
     _gl.UseProgram(_mesh);
     SetMatrix(_mesh, "uVP", vp);
     _gl.Uniform1(_gl.GetUniformLocation(_mesh, "uTex"), 0);
-    _gl.Uniform1(_gl.GetUniformLocation(_mesh, "uExposure"), layer.Exposure);
+    // mtl1-23: sfx (translucent) emissive is exposure-compensated, lerp(1, avgLum, k) (plasma PS s33060, SfxExposure).
+    _gl.Uniform1(_gl.GetUniformLocation(_mesh, "uExposure"), translucent ? SfxExposure.Exposure(layer.Exposure, ReferenceExposure, SfxLumK) : layer.Exposure);
+    _gl.Uniform1(_gl.GetUniformLocation(_mesh, "uTonemap"), CaptureTonemapOn ? 1 : 0);
+    _gl.Uniform1(_gl.GetUniformLocation(_mesh, "uSfxAdd"), translucent && SfxAdditive ? 1 : 0);
     _gl.Uniform3(_gl.GetUniformLocation(_mesh, "uEye"), eye.X, eye.Y, eye.Z);
     _gl.Uniform1(_gl.GetUniformLocation(_mesh, "uLightCount"), lights.Length);
     for (var i = 0; i < lights.Length; i++)
@@ -485,7 +516,11 @@ internal sealed unsafe class EffectRenderer : IDisposable
     if (translucent)
     {
       _gl.Enable(EnableCap.Blend);
-      _gl.BlendFuncSeparate(BlendingFactor.One, BlendingFactor.OneMinusSrcAlpha, BlendingFactor.One, BlendingFactor.OneMinusSrcAlpha);
+      // mtl1-23: VfxBlendRules.For(SfxMesh) = One/One, alpha Zero/One (plasma 101917 CB_DYNAMIC_SFX draws).
+      if (SfxAdditive)
+        _gl.BlendFuncSeparate(BlendingFactor.One, BlendingFactor.One, BlendingFactor.Zero, BlendingFactor.One);
+      else
+        _gl.BlendFuncSeparate(BlendingFactor.One, BlendingFactor.OneMinusSrcAlpha, BlendingFactor.One, BlendingFactor.OneMinusSrcAlpha);
     }
     else _gl.Disable(EnableCap.Blend);
 
@@ -612,17 +647,20 @@ internal sealed unsafe class EffectRenderer : IDisposable
     uniform int uHasSelf;
     uniform float uSelfPow;
     uniform vec2 uSelfScroll;
+    uniform vec2 uSelfK;
     out vec4 outColor;
     vec3 toGamma(vec3 c) { return mix(c * 12.92, 1.055 * pow(c, vec3(1.0 / 2.4)) - 0.055, step(0.0031308, c)); }
     vec2 SpriteUv()
     {
       if (uHasSelf == 0) return vUv;
-      // SELF_DISTORTION (HEURISTIC, the GPU shader is not REA'd): the sdr normal map, scrolled by its tcIn speed over the
-      // quad UV, offsets the sprite's own lookup by (RG*2-1)*power*SelfDistortK in quad units, converted to atlas-frame units
-      // (power is 0.5..1 in data, so the engine scale must be small; SelfDistortK like the refraction DistortionStrength).
-      vec2 n = texture(uSelfTex, vMask + uSelfScroll).rg * 2.0 - 1.0;
+      // SELF_DISTORTION: the sdr normal map, scrolled by its tcIn speed over the quad UV, offsets the sprite's own lookup.
+      // mtl1-23: capture distortion formula (DistortionRules, PS 4996/5160): off = (RG*2-1)*power, shift =
+      // clamp(0.08*sat(10|off|)*off, +-0.02) in quad units (HEURISTIC: quad space), converted to atlas-frame units.
+      vec2 off = (texture(uSelfTex, vMask + uSelfScroll).rg * 2.0 - 1.0) * uSelfPow;
+      float m = clamp(10.0 * (abs(off.x) + abs(off.y)), 0.0, 1.0);
+      vec2 shift = clamp(off * m * uSelfK.x, vec2(-uSelfK.y), vec2(uSelfK.y));
       float k = clamp(length(dFdx(vUv)) / max(length(dFdx(vMask)), 1e-6), 0.0, 4.0);
-      return vUv + n * uSelfPow * k;
+      return vUv + shift * k;
     }
 
     void main()
@@ -647,7 +685,7 @@ internal sealed unsafe class EffectRenderer : IDisposable
         tex *= 1.0 + uContrast * clamp(1.0 - length(uKey - tex), 0.0, 1.0); // additionalContrast (particles.sdc 00114_2)
         hdr = vColor.rgb * tex;
       }
-      vec3 c = toGamma(vec3(1.0) - exp(-hdr * uExposure));
+      vec3 c = toGamma(sm2Tonemap(hdr * uExposure));
       float alpha = clamp(vColor.a, 0.0, 1.0) * a;
       if (uHdrPremul == 1 && uMode != 1)
       {
@@ -657,7 +695,7 @@ internal sealed unsafe class EffectRenderer : IDisposable
         float va = clamp(vColor.a, 0.0, 1.0);
         float k = uBlendRea == 1 ? va * (uAlphaMul == 1 ? a : 1.0) : (uMode == 2 ? a : alpha);
         float ao = uBlendRea == 1 ? va * a : alpha;
-        outColor = vec4(toGamma(vec3(1.0) - exp(-hdr * uExposure * k)), ao);
+        outColor = vec4(toGamma(sm2Tonemap(hdr * uExposure * k)), ao);
       }
       else if (uBlendRea == 1 && uClipExact == 1)
       {
@@ -701,15 +739,17 @@ internal sealed unsafe class EffectRenderer : IDisposable
       vec2 q = vMask * 2.0 - 1.0;                       // quad-space -1..1 (unrotated by the mask angle is fine: radial)
       float edge = 1.0 - smoothstep(0.6, 1.0, length(q));
       float k = vColor.r * clamp(vColor.a, 0.0, 1.0) * edge;
-      vec2 offset = (n.rg * 2.0 - 1.0) * uStrength * k;
+      vec2 offset = clamp((n.rg * 2.0 - 1.0) * uStrength * k, vec2(-0.02), vec2(0.02)); // +-0.02: capture DUDV range (PS 5160)
       float a = clamp(k * 4.0, 0.0, 1.0);
       if (uExact == 1)
       {
         // vfx3z: particles.sdc 00005_1 (vfxsh_glsl/pc): o = (tex.rg*2.007874-1.007874) * TEXCOORD.w (per-vertex scalar);
         // mask = sat(10*(|o.x|+|o.y|)); buffer = mask*(o*2+0.5), w = mask. No radial edge fade in the shader.
+        // mtl1-23 capture (plasma PS 4996 -> post PS 5160 uv += dudv*0.04-0.02, gated by w): shift = 0.08*mask*o, max 0.02.
         vec2 o = (n.rg * 2.007874 - 1.007874) * vColor.r * clamp(vColor.a, 0.0, 1.0);
-        a = clamp(10.0 * (abs(o.x) + abs(o.y)), 0.0, 1.0);
-        offset = o * uStrength;
+        float mask = clamp(10.0 * (abs(o.x) + abs(o.y)), 0.0, 1.0);
+        offset = clamp(o * mask * uStrength, vec2(-0.02), vec2(0.02));
+        a = mask > 0.0 ? 1.0 : 0.0;
       }
       vec2 uv = gl_FragCoord.xy * uInvSize;
       vec3 c = texture(uScene, clamp(uv + offset, vec2(0.0), vec2(1.0))).rgb;
@@ -787,6 +827,7 @@ internal sealed unsafe class EffectRenderer : IDisposable
     uniform int uBloomPass;
     uniform float uBloomW;
     uniform int uTranslucent;
+    uniform int uSfxAdd;
     uniform float uExposure;
     uniform float uSurfLight;
     uniform vec3 uEye;
@@ -814,11 +855,12 @@ internal sealed unsafe class EffectRenderer : IDisposable
       }
       // emissive glow only for sfx (translucent) materials; lit combine_material shaders (blood splash) stay surface-lit
       vec3 hdr = base * light + base * uEmissive * (uTranslucent == 1 ? 25.0 : 0.0);
-      // Hue-preserving tonemap: per-channel 1-exp() turns saturated surfaces (blood red) orange/white under the key light.
+      // Hue-preserving tonemap: per-channel curves turn saturated surfaces (blood red) orange/white under the key light.
+      // mtl1-23: the curve is the capture CB_PASS_HDR one (sm2TonemapLum, CaptureTonemap) applied to luminance.
       float lum = max(dot(hdr, vec3(0.2126, 0.7152, 0.0722)) * uExposure, 1e-5);
-      vec3 c = toGamma(min(hdr * uExposure * ((1.0 - exp(-lum)) / lum), vec3(1.0)));
+      vec3 c = toGamma(min(hdr * uExposure * (sm2TonemapLum(lum) / lum), vec3(1.0)));
       if (uBloomPass == 1) { outColor = uTranslucent == 1 ? vec4(c * a * uBloomW, 0.0) : vec4(c * uBloomW, 1.0); return; }
-      if (uTranslucent == 1) outColor = vec4(c * a, a);
+      if (uTranslucent == 1) outColor = vec4(c * a, uSfxAdd == 1 ? 0.0 : a);
       else outColor = vec4(c, 1.0);
     }
     """;
