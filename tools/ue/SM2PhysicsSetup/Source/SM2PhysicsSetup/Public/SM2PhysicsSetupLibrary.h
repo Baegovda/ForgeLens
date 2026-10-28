@@ -77,4 +77,9 @@ public:
   // than ThresholdCm along the nearest body vertex normal, ignoring particles farther than MaxDistCm from any body vertex.
   UFUNCTION(BlueprintCallable, Category = "SM2")
   static int32 MeasureClothSkinPenetration(USkeletalMeshComponent* Comp, float ThresholdCm, float MaxDistCm, FString& Report);
+
+  // mtl1-33 (HEURISTIC): free particles whose path from the animated (skinned) position to the simulated position passes more
+  // than ThresholdCm behind the body surface while both ends are outside = cloth on the wrong side of a limb.
+  UFUNCTION(BlueprintCallable, Category = "SM2")
+  static int32 MeasureClothWrongSide(USkeletalMeshComponent* Comp, float ThresholdCm, float MaxDistCm, FString& Report);
 };

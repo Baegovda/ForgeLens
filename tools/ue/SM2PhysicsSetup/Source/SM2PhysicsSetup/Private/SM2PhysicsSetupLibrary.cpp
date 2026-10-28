@@ -440,11 +440,67 @@ int32 AddCollision(UPhysicsAsset* PA, const TSharedPtr<FJsonObject>& Coll, const
   FString Space;
   Coll->TryGetStringField(TEXT("space"), Space);
   const bool bMirror = Space == TEXT("ueMesh"); // un-negate extractor-mirrored offsets -> raw bone-local
-  int32 N = 0, Missing = 0;
-  auto BoneCS = [&](const FString& B, FTransform& Out) {
-    const int32 I = RS.FindBoneIndex(FName(*B));
-    if (I == INDEX_NONE) { ++Missing; return false; }
+  int32 N = 0, Missing = 0, Remapped = 0, BoxRestInside = 0;
+  // mtl1-33: generic missing-bone handling. Shared CDT shapes are defined per prop and can name bones the model does not
+  // have (calgar: box on Backpack_CDT_L). Rule (HEURISTIC, sidecar collision.missingBoneRemap=false -> skip only):
+  // split names into lower-case tokens at '_' / case changes are NOT split; side tokens l/r/left/right and "cdt" are qualifiers,
+  // the rest are core tokens. A candidate bone must contain every core token and no opposite side; score +1 for a matching
+  // "cdt" qualifier, +1 for a matching side. The unique best candidate is used, ties or no candidate -> the shape is skipped.
+  // Every remap and skip is logged by shape name.
+  bool bRemap = true;
+  Coll->TryGetBoolField(TEXT("missingBoneRemap"), bRemap);
+  TArray<FString> MissLog, RemapLog;
+  auto Tok = [](const FString& S) { TArray<FString> T; S.ToLower().ParseIntoArray(T, TEXT("_"), true); return T; };
+  auto IsSide = [](const FString& T) { return T == TEXT("l") || T == TEXT("r") || T == TEXT("left") || T == TEXT("right"); };
+  auto SideOf = [&](const TArray<FString>& T) { for (const FString& X : T) if (IsSide(X)) return X.Left(1); return FString(); };
+  auto Resolve = [&](const FString& B, const FString& Shape) -> int32 {
+    const int32 I = RS.FindBoneIndex(FName(*B)); // FName compare is case-insensitive
+    if (I != INDEX_NONE) return I;
+    ++Missing;
+    int32 Best = INDEX_NONE, BestScore = -1, Ties = 0;
+    if (bRemap)
+    {
+      const TArray<FString> MT = Tok(B);
+      const FString MS = SideOf(MT);
+      const bool MC = MT.Contains(TEXT("cdt"));
+      TArray<FString> Core;
+      for (const FString& X : MT) if (!IsSide(X) && X != TEXT("cdt")) Core.Add(X);
+      for (int32 K = 0; K < RS.GetRawBoneNum() && Core.Num() > 0; ++K)
+      {
+        const TArray<FString> CT = Tok(RS.GetBoneName(K).ToString());
+        bool Ok = true;
+        for (const FString& X : Core) Ok &= CT.Contains(X);
+        const FString CSd = SideOf(CT);
+        if (!Ok || (!MS.IsEmpty() && !CSd.IsEmpty() && CSd != MS)) continue;
+        const int32 Sc = (CT.Contains(TEXT("cdt")) == MC ? 1 : 0) + (CSd == MS ? 1 : 0);
+        if (Sc > BestScore) { BestScore = Sc; Best = K; Ties = 0; }
+        else if (Sc == BestScore) ++Ties;
+      }
+    }
+    if (Best != INDEX_NONE && Ties == 0)
+    {
+      ++Remapped;
+      RemapLog.AddUnique(FString::Printf(TEXT("%s:%s->%s"), *Shape, *B, *RS.GetBoneName(Best).ToString()));
+      return Best;
+    }
+    MissLog.AddUnique(FString::Printf(TEXT("%s:%s%s"), *Shape, *B, Ties ? TEXT("(ambiguous)") : TEXT("")));
+    return INDEX_NONE;
+  };
+  // mtl1-33 (UE evidence, calgar): Backpack_CDT_L -> powerplant_backpack_cdt put the 52x60x100 cm box around 114 free rest
+  // particles of the cloak (own-collider penetration 0 -> 204, worst 12.7 cm). A remapped shape that still holds free rest
+  // particles (box: any inside; capsule/sphere: rest fit hit the 0.25 floor) is therefore dropped and logged.
+  int32 Rejected = 0;
+  auto RejectRemap = [&](const FString& B, const FName& Name, const FString& Shape, bool bBad) {
+    if (!bBad || Name == FName(*B)) return false;
+    ++Rejected;
+    MissLog.AddUnique(FString::Printf(TEXT("%s:%s(remap->%s rejected: rest particles inside)"), *Shape, *B, *Name.ToString()));
+    return true;
+  };
+  auto BoneCS = [&](const FString& B, const FString& Shape, FTransform& Out, FName& Name) {
+    const int32 I = Resolve(B, Shape);
+    if (I == INDEX_NONE) return false;
     Out = CS[I];
+    Name = RS.GetBoneName(I);
     return true;
   };
   const TArray<TSharedPtr<FJsonValue>>* Arr = nullptr;
@@ -454,19 +510,25 @@ int32 AddCollision(UPhysicsAsset* PA, const TSharedPtr<FJsonObject>& Coll, const
       const TSharedPtr<FJsonObject> K = V->AsObject();
       const FString B1 = K->GetStringField(TEXT("BoneFirst")), B2 = K->GetStringField(TEXT("BoneSecond"));
       FTransform T1, T2;
-      if (!BoneCS(B1, T1)) continue;
+      FName N1, N2;
+      FString SN = K->HasField(TEXT("Name")) ? K->GetStringField(TEXT("Name")) : B1;
+      if (!BoneCS(B1, SN, T1, N1)) continue;
       const FVector P1 = JVec(K, TEXT("offsetFirstCm"), bMirror);
       FVector P2 = P1;
-      if (!B2.IsEmpty() && BoneCS(B2, T2))
+      if (!B2.IsEmpty())
+      {
+        if (!BoneCS(B2, SN, T2, N2)) continue; // mtl1-33: skip instead of collapsing to a sphere at the first bone
         P2 = T1.InverseTransformPosition(T2.TransformPosition(JVec(K, TEXT("offsetSecondCm"), bMirror)));
+      }
       float R1 = (float)K->GetNumberField(TEXT("radiusFirstCm")), R2 = (float)K->GetNumberField(TEXT("radiusSecondCm"));
       {
         const float S = FitScale(T1.TransformPosition(P1), T1.TransformPosition(P2), R1, R2);
+        if (RejectRemap(B1, N1, SN, S <= 0.2501f) || (!B2.IsEmpty() && RejectRemap(B2, N2, SN, S <= 0.2501f))) continue;
         if (S < 0.999f) { ++Fitted; MinScale = FMath::Min(MinScale, S); R1 *= S; R2 *= S; }
       }
       const FVector Axis = P2 - P1;
       const float Len = Axis.Size();
-      USkeletalBodySetup* Body = CollBody(PA, FName(*B1));
+      USkeletalBodySetup* Body = CollBody(PA, N1);
       const FQuat Rot = Len > KINDA_SMALL_NUMBER ? FQuat::FindBetweenNormals(FVector::UpVector, Axis / Len) : FQuat::Identity;
       if (Len <= KINDA_SMALL_NUMBER)
       {
@@ -495,13 +557,16 @@ int32 AddCollision(UPhysicsAsset* PA, const TSharedPtr<FJsonObject>& Coll, const
     {
       const TSharedPtr<FJsonObject> K = V->AsObject();
       FTransform T;
-      if (!BoneCS(K->GetStringField(TEXT("Bone")), T)) continue;
+      FName BN;
+      if (!BoneCS(K->GetStringField(TEXT("Bone")), K->HasField(TEXT("Name")) ? K->GetStringField(TEXT("Name")) : K->GetStringField(TEXT("Bone")), T, BN)) continue;
       float Rs = (float)K->GetNumberField(TEXT("radiusCm"));
       const FVector C = JVec(K, TEXT("offsetCm"), bMirror);
-      { const float S = FitScale(T.TransformPosition(C), T.TransformPosition(C), Rs, Rs); if (S < 0.999f) { ++Fitted; MinScale = FMath::Min(MinScale, S); Rs *= S; } }
+      { const float S = FitScale(T.TransformPosition(C), T.TransformPosition(C), Rs, Rs);
+        if (RejectRemap(K->GetStringField(TEXT("Bone")), BN, K->HasField(TEXT("Name")) ? K->GetStringField(TEXT("Name")) : BN.ToString(), S <= 0.2501f)) continue;
+        if (S < 0.999f) { ++Fitted; MinScale = FMath::Min(MinScale, S); Rs *= S; } }
       FKSphereElem E(Rs);
       E.Center = C;
-      CollBody(PA, FName(*K->GetStringField(TEXT("Bone"))))->AggGeom.SphereElems.Add(E);
+      CollBody(PA, BN)->AggGeom.SphereElems.Add(E);
       ++N;
     }
   if (Coll->TryGetArrayField(TEXT("boxes"), Arr))
@@ -509,14 +574,27 @@ int32 AddCollision(UPhysicsAsset* PA, const TSharedPtr<FJsonObject>& Coll, const
     {
       const TSharedPtr<FJsonObject> K = V->AsObject();
       FTransform T;
-      if (!BoneCS(K->GetStringField(TEXT("Bone")), T)) continue;
+      FName BN;
+      if (!BoneCS(K->GetStringField(TEXT("Bone")), K->HasField(TEXT("Name")) ? K->GetStringField(TEXT("Name")) : K->GetStringField(TEXT("Bone")), T, BN)) continue;
       const FVector Sz = JVec(K, TEXT("sizeCm"), false);
       FKBoxElem E(Sz.X, Sz.Y, Sz.Z);
       E.Center = JVec(K, TEXT("offsetCm"), bMirror);
-      CollBody(PA, FName(*K->GetStringField(TEXT("Bone"))))->AggGeom.BoxElems.Add(E);
+      int32 In = 0;
+      if (RestPV) // mtl1-33: boxes are not rest-fitted; count free rest particles that start inside (logged)
+        for (int32 I = 0; I < RestPV->Num(); ++I)
+        {
+          if (RestMaxDist && RestMaxDist->IsValidIndex(I) && (*RestMaxDist)[I] <= 0.1f) continue;
+          const FVector Q = (T.InverseTransformPosition(FVector((*RestPV)[I])) - E.Center).GetAbs() - FVector(Sz.X, Sz.Y, Sz.Z) * 0.5;
+          In += (Q.X < 0 && Q.Y < 0 && Q.Z < 0) ? 1 : 0;
+        }
+      if (RejectRemap(K->GetStringField(TEXT("Bone")), BN, K->HasField(TEXT("Name")) ? K->GetStringField(TEXT("Name")) : BN.ToString(), In > 0)) continue;
+      BoxRestInside += In;
+      CollBody(PA, BN)->AggGeom.BoxElems.Add(E);
       ++N;
     }
-  Log.Add(FString::Printf(TEXT("%s: collision shapes=%d missingBones=%d unnegated=%d restFitted=%d minRadiusScale=%.2f"), *Who, N, Missing, bMirror ? 1 : 0, Fitted, MinScale));
+  Log.Add(FString::Printf(TEXT("%s: collision shapes=%d missingBones=%d remapped=%d remapRejected=%d unnegated=%d restFitted=%d minRadiusScale=%.2f boxRestInside=%d"), *Who, N, Missing, Remapped, Rejected, bMirror ? 1 : 0, Fitted, MinScale, BoxRestInside));
+  if (RemapLog.Num()) Log.Add(FString::Printf(TEXT("%s: collision remap (HEURISTIC) %s"), *Who, *FString::Join(RemapLog, TEXT(" "))));
+  if (MissLog.Num()) Log.Add(FString::Printf(TEXT("%s: collision skipped (bone not in mesh) %s"), *Who, *FString::Join(MissLog, TEXT(" "))));
   return N;
 }
 
@@ -1355,11 +1433,122 @@ int32 USM2PhysicsSetupLibrary::MeasureClothPenetration(USkeletalMeshComponent* C
   return Inside;
 }
 
+// mtl1-33: shared body-skin helpers (HEURISTIC). Body = imported-model LOD0 sections that are enabled, carry no clothing data and
+// whose material is not a cloth/disabled section's; linear-blend CPU skinning with the component's current bone transforms;
+// a uniform hash grid (cell = MaxDistCm) makes the nearest-vertex query exact within MaxDistCm.
+namespace SM2Skin
+{
+  FMatrix Blend(const TArray<FTransform>& CS, const TArray<FMatrix44f>& Inv, const int32* Bones, const float* W, int32 Num)
+  {
+    FMatrix M(ForceInitToZero);
+    float Wsum = 0.f;
+    for (int32 K = 0; K < Num; ++K)
+    {
+      const int32 B = Bones[K];
+      if (W[K] <= 0.f || !CS.IsValidIndex(B) || !Inv.IsValidIndex(B)) continue;
+      M += (FMatrix(Inv[B]) * CS[B].ToMatrixWithScale()) * W[K];
+      Wsum += W[K];
+    }
+    if (Wsum <= 0.f) return FMatrix::Identity;
+    M *= 1.0f / Wsum;
+    return M;
+  }
+  struct FBody
+  {
+    TArray<FVector> P, N;
+    TArray<int32> Sec;
+    TMap<FIntVector, TArray<int32>> Grid;
+    float Cell = 10.f;
+    FIntVector Key(const FVector& Q) const { return FIntVector(FMath::FloorToInt(Q.X / Cell), FMath::FloorToInt(Q.Y / Cell), FMath::FloorToInt(Q.Z / Cell)); }
+    int32 Nearest(const FVector& Q, double MaxD2) const
+    {
+      const FIntVector K0 = Key(Q);
+      int32 Best = INDEX_NONE;
+      double BestD2 = MaxD2;
+      for (int32 X = -1; X <= 1; ++X) for (int32 Y = -1; Y <= 1; ++Y) for (int32 Z = -1; Z <= 1; ++Z)
+        if (const TArray<int32>* C = Grid.Find(K0 + FIntVector(X, Y, Z)))
+          for (int32 I : *C)
+          {
+            const double D2 = FVector::DistSquared(Q, P[I]);
+            if (D2 < BestD2) { BestD2 = D2; Best = I; }
+          }
+      return Best;
+    }
+    // depth behind the surface (positive = inside) of the nearest vertex, or -1e9 when none within MaxDist
+    float Depth(const FVector& Q, double MaxD2, int32* Hit = nullptr) const
+    {
+      const int32 I = Nearest(Q, MaxD2);
+      if (Hit) *Hit = I;
+      return I == INDEX_NONE ? -1e9f : -(float)FVector::DotProduct(Q - P[I], N[I]);
+    }
+  };
+  void Build(USkeletalMeshComponent* Comp, const FSkeletalMeshLODModel& L, float Cell, FBody& Out)
+  {
+    USkeletalMesh* Mesh = Comp->GetSkeletalMeshAsset();
+    const TArray<FTransform>& CS = Comp->GetComponentSpaceTransforms();
+    const TArray<FMatrix44f>& Inv = Mesh->GetRefBasesInvMatrix();
+    Out.Cell = FMath::Max(Cell, 1.0f);
+    TSet<int32> ClothMats;
+    for (const FSkelMeshSection& S : L.Sections)
+      if (S.HasClothingData() || S.bDisabled) ClothMats.Add(S.MaterialIndex);
+    for (int32 Si = 0; Si < L.Sections.Num(); ++Si)
+    {
+      const FSkelMeshSection& S = L.Sections[Si];
+      if (S.bDisabled || S.HasClothingData() || ClothMats.Contains(S.MaterialIndex)) continue;
+      for (const FSoftSkinVertex& V : S.SoftVertices)
+      {
+        int32 Bs[MAX_TOTAL_INFLUENCES]; float Ws[MAX_TOTAL_INFLUENCES];
+        int32 Nb = 0;
+        for (int32 K = 0; K < MAX_TOTAL_INFLUENCES; ++K)
+          if (V.InfluenceWeights[K] > 0 && S.BoneMap.IsValidIndex(V.InfluenceBones[K])) { Bs[Nb] = S.BoneMap[V.InfluenceBones[K]]; Ws[Nb++] = V.InfluenceWeights[K] / 65535.f; }
+        if (Nb == 0) continue;
+        const FMatrix M = Blend(CS, Inv, Bs, Ws, Nb);
+        const FVector P = M.TransformPosition(FVector(V.Position));
+        Out.Grid.FindOrAdd(Out.Key(P)).Add(Out.P.Num());
+        Out.P.Add(P);
+        Out.N.Add(M.TransformVector(FVector(V.TangentZ.X, V.TangentZ.Y, V.TangentZ.Z)).GetSafeNormal());
+        Out.Sec.Add(Si);
+      }
+    }
+  }
+  // component-space sim positions of one clothing data entry (same space pick as MeasureClothPenetration)
+  void SimPositions(USkeletalMeshComponent* Comp, const FClothSimulData& D, TArray<FVector>& Out)
+  {
+    const FTransform CompTM = Comp->GetComponentTransform();
+    FVector CA(0), CB(0);
+    for (const FVector3f& P : D.Positions) { CA += D.Transform.TransformPosition(FVector(P)); CB += CompTM.TransformPosition(FVector(P)); }
+    CA /= FMath::Max(1, D.Positions.Num()); CB /= FMath::Max(1, D.Positions.Num());
+    const bool bUseA = FVector::Dist(CA, Comp->Bounds.Origin) <= FVector::Dist(CB, Comp->Bounds.Origin);
+    Out.SetNum(D.Positions.Num());
+    for (int32 I = 0; I < D.Positions.Num(); ++I)
+      Out[I] = D.Positions[I].ContainsNaN() ? FVector(std::numeric_limits<double>::quiet_NaN()) : CompTM.InverseTransformPosition(bUseA ? D.Transform.TransformPosition(FVector(D.Positions[I])) : CompTM.TransformPosition(FVector(D.Positions[I])));
+  }
+  FString TopSlots(USkeletalMesh* Mesh, const FSkeletalMeshLODModel& L, TMap<int32, int32>& PerSec)
+  {
+    PerSec.ValueSort([](int32 A, int32 B) { return A > B; });
+    FString Top;
+    int32 N = 0;
+    for (const auto& KV : PerSec)
+    {
+      if (N++ == 3) break;
+      const int32 Mi = L.Sections[KV.Key].MaterialIndex;
+      Top += FString::Printf(TEXT(" %s:%d"), Mesh->GetMaterials().IsValidIndex(Mi) ? *Mesh->GetMaterials()[Mi].MaterialSlotName.ToString() : TEXT("?"), KV.Value);
+    }
+    return Top;
+  }
+  FString PerCloth(const TArray<UClothingAssetBase*>& CAs, const TMap<int32, int32>& M)
+  {
+    FString PC;
+    for (const auto& KV : M)
+      PC += FString::Printf(TEXT(" %s:%d"), CAs.IsValidIndex(KV.Key) && CAs[KV.Key] ? *CAs[KV.Key]->GetName() : TEXT("?"), KV.Value);
+    return PC;
+  }
+}
+
 int32 USM2PhysicsSetupLibrary::MeasureClothSkinPenetration(USkeletalMeshComponent* Comp, float ThresholdCm, float MaxDistCm, FString& Report)
 {
-  // HEURISTIC metric (mtl1-32): body = imported-model LOD0 sections that are enabled, carry no clothing data and whose slot is
-  // not a cloth slot; linear-blend CPU skinning with the component's current bone transforms. A particle counts as inside when
-  // dot(P - V, N) < -ThresholdCm for its nearest body vertex V (normal N) within MaxDistCm.
+  // HEURISTIC metric (mtl1-32): a free particle counts as inside when dot(P - V, N) < -ThresholdCm for its nearest body vertex V
+  // (normal N) within MaxDistCm. mtl1-33: same numbers, now via the SM2Skin grid.
   USkeletalMesh* Mesh = Comp ? Comp->GetSkeletalMeshAsset() : nullptr;
   if (!Mesh || !Mesh->GetImportedModel() || Mesh->GetImportedModel()->LODModels.Num() == 0)
   {
@@ -1367,37 +1556,8 @@ int32 USM2PhysicsSetupLibrary::MeasureClothSkinPenetration(USkeletalMeshComponen
     return -1;
   }
   const FSkeletalMeshLODModel& L = Mesh->GetImportedModel()->LODModels[0];
-  const TArray<FTransform>& CS = Comp->GetComponentSpaceTransforms();
-  const TArray<FMatrix44f>& Inv = Mesh->GetRefBasesInvMatrix();
-  TSet<int32> ClothMats;
-  for (const FSkelMeshSection& S : L.Sections)
-    if (S.HasClothingData() || S.bDisabled) ClothMats.Add(S.MaterialIndex);
-  TArray<FVector> BP, BN;
-  TArray<int32> BSec;
-  for (int32 Si = 0; Si < L.Sections.Num(); ++Si)
-  {
-    const FSkelMeshSection& S = L.Sections[Si];
-    if (S.bDisabled || S.HasClothingData() || ClothMats.Contains(S.MaterialIndex)) continue;
-    for (const FSoftSkinVertex& V : S.SoftVertices)
-    {
-      FMatrix M(ForceInitToZero);
-      float Wsum = 0.f;
-      for (int32 K = 0; K < MAX_TOTAL_INFLUENCES; ++K)
-      {
-        const float Wt = V.InfluenceWeights[K] / 65535.f;
-        if (Wt <= 0.f || !S.BoneMap.IsValidIndex(V.InfluenceBones[K])) continue;
-        const int32 B = S.BoneMap[V.InfluenceBones[K]];
-        if (!CS.IsValidIndex(B) || !Inv.IsValidIndex(B)) continue;
-        M += (FMatrix(Inv[B]) * CS[B].ToMatrixWithScale()) * Wt;
-        Wsum += Wt;
-      }
-      if (Wsum <= 0.f) continue;
-      M *= 1.0f / Wsum;
-      BP.Add(M.TransformPosition(FVector(V.Position)));
-      BN.Add(M.TransformVector(FVector(V.TangentZ.X, V.TangentZ.Y, V.TangentZ.Z)).GetSafeNormal());
-      BSec.Add(Si);
-    }
-  }
+  SM2Skin::FBody Body;
+  SM2Skin::Build(Comp, L, MaxDistCm, Body);
   TMap<int32, const TArray<float>*> MaxD;
   const TArray<UClothingAssetBase*>& CAs = Mesh->GetMeshClothingAssets();
   for (int32 Ai = 0; Ai < CAs.Num(); ++Ai)
@@ -1405,65 +1565,110 @@ int32 USM2PhysicsSetupLibrary::MeasureClothSkinPenetration(USkeletalMeshComponen
       if (C->LodData.Num() > 0)
         if (const FPointWeightMap* Wm = C->LodData[0].PhysicalMeshData.FindWeightMap(EWeightMapTargetCommon::MaxDistance))
           MaxD.Add(Ai, &Wm->Values);
-  const FTransform CompTM = Comp->GetComponentTransform();
   const TMap<int32, FClothSimulData>& Data = Comp->GetCurrentClothingData_GameThread();
   int32 Total = 0, Free = 0, Near = 0, Inside = 0, InsidePinned = 0;
   float Worst = 0.f;
   TMap<int32, int32> PerSec, PerCloth;
-  const float MaxD2 = MaxDistCm * MaxDistCm;
+  const double MaxD2 = (double)MaxDistCm * MaxDistCm;
+  TArray<FVector> SP;
   for (const auto& KV : Data)
   {
-    const FClothSimulData& D = KV.Value;
-    if (D.Positions.Num() == 0) continue;
-    FVector CA(0), CB(0);
-    for (const FVector3f& P : D.Positions) { CA += D.Transform.TransformPosition(FVector(P)); CB += CompTM.TransformPosition(FVector(P)); }
-    CA /= D.Positions.Num(); CB /= D.Positions.Num();
-    const bool bUseA = FVector::Dist(CA, Comp->Bounds.Origin) <= FVector::Dist(CB, Comp->Bounds.Origin);
+    if (KV.Value.Positions.Num() == 0) continue;
+    SM2Skin::SimPositions(Comp, KV.Value, SP);
     const TArray<float>* const* MV = MaxD.Find(KV.Key);
-    for (int32 Pi = 0; Pi < D.Positions.Num(); ++Pi)
+    for (int32 Pi = 0; Pi < SP.Num(); ++Pi)
     {
-      const FVector3f& P3 = D.Positions[Pi];
       ++Total;
-      if (P3.ContainsNaN()) continue;
+      if (SP[Pi].ContainsNaN()) continue;
       const bool bPinned = MV && (*MV)->IsValidIndex(Pi) && (**MV)[Pi] < 0.1f;
       Free += !bPinned;
-      const FVector W = bUseA ? D.Transform.TransformPosition(FVector(P3)) : CompTM.TransformPosition(FVector(P3));
-      const FVector P = CompTM.InverseTransformPosition(W);
-      int32 Best = INDEX_NONE;
-      double BestD2 = MaxD2;
-      for (int32 I = 0; I < BP.Num(); ++I)
-      {
-        const double D2 = FVector::DistSquared(P, BP[I]);
-        if (D2 < BestD2) { BestD2 = D2; Best = I; }
-      }
-      if (Best == INDEX_NONE) continue;
+      int32 Hit = INDEX_NONE;
+      const float Depth = Body.Depth(SP[Pi], MaxD2, &Hit);
+      if (Hit == INDEX_NONE) continue;
       ++Near;
-      const float Depth = -(float)FVector::DotProduct(P - BP[Best], BN[Best]);
       if (Depth > ThresholdCm)
       {
         if (bPinned) { ++InsidePinned; continue; }
         ++Inside;
-        PerSec.FindOrAdd(BSec[Best])++;
+        PerSec.FindOrAdd(Body.Sec[Hit])++;
         PerCloth.FindOrAdd(KV.Key)++;
         Worst = FMath::Max(Worst, Depth);
       }
     }
   }
-  PerSec.ValueSort([](int32 A, int32 B) { return A > B; });
-  FString Top;
-  int32 N = 0;
-  for (const auto& KV : PerSec)
-  {
-    if (N++ == 3) break;
-    const int32 Mi = L.Sections[KV.Key].MaterialIndex;
-    Top += FString::Printf(TEXT(" %s:%d"), Mesh->GetMaterials().IsValidIndex(Mi) ? *Mesh->GetMaterials()[Mi].MaterialSlotName.ToString() : TEXT("?"), KV.Value);
-  }
-  FString PC;
-  for (const auto& KV : PerCloth)
-    PC += FString::Printf(TEXT(" %s:%d"), CAs.IsValidIndex(KV.Key) && CAs[KV.Key] ? *CAs[KV.Key]->GetName() : TEXT("?"), KV.Value);
   Report = FString::Printf(TEXT("particles=%d free=%d nearBody=%d skinInside>%.1fcm=%d (free) +%d pinned worstFreeCm=%.2f bodyVerts=%d top:%s cloth:%s"),
-    Total, Free, Near, ThresholdCm, Inside, InsidePinned, Worst, BP.Num(), *Top, *PC);
+    Total, Free, Near, ThresholdCm, Inside, InsidePinned, Worst, Body.P.Num(), *SM2Skin::TopSlots(Mesh, L, PerSec), *SM2Skin::PerCloth(CAs, PerCloth));
   return Inside;
+}
+
+int32 USM2PhysicsSetupLibrary::MeasureClothWrongSide(USkeletalMeshComponent* Comp, float ThresholdCm, float MaxDistCm, FString& Report)
+{
+  // HEURISTIC metric (mtl1-33): wrong side of a limb. For every free particle, A = its animated (skinned, unsimulated) position
+  // from the clothing asset's physical mesh and bone weights, P = its simulated position. When neither end is inside the body
+  // but a point on the segment A->P (1 cm steps) is more than ThresholdCm behind the body surface, the particle went AROUND or
+  // THROUGH a body part to get where it is (e.g. a skirt pulled behind a leg), which the per-point skin metric cannot see.
+  USkeletalMesh* Mesh = Comp ? Comp->GetSkeletalMeshAsset() : nullptr;
+  if (!Mesh || !Mesh->GetImportedModel() || Mesh->GetImportedModel()->LODModels.Num() == 0)
+  {
+    Report = TEXT("no mesh");
+    return -1;
+  }
+  const FSkeletalMeshLODModel& L = Mesh->GetImportedModel()->LODModels[0];
+  SM2Skin::FBody Body;
+  SM2Skin::Build(Comp, L, MaxDistCm, Body);
+  const TArray<FTransform>& CS = Comp->GetComponentSpaceTransforms();
+  const TArray<FMatrix44f>& Inv = Mesh->GetRefBasesInvMatrix();
+  const TArray<UClothingAssetBase*>& CAs = Mesh->GetMeshClothingAssets();
+  const TMap<int32, FClothSimulData>& Data = Comp->GetCurrentClothingData_GameThread();
+  const double MaxD2 = (double)MaxDistCm * MaxDistCm;
+  int32 Total = 0, Free = 0, Moved = 0, Wrong = 0, EndInside = 0, Mismatch = 0;
+  float MeanMove = 0.f, WorstMove = 0.f;
+  TMap<int32, int32> PerSec, PerCloth;
+  TArray<FVector> SP;
+  for (const auto& KV : Data)
+  {
+    UClothingAssetCommon* C = CAs.IsValidIndex(KV.Key) ? Cast<UClothingAssetCommon>(CAs[KV.Key]) : nullptr;
+    if (!C || C->LodData.Num() == 0 || KV.Value.Positions.Num() == 0) continue;
+    const FClothPhysicalMeshData& PM = C->LodData[0].PhysicalMeshData;
+    if (PM.Vertices.Num() != KV.Value.Positions.Num() || PM.BoneData.Num() != PM.Vertices.Num()) { ++Mismatch; continue; }
+    const FPointWeightMap* MV = PM.FindWeightMap(EWeightMapTargetCommon::MaxDistance);
+    SM2Skin::SimPositions(Comp, KV.Value, SP);
+    for (int32 Pi = 0; Pi < SP.Num(); ++Pi)
+    {
+      ++Total;
+      if (SP[Pi].ContainsNaN() || (MV && MV->Values.IsValidIndex(Pi) && MV->Values[Pi] < 0.1f)) continue;
+      ++Free;
+      const FClothVertBoneData& BD = PM.BoneData[Pi];
+      int32 Bs[MAX_TOTAL_INFLUENCES]; float Ws[MAX_TOTAL_INFLUENCES];
+      int32 Nb = 0;
+      for (int32 K = 0; K < FMath::Min(BD.NumInfluences, (int32)MAX_TOTAL_INFLUENCES); ++K)
+        if (C->UsedBoneIndices.IsValidIndex(BD.BoneIndices[K])) { Bs[Nb] = C->UsedBoneIndices[BD.BoneIndices[K]]; Ws[Nb++] = BD.BoneWeights[K]; }
+      if (Nb == 0) continue;
+      const FVector A = SM2Skin::Blend(CS, Inv, Bs, Ws, Nb).TransformPosition(FVector(PM.Vertices[Pi]));
+      const FVector& P = SP[Pi];
+      const float Len = (float)FVector::Dist(A, P);
+      MeanMove += Len;
+      WorstMove = FMath::Max(WorstMove, Len);
+      if (Len < 2.f * ThresholdCm) continue;
+      ++Moved;
+      if (Body.Depth(A, MaxD2) > ThresholdCm || Body.Depth(P, MaxD2) > ThresholdCm) { ++EndInside; continue; }
+      const int32 Steps = FMath::Clamp(FMath::CeilToInt(Len), 2, 300);
+      for (int32 St = 1; St < Steps; ++St)
+      {
+        int32 Hit = INDEX_NONE;
+        if (Body.Depth(FMath::Lerp(A, P, (double)St / Steps), MaxD2, &Hit) > ThresholdCm)
+        {
+          ++Wrong;
+          PerSec.FindOrAdd(Body.Sec[Hit])++;
+          PerCloth.FindOrAdd(KV.Key)++;
+          break;
+        }
+      }
+    }
+  }
+  Report = FString::Printf(TEXT("particles=%d free=%d moved>=%.1fcm=%d wrongSide=%d endInside=%d meanMoveCm=%.2f worstMoveCm=%.1f mismatch=%d top:%s cloth:%s"),
+    Total, Free, 2.f * ThresholdCm, Moved, Wrong, EndInside, Free ? MeanMove / Free : 0.f, WorstMove, Mismatch, *SM2Skin::TopSlots(Mesh, L, PerSec), *SM2Skin::PerCloth(CAs, PerCloth));
+  return Wrong;
 }
 
 UPhysicsAsset* USM2PhysicsSetupLibrary::SetClothCollision(USkeletalMesh* Mesh, UPhysicsAsset* Collision)

@@ -1,4 +1,5 @@
 # ue_c28.py spawn|start|sample|sampleref|cap|exp <tag>|kick|stop|clean <name> <set>
+# samplewrong (mtl1-33): free particles whose skinned->simulated path crosses the body (wrong side of a limb).
 # sampleskin (mtl1-32): free particles behind the skinned body surface (non-cloth sections), nearest vertex within 10 cm.
 # sampleref (mtl1-31): penetration of every cloth vs a FIXED reference = the mesh's body PhysicsAsset (independent of the cloth colliders).: Chaos Cloth live check of the unsaved diag duplicate (ue_cdiag) vs the base mesh.
 import unreal, sys, math
@@ -45,6 +46,9 @@ else:
     elif mode == "sampleskin":  # mtl1-32: vs the CPU-skinned body surface of the same mesh (HEURISTIC)
         r = unreal.SM2PhysicsSetupLibrary.measure_cloth_skin_penetration(A["cloth"].skeletal_mesh_component, 1.0, 10.0)
         print("C28 clothSKIN", r)
+    elif mode == "samplewrong":  # mtl1-33: animated->simulated path through the body (wrong side of a limb, HEURISTIC)
+        r = unreal.SM2PhysicsSetupLibrary.measure_cloth_wrong_side(A["cloth"].skeletal_mesh_component, 1.0, 10.0)
+        print("C28 clothWRONG", r)
     elif mode == "kick":
         for lab in ("base", "cloth"): A[lab].add_actor_world_offset(unreal.Vector(0, 0, 80), False, False)
         print("C28 kicked +80z")

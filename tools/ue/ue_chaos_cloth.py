@@ -23,6 +23,9 @@ if EAL.does_asset_exist(dst):
 # mtl1-22: a referenced mesh leaves an ObjectRedirector at dst after the rename; remove it so dst is free for the new mesh.
 fix_redirector(dst)
 mesh = EAL.duplicate_asset(src, dst)
+if mesh is None:  # mtl1-33: the registry can still report the fresh redirector as the renamed mesh right after the rename (calgar, referenced by L_wind16) -> retry once
+    fix_redirector(dst); mesh = EAL.duplicate_asset(src, dst)
+if mesh is None: raise SystemExit("CHAOS duplicate failed: %s exists (%s)" % (dst, EAL.does_asset_exist(dst)))
 # mtl1-28: exports without --include-cloth-sim have no _SIM section; CreateChaosCloth then falls back to render-as-sim.
 try:
     for c in json.load(open(pj, encoding="utf-8")).get("cloths", []):
