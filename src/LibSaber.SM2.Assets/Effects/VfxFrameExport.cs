@@ -88,7 +88,7 @@ public static class VfxFrameExport
   public static JsonObject Batch(SpriteBatch b, string? texture = null)
   {
     var e = b.Emitter;
-    var flags = EffectBlendRea.Flags(e.Blend, e.BlendAlphaMultiply);
+    var flags = EffectBlendRea.Flags(e);
     var tex = texture ?? (b.Distortion ? e.DistortTexture : e.Texture);
     var verts = new JsonArray();
     for (var i = 0; i < b.QuadCount * 4 * SpriteBatch.Stride; i++) verts.Add(R(b.Vertices[i]));

@@ -9,7 +9,7 @@
    - 5a. Constructor fix (`--variant`, `--tex-formats`): **done + UE verified**
    - 5b. UE folder cleanup (approved deletions only): **done**
 6. Secondary physics (user request: purity seals and cloth should move as in-game in the browser and carry over to Unreal): **done + UE verified** (mtl1-37: CDT bones resolved via tpl_markup locators; retail simRemap defaults 0.15/5)
-7. Browser VFX (the user said go at 02:32 KST, "일단 냅두고 그담거해봐"): **in progress, ~94 %** (mtl1-36: light units calibrated from capture CB, missing-asset loop, half-float clamp; mtl1-35: lights, mesh particles, soft depth, grading LUT; mtl1-34: UE frozen-frame export with capture blend/tonemap/distortion rules, verified; engine VFX defaults; browser BGRA fix)
+7. Browser VFX (the user said go at 02:32 KST, "일단 냅두고 그담거해봐"): **in progress, ~95 %** (mtl1-41: isAlphaKill flag rule, 21343 emitters; mtl1-36: light units calibrated from capture CB, missing-asset loop, half-float clamp; mtl1-35: lights, mesh particles, soft depth, grading LUT; mtl1-34: UE frozen-frame export with capture blend/tonemap/distortion rules, verified; engine VFX defaults; browser BGRA fix)
 8. In-game side-by-side comparison (VFX, physics, materials): **todo**. It needs the PC free and in-game captures.
 9. Unreal export test without Niagara (meshes/textures/materials of the compared effects → `/Game/SM2_Work/VfxExport`): **done** (2026-10-27, vfx4-2).
 10. Browser viewer polish (asset search, preview, export button): **done (vfx4-3)**.
@@ -36,7 +36,7 @@ Pushed so far: sockets/bone attach, anim-event cues and stop cues, distortion, d
    - **[mtl1-36 done]** Light units calibrated from CB_COMMON_LIGHTNG (plasma capture; adaptive factor and albedo 0.18 HEURISTIC). cine_bomb missing assets fetched via `missingTemplates`/`missing_assets.py`.
    - Confirm `isAdaptiveIntensity` scaling with a second capture light (only one matched so far); identify plasma light 1 (r 3.82).
    - **[mtl1-40 done]** Exposure from the capture's average luminance (`CaptureScenes`/`CaptureExposure`, `SM2_VFX_SCENE`; per-scene key PROVEN, bench scale HEURISTIC). Open: the histogram auto-exposure CPU mapping (key varies 0.025-0.115).
-   - **[mtl1-40 done]** textureTint verified against the plasma shared buffer (123/123 keyed slots; absent = 0). Open: blend-flag outlier frag sparks_05 (Add parsed, flags 0x2500).
+   - **[mtl1-40 done]** textureTint verified against the plasma shared buffer (123/123 keyed slots; absent = 0). **[mtl1-41 done]** sparks_05 outlier PROVEN: 0x20 needs add && (!default || isScreenSpace || !isAlphaKill) (FUN_1417e1e50); now 123/123. Also fixed: inline `sfx_part`/`sfx_trail` list entries and `GPU_EMITTER`-keyed emitters (18189 → 21343 emitters; INFERRED from data).
    - **[mtl1-40 done]** Distortion coverage gate (PROVEN PS 5160) + bilinear resample (INFERRED from sampler slot usage); UE 3.70/11.85/24.0 px.
    - **[mtl1-40 done]** UE frame sequences (`name@a:b:step`, `vfx_sequence.ps1`, `sequence_sheet.py`). Next: read the PS_SAMPLERS[4] descriptor from a capture to prove bilinear; trace the auto-exposure mapping.
 10. Then report VFX done (with %).

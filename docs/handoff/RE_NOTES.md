@@ -98,6 +98,7 @@ All addresses are virtual addresses in `sm2_retail.exe` (retail Steam build, 81 
 
 ### Particle shared data packer (2026-10-27)
 - 0x140175820 init "part_cpu_data_shared"; 0x1417e1e50 packer; 0x1417e473e call; 0x141854209 upload (0x90000).
+- mtl1-41: 0x1417e1e50 flag word: 0x20 = blendType add (desc+0x48c) && (type != default (desc+0x1a8) || isScreenSpace (+0x1b0) || !isAlphaKill (+0x1fa)); 0x8000 = default && isScreenSpace; 0x100 = desc+0x6e9; 0x2000 = desc+0x77c; 0x200 = softDepth (desc+0x3a0) sign; 0x400 = !(isBlendAlphaMultiply && !add). typeParams.default serializer 0x141793d40: isScreenSpace +0x0, isAlphaKill +0x4a, visuals +0x1f8. Tools: box /workspace/mtl_fix/mtl41/re/{xdis.py (addr:before:len), fields.py (serializer name→offset table), ssl.py}; PYTHONPATH=/tmp/cs/lib/python3.13/site-packages.
 - desc+0x4e8 → shared[0].z = textureTintControl; desc+0x4d4..0x4e0 → shared[1].
 - Trail VS DEGR/MISC/OFFSET math: see HANDOFF vfx3d.
 

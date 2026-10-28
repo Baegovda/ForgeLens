@@ -108,6 +108,16 @@ public sealed class EffectLibrary(IEffectSource source)
         }
         else
         {
+          // mtl1-41: an untyped entry with no effect file of that name whose key is itself a node type name
+          // ("sfx_part" 360x, "sfx_trail" 54x in the retail corpus, payload emitters2 / trailParams) is an inline node
+          // of that type: 342 effects (e.g. fx_krak_grenade_explosion, 59 CPU emitters) parsed 0 emitters before.
+          // INFERRED from the data (every such payload matches the type), the exe list loader was not traced.
+          if (entryType is null && IsNodeType(baseName))
+          {
+            entry = (JsonObject)entry.DeepClone();
+            entry["__type"] = baseName;
+          }
+
           chain.Add(baseName);
           child = Expand(entry, depth + 1, chain);
           chain.Remove(baseName);

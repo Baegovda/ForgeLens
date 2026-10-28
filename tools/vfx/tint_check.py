@@ -47,12 +47,16 @@ def main(argv):
         ok += st == "ok"; bad += st == "mismatch"; miss += st == "missing"
         add = bool(s["flags"] & 0x20)
         blends = Counter(e["blend"] for e in cands if round(e["tint"], 3) == round(s["tint"], 3))
+        # mtl1-41: predicted FUN_1417e1e50 bits (0x20 add && (!default || screenSpace || !alphaKill), 0x400) when the dump has them
+        pred = Counter(e["flags"] & 0x420 for e in cands if "flags" in e and round(e["tint"], 3) == round(s["tint"], 3))
         res["keyed"].append({**s, "status": st, "libTints": dict(tints), "flagAdd": add, "libBlends": dict(blends),
-                             "examples": [f'{e["effect"]}/{e["emitter"]}' for e in cands[:3]]})
+                             "examples": [f'{e["effect"]}/{e["emitter"]}' for e in cands[:3]],
+                             "predFlags": {hex(k): v for k, v in pred.items()}, "predOk": (s["flags"] & 0x420) in pred if pred else None})
     strict = [k for k in res["keyed"] if len(k["libTints"]) == 1]
     blend_ok = sum(1 for k in res["keyed"] if k["status"] == "ok" and ((k["flagAdd"] and "Add" in k["libBlends"]) or (not k["flagAdd"] and set(k["libBlends"]) - {"Add"})))
     res["summary"] = {"ok": ok, "mismatch": bad, "missing": miss, "unambiguous": len(strict),
-                      "unambiguousTint0": sum(1 for k in strict if round(k["tint"], 3) == 0), "blendFlagConsistent": blend_ok}
+                      "unambiguousTint0": sum(1 for k in strict if round(k["tint"], 3) == 0), "blendFlagConsistent": blend_ok,
+                      "predFlagsOk": sum(1 for k in res["keyed"] if k["predOk"]), "predFlagsBad": [k["slot"] for k in res["keyed"] if k["predOk"] is False]}
     txt = json.dumps(res, indent=1)
     if len(argv) > 3:
         open(argv[3], "w").write(txt)

@@ -23,9 +23,24 @@ public static class EffectBlendRea
 {
   public static bool Enabled { get; set; } = Environment.GetEnvironmentVariable("SM2_VFX_BLEND_REA") != "0";
 
-  /// <summary>Flag word bits as written by FUN_1417e1e50 (only the two blend bits).</summary>
+  /// <summary>Flag word bits as written by FUN_1417e1e50 (only the two blend bits) for a plain add/blend emitter.</summary>
   public static uint Flags(EffectBlend blend, bool alphaMultiply)
     => (blend == EffectBlend.Add ? 0x20u : 0u) | (alphaMultiply && blend != EffectBlend.Add ? 0u : 0x400u);
+
+  /// <summary>
+  ///   mtl1-41, PROVEN (FUN_1417e1e50 decompiled, m20_b2.c; field offsets from the typeParams.default serializer
+  ///   0x141793d40: isScreenSpace +0x0, isAlphaKill +0x4a, visuals +0x1f8, struct at desc+0x1b0): bit 0x20 is set only if
+  ///   blendType == add (desc+0x48c) AND (particle type != default (desc+0x1a8) OR isScreenSpace (+0x1b0) OR
+  ///   !isAlphaKill (+0x1fa)). A default-type add emitter with <c>isAlphaKill = True</c> therefore keeps its output alpha
+  ///   (no pure additive): capture plasma 101917 slot 56 (part_mg_frag_grenade_expl/sparks_05, add, isAlphaKill True)
+  ///   reads 0x2500 without 0x20. Only CPU emitters go through FUN_1417e1e50; GPU emitters keep the plain rule.
+  /// </summary>
+  public static uint Flags(EmitterDef e)
+  {
+    if (e.IsGpu) return Flags(e.Blend, e.BlendAlphaMultiply);
+    var add = e.Blend == EffectBlend.Add && (e.ParticleType != "default" || e.ScreenSpace || !e.AlphaKill);
+    return (add ? 0x20u : 0u) | (e.BlendAlphaMultiply && e.Blend != EffectBlend.Add ? 0u : 0x400u);
+  }
 
   /// <summary>Premultiplied output (rgb factor on colour, output alpha) for vertex alpha <paramref name="va"/> and texture alpha <paramref name="ta"/>.</summary>
   public static (float Rgb, float Alpha) Output(uint flags, float va, float ta)
@@ -169,6 +184,10 @@ public sealed class EmitterDef
   ///   (Mod Tools meta_desc __defaultValue = True).
   /// </summary>
   public bool BlendAlphaMultiply { get; init; } = true;
+  /// <summary><c>typeParams.default.isAlphaKill</c> (desc+0x1fa; Mod Tools meta_desc __defaultValue False). See <see cref="EffectBlendRea.Flags(EmitterDef)"/>.</summary>
+  public bool AlphaKill { get; init; }
+  /// <summary><c>typeParams.default.isScreenSpace</c> (desc+0x1b0; flag 0x8000 in FUN_1417e1e50; default False assumed, 0 of 123 capture slots set 0x8000).</summary>
+  public bool ScreenSpace { get; init; }
   public ColorCurve Color { get; init; } = ColorCurve.White;
   public ScalarParam ColorIntensity { get; init; } = ScalarParam.Constant(1);
   public float AlphaIntensity { get; init; } = 1f;
@@ -327,6 +346,15 @@ public sealed class EffectDefinition
                 var et = eo.Str("__type") ?? "";
                 // Untyped entries (5499 in the corpus, 89% isVisible=False) are CPU emitters when they are still in the
                 // editor graph (<c>__node</c>); untyped entries without a node are orphans and are not emitted.
+                // mtl1-41: an untyped entry keyed exactly "CPU_EMITTER" / "GPU_EMITTER" is that type (the editor's default
+                // name; in the retail corpus every untyped entry with an emission block has one of these two keys, 211 of them
+                // GPU_EMITTER, which were simulated as CPU before). __node is editor graph metadata, so it no longer decides.
+                // INFERRED from the data, the exe loader was not traced.
+                if (et.Length == 0 && en is "CPU_EMITTER" or "GPU_EMITTER" && eo.ContainsKey("emission"))
+                {
+                  et = en;
+                  eo["__type"] = en;
+                }
                 if (et.Length == 0 && eo.ContainsKey("emission")) et = eo.ContainsKey("__node") ? "CPU_EMITTER" : "orphan";
                 if (CoveringDef.TryParse(eo, en, path + "/" + en, nameParent) is { } covering)
                   def.Coverings.Add(covering);
@@ -464,6 +492,8 @@ public sealed class EffectDefinition
       Path = path,
       IsGpu = gpu,
       ParticleType = particleType,
+      AlphaKill = !gpu && particleType == "default" && tp.Bool("isAlphaKill", false),
+      ScreenSpace = !gpu && particleType == "default" && tp.Bool("isScreenSpace", false),
       Geom = particleType == "lwiGeom" ? MeshParticleDef.Parse(tp) : null,
       Visible = e.Bool("isVisible", true),
       NameParent = e.Str("nameParent") is { Length: > 0 } np ? np : parentName,

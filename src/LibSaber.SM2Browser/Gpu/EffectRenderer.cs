@@ -385,7 +385,7 @@ internal sealed unsafe class EffectRenderer : IDisposable
       _gl.Uniform1(reaLoc, rea ? 1 : 0);
       _gl.Uniform1(_gl.GetUniformLocation(_sprite, "uHdrPremul"), HdrPremul ? 1 : 0);
       _gl.Uniform1(_gl.GetUniformLocation(_sprite, "uClipExact"), ClipExact ? 1 : 0);
-      _gl.Uniform1(alphaMulLoc, (EffectBlendRea.Flags(batch.Emitter.Blend, batch.Emitter.BlendAlphaMultiply) & 0x400u) == 0 ? 1 : 0);
+      _gl.Uniform1(alphaMulLoc, (EffectBlendRea.Flags(batch.Emitter) & 0x400u) == 0 ? 1 : 0);
       if (rea)
         _gl.BlendFuncSeparate(BlendingFactor.One, BlendingFactor.OneMinusSrcAlpha, BlendingFactor.One, BlendingFactor.OneMinusSrcAlpha);
       else switch (batch.Emitter.Blend)
@@ -403,7 +403,8 @@ internal sealed unsafe class EffectRenderer : IDisposable
       ApplyKindState(kind);
       if (kind == VfxDrawKind.Trail) TrailBatches++;
       if (kind == VfxDrawKind.Spark) SparkBatches++;
-      _gl.Uniform1(modeLoc, (int)batch.Emitter.Blend);
+      // mtl1-41: with the REA blend the "add" mode is flag 0x20 (FUN_1417e1e50: add && (!default || screenSpace || !alphaKill)).
+      _gl.Uniform1(modeLoc, rea ? ((EffectBlendRea.Flags(batch.Emitter) & 0x20u) != 0 ? 1 : 0) : (int)batch.Emitter.Blend);
       _gl.Uniform1(tintLoc, batch.Emitter.TextureTint);
       // additionalContrast / contrastColorKey (shared[1]); PROVEN PS 281 boost, default on (mtl1-38).
       var key = batch.Emitter.ContrastColorKey / 255f;
