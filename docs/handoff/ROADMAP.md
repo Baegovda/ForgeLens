@@ -35,10 +35,10 @@ Pushed so far: sockets/bone attach, anim-event cues and stop cues, distortion, d
    - Dump the runtime COLOR_GRADING 16³ volumes and disassemble final PS 1209 (LUT apply mapping) from a capture.
    - **[mtl1-36 done]** Light units calibrated from CB_COMMON_LIGHTNG (plasma capture; adaptive factor and albedo 0.18 HEURISTIC). cine_bomb missing assets fetched via `missingTemplates`/`missing_assets.py`.
    - Confirm `isAdaptiveIntensity` scaling with a second capture light (only one matched so far); identify plasma light 1 (r 3.82).
-   - Take exposure from the capture's average luminance instead of 1/250.
-   - Check the textureTint=0 luminance mix (still a shader heuristic) against captures.
-   - Bilinear distortion resample.
-   - UE frame sequences.
+   - **[mtl1-40 done]** Exposure from the capture's average luminance (`CaptureScenes`/`CaptureExposure`, `SM2_VFX_SCENE`; per-scene key PROVEN, bench scale HEURISTIC). Open: the histogram auto-exposure CPU mapping (key varies 0.025-0.115).
+   - **[mtl1-40 done]** textureTint verified against the plasma shared buffer (123/123 keyed slots; absent = 0). Open: blend-flag outlier frag sparks_05 (Add parsed, flags 0x2500).
+   - **[mtl1-40 done]** Distortion coverage gate (PROVEN PS 5160) + bilinear resample (INFERRED from sampler slot usage); UE 3.70/11.85/24.0 px.
+   - **[mtl1-40 done]** UE frame sequences (`name@a:b:step`, `vfx_sequence.ps1`, `sequence_sheet.py`). Next: read the PS_SAMPLERS[4] descriptor from a capture to prove bilinear; trace the auto-exposure mapping.
 10. Then report VFX done (with %).
 
 ## UE verification — results so far (details in STATUS.md / HANDOFF "UE verification")

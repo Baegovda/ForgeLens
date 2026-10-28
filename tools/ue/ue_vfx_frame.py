@@ -59,7 +59,28 @@ SOFT = ("AlphaComposite", "Translucent", "Additive")  # translucent masters can 
 SOFT_CODE = "va *= SoftDepth > 0.0 ? saturate((SD - PD) / (SoftDepth * 100.0)) : 1.0;\n"
 DISTORT = """float2 o = (T.rg * 2.007874 - 1.007874) * C.r * saturate(C.a) * (HasMask > 0.5 ? M.a : 1.0);
 float m = saturate(10.0 * (abs(o.x) + abs(o.y)));
-return float3(clamp(0.08 * m * o, -0.02, 0.02), 0.0);"""
+return float3(clamp(0.08 * m * o, -0.02, 0.02), 1.0);"""  # b = footprint (game: DUDV alpha 0; here additive count, RT cleared to 0)
+# mtl1-40 PROVEN post PS 5160 (capture 5160_ps.txt l.30-64): the shift is applied only when the source DUDV is non-neutral
+# and the DUDV alpha at the shifted uv is 0, i.e. inside the distortion footprint (all bilinear taps drawn). Resample of
+# the scene with the same sampler (PS_SAMPLERS[4], bilinear: INFERRED) -> SceneTexture filtered.
+DISTORT_UV = """float2 s = float2(0.0, 0.0);
+if (On > 0.5)
+{
+  float4 d = Texture2DSampleLevel(D, DSampler, UV, 0.0);
+  if (dot(d.rg, d.rg) > 0.0)
+  {
+    float2 p = (UV + d.rg) * Size - 0.5; float2 f = frac(p); float2 b = (floor(p) + 0.5) / Size;
+    float cov = 1.0;
+    for (int j = 0; j < 2; j++)
+      for (int i = 0; i < 2; i++)
+      {
+        float w = (i == 1 ? f.x : 1.0 - f.x) * (j == 1 ? f.y : 1.0 - f.y);
+        if (w > 0.0 && Texture2DSampleLevel(D, DSampler, b + float2(i, j) / Size, 0.0).b < 0.5) cov = 0.0;
+      }
+    s = d.rg * cov;
+  }
+}
+return UV + s;"""
 TONEMAP = """float3 x = max(S.rgb * Exposure, 0.0);
 if (LutOn > 0.5)
 {
@@ -219,16 +240,17 @@ def build_tonemap(folder, lin_default):
     m.set_editor_property("material_domain", unreal.MaterialDomain.MD_POST_PROCESS)
     m.set_editor_property("blendable_location", unreal.BlendableLocation.BL_REPLACING_TONEMAPPER)
     sp = node(m, unreal.MaterialExpressionScreenPosition, -1300, 0)
-    dt = node(m, unreal.MaterialExpressionTextureSampleParameter2D, -1300, 200)
+    dt = node(m, unreal.MaterialExpressionTextureObjectParameter, -1300, 200)
     dt.set_editor_property("parameter_name", "Distort"); dt.set_editor_property("sampler_type", unreal.MaterialSamplerType.SAMPLERTYPE_LINEAR_COLOR)
     dt.set_editor_property("texture", lin_default)
-    don = scalar(m, "DistortOn", 0.0, 400)
-    MEL.connect_material_expressions(sp, "ViewportUV", dt, "UVs")
-    uv = custom(m, "return UV + D.rg * On;", ["UV", "D", "On"], unreal.CustomMaterialOutputType.CMOT_FLOAT2, -1000, 0)
-    MEL.connect_material_expressions(sp, "ViewportUV", uv, "UV"); MEL.connect_material_expressions(dt, "RGBA", uv, "D")
-    MEL.connect_material_expressions(don, "", uv, "On")
+    don = scalar(m, "DistortOn", 0.0, 400); dsz = scalar(m, "DistortSize", 512.0, 480)
+    uv = custom(m, DISTORT_UV, ["UV", "D", "On", "Size"], unreal.CustomMaterialOutputType.CMOT_FLOAT2, -1000, 0)
+    MEL.connect_material_expressions(sp, "ViewportUV", uv, "UV"); MEL.connect_material_expressions(dt, "", uv, "D")
+    MEL.connect_material_expressions(don, "", uv, "On"); MEL.connect_material_expressions(dsz, "", uv, "Size")
     st = node(m, unreal.MaterialExpressionSceneTexture, -700, 0)
     st.set_editor_property("scene_texture_id", unreal.SceneTextureId.PPI_POST_PROCESS_INPUT0)
+    try: st.set_editor_property("filtered", True)  # bilinear resample (game PS_SAMPLERS[4], INFERRED)
+    except Exception as e: print("note SceneTexture filtered", e)
     MEL.connect_material_expressions(uv, "", st, "UVs")
     ex = scalar(m, "Exposure", 1.0 / 250.0, 200)
     lon = scalar(m, "LutOn", 0.0, 500); wpt = scalar(m, "WhitePoint", 1.375385, 600)
@@ -429,6 +451,7 @@ elif mode == "render":
     elif use_lut and gr.get("strip"): print("MISSING lut strip", gr["strip"])
     if rtd:
         pp.set_texture_parameter_value("Distort", rtd); pp.set_scalar_parameter_value("DistortOn", 1.0)
+        pp.set_scalar_parameter_value("DistortSize", float(res))
     wb = unreal.WeightedBlendables(); wb.set_editor_property("array", [unreal.WeightedBlendable(1.0, pp)])
     pps.set_editor_property("weighted_blendables", wb)
     c.set_editor_property("post_process_settings", pps); c.set_editor_property("post_process_blend_weight", 1.0)

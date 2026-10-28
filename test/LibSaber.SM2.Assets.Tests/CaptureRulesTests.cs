@@ -34,8 +34,9 @@ public class CaptureRulesTests
     Assert.Equal(-0.016f, DistortionRules.Shift(-0.2f, 1f), 1e-6f);
     // encoding range 0..1 caps the screen shift at +-0.02.
     Assert.Equal(0.02f, DistortionRules.Shift(5f, 1f), 1e-6f);
-    Assert.Equal(-0.02f, DistortionRules.PostShift(0f), 1e-6f);
-    Assert.Equal(0f, DistortionRules.PostShift(0.5f), 1e-6f);
+    Assert.Equal(-0.0200391f, DistortionRules.PostShift(0f), 1e-7f);
+    Assert.Equal(0f, DistortionRules.PostShift(DistortionRules.Neutral), 1e-7f);
+    Assert.Equal(0.02f, DistortionRules.PostShift(1f), 1e-7f);
     Assert.Equal(0.5f, DistortionRules.Mask(0.03f, 0.02f), 1e-5f);
     Assert.Equal(0.25f, DistortionRules.Mask(0.5f, 0f, 0.25f), 1e-5f);
   }
@@ -60,5 +61,44 @@ public class CaptureRulesTests
     Assert.Contains("0.12 * x + 0.05", src);
     Assert.Contains("1.375385", src);
     Assert.Contains("- 0.25", src);
+  }
+
+  [Fact]
+  public void CaptureSceneKeysFromAverageLuminance()
+  {
+    Assert.Equal(0.1124f, CaptureScenes.Hellbrute.Key, 1e-3f);
+    Assert.Equal(0.1146f, CaptureScenes.Smoke.Key, 1e-3f);
+    Assert.Equal(0.1134f, CaptureScenes.Plasma.Key, 1e-3f);
+    Assert.Equal(0.0737f, CaptureScenes.Outdoor.Key, 1e-3f);
+    Assert.Equal(0.0245f, CaptureScenes.Armory.Key, 1e-3f);
+    Assert.Equal(1.343645f, CaptureScenes.Outdoor.WhitePoint, 1e-6f);
+    Assert.Same(CaptureScenes.Plasma, CaptureScenes.Find("PLASMA"));
+    Assert.Null(CaptureScenes.Find("bench"));
+  }
+
+  [Fact]
+  public void FrameExposureKeepsReferenceAndScalesByKey()
+  {
+    Assert.Equal(1f / 250f, CaptureExposure.Frame(CaptureScenes.Smoke), 1e-7f);
+    Assert.Equal(CaptureScenes.Outdoor.Key / CaptureScenes.Smoke.Key,
+      CaptureExposure.Frame(CaptureScenes.Outdoor) / CaptureExposure.Frame(CaptureScenes.Smoke), 1e-5f);
+    Assert.InRange(CaptureExposure.Frame(CaptureScenes.Armory) * 250f, 0.21f, 0.22f);
+    // sfx k = 1: emissive scales by avgLumClamped / avgLum = 1 relative to particles; k = 0: 1 / avgLum.
+    Assert.Equal(0.004f, CaptureExposure.Sfx(0.004f, CaptureScenes.Smoke, 1f), 1e-7f);
+    Assert.Equal(0.004f / 4.818526f, CaptureExposure.Sfx(0.004f, CaptureScenes.Smoke, 0f), 1e-7f);
+  }
+
+  [Fact]
+  public void DistortionGateNeedsEveryBilinearTap()
+  {
+    Assert.Equal(0.0400391f, DistortionRules.PostScale, 1e-7f);
+    Assert.Equal(-0.0200391f, DistortionRules.PostBias, 1e-7f);
+    Assert.True(DistortionRules.BilinearResample);
+    bool Drawn(int x, int y) => x >= 4 && x < 8 && y >= 0 && y < 8;
+    Assert.True(DistortionRules.Covered(Drawn, 6.5f, 3.5f));   // texel centre: one tap
+    Assert.True(DistortionRules.Covered(Drawn, 7.0f, 3.5f));   // between texels 6 and 7
+    Assert.False(DistortionRules.Covered(Drawn, 7.75f, 3.5f)); // taps 7 and 8: 8 not drawn
+    Assert.True(DistortionRules.Covered(Drawn, 4.5f, 3.5f));
+    Assert.False(DistortionRules.Covered(Drawn, 4.25f, 3.5f)); // taps 3 and 4
   }
 }

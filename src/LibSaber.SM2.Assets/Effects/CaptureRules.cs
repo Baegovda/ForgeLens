@@ -82,10 +82,16 @@ public static class SfxExposure
 }
 
 /// <summary>
-///   Screen distortion, plasma 101917: particle PS 4996 writes DUDV (R10G10B10A2, One/InvSrcAlpha) =
+///   Screen distortion, plasma 101917: particle PS 4996 writes DUDV (R10G10B10A2, One/InvSrcAlpha, alpha Zero/Zero) =
 ///   mask * (0.5 + 2*offset), mask = sat(10*|offset|) * depthFade, offset = normal.xy * TEXCOORD0.w (per-particle strength
-///   x fade); post PS 5160: uv += DUDV.xy * 0.04 - 0.02 (hardcoded), gated by DUDV.w. Over the neutral 0.5 buffer
-///   the screen shift is 0.08 * mask * offset, at most +-0.02 of the screen.
+///   x fade); post PS 5160 (capture disasm 5160_ps.txt l.30-64): uv += DUDV.xy * 0.0400391 - 0.0200391, applied only when
+///   the source DUDV is non-neutral (|DUDV.xy * 2.00196 - 1.00196|^2 > 0) AND the DUDV alpha sampled at the shifted uv is 0.
+///   The DUDV target is cleared to alpha 1 and every distortion particle writes alpha 0 (blend alpha Zero/Zero; capture
+///   dudv.png: 21726 alpha-0 pixels, all 4231 shifted pixels inside them), so distortion only pulls colour from inside the
+///   distortion footprint (<see cref="Covered"/>). Over the neutral 0.5 buffer the screen shift is 0.08 * mask * offset,
+///   at most +-0.02 of the screen. Both PS 5160 samples (DUDV and DISTORT_FRAMEBUF) use PS_SAMPLERS[4]; the same slot is
+///   used with textureGrad (particles PS 281 l.260/264) and for the per-particle light atlas, so it filters: the resample
+///   is bilinear (INFERRED from static usage; the sampler descriptor table itself was not read).
 /// </summary>
 public static class DistortionRules
 {
@@ -93,6 +99,10 @@ public static class DistortionRules
   public const float UvPerOffset = 0.08f;
   /// <summary>Largest shift the 0..1 DUDV encoding can produce (0.04 x 0.5).</summary>
   public const float MaxShift = 0.02f;
+  /// <summary>PS 5160 post constants (exact 10-bit UNORM rescale of 0.04 / -0.02).</summary>
+  public const float PostScale = 0.0400391f, PostBias = -0.0200391f;
+  /// <summary>Sampler of the post resample (PS_SAMPLERS[4]): bilinear, INFERRED.</summary>
+  public const bool BilinearResample = true;
 
   public static float Mask(float offsetX, float offsetY, float depthFade = 1f)
     => Math.Clamp(10f * (MathF.Abs(offsetX) + MathF.Abs(offsetY)), 0f, 1f) * depthFade;
@@ -101,11 +111,86 @@ public static class DistortionRules
   public static float Encode(float offset, float mask) => mask * (0.5f + 2f * offset);
 
   /// <summary>Post-process uv shift from a DUDV channel value, PS 5160.</summary>
-  public static float PostShift(float dudv) => dudv * 0.04f - 0.02f;
+  public static float PostShift(float dudv) => dudv * PostScale + PostBias;
 
-  /// <summary>Screen shift of one particle over the neutral (0.5) buffer: PostShift(Encode + (1-mask)*0.5), clamped.</summary>
+  /// <summary>DUDV value with zero shift: the 10-bit UNORM code 512 (PostShift(512/1023) = 0; the gate tests the same point).</summary>
+  public const float Neutral = 512f / 1023f;
+
+  /// <summary>
+  ///   Screen shift of one particle over the neutral buffer: nominal decode 0.04 * (Encode + (1-mask)*0.5) - 0.02, clamped
+  ///   (= 0.08 * mask * offset; the exact constants add the 10-bit rescale, +0.1 %, and move the neutral to 512/1023).
+  /// </summary>
   public static float Shift(float offset, float mask)
-    => Math.Clamp(PostShift(Encode(offset, mask) + (1f - mask) * 0.5f), -MaxShift, MaxShift);
+    => Math.Clamp(0.04f * (Encode(offset, mask) + (1f - mask) * 0.5f) - 0.02f, -MaxShift, MaxShift);
+
+  /// <summary>
+  ///   PS 5160 gate: the shift is applied only if the target texel lies inside the distortion footprint (bilinear DUDV
+  ///   alpha == 0, i.e. every filter tap with non-zero weight was drawn by a distortion particle).
+  /// </summary>
+  public static bool Covered(Func<int, int, bool> drawn, float x, float y)
+  {
+    var fx = x - 0.5f; var fy = y - 0.5f; var x0 = (int)MathF.Floor(fx); var y0 = (int)MathF.Floor(fy);
+    float wx = fx - x0, wy = fy - y0;
+    for (var j = 0; j < 2; j++)
+      for (var i = 0; i < 2; i++)
+        if ((i == 0 ? 1 - wx : wx) * (j == 0 ? 1 - wy : wy) > 0 && !drawn(x0 + i, y0 + j)) return false;
+    return true;
+  }
+}
+
+/// <summary>
+///   mtl1-40: per-capture HDR state (CB_COMMON, identical in every draw of a capture; /workspace/rdc/&lt;scene&gt;/cbuffers):
+///   COMMON_HDR_AVERAGE_LUMINANCE(_CLAMPED) and COMMON_HDR_EXPOSURE_DIV_AVG_LUM (= final tonemap HDR_TONEMAP_EXPOSURE,
+///   smoke eid 3500 0.023784, LUT bake eid 3226 0.023783), whitepoint from CB_PASS_HDR.
+///   Particle VS 390 / 248 multiply unlit colour and the emissive term by COMMON_HDR_AVERAGE_LUMINANCE (VS 390 GLSL l.490-492,
+///   788-790: COLOR * TEXCOORD_1 * CB_COMMON[22].y) and the final tonemap multiplies by EXPOSURE_DIV_AVG_LUM, so an unlit /
+///   emissive particle displays colour * intensity * Key with Key = exposure * avgLum (PROVEN). Key is NOT constant:
+///   0.112-0.115 in the three combat captures, outdoor 0.074, armory 0.025 (the old "0.11 in every scene" was wrong).
+///   The histogram auto-exposure that picks EXPOSURE_DIV_AVG_LUM (hdr CS 36: 64 log2 bins of max(rgb); CS 20 merge; debug
+///   PS 104 corr = (2 - 4/(AUTO_K*log10(SCALE_X*L+1)+2))*SCALE_Y) runs its final mapping on the CPU: not traced.
+/// </summary>
+public sealed record CaptureScene(string Name, int Frame, float AverageLuminance, float AverageLuminanceClamped, float ExposureDivAvgLum, float WhitePoint)
+{
+  /// <summary>Display key: exposure x average luminance (what an unlit particle of HDR 1/avgLum shows).</summary>
+  public float Key => ExposureDivAvgLum * AverageLuminance;
+}
+
+public static class CaptureScenes
+{
+  public static readonly CaptureScene Hellbrute = new("hellbrute", 68141, 3.66142f, 3.66142f, 0.030691f, 1.375385f);
+  public static readonly CaptureScene Smoke = new("smoke", 88302, 4.818526f, 4.818526f, 0.023783f, 1.375385f);
+  public static readonly CaptureScene Plasma = new("plasma", 101917, 4.150339f, 4.150339f, 0.027324f, 1.375385f);
+  public static readonly CaptureScene Armory = new("armory", 128197, 0.108577f, 0.108577f, 0.225831f, 1.375385f);
+  public static readonly CaptureScene Outdoor = new("outdoor", 137266, 2.287158f, 2.287158f, 0.03224f, 1.343645f);
+  public static IReadOnlyList<CaptureScene> All { get; } = [Hellbrute, Smoke, Plasma, Armory, Outdoor];
+
+  /// <summary>Reference scene of the bench look: the grenade smoke capture (the 1/250 bench exposure was tuned on grenade shots).</summary>
+  public static CaptureScene Reference => Smoke;
+
+  public static CaptureScene? Find(string? name) => All.FirstOrDefault(s => string.Equals(s.Name, name, StringComparison.OrdinalIgnoreCase));
+}
+
+/// <summary>
+///   mtl1-40: frame exposure from a capture's average luminance. Bench / UE frame HDR is in particle-relative units
+///   (game HDR / avgLum: unlit sprite = colour * intensity, lights relative to the ambient = avgLum, CaptureLightUnits), so
+///   its exposure is the scene Key times one bench scale: exposure = Key(scene) * BenchScale, BenchScale = (1/250) /
+///   Key(smoke). The CPU colour -> vertex scale (what TEXCOORD_1.w holds) is untraced, so BenchScale is HEURISTIC (it
+///   keeps the tuned 1/250 look for the reference scene); the per-scene ratio Key(scene)/Key(smoke) is PROVEN capture data.
+/// </summary>
+public static class CaptureExposure
+{
+  public const float ReferenceExposure = 1f / 250f;
+  public static float BenchScale => ReferenceExposure / CaptureScenes.Reference.Key;
+
+  /// <summary>Particle-relative frame exposure for a scene.</summary>
+  public static float Frame(CaptureScene scene) => scene.Key * BenchScale;
+
+  /// <summary>
+  ///   SFX emissive exposure in particle-relative units: the emissive is not multiplied by avgLum like particles, but by
+  ///   lerp(1, avgLumClamped, k) (SfxExposure), so relative to particles it scales by lerp(1, avgLumClamped, k) / avgLum.
+  /// </summary>
+  public static float Sfx(float frameExposure, CaptureScene scene, float k)
+    => frameExposure * SfxExposure.Scale(scene.AverageLuminanceClamped, k) / MathF.Max(scene.AverageLuminance, 1e-6f);
 }
 
 /// <summary>
@@ -113,8 +198,9 @@ public static class DistortionRules
 ///   F(x) = (x(Ax+CB)+DE)/(x(Ax+B)+DF) - E/F (Uncharted 2 / Hable) with A..D = HDR_TONEMAP_CURVE_PARAMS_0 [0.12,0.05,0.45,0.2],
 ///   E,F = _1 [0.02,0.08]; out = sat(F(x) * WHITEPOINT_SCALE 1.375385 (outdoor 1.343645)), then sRGB and the grading LUT
 ///   (LUT_RANGE_LOG 14, GREY_POINT 0.43, LUT input x = 0.18*2^((i/31 - grey)*rangeLog) - 0.18*2^(-grey*rangeLog)).
-///   Exposure: CB_COMMON EXPOSURE_DIV_AVG_LUM x AVG_LUM = 0.112..0.117 in every scene, so exposure ~ Key / avgLum
-///   (Key 0.11 is a fit of five scenes: HEURISTIC; the histogram auto-exposure was not traced).
+///   Exposure: CB_COMMON EXPOSURE_DIV_AVG_LUM; EXPOSURE_DIV_AVG_LUM x AVG_LUM (the key) is 0.112-0.115 in the three combat
+///   captures but 0.074 outdoor and 0.025 in the armory (mtl1-40 correction, <see cref="CaptureScenes"/>). Key 0.11 is the
+///   combat-scene value: HEURISTIC for other scenes; the histogram auto-exposure CPU mapping was not traced.
 /// </summary>
 public static class CaptureTonemap
 {
@@ -132,7 +218,7 @@ public static class CaptureTonemap
   /// <summary>Display value 0..1 (linear, before sRGB encoding) for an exposed HDR value.</summary>
   public static float Apply(float exposed) => Math.Clamp(Curve(exposed) * WhitePointScale, 0f, 1f);
 
-  /// <summary>Game exposure for a scene average luminance (EXPOSURE_DIV_AVG_LUM).</summary>
+  /// <summary>Game exposure for a combat-scene average luminance (EXPOSURE_DIV_AVG_LUM ~ 0.11 / avgLum; see CaptureScenes for measured keys).</summary>
   public static float Exposure(float averageLuminance) => Key / MathF.Max(averageLuminance, 1e-6f);
 }
 

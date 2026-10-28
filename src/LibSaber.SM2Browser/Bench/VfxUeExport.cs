@@ -46,7 +46,8 @@ internal static class VfxUeExport
     // mtl1-35 grading: SM2_VFX_GRADING = content LUT name (e.g. story_tower_lut) or "identity" (default; the runtime
     // COLOR_GRADING volumes of the smoke/plasma captures were not dumped, so identity is HEURISTIC there).
     var gradingName = Environment.GetEnvironmentVariable("SM2_VFX_GRADING") is { Length: > 0 } gn ? gn : "identity";
-    var whitePoint = float.TryParse(Environment.GetEnvironmentVariable("SM2_VFX_WHITEPOINT"), CultureInfo.InvariantCulture, out var wp) ? wp : CaptureTonemap.WhitePointScale;
+    var hdr = FrameHdr.FromEnvironment();
+    var whitePoint = float.TryParse(Environment.GetEnvironmentVariable("SM2_VFX_WHITEPOINT"), CultureInfo.InvariantCulture, out var wp) ? wp : hdr.WhitePoint;
     GradingLut? grading = null;
     if (gradingName != "identity")
     {
@@ -56,10 +57,10 @@ internal static class VfxUeExport
     var baked = CaptureLut.Bake(grading, null, 1f, whitePoint);
     var lutName = $"sm2lut_{gradingName}_{(int)MathF.Round(whitePoint * 1e6f)}".ToLowerInvariant();
     ImageWriters.WritePng(Path.Combine(texDir, lutName + ".png"), CaptureLut.Strip(baked), CaptureLut.Size * CaptureLut.Size, CaptureLut.Size);
-    var exposure = float.TryParse(Environment.GetEnvironmentVariable("SM2_VFX_EXPOSURE"), CultureInfo.InvariantCulture, out var ex) ? ex : 1f / 250f;
+    var exposure = hdr.Exposure;
     const int size = 512;
     var exit = 0;
-    foreach (var spec in args.Skip(5))
+    foreach (var spec in ExpandSpecs(args.Skip(5)))
     {
       var parts = spec.Split('@');
       var name = parts[0];
@@ -97,7 +98,7 @@ internal static class VfxUeExport
       }
 
       var lights = instance.Lights().ToList();
-      var meshBatches = MeshBatches(instance, view, eye, meshes, lights, exposure, seconds, out var meshNote, out var missingTemplates);
+      var meshBatches = MeshBatches(instance, view, eye, meshes, lights, hdr, seconds, out var meshNote, out var missingTemplates);
       foreach (var j in meshBatches)
       {
         var t = (string?)j["texture"];
@@ -115,9 +116,10 @@ internal static class VfxUeExport
       // Draw order: opaque lit meshes, sfx meshes (One/One, order-free), then the far-to-near sprite batches.
       written.InsertRange(0, meshBatches.OrderBy(j => (string)j["ueBlend"]! == "Solid" ? 0 : 1));
       var frame = VfxFrameExport.Frame(name, seconds, VfxFrameExport.Camera(eye, camera.Center, camera.Fov), exposure, written,
-        "browser bench exposure (SM2_VFX_EXPOSURE, default 1/250; HEURISTIC). Game exposure = key/avgLum (CaptureTonemap.Exposure).");
+        hdr.Note);
       frame["pixels"] = size;
-      frame["lights"] = VfxFrameExport.Lights(lights, CaptureLightUnits.BenchAverageLuminance(exposure, EffectRenderer.ReferenceExposure));
+      frame["lights"] = VfxFrameExport.Lights(lights, hdr.AverageLuminance);
+      frame["scene"] = hdr.Json();
       frame["lightUnits"] = "mtl1-36 CaptureLightUnits: color = srgbToLinear(ColorCtrl) * Intensity * (adaptive ? 1 : 1/avgLum), relative to the particle ambient (= capture avgLum); att = sat(1-(d/r)^4)^2 (s4462). Ground/cover: grey * (1 + albedo/pi * sum(color * att * max(0, n.l))), albedo 0.18 HEURISTIC.";
       frame["groundY"] = 0f;
       frame["grading"] = new System.Text.Json.Nodes.JsonObject
@@ -139,6 +141,31 @@ internal static class VfxUeExport
   }
 
   /// <summary>
+  ///   mtl1-40 frame sequences: <c>name@start:end:step[@distance]</c> expands to one spec per time (inclusive end, at most
+  ///   240 frames); a plain <c>name@t</c> passes through. Every frame shares the textures directory.
+  /// </summary>
+  internal static IEnumerable<string> ExpandSpecs(IEnumerable<string> specs)
+  {
+    foreach (var spec in specs)
+    {
+      var parts = spec.Split('@');
+      var range = parts.Length > 1 ? parts[1].Split(':') : [];
+      if (range.Length != 3) { yield return spec; continue; }
+      var a = float.Parse(range[0], CultureInfo.InvariantCulture);
+      var b = float.Parse(range[1], CultureInfo.InvariantCulture);
+      var step = float.Parse(range[2], CultureInfo.InvariantCulture);
+      if (step <= 0) throw new ArgumentException($"sequence step must be > 0: {spec}");
+      var tail = parts.Length > 2 ? "@" + string.Join("@", parts.Skip(2)) : "";
+      for (var i = 0; i < 240; i++)
+      {
+        var t = a + i * step;
+        if (t > b + step * 1e-3f) break;
+        yield return $"{parts[0]}@{t.ToString("0.####", CultureInfo.InvariantCulture)}{tail}";
+      }
+    }
+  }
+
+  /// <summary>
   ///   mtl1-35: mesh particles (<see cref="EffectMeshParticles"/>) flattened to world-space triangle batches in the sprite
   ///   vertex stride, one batch per (emitter, template part material). Per-vertex HDR colour is the browser mesh shading
   ///   (EffectRenderer.MeshFs) evaluated at the vertex: base = sRGB->linear(override colour) * material tint;
@@ -147,7 +174,7 @@ internal static class VfxUeExport
   ///   VAT deformation is not applied (rest pose). HEURISTIC: the browser shading itself (light units, key light).
   /// </summary>
   internal static List<System.Text.Json.Nodes.JsonObject> MeshBatches(EffectInstance instance, Matrix4x4 view, Vector3 eye, EffectMeshes meshes,
-    List<LightSample> lights, float exposure, float time, out string note, out List<string> missingTemplates)
+    List<LightSample> lights, FrameHdr frameHdr, float time, out string note, out List<string> missingTemplates)
   {
     var result = new List<System.Text.Json.Nodes.JsonObject>();
     var list = EffectMeshParticles.Build(instance, view);
@@ -158,8 +185,9 @@ internal static class VfxUeExport
       meshes.Prefetch(list.Select(b => b.Geom.Template));
       meshes.WaitAll(TimeSpan.FromSeconds(60));
     }
-    var avgLum = CaptureLightUnits.BenchAverageLuminance(exposure, EffectRenderer.ReferenceExposure);
-    var sfxScale = SfxExposure.Exposure(exposure, EffectRenderer.ReferenceExposure, EffectRenderer.SfxLumK) / MathF.Max(exposure, 1e-12f);
+    var exposure = frameHdr.Exposure;
+    var avgLum = frameHdr.AverageLuminance;
+    var sfxScale = frameHdr.SfxScale(EffectRenderer.SfxLumK);
     var key = Vector3.Normalize(new Vector3(0.4f, 0.8f, 0.3f));
     foreach (var batch in list)
     {
@@ -223,3 +251,40 @@ internal static class VfxUeExport
     return result;
   }
 }
+
+/// <summary>
+///   mtl1-40: exposure / average luminance of an exported frame. <c>SM2_VFX_SCENE</c> = capture scene
+///   (<see cref="CaptureScenes"/>: smoke (default), plasma, hellbrute, outdoor, armory) gives exposure = Key(scene) x
+///   BenchScale (<see cref="CaptureExposure"/>), the scene avgLum for non-adaptive lights and the SFX compensation, and the
+///   scene whitepoint. <c>SM2_VFX_SCENE=bench</c> = the pre-mtl1-40 convention (avgLum = 1/250 / exposure).
+///   <c>SM2_VFX_EXPOSURE</c> still overrides the exposure (avgLum then follows the bench convention).
+/// </summary>
+internal sealed record FrameHdr(string Scene, float Exposure, float AverageLuminance, float AverageLuminanceClamped, float WhitePoint, string Note)
+{
+  public float SfxScale(float k) => SfxExposure.Scale(AverageLuminanceClamped, k) / MathF.Max(AverageLuminance, 1e-6f);
+
+  public static FrameHdr FromEnvironment()
+    => Resolve(Environment.GetEnvironmentVariable("SM2_VFX_SCENE"), Environment.GetEnvironmentVariable("SM2_VFX_EXPOSURE"));
+
+  public static FrameHdr Resolve(string? sceneName, string? exposureOverride)
+  {
+    var hasOverride = float.TryParse(exposureOverride, CultureInfo.InvariantCulture, out var ex) && ex > 0;
+    var scene = string.IsNullOrEmpty(sceneName) ? CaptureScenes.Reference : CaptureScenes.Find(sceneName);
+    if (scene is null || hasOverride)
+    {
+      var e = hasOverride ? ex : CaptureExposure.ReferenceExposure;
+      var a = CaptureLightUnits.BenchAverageLuminance(e, CaptureExposure.ReferenceExposure);
+      return new("bench", e, a, a, CaptureTonemap.WhitePointScale,
+        $"bench exposure {(hasOverride ? "SM2_VFX_EXPOSURE" : "1/250")} (pre-mtl1-40 convention: avgLum = (1/250)/exposure; HEURISTIC)");
+    }
+    return new(scene.Name, CaptureExposure.Frame(scene), scene.AverageLuminance, scene.AverageLuminanceClamped, scene.WhitePoint,
+      $"mtl1-40 exposure from capture {scene.Name} {scene.Frame}: avgLum {scene.AverageLuminance:0.######}, EXPOSURE_DIV_AVG_LUM {scene.ExposureDivAvgLum:0.######}, key {scene.Key:0.####} (PROVEN CB values); frame exposure = key x BenchScale {CaptureExposure.BenchScale:0.#####} (HEURISTIC: (1/250)/key(smoke), CPU colour->vertex scale untraced)");
+  }
+
+  public System.Text.Json.Nodes.JsonObject Json() => new()
+  {
+    ["name"] = Scene, ["averageLuminance"] = AverageLuminance, ["averageLuminanceClamped"] = AverageLuminanceClamped,
+    ["exposure"] = Exposure, ["whitePoint"] = WhitePoint, ["note"] = Note,
+  };
+}
+

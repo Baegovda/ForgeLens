@@ -22,7 +22,7 @@ for e in j['expect']:
         rows.append((e['id'], round(e['value'], 1), round(r, 1), round(d, 1)))
     else:
         yi = int(y); ref = im[int(y - 0.8 * px), :, 0]  # ramp row above the distortion quad (inside ramp, outside quad)
-        x0, x1 = int(x - 0.4 * px), int(x + 0.4 * px)
+        x0, x1 = int(x - 0.3 * px), int(x + 0.3 * px)  # mtl1-40: |shift| <= 24 px stays inside the 120 px quad (coverage gate)
         s, err = ramp_shift(im[yi, :, 0], ref, x0, x1)
         rows.append((e['id'], round(e['value'], 2), s, round(s - e['value'], 2), 'mse', round(err, 1)))
 for r in rows: print(*r)

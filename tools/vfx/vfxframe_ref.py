@@ -42,6 +42,7 @@ def sample(t, u, v):  # bilinear, wrap
 hdr = np.zeros((res, res, 3), np.float32)
 zbuf = np.full((res, res), np.inf, np.float32)
 shift = np.zeros((res, res, 2), np.float32)
+cover = np.zeros((res, res), bool)  # DUDV footprint (game: DUDV alpha 0 where a distortion particle drew)
 batches = list(fr["batches"])
 pre = []
 if bd >= 0: pre.append(S.backdrop_batch(fr, bd))
@@ -83,7 +84,7 @@ for b in batches:
         if kind == "Distortion":
             o = (t[:, :2] * 2.007874 - 1.007874) * A[:, 5:6] * np.clip(A[:, 8:9], 0, 1)
             mk = np.clip(10 * np.abs(o).sum(1, keepdims=True), 0, 1)
-            shift[yy, xx] += np.clip(0.08 * mk * o, -0.02, 0.02); continue
+            shift[yy, xx] += np.clip(0.08 * mk * o, -0.02, 0.02); cover[yy, xx] = True; continue
         a = t[:, 3] * (sample(M, A[:, 11], A[:, 12])[:, 3] if M is not None else 1)
         clip = A[:, 9]; a = np.where(clip > 0, np.clip((a - clip) / np.maximum(1 - clip, 1e-4), 0, 1), a)
         # PROVEN particles PS 281 (mtl1-38): c0 = tex*V*boost, boost = 1 + contrast*sat(1 - |key - tex|); c = mix(c0, t*V*tex.a, t)
@@ -100,8 +101,7 @@ for b in batches:
             keep = a >= 0.5; hdr[yy[keep], xx[keep]] = (c * va[:, None])[keep]; zbuf[yy[keep], xx[keep]] = z[keep]
         elif kind == "Additive": hdr[yy, xx] = dst + c * (va * a)[:, None]
 if np.abs(shift).max() > 0:
-    gy, gx = np.mgrid[0:res, 0:res]; sx_ = np.clip(np.rint(gx + shift[..., 0] * res), 0, res - 1).astype(int); sy_ = np.clip(np.rint(gy + shift[..., 1] * res), 0, res - 1).astype(int)
-    hdr = hdr[sy_, sx_]
+    hdr, nshift = S.distort_resample(hdr, shift, cover); print("distortion: shifted", nshift, "of footprint", int(cover.sum()))
 x = np.maximum(hdr * E, 0)
 strip = (fr.get("grading") or {}).get("strip")
 if use_lut and strip:

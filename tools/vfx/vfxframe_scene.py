@@ -100,3 +100,20 @@ def lut_coord(x):
     grey, rng = 0.43, 14.0
     c0 = 0.18 * 2.0 ** (-grey * rng)
     return min(max(grey + math.log2((max(x, 0.0) + c0) / 0.18) / rng, 0.0), 1.0)
+
+
+def distort_resample(hdr, shift, cover):
+    """mtl1-40 PS 5160 (PROVEN gate): shift only where the shift is non-zero and every bilinear tap of the shifted uv lies
+    in the DUDV footprint; the scene is resampled bilinearly, clamped (sampler PS_SAMPLERS[4]: bilinear INFERRED).
+    numpy is imported here so the module stays numpy-free inside UE."""
+    import numpy as np
+    n = hdr.shape[0]; gy, gx = np.mgrid[0:n, 0:n].astype(np.float32)
+    px = gx + shift[..., 0] * n; py = gy + shift[..., 1] * n  # texel-space sample position (pixel centre -> index)
+    x0 = np.floor(px).astype(int); y0 = np.floor(py).astype(int); fx = px - x0; fy = py - y0
+    cl = lambda a: np.clip(a, 0, n - 1)
+    ok = (shift != 0).any(-1)
+    for dy, wy in ((0, 1 - fy), (1, fy)):
+        for dx, wx in ((0, 1 - fx), (1, fx)):
+            ok &= ~((wx * wy > 0) & ~cover[cl(y0 + dy), cl(x0 + dx)])
+    out = sum(hdr[cl(y0 + dy), cl(x0 + dx)] * (wx * wy)[..., None] for dy, wy in ((0, 1 - fy), (1, fy)) for dx, wx in ((0, 1 - fx), (1, fx)))
+    return np.where(ok[..., None], out, hdr), int(ok.sum())
