@@ -50,6 +50,12 @@ internal sealed class EffectTextures
 
   public bool IsMissing(string name) => _cache.TryGetValue(name, out var t) && t.IsCompleted && t.Result.Width == 0;
 
+  /// <summary>BGRA -> RGBA in place.</summary>
+  internal static void SwapRedBlue(byte[] pixels)
+  {
+    for (var i = 0; i + 3 < pixels.Length; i += 4) (pixels[i], pixels[i + 2]) = (pixels[i + 2], pixels[i]);
+  }
+
   private EffectImage Decode(string name)
   {
     try
@@ -57,7 +63,11 @@ internal sealed class EffectTextures
       var doc = _resolve(name);
       if (doc is null) return new EffectImage(0, 0, []);
       var rgba = doc.Decode(0, 0, out var w, out var h, out _);
-      return rgba is { Length: > 0 } && w > 0 ? new EffectImage(w, h, rgba) : new EffectImage(0, 0, []);
+      if (rgba is not { Length: > 0 } || w <= 0) return new EffectImage(0, 0, []);
+      // TextureDocument.Decode returns BGRA (TextureDecode / AssetExporter); EffectRenderer uploads RGBA, so swap here
+      // (GlPreview does the same swap for mesh textures). mtl1-34: fire/muzzle atlases are warm only in this order.
+      SwapRedBlue(rgba);
+      return new EffectImage(w, h, rgba);
     }
     catch (Exception)
     {

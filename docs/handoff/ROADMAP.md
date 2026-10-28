@@ -9,7 +9,7 @@
    - 5a. Constructor fix (`--variant`, `--tex-formats`): **done + UE verified**
    - 5b. UE folder cleanup (approved deletions only): **done**
 6. Secondary physics (user request: purity seals and cloth should move as in-game in the browser and carry over to Unreal): **done + UE verified**
-7. Browser VFX (the user said go at 02:32 KST, "일단 냅두고 그담거해봐"): **in progress, ~85 %**
+7. Browser VFX (the user said go at 02:32 KST, "일단 냅두고 그담거해봐"): **in progress, ~90 %** (mtl1-34: UE frozen-frame export with capture blend/tonemap/distortion rules, verified; engine VFX defaults; browser BGRA fix)
 8. In-game side-by-side comparison (VFX, physics, materials): **todo**. It needs the PC free and in-game captures.
 9. Unreal export test without Niagara (meshes/textures/materials of the compared effects → `/Game/SM2_Work/VfxExport`): **done** (2026-10-27, vfx4-2).
 10. Browser viewer polish (asset search, preview, export button): **done (vfx4-3)**.
@@ -28,7 +28,17 @@ Pushed so far: sockets/bone attach, anim-event cues and stop cues, distortion, d
 5. **[mtl1-21: DEMO host preview added (plane/sphere, heuristic)] [mtl1-20: classified, not drawable standalone - covering painter writes the host surface coveringMask; needs a host character + covering_simulation]** **Flesh emitter:** `part_mag_ee_bolter_flesh` untyped entry. It is now known to be an `em_covering_*` surface painter (blood r0.4 on HEAD), shown as a note. Optional: draw a decal-like covering on the model.
 6. **[mtl1-20: animStage source REA'd (spline over age) and implemented; rest of VAT was done in vfx3e-g]** **VAT blood splashes** (`splash_5_v2_anim_data*`, `shader_blood_splash`): the layout is still unknown, see the findings in HANDOFF vfx3 part 3. The pct is downsampled (2400×471, 8 bands). REA the vertex shader / `combineMtlAnimControl.animStage`.
 7. **SELF_DISTORTION** render: **done** (mtl1-19; mtl1-23 uses the capture distortion formula 0.08·sat(10|off|)·off clamped ±0.02, quad-space use HEURISTIC). degNear on trails and mesh particles: **done** (trails TRAIL_DEGR; mesh particles mtl1-17).
-8. Then report VFX done (with %).
+8. **[mtl1-34 done]** UE frozen-frame export (`--vfxue`, `ue_vfx_frame.py`) with capture rules; rule scene within 0.41/255; CPU reference `tools/vfx/vfxframe_ref.py`; Mod Tools engine defaults (alphaMul true, textureTint 0, GPU streaks 0.3).
+9. Next (VFX, highest impact first):
+   - Export lights (the grenade glow) to the frame.
+   - Export mesh particles (the SfxMesh Additive master exists).
+   - Soft-depth fade.
+   - Dump and apply the grading LUT from the next capture.
+   - Take exposure from the capture's average luminance instead of 1/250.
+   - Check the textureTint=0 luminance mix (still a shader heuristic) against captures.
+   - Bilinear distortion resample.
+   - UE frame sequences.
+10. Then report VFX done (with %).
 
 ## UE verification — results so far (details in STATUS.md / HANDOFF "UE verification")
 - Constructors PASS (`/Game/SM2_Work/Tests/bulk_fix`). Titus + Calgar physics bake PASS (`/Game/SM2_Work/Tests/physics`), with 60 Hz import fixed.

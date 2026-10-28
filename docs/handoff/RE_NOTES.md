@@ -127,3 +127,16 @@ All addresses are virtual addresses in `sm2_retail.exe` (retail Steam build, 81 
 ## mtl1-31 shared CDT union (HEURISTIC, data only)
 - Retail scan of 282 cls files with prop_cloth_sim: cdt capsule/sphere entries are always full items with bones (306), never name references to shared shapes. 217 files define shared shapes. Of all cloths, 2995 have own and shared shapes, 1014 have own only, 538 have shared only. Shared shapes are prop-level and can't be attached to a cloth by name, so the parser treats them as applying to every cloth of the prop (union with own lists). The exe consumer is still not located (only (de)serializers; see mtl1-30).
 - UE evidence for per-cloth colliders: a shared PA (the union of every cloth's shapes) pushes particles of one cloth with shapes rest-fitted to another (tech_priest v0/v3, STATUS mtl1-31).
+
+## mtl1-34 VFX export / UE findings
+- `TextureDocument.Decode` (TextureDecode.DecodeLibrary) returns BGRA. GlPreview swaps it for meshes (GlPreview.cs ~480-498), but EffectRenderer uploaded it as RGBA without a swap. Fixed in EffectTextures.
+- Engine defaults for absent sfx keys (constructors FUN_14178cbf0 / FUN_1417c6290; the readers only overwrite present keys):
+  - isBlendAlphaMultiply = true.
+  - textureTintControl = 0.
+  - GPU streaks: isEnabled true, ratio 0.3.
+  - See /workspace/rdc/modtools/FINDINGS.md.
+- UE 5.7 SceneCapture2D (measured):
+  - BLEND_AlphaComposite = One/InvSrcAlpha.
+  - Manual exposure, bias 0, physical camera off -> exposure scale exactly 1.
+  - SceneColor (translucent) and RM_2D_OFFSET refraction return a constant inside the capture, so distortion is a separate shift pass + PostProcessInput0 resample (point sampled).
+  - With capture_every_frame off, editor capture_scene() skips the PP material.

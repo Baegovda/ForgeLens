@@ -151,12 +151,21 @@ public sealed class EmitterDef
   public Vector2 SpeedInherit { get; init; }
   public Vector2 RatioXY { get; init; } = Vector2.One;
   public string RatioDependency { get; init; } = "none";
+  /// <summary>
+  ///   GPU <c>visuals.transforms.streaks</c> {bool isEnabled @+0x178, float ratio @+0x17c}. The GPU visuals constructor
+  ///   FUN_1417c6290 sets isEnabled=true, ratio=0.3 and the reader (FUN_1417c7720 -> FUN_1417c0eb0) only overwrites keys
+  ///   that are present (Mod Tools meta_desc partEMITTER_GPU_STREAKS agrees: True / 0.3). CPU emitters have no streaks.
+  /// </summary>
   public float StreakRatio { get; init; }
 
   public string? Texture { get; init; }
   public EffectBlend Blend { get; init; }
-  /// <summary><c>visuals.isBlendAlphaMultiply</c> (emitter desc +0x490, read by FUN_1417e1e50).</summary>
-  public bool BlendAlphaMultiply { get; init; }
+  /// <summary>
+  ///   <c>visuals.isBlendAlphaMultiply</c> (emitter desc +0x490, read by FUN_1417e1e50). Absent means true: the visuals
+  ///   constructor FUN_14178cbf0 writes 1 at +0xe8 and the reader FUN_14178f3b0 only overwrites present keys
+  ///   (Mod Tools meta_desc __defaultValue = True).
+  /// </summary>
+  public bool BlendAlphaMultiply { get; init; } = true;
   public ColorCurve Color { get; init; } = ColorCurve.White;
   public ScalarParam ColorIntensity { get; init; } = ScalarParam.Constant(1);
   public float AlphaIntensity { get; init; } = 1f;
@@ -164,9 +173,10 @@ public sealed class EmitterDef
   ///   <c>visuals.textureTintControl</c> (0..1, @0x143645278, typeParams+0x140): how much of the texture's own RGB tints
   ///   the particle. 0 uses the texture as intensity only (luminance), so channel-packed flipbooks such as
   ///   <c>seq_fin_expl_g</c> (blue fire mask in B) draw grey/white smoke tinted by <see cref="Color"/>, not blue.
-  ///   Absent means 1 (texture colour as authored), which keeps every emitter that never sets it unchanged.
+  ///   Absent means 0: the visuals constructor FUN_14178cbf0 zeroes +0x140 and the reader FUN_14178f3b0 only overwrites
+  ///   present keys (Mod Tools meta_desc __defaultValue = 0). The luminance/colour mix itself is still a shader heuristic.
   /// </summary>
-  public float TextureTint { get; init; } = 1f;
+  public float TextureTint { get; init; }
   /// <summary>
   ///   <c>visuals.additionalContrast</c> (string @0x143645248, float at typeParams+0x12C, serialized at 0x14178d437):
   ///   extra brightness on texels close to <see cref="ContrastColorKey"/>. The particle PS (particles.sdc 00114_2) does
@@ -479,14 +489,14 @@ public sealed class EffectDefinition
       AlignSpeed = particle.Bool("isAlignSpeed", false),
       RatioXY = ratio is null ? Vector2.One : SslRead.Range(ratio.Get("ratioXY") is JsonObject ro && SslRead.UnionKind(ro) is { } rk ? ro.Get(rk) : ratio.Get("ratioXY"), Vector2.One),
       RatioDependency = ratio.Str("dependencyType") ?? "none",
-      StreakRatio = transforms.Obj("streaks") is { } st && st.Bool("isEnabled", false) ? st.Float("ratio", 0f) : 0f,
+      StreakRatio = !gpu ? 0f : transforms.Obj("streaks") is not { } st ? 0.3f : st.Bool("isEnabled", true) ? st.Float("ratio", 0.3f) : 0f,
       Texture = texture.Str("nameTex"),
       Blend = blend,
-      BlendAlphaMultiply = visuals.Bool("isBlendAlphaMultiply", false),
+      BlendAlphaMultiply = visuals.Bool("isBlendAlphaMultiply", true),
       Color = SslRead.Color(visuals.Get("color")),
       ColorIntensity = SslRead.Scalar(visuals.Get("colorIntensity"), 1f),
       AlphaIntensity = SslRead.Scalar(visuals.Get("alphaIntensity"), 1f).Sample(0, 0.5f),
-      TextureTint = Math.Clamp(visuals.Float("textureTintControl", 1f), 0f, 1f),
+      TextureTint = Math.Clamp(visuals.Float("textureTintControl", 0f), 0f, 1f),
       AdditionalContrast = Math.Max(0f, visuals.Float("additionalContrast", 0f)),
       ContrastColorKey = EmitterDef.ContrastKey(visuals.Get("contrastColorKey")),
       AlphaClip = SslRead.Scalar(visuals.Get("alphaClip"), 0f),

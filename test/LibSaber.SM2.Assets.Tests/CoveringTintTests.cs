@@ -43,7 +43,8 @@ public class CoveringTintTests
                    texture   =   {
                       nameTex   =   "seq_fin_expl_g"
                    }
-                   textureTintControl   =   0
+                   textureTintControl   =   1
+                   isBlendAlphaMultiply   =   False
                 }
              }
              __type   =   "local__default"
@@ -75,6 +76,38 @@ public class CoveringTintTests
           }
           __type   =   "CPU_EMITTER"
        }
+       gpu_default   =   {
+          isVisible   =   True
+          visuals   =   {
+             texture   =   {
+                nameTex   =   "spark_01"
+             }
+          }
+          __type   =   "GPU_EMITTER"
+       }
+       gpu_ratio   =   {
+          isVisible   =   True
+          visuals   =   {
+             transforms   =   {
+                streaks   =   {
+                   ratio   =   0.5
+                }
+             }
+          }
+          __type   =   "GPU_EMITTER"
+       }
+       gpu_off   =   {
+          isVisible   =   True
+          visuals   =   {
+             transforms   =   {
+                streaks   =   {
+                   isEnabled   =   False
+                   ratio   =   0.5
+                }
+             }
+          }
+          __type   =   "GPU_EMITTER"
+       }
     }
     __type   =   "sfx_part"
     """;
@@ -94,10 +127,26 @@ public class CoveringTintTests
   }
 
   [Fact]
-  public void TextureTintControlDefaultsToOne()
+  public void VisualsDefaultsMatchEngineConstructor()
   {
+    // FUN_14178cbf0: textureTintControl 0, isBlendAlphaMultiply true when the key is absent.
     var def = Def();
-    Assert.Equal(0f, def.Emitters.Single(e => e.Name == "smoke").TextureTint);
-    Assert.Equal(1f, def.Emitters.Single(e => e.Name == "spark").TextureTint);
+    var smoke = def.Emitters.Single(e => e.Name == "smoke");
+    var spark = def.Emitters.Single(e => e.Name == "spark");
+    Assert.Equal(1f, smoke.TextureTint);
+    Assert.False(smoke.BlendAlphaMultiply);
+    Assert.Equal(0f, spark.TextureTint);
+    Assert.True(spark.BlendAlphaMultiply);
+    Assert.Equal(0f, spark.StreakRatio);
+  }
+
+  [Fact]
+  public void GpuStreaksDefaultToEnabledRatio03()
+  {
+    // FUN_1417c6290: streaks.isEnabled true, ratio 0.3 when the keys are absent.
+    var def = Def();
+    Assert.Equal(0.3f, def.Emitters.Single(e => e.Name == "gpu_default").StreakRatio, 0.0001f);
+    Assert.Equal(0.5f, def.Emitters.Single(e => e.Name == "gpu_ratio").StreakRatio, 0.0001f);
+    Assert.Equal(0f, def.Emitters.Single(e => e.Name == "gpu_off").StreakRatio);
   }
 }

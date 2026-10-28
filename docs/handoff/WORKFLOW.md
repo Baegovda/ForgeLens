@@ -125,6 +125,14 @@ The box has no GitHub write login. Pushes go through a Cursor cloud agent with r
   - `ue_mat_apply.py`, `ue_step3*.py`: materials.
   - `ue_sm2_physics.py <physics.json> <mesh> [folder] verify|physasset`, `ue_phys_probe.py`: physics.
   - `ue_cap_lit.py` (modes capture/pose/export/fit, each **a separate call**; same-call export returns a stale render target): lit captures. Wait for shaders/textures to finish compiling, or the capture comes out grey.
+- **VFX frozen frames (mtl1-34):**
+  1. Box: `ForgeLens --vfxue <raw>/sfx <aliases.ps> <raw> <out> name@sec ...` (`--vfxue-rules <out>` for the rule scene).
+  2. Tar the output to the PC.
+  3. `uerun.ps1 Scripts\mtl_fix\ue_vfx_frame.py import <dir> /Game/SM2_Work/VfxUe [fresh]`.
+  4. For each frame, `render <json> /Game/SM2_Work/VfxUe [res] [backdrop_exposed]`, then `export <png>` as **a separate call**. PC wrapper: `mtl34_vfx\rr.ps1 <json> <png> @('512','0.06')`.
+  5. Check on the box with `tools/vfx/check_rules.py <png> <rules json>` and `tools/vfx/vfxframe_ref.py <json> <png> 512 0.06` (CPU reference, same formulas).
+  - Keep `capture_every_frame` True, otherwise the PP tonemap is skipped.
+  - After a box restart: `export DOTNET_ROOT=/home/box/tools/dotnet PATH=/home/box/tools/dotnet:$PATH`.
 - Restarting the editor is allowed (save all first). Long imports run inside one editor tick; import big sets one asset at a time.
 
 ## 6. Headless browser captures (box)
