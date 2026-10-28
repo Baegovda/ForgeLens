@@ -118,3 +118,8 @@ All addresses are virtual addresses in `sm2_retail.exe` (retail Steam build, 81 
 
 ## mtl1-28 sparks / trails
 - "SPARKS" strings @0x1436dceac / 0x1436e16a0 have data-table refs only (no code xref found). The spark draw kind (opaque, blending off) comes from the capture (smoke 88302 eid 2086, PS 1770712). The mapping from emitter to spark (IsGpu && StreakRatio>0) is **HEURISTIC**. Trails: CB_PASS_TRAIL, SrcAlpha/InvSrcAlpha (capture).
+
+## mtl1-30 cloth shared CDT
+- Prop cloth struct (serializer FUN_1410953d0 / deserializers FUN_141094a60, FUN_141094fb0, FUN_141094260): clothes @+0x148 (count +0x150, stride 0x140), simulationDistance +0x158, decreaseSolverFreq +0x15c, enableTeleportationInCine +0x15d, **sharedCDTCapsules @+0x160 (count +0x168, stride 0x48)**, sharedCDTSpheres @+0x170 (count +0x178, stride 0x28), sharedCDTBoxes after, interCollisionCfg {iterations +0x194, collisionDistance +0x198, collisionStiffness}.
+- Per-config `cdtCapsules` (string @0x1435f1328) is referenced only by FUN_14108f130/14108ff30/141090c00/141091880 (config (de)serializers). The runtime consumer that decides which shapes a cloth collides with was **not** located, so "no cdt lists → all shared shapes" is **HEURISTIC**.
+

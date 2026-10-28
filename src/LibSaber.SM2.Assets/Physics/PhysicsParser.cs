@@ -32,12 +32,13 @@ public static class PhysicsParser
     var sharedCapsules = new Dictionary<string, ClothCapsule>(StringComparer.OrdinalIgnoreCase);
     var sharedSpheres = new Dictionary<string, ClothSphere>(StringComparer.OrdinalIgnoreCase);
     var sharedBoxes = new Dictionary<string, ClothBox>(StringComparer.OrdinalIgnoreCase);
+    var shared = new SharedCdt();
     foreach (var item in Items(Child(prop, "sharedCDTCapsules")))
-      if (ReadCapsule(item) is { } capsule) sharedCapsules[capsule.Name] = capsule;
+      if (ReadCapsule(item) is { } capsule) { sharedCapsules[capsule.Name] = capsule; shared.Capsules.Add(capsule); }
     foreach (var item in Items(Child(prop, "sharedCDTSpheres")))
-      if (ReadSphere(item) is { } sphere) sharedSpheres[sphere.Name] = sphere;
+      if (ReadSphere(item) is { } sphere) { sharedSpheres[sphere.Name] = sphere; shared.Spheres.Add(sphere); }
     foreach (var item in Items(Child(prop, "sharedCDTBoxes")))
-      if (ReadBox(item) is { } box) sharedBoxes[box.Name] = box;
+      if (ReadBox(item) is { } box) { sharedBoxes[box.Name] = box; shared.Boxes.Add(box); }
 
     foreach (var item in Items(Child(prop, "clothes")))
     {
@@ -57,7 +58,7 @@ public static class PhysicsParser
       }
 
       if (Child(item, "config") is JsonObject config)
-        entry.Config = ReadConfig(config, sharedCapsules, sharedSpheres, sharedBoxes, setup.Notes, entry.SimMeshName);
+        entry.Config = ReadConfig(config, sharedCapsules, sharedSpheres, sharedBoxes, setup.Notes, entry.SimMeshName, shared);
       if (entry.SimMeshName.Length > 0)
         setup.Cloths.Add(entry);
     }
@@ -69,7 +70,8 @@ public static class PhysicsParser
     Dictionary<string, ClothSphere> sharedSpheres,
     Dictionary<string, ClothBox> sharedBoxes,
     List<string> notes,
-    string owner)
+    string owner,
+    SharedCdt? allShared = null)
   {
     var c = new ClothConfig();
     c.Vertical = ReadPhase(Child(o, "vertical"));
@@ -147,6 +149,19 @@ public static class PhysicsParser
       e.FluidDensity = Num(env, "fluidDensity", e.FluidDensity);
     }
 
+    // mtl1-30 HEURISTIC: a cloth config with no cdtCapsules/cdtSpheres/cdtBoxes lists at all (e.g. lesser_sorcerer
+    // skirt_SIM/ribbons_SIM) collides against every prop-level shared CDT shape. Not proven from the exe; an explicit
+    // (even empty) list keeps its own meaning. Shapes without bones or with radius <= 0 are skipped.
+    if (Child(o, "cdtCapsules") is null && Child(o, "cdtSpheres") is null && Child(o, "cdtBoxes") is null &&
+        allShared is not null && allShared.Capsules.Count + allShared.Spheres.Count + allShared.Boxes.Count > 0)
+    {
+      c.Capsules.AddRange(allShared.Capsules.Where(x => x.BoneFirst.Length > 0 && Math.Max(x.RadiusFirst, x.RadiusSecond) > 0));
+      c.Spheres.AddRange(allShared.Spheres.Where(x => x.Bone.Length > 0 && x.Radius > 0));
+      c.Boxes.AddRange(allShared.Boxes.Where(x => x.Bone.Length > 0 && x.Size != Vector3.Zero));
+      c.CollisionFromShared = true;
+      notes.Add($"{owner}: no cdt lists; using all shared CDT shapes ({c.Capsules.Count} capsules, {c.Spheres.Count} spheres, {c.Boxes.Count} boxes) (HEURISTIC).");
+    }
+
     c.SolverFrequency = Num(o, "solverFrequency", c.SolverFrequency);
     c.StiffnessFrequency = Num(o, "stiffnessFrequency", Num(o, "stiffnessFrequencyScale", c.StiffnessFrequency));
     c.AccelerationFilterWidth = (int)Num(o, "acceleationFilterWidth", c.AccelerationFilterWidth);
@@ -168,6 +183,14 @@ public static class PhysicsParser
 
     c.CollisionMassScale = Num(o, "collisionMassScale", c.CollisionMassScale);
     return c;
+  }
+
+  /// <summary>Prop-level shared CDT shapes in file order, including unnamed ones (the name dictionaries collapse those).</summary>
+  private sealed class SharedCdt
+  {
+    public List<ClothCapsule> Capsules { get; } = new();
+    public List<ClothSphere> Spheres { get; } = new();
+    public List<ClothBox> Boxes { get; } = new();
   }
 
   private static ClothPhase ReadPhase(JsonNode? node)

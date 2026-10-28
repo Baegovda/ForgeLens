@@ -803,8 +803,9 @@ bool USM2PhysicsSetupLibrary::CreateChaosCloth(USkeletalMesh* Mesh, const FStrin
         SimSection = Best;
         bRenderAsSim = true;
         const FName PrimarySlot = Mesh->GetMaterials()[BS.MaterialIndex].MaterialSlotName;
-        RenderSections = {Best}; // bound to itself; other render slots stay bone-skinned (as with a _SIM source)
-        RenderSlots = {PrimarySlot};
+        RenderSlots.Remove(PrimarySlot);
+        RenderSlots.Insert(PrimarySlot, 0); // primary first; mtl1-30: the other render slots get their own render-as-sim asset in step 6
+        RenderSections = {Best};
       }
     }
     if (SimSection == INDEX_NONE || RenderSections.Num() == 0)
@@ -813,182 +814,261 @@ bool USM2PhysicsSetupLibrary::CreateChaosCloth(USkeletalMesh* Mesh, const FStrin
       continue;
     }
 
-    // 3. clothing asset from the sim section (the editor's Create Clothing Data from Section, section removed = disabled).
-    UClothingAssetCommon* Asset = nullptr;
+    // mtl1-30: steps 3-5b as a lambda so one cloth can make several clothing assets (UE binds one section per asset LOD).
+    auto MakeAsset = [&](int32 Src, bool bRemoveSrc, const FString& Suffix, bool bAddCollision, int32& Pinned, float& WorstMatch) -> UClothingAssetCommon*
     {
-      FScopedSkeletalMeshPostEditChange Outer(Mesh);
-      if (!bRenderAsSim)
+      // 3. clothing asset from the sim section (the editor's Create Clothing Data from Section, section removed = disabled).
+      UClothingAssetCommon* Asset = nullptr;
       {
-        FScopedSkeletalMeshPostEditChange Inner(Mesh);
-        Mesh->RemoveMeshSection(0, SimSection);
+        FScopedSkeletalMeshPostEditChange Outer(Mesh);
+        if (bRemoveSrc)
+        {
+          FScopedSkeletalMeshPostEditChange Inner(Mesh);
+          Mesh->RemoveMeshSection(0, Src);
+        }
+        FSkeletalMeshClothBuildParams Params;
+        Params.AssetName = TEXT("SM2Cloth_") + SimName + Suffix;
+        Params.LodIndex = 0;
+        Params.SourceSection = Src;
+        Params.bRemoveFromMesh = false; // already disabled above
+        Asset = Cast<UClothingAssetCommon>(Factory->CreateFromSkeletalMesh(Mesh, Params));
+        if (Asset)
+          Mesh->AddClothingAsset(Asset);
       }
-      FSkeletalMeshClothBuildParams Params;
-      Params.AssetName = TEXT("SM2Cloth_") + SimName;
-      Params.LodIndex = 0;
-      Params.SourceSection = SimSection;
-      Params.bRemoveFromMesh = false; // already disabled above
-      Asset = Cast<UClothingAssetCommon>(Factory->CreateFromSkeletalMesh(Mesh, Params));
-      if (Asset)
-        Mesh->AddClothingAsset(Asset);
-    }
-    SM2WaitMeshBuild(Mesh);
-    if (!Asset || Asset->LodData.Num() == 0)
-    {
-      Log.Add(SimName + TEXT(": factory failed"));
-      continue;
-    }
+      SM2WaitMeshBuild(Mesh);
+      if (!Asset || Asset->LodData.Num() == 0)
+      {
+        Log.Add(SimName + Suffix + TEXT(": factory failed"));
+        return (UClothingAssetCommon*)nullptr;
+      }
 
-    // 4. MaxDistance from the game (maxDistanceMeters x100 per sim particle, nearest particle; 0 = pinned / kinematic).
-    FClothLODDataCommon& CLod = Asset->LodData[0];
-    const TArray<FVector3f>& PV = CLod.PhysicalMeshData.Vertices;
-    FPointWeightMap& Mask = CLod.PointWeightMaps.AddDefaulted_GetRef();
-    Mask.Initialize(PV.Num());
-    Mask.Name = TEXT("SM2_MaxDistance");
-    Mask.CurrentTarget = (uint8)EWeightMapTargetCommon::MaxDistance;
-    Mask.bEnabled = true;
+      // 4. MaxDistance from the game (maxDistanceMeters x100 per sim particle, nearest particle; 0 = pinned / kinematic).
+      FClothLODDataCommon& CLod = Asset->LodData[0];
+      const TArray<FVector3f>& PV = CLod.PhysicalMeshData.Vertices;
+      FPointWeightMap& Mask = CLod.PointWeightMaps.AddDefaulted_GetRef();
+      Mask.Initialize(PV.Num());
+      Mask.Name = TEXT("SM2_MaxDistance");
+      Mask.CurrentTarget = (uint8)EWeightMapTargetCommon::MaxDistance;
+      Mask.bEnabled = true;
+      Pinned = 0;
+      WorstMatch = 0.0f;
+      for (int32 I = 0; I < PV.Num(); ++I)
+      {
+        float D;
+        const int32 N = Nearest(PV[I], D);
+        WorstMatch = FMath::Max(WorstMatch, D);
+        const float Cm = MaxV->IsValidIndex(N) ? (float)(*MaxV)[N]->AsNumber() * 100.0f : 0.0f;
+        Mask.Values[I] = Cm;
+        Pinned += Cm <= 0.0f;
+      }
+      const TArray<float> MaxCm = Mask.Values; // Mask ref is invalidated by the AddDefaulted below
+      // 4b. mtl1-22: backstop (HEURISTIC, generic; not from the game). A free particle may sink at most BackstopCm behind its
+      // skinned position along the animated normal (non-legacy Chaos backstop: sphere surface at Distance behind, radius R).
+      // R = clamp(2 x MaxDistance, 5, 50) cm approximates a plane locally; pinned particles get 0 (off).
+      // Sidecar ue.chaosCloth.backstopCm overrides the 1 cm default; < 0 disables.
+      {
+        const TSharedPtr<FJsonObject>* UeB = nullptr;
+        const TSharedPtr<FJsonObject>* CCB = nullptr;
+        double BackCm = 1.0;
+        if (Cloth->TryGetObjectField(TEXT("ue"), UeB) && (*UeB)->TryGetObjectField(TEXT("chaosCloth"), CCB))
+          (*CCB)->TryGetNumberField(TEXT("backstopCm"), BackCm);
+        if (BackCm >= 0.0)
+        {
+          const TArray<float> MDv = MaxCm;
+          CLod.PointWeightMaps.AddDefaulted(2);
+          FPointWeightMap& BD = CLod.PointWeightMaps[CLod.PointWeightMaps.Num() - 2];
+          BD.Initialize(PV.Num());
+          BD.Name = TEXT("SM2_BackstopDistance");
+          BD.CurrentTarget = (uint8)EWeightMapTargetCommon::BackstopDistance;
+          BD.bEnabled = true;
+          FPointWeightMap& BR = CLod.PointWeightMaps.Last();
+          BR.Initialize(PV.Num());
+          BR.Name = TEXT("SM2_BackstopRadius");
+          BR.CurrentTarget = (uint8)EWeightMapTargetCommon::BackstopRadius;
+          BR.bEnabled = true;
+          for (int32 I = 0; I < PV.Num(); ++I)
+          {
+            const bool bFree = MDv[I] > 0.0f;
+            BD.Values[I] = bFree ? (float)BackCm : 0.0f;
+            BR.Values[I] = bFree ? FMath::Clamp(2.0f * MDv[I], 5.0f, 50.0f) : 0.0f;
+          }
+          Log.Add(FString::Printf(TEXT("%s: backstop %.2fcm on %d free particles"), *SimName, BackCm, PV.Num() - Pinned));
+        }
+      }
+      Asset->ApplyParameterMasks(true);
+
+      // 5. ChaosClothConfig from ue.chaosCloth (copied; see PhysicsSidecar note). Velocity clamps are HEURISTIC (root-motion dashes).
+      UObject* Config = nullptr;
+      for (const auto& KV : Asset->ClothConfigs)
+        if (KV.Value && ChaosConfigClass && KV.Value->IsA(ChaosConfigClass))
+          Config = KV.Value;
+      if (!Config && ChaosConfigClass)
+      {
+        Config = NewObject<UClothConfigBase>(Asset, ChaosConfigClass, NAME_None, RF_Transactional);
+        Asset->ClothConfigs.Add(ChaosConfigClass->GetFName(), Cast<UClothConfigBase>(Config));
+      }
+      const TSharedPtr<FJsonObject>* UeO = nullptr;
+      TSharedPtr<FJsonObject> CC;
+      if (Cloth->TryGetObjectField(TEXT("ue"), UeO))
+      {
+        const TSharedPtr<FJsonObject>* C = nullptr;
+        if ((*UeO)->TryGetObjectField(TEXT("chaosCloth"), C))
+          CC = *C;
+      }
+      if (Config)
+      {
+        auto W = [](double V) { return FString::Printf(TEXT("(Low=%f,High=%f)"), V, V); };
+        SetProp(Config, TEXT("EdgeStiffnessWeighted"), W(Num(CC, TEXT("edgeStiffness"), 1)), Log);
+        SetProp(Config, TEXT("BendingStiffnessWeighted"), W(Num(CC, TEXT("bendingStiffness"), 1)), Log);
+        SetProp(Config, TEXT("AreaStiffnessWeighted"), W(Num(CC, TEXT("areaStiffness"), 1)), Log);
+        SetProp(Config, TEXT("TetherStiffness"), W(FMath::Max(0.5, Num(CC, TEXT("tetherStiffness"), 1))), Log);
+        SetProp(Config, TEXT("TetherScale"), W(FMath::Clamp(Num(CC, TEXT("tetherScale"), 1), 1.0, 1.2)), Log);
+        SetProp(Config, TEXT("DampingCoefficient"), FString::SanitizeFloat(FMath::Clamp(Num(CC, TEXT("dampingCoefficient"), 0.01), 0.0, 1.0)), Log);
+        // mtl1-13b: thicker collision + CCD against fast limbs (HEURISTIC; measured penetration 2-6% at 1 cm).
+        SetProp(Config, TEXT("CollisionThickness"), FString::SanitizeFloat(FMath::Max(2.0, Num(CC, TEXT("collisionThicknessCm"), 1))), Log);
+        SetProp(Config, TEXT("bUseCCD"), TEXT("True"), Log);
+        SetProp(Config, TEXT("FrictionCoefficient"), FString::SanitizeFloat(Num(CC, TEXT("frictionCoefficient"), 0.8)), Log);
+        const double LV = FMath::Clamp(Num(CC, TEXT("linearVelocityScale"), 0.75), 0.0, 1.0);
+        SetProp(Config, TEXT("LinearVelocityScale"), FString::Printf(TEXT("(X=%f,Y=%f,Z=%f)"), LV, LV, LV), Log);
+        SetProp(Config, TEXT("AngularVelocityScale"), FString::SanitizeFloat(FMath::Clamp(Num(CC, TEXT("angularVelocityScale"), 0.75), 0.0, 1.0)), Log);
+        SetProp(Config, TEXT("bEnableLinearVelocityClamping"), TEXT("True"), Log);
+        SetProp(Config, TEXT("MaxLinearVelocity"), TEXT("(X=600,Y=600,Z=600)"), Log);
+        SetProp(Config, TEXT("bEnableAngularVelocityClamping"), TEXT("True"), Log);
+        SetProp(Config, TEXT("MaxAngularVelocity"), TEXT("10"), Log);
+      }
+      else
+        Log.Add(TEXT("no ChaosClothConfig class"));
+      // mtl1-16: 2 solver substeps by default (sidecar ue.chaosCloth.solverSubsteps overrides). HEURISTIC from live SIE runs
+      // (pen16): sorcerer_exalted free particles >1 cm inside 243-359 -> 174-272, worst 6.6-11.2 -> 4.8-11.1 cm; calgar stays 0;
+      // tech_priest 132-140 -> 59-192. 4 substeps or IterationCount 4 gave no further clear gain. Shared config = whichever
+      // ClothConfigs entry has SubdivisionCount (ChaosClothSharedSimConfig).
+      for (const auto& KV : Asset->ClothConfigs)
+        if (UClothConfigBase* Cfg = KV.Value.Get())
+          if (Cfg->GetClass()->FindPropertyByName(TEXT("SubdivisionCount")))
+            SetProp(Cfg, TEXT("SubdivisionCount"), FString::FromInt(FMath::Clamp((int32)Num(CC, TEXT("solverSubsteps"), 2), 1, 8)), Log);
+
+      // 5b. mtl1-13: sidecar collision -> shared collision PhysicsAsset on this clothing asset.
+      {
+        const TSharedPtr<FJsonObject>* CO = nullptr;
+        TSharedPtr<FJsonObject> Coll;
+        if (CC.IsValid() && CC->TryGetObjectField(TEXT("collision"), CO))
+          Coll = *CO;
+        if ((bAddCollision && AddCollision(CollPA, Coll, Mesh->GetRefSkeleton(), RefCS, Log, SimName, &PV, &MaxCm, FMath::Max(2.0f, (float)Num(CC, TEXT("collisionThicknessCm"), 1))) > 0) || CollPA->SkeletalBodySetups.Num() > 0)
+        {
+          Asset->PhysicsAsset = CollPA;
+          Asset->RefreshBoneMapping(Mesh);
+        }
+      }
+      return Asset;
+    };
     int32 Pinned = 0;
     float WorstMatch = 0.0f;
-    for (int32 I = 0; I < PV.Num(); ++I)
-    {
-      float D;
-      const int32 N = Nearest(PV[I], D);
-      WorstMatch = FMath::Max(WorstMatch, D);
-      const float Cm = MaxV->IsValidIndex(N) ? (float)(*MaxV)[N]->AsNumber() * 100.0f : 0.0f;
-      Mask.Values[I] = Cm;
-      Pinned += Cm <= 0.0f;
-    }
-    const TArray<float> MaxCm = Mask.Values; // Mask ref is invalidated by the AddDefaulted below
-    // 4b. mtl1-22: backstop (HEURISTIC, generic; not from the game). A free particle may sink at most BackstopCm behind its
-    // skinned position along the animated normal (non-legacy Chaos backstop: sphere surface at Distance behind, radius R).
-    // R = clamp(2 x MaxDistance, 5, 50) cm approximates a plane locally; pinned particles get 0 (off).
-    // Sidecar ue.chaosCloth.backstopCm overrides the 1 cm default; < 0 disables.
-    {
-      const TSharedPtr<FJsonObject>* UeB = nullptr;
-      const TSharedPtr<FJsonObject>* CCB = nullptr;
-      double BackCm = 1.0;
-      if (Cloth->TryGetObjectField(TEXT("ue"), UeB) && (*UeB)->TryGetObjectField(TEXT("chaosCloth"), CCB))
-        (*CCB)->TryGetNumberField(TEXT("backstopCm"), BackCm);
-      if (BackCm >= 0.0)
-      {
-        const TArray<float> MDv = MaxCm;
-        CLod.PointWeightMaps.AddDefaulted(2);
-        FPointWeightMap& BD = CLod.PointWeightMaps[CLod.PointWeightMaps.Num() - 2];
-        BD.Initialize(PV.Num());
-        BD.Name = TEXT("SM2_BackstopDistance");
-        BD.CurrentTarget = (uint8)EWeightMapTargetCommon::BackstopDistance;
-        BD.bEnabled = true;
-        FPointWeightMap& BR = CLod.PointWeightMaps.Last();
-        BR.Initialize(PV.Num());
-        BR.Name = TEXT("SM2_BackstopRadius");
-        BR.CurrentTarget = (uint8)EWeightMapTargetCommon::BackstopRadius;
-        BR.bEnabled = true;
-        for (int32 I = 0; I < PV.Num(); ++I)
-        {
-          const bool bFree = MDv[I] > 0.0f;
-          BD.Values[I] = bFree ? (float)BackCm : 0.0f;
-          BR.Values[I] = bFree ? FMath::Clamp(2.0f * MDv[I], 5.0f, 50.0f) : 0.0f;
-        }
-        Log.Add(FString::Printf(TEXT("%s: backstop %.2fcm on %d free particles"), *SimName, BackCm, PV.Num() - Pinned));
-      }
-    }
-    Asset->ApplyParameterMasks(true);
-
-    // 5. ChaosClothConfig from ue.chaosCloth (copied; see PhysicsSidecar note). Velocity clamps are HEURISTIC (root-motion dashes).
-    UObject* Config = nullptr;
-    for (const auto& KV : Asset->ClothConfigs)
-      if (KV.Value && ChaosConfigClass && KV.Value->IsA(ChaosConfigClass))
-        Config = KV.Value;
-    if (!Config && ChaosConfigClass)
-    {
-      Config = NewObject<UClothConfigBase>(Asset, ChaosConfigClass, NAME_None, RF_Transactional);
-      Asset->ClothConfigs.Add(ChaosConfigClass->GetFName(), Cast<UClothConfigBase>(Config));
-    }
-    const TSharedPtr<FJsonObject>* UeO = nullptr;
-    TSharedPtr<FJsonObject> CC;
-    if (Cloth->TryGetObjectField(TEXT("ue"), UeO))
-    {
-      const TSharedPtr<FJsonObject>* C = nullptr;
-      if ((*UeO)->TryGetObjectField(TEXT("chaosCloth"), C))
-        CC = *C;
-    }
-    if (Config)
-    {
-      auto W = [](double V) { return FString::Printf(TEXT("(Low=%f,High=%f)"), V, V); };
-      SetProp(Config, TEXT("EdgeStiffnessWeighted"), W(Num(CC, TEXT("edgeStiffness"), 1)), Log);
-      SetProp(Config, TEXT("BendingStiffnessWeighted"), W(Num(CC, TEXT("bendingStiffness"), 1)), Log);
-      SetProp(Config, TEXT("AreaStiffnessWeighted"), W(Num(CC, TEXT("areaStiffness"), 1)), Log);
-      SetProp(Config, TEXT("TetherStiffness"), W(FMath::Max(0.5, Num(CC, TEXT("tetherStiffness"), 1))), Log);
-      SetProp(Config, TEXT("TetherScale"), W(FMath::Clamp(Num(CC, TEXT("tetherScale"), 1), 1.0, 1.2)), Log);
-      SetProp(Config, TEXT("DampingCoefficient"), FString::SanitizeFloat(FMath::Clamp(Num(CC, TEXT("dampingCoefficient"), 0.01), 0.0, 1.0)), Log);
-      // mtl1-13b: thicker collision + CCD against fast limbs (HEURISTIC; measured penetration 2-6% at 1 cm).
-      SetProp(Config, TEXT("CollisionThickness"), FString::SanitizeFloat(FMath::Max(2.0, Num(CC, TEXT("collisionThicknessCm"), 1))), Log);
-      SetProp(Config, TEXT("bUseCCD"), TEXT("True"), Log);
-      SetProp(Config, TEXT("FrictionCoefficient"), FString::SanitizeFloat(Num(CC, TEXT("frictionCoefficient"), 0.8)), Log);
-      const double LV = FMath::Clamp(Num(CC, TEXT("linearVelocityScale"), 0.75), 0.0, 1.0);
-      SetProp(Config, TEXT("LinearVelocityScale"), FString::Printf(TEXT("(X=%f,Y=%f,Z=%f)"), LV, LV, LV), Log);
-      SetProp(Config, TEXT("AngularVelocityScale"), FString::SanitizeFloat(FMath::Clamp(Num(CC, TEXT("angularVelocityScale"), 0.75), 0.0, 1.0)), Log);
-      SetProp(Config, TEXT("bEnableLinearVelocityClamping"), TEXT("True"), Log);
-      SetProp(Config, TEXT("MaxLinearVelocity"), TEXT("(X=600,Y=600,Z=600)"), Log);
-      SetProp(Config, TEXT("bEnableAngularVelocityClamping"), TEXT("True"), Log);
-      SetProp(Config, TEXT("MaxAngularVelocity"), TEXT("10"), Log);
-    }
-    else
-      Log.Add(TEXT("no ChaosClothConfig class"));
-    // mtl1-16: 2 solver substeps by default (sidecar ue.chaosCloth.solverSubsteps overrides). HEURISTIC from live SIE runs
-    // (pen16): sorcerer_exalted free particles >1 cm inside 243-359 -> 174-272, worst 6.6-11.2 -> 4.8-11.1 cm; calgar stays 0;
-    // tech_priest 132-140 -> 59-192. 4 substeps or IterationCount 4 gave no further clear gain. Shared config = whichever
-    // ClothConfigs entry has SubdivisionCount (ChaosClothSharedSimConfig).
-    for (const auto& KV : Asset->ClothConfigs)
-      if (UClothConfigBase* Cfg = KV.Value.Get())
-        if (Cfg->GetClass()->FindPropertyByName(TEXT("SubdivisionCount")))
-          SetProp(Cfg, TEXT("SubdivisionCount"), FString::FromInt(FMath::Clamp((int32)Num(CC, TEXT("solverSubsteps"), 2), 1, 8)), Log);
-
-    // 5b. mtl1-13: sidecar collision -> shared collision PhysicsAsset on this clothing asset.
-    {
-      const TSharedPtr<FJsonObject>* CO = nullptr;
-      TSharedPtr<FJsonObject> Coll;
-      if (CC.IsValid() && CC->TryGetObjectField(TEXT("collision"), CO))
-        Coll = *CO;
-      if (AddCollision(CollPA, Coll, Mesh->GetRefSkeleton(), RefCS, Log, SimName, &PV, &MaxCm, FMath::Max(2.0f, (float)Num(CC, TEXT("collisionThicknessCm"), 1))) > 0 || CollPA->SkeletalBodySetups.Num() > 0)
-      {
-        Asset->PhysicsAsset = CollPA;
-        Asset->RefreshBoneMapping(Mesh);
-      }
-    }
+    // slot of the sim section, taken before any rebuild (section indices move); mtl1-30 extra assets re-find it by slot.
+    const FName SimSlot = Mesh->GetMaterials().IsValidIndex(Lod.Sections[SimSection].MaterialIndex) ? Mesh->GetMaterials()[Lod.Sections[SimSection].MaterialIndex].MaterialSlotName : NAME_None;
+    UClothingAssetCommon* Asset = MakeAsset(SimSection, !bRenderAsSim, FString(), true, Pinned, WorstMatch);
+    if (!Asset)
+      continue;
+    const int32 NumParticles = Asset->LodData[0].PhysicalMeshData.Vertices.Num();
     // 6. bind to the render sections (mesh-to-mesh skinning, as the editor's Apply Clothing).
     // mtl1-15: one rebuild scope per section, indices re-resolved by slot each time (they move after every rebuild), and a
-    // failed bind is cleaned off the section: sorcerer skirt/beads (2 render sections) left a half-bound second section that
-    // turned the whole mesh into spikes on the next PostEditChange (16-bit bone index build).
+    // failed bind is cleaned off the section. UClothingAssetCommon::BindToSkeletalMesh maps ONE section per asset LOD, so a
+    // second bind of the same asset fails (mtl1-15b: half-bound sections exploded the sorcerer mesh).
+    // mtl1-30 GENERIC: every further render slot gets its OWN clothing asset instead of staying bone-skinned:
+    //   - _SIM source: another asset built from the same sim section (identical sim, identical config), bound to that slot;
+    //   - render-as-sim: the slot's own section, if >= 50% of its vertices lie within 3 cm of the game's sim particles.
+    // Sidecar ue.chaosCloth.bindAllRenderSlots = false restores the old "primary slot only" behaviour.
     int32 Bound = 0;
-    // mtl1-15b: UClothingAssetCommon::BindToSkeletalMesh maps one section per asset LOD (LodMap "already mapped" -> false);
-    // the failed 2nd attempt on skirt_adds_REND / beads_REND1 still left the sorcerer mesh exploding after the next rebuild.
-    // So bind the first matching render slot only; the other render sections of the cloth stay bone-skinned (logged).
-    TArray<FName> Extra;
     {
-      // primary = the matching render section with the most vertices (the cloth body, not trims/metal bits).
       TMap<FName, int32> NV;
       for (const FSkelMeshSection& Sx : Lod.Sections)
         if (Mesh->GetMaterials().IsValidIndex(Sx.MaterialIndex))
           NV.FindOrAdd(Mesh->GetMaterials()[Sx.MaterialIndex].MaterialSlotName) += Sx.SoftVertices.Num();
-      RenderSlots.StableSort([&](const FName& A, const FName& B) { return NV.FindRef(A) > NV.FindRef(B); });
+      if (!bRenderAsSim) // primary = the matching render section with the most vertices (render-as-sim: already first)
+        RenderSlots.StableSort([&](const FName& A, const FName& B) { return NV.FindRef(A) > NV.FindRef(B); });
     }
-    while (RenderSlots.Num() > 1)
-      Extra.Add(RenderSlots.Pop());
-    if (Extra.Num() > 0)
+    bool bAllSlots = true;
     {
-      FString E;
-      for (const FName& N : Extra) E += N.ToString() + TEXT(" ");
-      Log.Add(FString::Printf(TEXT("%s: extra render slots stay bone-skinned [%s]"), *SimName, *E));
+      const TSharedPtr<FJsonObject>* UeA = nullptr;
+      const TSharedPtr<FJsonObject>* CCA = nullptr;
+      if (Cloth->TryGetObjectField(TEXT("ue"), UeA) && (*UeA)->TryGetObjectField(TEXT("chaosCloth"), CCA))
+        (*CCA)->TryGetBoolField(TEXT("bindAllRenderSlots"), bAllSlots);
     }
-    {
-      FString SlotLog;
-      for (const FName& N : RenderSlots) SlotLog += N.ToString() + TEXT(" ");
-      int32 AssetIndex = INDEX_NONE;
-      Mesh->GetMeshClothingAssets().Find(Asset, AssetIndex);
-      int32 Fail = 0;
-      for (const FName& SlotN : RenderSlots)
+    auto FindSlotSection = [&](const FName& SlotN, bool bAllowDisabled) {
+      const FSkeletalMeshLODModel& LL = Model->LODModels[0];
+      for (int32 S = 0; S < LL.Sections.Num(); ++S)
       {
-        SM2WaitMeshBuild(Mesh);
+        const FSkelMeshSection& Sec = LL.Sections[S];
+        if ((!bAllowDisabled && Sec.bDisabled) || Sec.HasClothingData() || !Mesh->GetMaterials().IsValidIndex(Sec.MaterialIndex) ||
+          Mesh->GetMaterials()[Sec.MaterialIndex].MaterialSlotName != SlotN)
+          continue;
+        return S;
+      }
+      return (int32)INDEX_NONE;
+    };
+    TArray<TPair<UClothingAssetCommon*, FName>> Jobs;
+    Jobs.Add({Asset, RenderSlots[0]});
+    for (int32 K = 1; K < RenderSlots.Num(); ++K)
+    {
+      const FName X = RenderSlots[K];
+      if (!bAllSlots)
+      {
+        Log.Add(FString::Printf(TEXT("%s: extra render slot %s stays bone-skinned (bindAllRenderSlots=false)"), *SimName, *X.ToString()));
+        continue;
+      }
+      int32 Src = INDEX_NONE;
+      if (bRenderAsSim)
+      {
+        const int32 SX = FindSlotSection(X, false);
+        if (SX != INDEX_NONE)
+        {
+          int32 Hit = 0;
+          const FSkelMeshSection& XS = Model->LODModels[0].Sections[SX];
+          TArray<float> Ds;
+          for (const FSoftSkinVertex& V : XS.SoftVertices) { float D; Nearest(V.Position, D); Hit += D < 3.0f; Ds.Add(D); }
+          Ds.Sort();
+          const float Med = Ds.Num() ? Ds[Ds.Num() / 2] : 0.f;
+          const float R = XS.SoftVertices.Num() ? float(Hit) / XS.SoftVertices.Num() : 0.f;
+          // the game drives a render mesh from the sim mesh within simRemapConfig.maxInfluenceDist (m) of it
+          const float InflCm = (float)Num(Cloth, TEXT("MaxInfluenceDist"), 0) * 100.0f;
+          Log.Add(FString::Printf(TEXT("%s: extra slot %s render-as-sim section %d verts=%d hit3cm=%.2f medianCm=%.2f maxInfluenceCm=%.1f"), *SimName, *X.ToString(), SX,
+            XS.SoftVertices.Num(), R, Med, InflCm));
+          if (R >= 0.5f)
+            Src = SX; // its own sim mesh
+          else if (Med <= InflCm && RenderSlots.Num() > 0)
+          {
+            Src = FindSlotSection(RenderSlots[0], false); // driven by (a copy of) the primary sim mesh, as the game's sim remap
+            Log.Add(FString::Printf(TEXT("%s: extra slot %s driven by the primary sim mesh (section %d)"), *SimName, *X.ToString(), Src));
+          }
+        }
+      }
+      else
+        Src = SimSlot.IsNone() ? INDEX_NONE : FindSlotSection(SimSlot, true);
+      if (Src == INDEX_NONE)
+      {
+        Log.Add(FString::Printf(TEXT("%s: extra render slot %s stays bone-skinned (no sim source)"), *SimName, *X.ToString()));
+        continue;
+      }
+      int32 P2 = 0;
+      float W2 = 0.f;
+      if (UClothingAssetCommon* A2 = MakeAsset(Src, false, TEXT("_") + X.ToString(), false, P2, W2))
+      {
+        Jobs.Add({A2, X});
+        Log.Add(FString::Printf(TEXT("%s: extra slot %s -> own asset %s particles=%d pinned=%d worstMatchCm=%.2f"), *SimName, *X.ToString(), *A2->GetName(),
+          A2->LodData[0].PhysicalMeshData.Vertices.Num(), P2, W2));
+      }
+    }
+    int32 Fail = 0;
+    FString SlotLog;
+    for (const TPair<UClothingAssetCommon*, FName>& J : Jobs)
+    {
+      UClothingAssetCommon* JA = J.Key;
+      const FName SlotN = J.Value;
+      SlotLog += SlotN.ToString() + TEXT(" ");
+      int32 AssetIndex = INDEX_NONE;
+      Mesh->GetMeshClothingAssets().Find(JA, AssetIndex);
+      SM2WaitMeshBuild(Mesh);
+      bool bOk = false;
+      {
         FScopedSkeletalMeshPostEditChange Scope(Mesh);
         FSkeletalMeshLODModel& L6 = Model->LODModels[0];
         for (int32 S = 0; S < L6.Sections.Num(); ++S)
@@ -997,17 +1077,16 @@ bool USM2PhysicsSetupLibrary::CreateChaosCloth(USkeletalMesh* Mesh, const FStrin
           if (Sec.bDisabled || Sec.HasClothingData() || !Mesh->GetMaterials().IsValidIndex(Sec.MaterialIndex) ||
             Mesh->GetMaterials()[Sec.MaterialIndex].MaterialSlotName != SlotN)
             continue;
-          if (Asset->BindToSkeletalMesh(Mesh, 0, S, 0))
+          if (JA->BindToSkeletalMesh(Mesh, 0, S, 0))
           {
             FSkelMeshSourceSectionUserData& UD = L6.UserSectionsData.FindOrAdd(Sec.OriginalDataSectionIndex);
             UD.CorrespondClothAssetIndex = (int16)AssetIndex;
-            UD.ClothingData.AssetGuid = Asset->GetAssetGuid();
+            UD.ClothingData.AssetGuid = JA->GetAssetGuid();
             UD.ClothingData.AssetLodIndex = 0;
-            ++Bound;
+            bOk = true;
           }
           else
           {
-            ++Fail;
             Sec.ClothMappingDataLODs.Empty();
             Sec.ClothingData = FClothingSectionData();
             Sec.CorrespondClothAssetIndex = INDEX_NONE;
@@ -1020,18 +1099,17 @@ bool USM2PhysicsSetupLibrary::CreateChaosCloth(USkeletalMesh* Mesh, const FStrin
           break; // one section per slot
         }
       }
-      SM2WaitMeshBuild(Mesh);
-      Log.Add(FString::Printf(TEXT("%s: slots=[%s] bound=%d failed=%d"), *SimName, *SlotLog, Bound, Fail));
-    }
-    {
-      FBindRec R{Asset, {}, SimName};
-      R.Slots = RenderSlots;
+      Bound += bOk;
+      Fail += !bOk;
+      FBindRec R{JA, {SlotN}, SimName + (JA == Asset ? FString() : TEXT("/") + SlotN.ToString())};
       BindRecs.Add(R);
     }
+    SM2WaitMeshBuild(Mesh);
+    Log.Add(FString::Printf(TEXT("%s: slots=[%s] bound=%d failed=%d assets=%d"), *SimName, *SlotLog, Bound, Fail, Jobs.Num()));
     if (Bound > 0)
       Converted.Add(SimName);
     Log.Add(FString::Printf(TEXT("%s: simSection=%d%s particles=%d pinned=%d worstMatchCm=%.2f boundSections=%d/%d"), *SimName, SimSection,
-      bRenderAsSim ? TEXT(" (render-as-sim)") : TEXT(""), PV.Num(), Pinned, WorstMatch, Bound, RenderSections.Num()));
+      bRenderAsSim ? TEXT(" (render-as-sim)") : TEXT(""), NumParticles, Pinned, WorstMatch, Bound, RenderSlots.Num()));
   }
   if (BindRecs.Num() > 0)
   {

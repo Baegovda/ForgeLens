@@ -115,6 +115,8 @@ public sealed class ClothConfig
   public List<ClothCapsule> Capsules { get; } = new();
   public List<ClothSphere> Spheres { get; } = new();
   public List<ClothBox> Boxes { get; } = new();
+  /// <summary>mtl1-30 HEURISTIC: true when the config had no cdt lists and the shapes are all shared CDT shapes.</summary>
+  public bool CollisionFromShared { get; set; }
   public ClothEnvironment Environment { get; set; } = new();
   /// <summary>+0xe0, default 30 Hz.</summary>
   public float SolverFrequency { get; set; } = 30f;

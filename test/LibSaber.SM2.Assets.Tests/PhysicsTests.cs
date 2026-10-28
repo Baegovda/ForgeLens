@@ -380,4 +380,64 @@ public class PhysicsTests
     Assert.True(Vector3.Distance(expected.Translation, moved[helper + 1].Translation) < 1e-6f);
     Assert.True(Vector3.Distance(expected.Translation, mesh.Bones[helper].Local.Translation) > 1e-4f, "helper bone did not move");
   }
+
+  [Fact]
+  public void ClothWithoutCdtListsUsesAllSharedShapes()
+  {
+    // Shape of npc_lesser_sorcerer_client.cls (trimmed): the cloths have no cdt lists, only prop-level shared shapes.
+    const string text = """
+      properties   =   {
+         prop_cloth_sim   =   {
+            sharedCDTCapsules   =   [
+               {
+                  name   =   "Hip_L"
+                  boneFirst   =   "HIP_L"
+                  radiusFirst   =   0.23
+                  boneSecond   =   "LEG2L"
+                  radiusSecond   =   0.2
+               }
+            ]
+            sharedCDTSpheres   =   [
+               {
+                  name   =   "Pelvis"
+                  bone   =   "CENTRE"
+                  radius   =   0.3
+               },
+               {
+                  bone   =   "powerplant_backpack"
+               }
+            ]
+            clothes   =   [
+               {
+                  simMeshName   =   "skirt_SIM"
+                  config   =   {
+                     damping   =   0.1
+                  }
+               },
+               {
+                  simMeshName   =   "own_SIM"
+                  config   =   {
+                     cdtSpheres   =   [
+                        {
+                           name   =   "Pelvis"
+                        }
+                     ]
+                  }
+               }
+            ]
+         }
+      }
+      """;
+    var setup = PhysicsParser.Parse(text, "sorcerer.cls");
+    var skirt = setup.Cloths[0].Config;
+    Assert.True(skirt.CollisionFromShared);
+    Assert.Single(skirt.Capsules);
+    Assert.Equal("HIP_L", skirt.Capsules[0].BoneFirst);
+    Assert.Single(skirt.Spheres); // the radius-less backpack sphere is skipped
+    Assert.Equal("CENTRE", skirt.Spheres[0].Bone);
+    var own = setup.Cloths[1].Config;
+    Assert.False(own.CollisionFromShared); // an explicit list keeps its meaning
+    Assert.Empty(own.Capsules);
+    Assert.Single(own.Spheres);
+  }
 }
