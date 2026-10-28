@@ -676,6 +676,21 @@ bool USM2PhysicsSetupLibrary::CreateChaosCloth(USkeletalMesh* Mesh, const FStrin
 
     // 1. the _SIM section: every vertex sits on a sim particle (0.5 cm) and the vertex count is close.
     FSkeletalMeshLODModel& Lod = Model->LODModels[0];
+    TArray<FString> RenderNames;
+    const TArray<TSharedPtr<FJsonValue>>* RV = nullptr;
+    if (Cloth->TryGetArrayField(TEXT("RenderMeshes"), RV))
+      for (const TSharedPtr<FJsonValue>& V : *RV)
+        RenderNames.Add(V->AsString());
+    auto IsRenderSlot = [&](const FSkelMeshSection& Sec)
+    {
+      if (!Mesh->GetMaterials().IsValidIndex(Sec.MaterialIndex))
+        return false;
+      const FString Slot = Mesh->GetMaterials()[Sec.MaterialIndex].MaterialSlotName.ToString();
+      for (const FString& R : RenderNames)
+        if (!R.IsEmpty() && (Slot.Equals(R, ESearchCase::IgnoreCase) || Slot.Contains(R, ESearchCase::IgnoreCase) || R.Contains(Slot, ESearchCase::IgnoreCase)))
+          return true;
+      return false;
+    };
     int32 SimSection = INDEX_NONE;
     // 1a. by material slot name (the exporter names the sim mesh's slot after the cloth, e.g. cloak_SIM).
     float SimHit = -1.f;
@@ -721,6 +736,10 @@ bool USM2PhysicsSetupLibrary::CreateChaosCloth(USkeletalMesh* Mesh, const FStrin
       const FSkelMeshSection& Sec = Lod.Sections[S];
       if (Sec.bDisabled || Sec.HasClothingData() || Sec.SoftVertices.Num() < SimPos.Num() / 2 || Sec.SoftVertices.Num() > SimPos.Num() * 3)
         continue;
+      // mtl1-28b: a render slot (RenderMeshes) is never the hidden _SIM shell, even when its vertices sit on the particles
+      // (mtl15 cc_sorcerer skirt_REND: claimed as sim by vertex hits -> 0 render sections -> bone-based). Step 2b handles it.
+      if (IsRenderSlot(Sec))
+        continue;
       int32 Hit = 0;
       for (const FSoftSkinVertex& V : Sec.SoftVertices)
       {
@@ -732,11 +751,6 @@ bool USM2PhysicsSetupLibrary::CreateChaosCloth(USkeletalMesh* Mesh, const FStrin
         SimSection = S;
     }
     // 2. render sections: material slot name listed in RenderMeshes (case-insensitive, either containing the other).
-    TArray<FString> RenderNames;
-    const TArray<TSharedPtr<FJsonValue>>* RV = nullptr;
-    if (Cloth->TryGetArrayField(TEXT("RenderMeshes"), RV))
-      for (const TSharedPtr<FJsonValue>& V : *RV)
-        RenderNames.Add(V->AsString());
     // mtl1-15: exact (case-insensitive) slot match first; Contains only when no exact hit (beads_REND vs beads_REND1 etc).
     TArray<int32> RenderSections;
     TArray<FName> RenderSlots;

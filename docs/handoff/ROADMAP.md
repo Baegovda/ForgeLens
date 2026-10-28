@@ -46,7 +46,7 @@ Pushed so far: sockets/bone attach, anim-event cues and stop cues, distortion, d
 - Mod Tools (appid 3856330): click Install in Steam, then ilspycmd the managed DLLs for TD/material (chameleon, aniso, second spec, colorization, DYNAMIC_GLT), .sani, cloth, sfx. Then multi-layer material export (layers[].blending weights) and cloth coverage rule (rigid if SIM does not cover REND).
 - Trails and sparks are not drawn by the browser GPU renderer yet; blend rules are ready in VfxBlendRules.
 
-- mtl1-28: trails SrcAlpha/InvSrcAlpha + sparks opaque (spark classification HEURISTIC), distortion backdrop preview **done**. Cloth render-as-sim fallback built; UE verification open (install build28 Binaries, restart editor, ue_cdiag cc_sorcerer mtl15).
+- mtl1-28: trails SrcAlpha/InvSrcAlpha + sparks opaque (spark classification HEURISTIC), distortion backdrop preview **done**. Cloth render-as-sim fallback **verified in UE** (mtl1-29: 2/2 cloths on mtl15 cc_sorcerer, simulating in SIE).
 
 ## Later / backlog
 - In-game captures on the PC (when the user isn't playing) for: grenade/bolter VFX, Titus seals, Calgar cape, Calgar hair.
