@@ -81,6 +81,18 @@ public sealed class BaseLayer
 ///   clamp01; r14 = (0, 1/(o1+1e-6), o1, 1/(o2-o1+1e-6)); r15 = (o2, 1/(1-o2+1e-6), fresnelPwr, -); colours rows 10..13 in order.
 ///   See <see cref="ChameleonSpec.Ramp"/>.
 /// </summary>
+/// <summary>
+///   <c>glt.detail</c> { density, scale }: tiling and strength of the <c>tex.det</c> detail normal. The retail .td set
+///   (18690 files) has 1535 such blocks; density is mostly 5 or 1 (up to 20), scale is often absent. HEURISTIC: density is
+///   used as the detail UV repeat count and scale as the detail blend strength; the CPU packer and shader use were not
+///   located. Defaults (1, 1) when a key is absent are also unproven.
+/// </summary>
+public sealed class DetailSpec
+{
+  public float Density { get; set; } = 1f;
+  public float Scale { get; set; } = 1f;
+}
+
 public sealed class ChameleonSpec
 {
   public float[][] Colors { get; set; } = { new float[4], new float[4], new float[4], new float[4] };
@@ -158,6 +170,18 @@ public static class SpecLayers
       result.RoughnessBias = Number(rough, "bias") ?? result.RoughnessBias;
     }
 
+    return result;
+  }
+
+  /// <summary><c>glt.detail</c> of the variant, or null when the variant has no detail block.</summary>
+  public static DetailSpec? Detail(string variantBlock)
+  {
+    var block = Child(Glt(variantBlock), "detail");
+    if (block is null)
+      return null;
+    var result = new DetailSpec();
+    result.Density = Number(block, "density") ?? result.Density;
+    result.Scale = Number(block, "scale") ?? result.Scale;
     return result;
   }
 

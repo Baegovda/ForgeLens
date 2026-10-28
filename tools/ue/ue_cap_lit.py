@@ -4,10 +4,25 @@
 # fit (frame the whole skeletal mesh from its imported bounds instead of the actor bounds).
 # view=ref (head mode): one close-up "ref.png" three-quarter camera matching the Calgar in-game reference
 # (face toward +Y, camera at +Y/+X so the bionic side is on the image right) with a front-left key light.
+# Before capturing, waits until textures/shaders have compiled and streamed (mtl1-42; "nowait" skips).
 # Capture: "capture" renders into kept render targets, "export" (a later call) writes PNGs; exporting in the same call
 # returned stale frames. For an animated pose run "pose" (same args) first in its own call, then "capture", then "export".
-import unreal, sys, builtins
+import unreal, sys, builtins, time
 mode = sys.argv[1]
+
+def wait_compiled():
+    # mtl1-42: freshly imported textures/materials compile asynchronously, so a capture taken right after an import
+    # showed default (grey/checker) textures. AutomationLibrary.finish_loading_before_screenshot (the screenshot
+    # functional-test helper) flushes async loading, finishes all pending asset (texture/mesh) and shader compilation
+    # and streams all resources in, blocking this call. Opt out with nowait.
+    if "nowait" in sys.argv: return
+    t = time.time()
+    try:
+        unreal.AutomationLibrary.finish_loading_before_screenshot()
+        print("compiled+streamed in %.1fs" % (time.time() - t))
+    except Exception as ex:
+        print("finish_loading_before_screenshot unavailable: %r" % ex)
+
 posed = getattr(builtins, "_sm2_posed", None) if mode == "capture" else None
 if mode in ("capture", "pose"):
     asset, out, src = sys.argv[2], sys.argv[3], sys.argv[4]
@@ -42,6 +57,7 @@ if mode in ("capture", "pose"):
     else:
         a = eas.spawn_actor_from_class(unreal.StaticMeshActor, base); a.tags = [unreal.Name("SM2Cap")]; a.static_mesh_component.set_static_mesh(m)
     if mode == "pose":
+        wait_compiled()
         builtins._sm2_posed = a
         print("posed")
     else:
@@ -98,6 +114,7 @@ if mode in ("capture", "pose"):
                 if p and unreal.EditorAssetLibrary.does_asset_exist(p) and comp.get_material(i) == mi:
                     comp.set_material(i, unreal.load_asset(p)); swapped += 1
             print("off swapped", swapped)
+        wait_compiled()
         pending = []
         views = (("front", unreal.Vector(-1, 0, 0), 0), ("side", unreal.Vector(0, -1, 0), 90), ("back", unreal.Vector(1, 0, 0), 180))
         if ref:

@@ -123,8 +123,8 @@ The box has no GitHub write login. Pushes go through a Cursor cloud agent with r
   - `ue_bulk.py import|check <asset> [set]`: import + checker into `/Game/SM2_Work/Tests/<set>/<asset>`.
   - `ue_import_anim.py`: anim-only FBX via the legacy importer (Interchange bug UE-307815). It does yaw auto, root-motion policy and 60 Hz for baked clips.
   - `ue_mat_apply.py`, `ue_step3*.py`: materials.
-  - `ue_sm2_physics.py <physics.json> <mesh> [folder] verify|physasset`, `ue_phys_probe.py`: physics.
-  - `ue_cap_lit.py` (modes capture/pose/export/fit, each **a separate call**; same-call export returns a stale render target): lit captures. Wait for shaders/textures to finish compiling, or the capture comes out grey.
+  - `ue_sm2_physics.py <physics.json> <mesh> [folder] verify|physasset|assign`, `ue_phys_probe.py`: physics. `assign` sets the mesh's physics asset to `PA_<mesh>_sm2[_N]` only when the slot is empty or already ours; `physasset` assigns what it creates.
+  - `ue_cap_lit.py` (modes capture/pose/export/fit, each **a separate call**; same-call export returns a stale render target): lit captures. It now waits for shaders/textures to compile and stream (`AutomationLibrary.finish_loading_before_screenshot`); pass `nowait` to skip. `off=<folder>` swaps in `<MI>_off` copies for A/B.
 - **VFX frozen frames (mtl1-34):**
   1. Box: `ForgeLens --vfxue <raw>/sfx <aliases.ps> <raw> <out> name@sec ...` (`--vfxue-rules <out>` for the rule scene).
   2. Tar the output to the PC.

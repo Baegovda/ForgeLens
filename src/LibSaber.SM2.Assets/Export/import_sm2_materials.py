@@ -590,7 +590,18 @@ def make_master(folder, asset_name="M_SM2", translucent=False):
     detail_lerp = expr(material, unreal.MaterialExpressionLinearInterpolate, -280, 900)
     link(normal, "RGB", detail_lerp, "A")
     link(detail, "RGB", detail_lerp, "B")
-    link(mask_g, "", detail_lerp, "Alpha")
+    # glt.detail {density, scale} (HEURISTIC): detail UV = UV0 * DetailDensity, blend = saturate(mask.g * DetailScale).
+    detail_uv0 = expr(material, unreal.MaterialExpressionTextureCoordinate, -1300, 900)
+    detail_uv = expr(material, unreal.MaterialExpressionMultiply, -1100, 900)
+    link(detail_uv0, "", detail_uv, "A")
+    link(scalar(material, "DetailDensity", 1.0, -1300, 980), "", detail_uv, "B")
+    link(detail_uv, "", detail, "UVs")
+    detail_amount = expr(material, unreal.MaterialExpressionMultiply, -420, 1000)
+    link(mask_g, "", detail_amount, "A")
+    link(scalar(material, "DetailScale", 1.0, -560, 1060), "", detail_amount, "B")
+    detail_alpha = expr(material, unreal.MaterialExpressionSaturate, -340, 1000)
+    link(detail_amount, "", detail_alpha, "")
+    link(detail_alpha, "", detail_lerp, "Alpha")
     detail_switch = expr(material, unreal.MaterialExpressionStaticSwitchParameter, -40, 120)
     detail_switch.set_editor_property("parameter_name", "HasDetail")
     detail_switch.set_editor_property("default_value", False)
@@ -912,6 +923,9 @@ def build(sidecar_path, folder):
         unreal.MaterialEditingLibrary.set_material_instance_static_switch_parameter_value(instance, "UseOpacityMask", slot.get("blend") in ("masked", "translucent"))
         if emissive is not None:
             unreal.MaterialEditingLibrary.set_material_instance_scalar_parameter_value(instance, "EmissiveStrength", 1.0)
+        detail_spec = slot.get("detail") or {}
+        unreal.MaterialEditingLibrary.set_material_instance_scalar_parameter_value(instance, "DetailDensity", float(detail_spec.get("density", 1.0)))
+        unreal.MaterialEditingLibrary.set_material_instance_scalar_parameter_value(instance, "DetailScale", float(detail_spec.get("scale", 1.0)))
         albedo_tint = slot.get("albedoTint")
         if albedo_tint:
             # The tint bytes are sRGB like the albedo they multiply; Unreal multiplies in linear.

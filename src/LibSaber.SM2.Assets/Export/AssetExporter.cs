@@ -1102,6 +1102,8 @@ public static class AssetExporter
         dirMap = aniso.DirMap.Length == 0 ? null : aniso.DirMap,
         extra = new { anisotropy = aniso.ExtraAnisotropy, intensity = aniso.ExtraIntensity, shift = aniso.ExtraShift },
       } : null,
+      // glt.detail {density, scale} (null when absent). HEURISTIC: Unreal tiles the detail normal by density and blends it by scale.
+      detail = slot.Part.Detail is { } det ? new { density = det.Density, scale = det.Scale } : null,
       // glt.chameleon (null when disabled): colors R, G, B, A in 0..1; see ChameleonSpec for the shader ramp.
       chameleon = slot.Part.Chameleon is { } cham ? new
       {
@@ -1155,7 +1157,7 @@ public static class AssetExporter
     {
       mesh = mesh.Name,
       fbx = Path.GetFileName(fbxPath),
-      note = "Each map's channels are the .td format_descr (logical channels). stored/packing[].stored say where each one physically is in the exported PNG: BC5 (DXN) keeps two channels, so Roughness(a) is in g; BC4 (DXT5A) keeps one, so AO(a) is in r. The game swizzles these in its shader (swizzleTexInShader). srgb false is a normal or a packed mask, so Unreal imports it linear. The FBX links diffuse, normal, and specular. import_sm2_materials.py builds a master material and one instance per slot from this file. secondSpec and anisotropicSpec are the variant's glt.second_spec and glt.anisotropic_spec (second lobe metalness/roughness = saturate(packed * scale + bias)); absent means disabled. baseLayer is the glt-level metallicTint, reflectance and metalness/roughness {scale, bias} (base metal/rough = saturate(packed * scale + bias), albedo *= lerp(albedo_tint, metallicTint, metal), dielectric F0 = 0.16 * reflectance^2). With Substrate the script builds base + second as two added Slabs (SecondSpecGain 4 without aniso, 1 with aniso; aniso extra{} drives the second slab).",
+      note = "Each map's channels are the .td format_descr (logical channels). stored/packing[].stored say where each one physically is in the exported PNG: BC5 (DXN) keeps two channels, so Roughness(a) is in g; BC4 (DXT5A) keeps one, so AO(a) is in r. The game swizzles these in its shader (swizzleTexInShader). srgb false is a normal or a packed mask, so Unreal imports it linear. The FBX links diffuse, normal, and specular. import_sm2_materials.py builds a master material and one instance per slot from this file. secondSpec and anisotropicSpec are the variant's glt.second_spec and glt.anisotropic_spec (second lobe metalness/roughness = saturate(packed * scale + bias)); absent means disabled. baseLayer is the glt-level metallicTint, reflectance and metalness/roughness {scale, bias} (base metal/rough = saturate(packed * scale + bias), albedo *= lerp(albedo_tint, metallicTint, metal), dielectric F0 = 0.16 * reflectance^2). detail is glt.detail {density, scale} (absent = no block): the script tiles the detail normal UVs by density and scales its blend by scale (HEURISTIC). With Substrate the script builds base + second as two added Slabs (SecondSpecGain 4 without aniso, 1 with aniso; aniso extra{} drives the second slab).",
       slots,
     }, JsonOptions));
     report.Written++;

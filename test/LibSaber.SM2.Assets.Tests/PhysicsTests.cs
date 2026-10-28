@@ -166,13 +166,12 @@ public class PhysicsTests
   }
 
   /// <summary>A 5x5 strip hanging from its pinned top row on one bone.</summary>
-  private static (ExportedMesh Mesh, PhysicsSetup Setup) Strip(float windX = 0)
+  private static (ExportedMesh Mesh, PhysicsSetup Setup) Strip(float windX = 0, int n = 5)
   {
     var mesh = new ExportedMesh { Name = "strip" };
     mesh.Bones.Add(new Bone { Name = "Root", Parent = -1 });
     mesh.Bones.Add(new Bone { Name = "Thigh_R", Parent = 0 });
     var shell = new ClothSimShell { Name = "seal_SIM" };
-    const int n = 5;
     for (var r = 0; r < n; r++)
       for (var c = 0; c < n; c++)
       {
@@ -243,6 +242,34 @@ public class PhysicsTests
     Assert.Equal((double)(1f), (double)(bary.X + bary.Y + bary.Z), 4);
     point = PhysicsRuntime.ClosestOnTriangle(new Vector3(2, -1, 0), a, b, c, out _);
     Assert.True(Vector3.Distance(point, b) < 1e-5f);
+  }
+
+  [Fact]
+  public void LargeClothGetsOneBonePerFreeParticleByDefault()
+  {
+    // mtl1-42: 36x36 grid, top row pinned = 1260 free particles (> the old 1024 cap, like calgar's 1133-particle cloak).
+    static (ExportedMesh, PhysicsSetup) Big()
+    {
+      var (m, st) = Strip(n: 36);
+      var shell = m.ClothSims[0];
+      st.Cloths[0].RenderMeshes.Add("seal_REND");
+      foreach (var p in shell.Positions)
+      {
+        m.Positions.Add(p + new Vector3(0, 0, 0.002f));
+        m.Normals.Add(Vector3.UnitZ);
+        m.Skin.Add(new SkinWeights { J0 = 1, W0 = 1 });
+      }
+      m.Indices.AddRange(shell.Indices);
+      m.Parts.Add(new MeshPart { Name = "seal_REND", IndexStart = 0, IndexCount = shell.Indices.Count });
+      return (m, st);
+    }
+    var (mesh, setup) = Big();
+    var rig = PhysicsBake.AddClothBones(mesh, setup);
+    Assert.Equal(36 * 35, rig.Clusters.Count);
+    Assert.All(rig.Clusters, c => Assert.Single(c.Particles));
+    var (m2, s2) = Big();
+    var capped = PhysicsBake.AddClothBones(m2, s2, maxBonesPerCloth: 1024);
+    Assert.Equal(1024, capped.Clusters.Count);
   }
 
   [Fact]

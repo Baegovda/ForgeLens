@@ -44,11 +44,11 @@ Pushed so far: sockets/bone attach, anim-event cues and stop cues, distortion, d
 ## UE verification — results so far (details in STATUS.md / HANDOFF "UE verification")
 - Constructors PASS (`/Game/SM2_Work/Tests/bulk_fix`). Titus + Calgar physics bake PASS (`/Game/SM2_Work/Tests/physics`), with 60 Hz import fixed.
 - Follow-ups, in order:
-  1. Calgar cape red/white stripe: REA the cloak material (cc_calgar cloak `.td`, layer blend?).
-  2. Re-import Calgar clips at 60 Hz (`Anims60`, same as Titus).
-  3. Spiky cloak hem: raise `maxBonesPerCloth` above 1024 (Calgar has 1133 free particles), or regularise the polar fit on near-collinear one-rings.
+  1. **[mtl1-42 done]** Calgar cape stripe: glt.detail density/scale now drive the detail normal tiling/strength (HEURISTIC rule, UE A/B verified). Open: cloak_REND_01 V-flip lead (padding sampled at the lower corners); re-export + re-import cc_calgar to adopt.
+  2. **[mtl1-42 done]** Calgar clips at 60 Hz (`Anims60`, 398 frames).
+  3. **[mtl1-42 done]** Spiky hem: bone cap 4096 (fit 3.9 → 0.0 cm). Remaining spikes are sim stretch (no self-collision/drag; HEURISTIC).
   4. Loop-seamless bakes (blend the tail into frame 0 after settle).
-  5. Optional: assign `PA_*_sm2` physics assets; the manual AnimDynamics/Chaos Cloth recipe comes from `physics.json` → `ue`.
+  5. **[mtl1-42 done]** `PA_*_sm2` assigned (`ue_sm2_physics.py assign`). Open: CDT shape bones that exist in no tpl/markup (`LEG_L_Gun`, `Hip_gun_CDT`, `Backpack_cl_cdt`, `weapon_box`, `wpn_grapling_hook_01_chaos`): find the attached weapon/equipment templates.
 
 ## Leads from the mtl1-23 captures
 - Armory per-instance customization colours (LWI_INST_DATA_BUF, see HANDOFF mtl1-23): map slots +21..23 / +28..30 to the _cc mask channels (HEURISTIC today) and apply in UE/browser.
@@ -63,7 +63,7 @@ Pushed so far: sockets/bone attach, anim-event cues and stop cues, distortion, d
 - In-game captures on the PC (when the user isn't playing) for: grenade/bolter VFX, Titus seals, Calgar cape, Calgar hair.
 - WARN items: rubric/sorcerer 0-root-motion loco clips (REA whether those clips are in-place by design).
 - Retarget: Cadian index finger curl offset.
-- `ue_cap_lit.py`: wait for texture compilation before capturing.
+- Krak CPU reference: re-render with the fetched plasma_clouds_menu_01 / scorch_meltagun_sml1 textures.
 - CPU renderer: blend modes and physics (low priority; GPU is the default).
 
 ## Possible future development (not on the roadmap)

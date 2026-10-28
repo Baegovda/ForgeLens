@@ -55,8 +55,12 @@ public static class PhysicsBake
   public const float Rate = 60f;
   /// <summary>Frame 0 held this long before recording, so the springs and cloth start settled (no drop at frame 0).</summary>
   public const float Preroll = 1.5f;
-  /// <summary>Default cap of helper bones per cloth.</summary>
-  public const int MaxBonesPerCloth = 1024;
+  /// <summary>
+  ///   Default cap of helper bones per cloth. mtl1-42: 4096 (was 1024) so every free particle of the largest retail cloth
+  ///   gets its own bone (calgar cloak_SIM: 1133 free particles; 1024 merged 109 of them into 2-particle clusters, fit
+  ///   error up to 3.9 cm at the cloak hem). UE skeletal meshes take &gt;256 bones per section with 16-bit indices.
+  /// </summary>
+  public const int MaxBonesPerCloth = 4096;
   public const string ClothBoneSuffix = "_phys";
 
   /// <summary>

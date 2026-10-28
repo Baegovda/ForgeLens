@@ -61,6 +61,8 @@ public sealed class MeshPart
   public AnisoSpec? AnisoSpec { get; set; }
   /// <summary><c>glt.chameleon</c> when the variant enables it.</summary>
   public ChameleonSpec? Chameleon { get; set; }
+  /// <summary><c>glt.detail</c> {density, scale} of the variant (null when absent). See <see cref="DetailSpec"/>.</summary>
+  public DetailSpec? Detail { get; set; }
   /// <summary>Glt-level metallicTint, reflectance, metalness and roughness scale/bias (engine defaults when unset).</summary>
   public BaseLayer BaseLayer { get; set; } = new();
   /// <summary>Index leaves LOD and collision shells unchecked. Defaults on so hand-built meshes still export whole.</summary>
@@ -96,6 +98,7 @@ public sealed class MeshPart
       SecondSpec = SecondSpec,
       AnisoSpec = AnisoSpec,
       Chameleon = Chameleon,
+      Detail = Detail,
       BaseLayer = BaseLayer,
       Visible = Visible,
       HideReason = HideReason,

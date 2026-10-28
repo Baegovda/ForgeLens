@@ -1,6 +1,6 @@
 # Check / set up the SM2 secondary physics of an imported character in Unreal (UE 5.4+).
 # usage (UEMCP ue_python): sys.argv = ['x', <{model}.physics.json>, <skeletal mesh asset>,
-#                                      [dest=/Game/SM2_Work/Tests/physics], [verify|physasset]]
+#                                      [dest=/Game/SM2_Work/Tests/physics], [verify|physasset|assign]]
 #
 # The exporter (SM2Extractor export / SM2Browser export, physics on by default) already BAKES the game's secondary
 # motion into the files, so nothing has to run in Unreal for it to play:
@@ -11,8 +11,11 @@
 #     re-skinned to them; their per-frame best fit is baked into every clip.
 # verify    (default) checks that the skeleton has the jiggle and cloth helper bones the clips animate and lists the
 #           baked clips. Read-only.
-# physasset also creates a PhysicsAsset (FBX-import settings) under dest, without assigning it, as the base for a live
-#           setup (RigidBody / Chaos Cloth collision). Existing assets are never replaced: a free _N name is used.
+# physasset also creates a PhysicsAsset (FBX-import settings) under dest as the base for a live setup (RigidBody /
+#           Chaos Cloth collision) and assigns it (mtl1-42). Existing assets are never replaced: a free _N name is used.
+# assign    (mtl1-42) assigns the newest existing PA_<mesh>_sm2[_N] under dest (creates one when there is none).
+# Assignment rule (both modes, generic): the mesh's physics_asset is only set when it is empty or already one of our
+# PA_<mesh>_sm2* assets; a user-assigned PhysicsAsset is left alone (reported). The mesh is saved after assigning.
 # A live (runtime) setup instead of the bake is documented per bone / cloth in the json "ue" blocks:
 #   jiggles -> AnimDynamics (linear spring k/m, damping, gravity scale, angular limits atan(constraint)),
 #   cloths  -> Chaos Cloth config + MaxDistance mask + PhysicsAsset collision capsules / spheres / boxes.
@@ -32,6 +35,30 @@ def _free_name(folder, name):
     while eal.does_asset_exist(folder + "/" + cand):
         cand = "%s_%d" % (name, n); n += 1
     return cand
+
+def _sm2_pas(folder, mesh_name):
+    base = "PA_" + mesh_name + "_sm2"
+    out = []
+    for a in unreal.EditorAssetLibrary.list_assets(folder, False, False):
+        n = a.split("/")[-1].split(".")[0]
+        if n == base or (n.startswith(base + "_") and n[len(base) + 1:].isdigit()):
+            out.append((int(n[len(base) + 1:]) if n != base else 0, a.split(".")[0]))
+    return [p for _, p in sorted(out)]
+
+def assign(mesh, pa_path):
+    """Sets mesh.physics_asset = pa when the slot is empty or holds one of our PA_<mesh>_sm2* assets. Returns a status."""
+    pa = unreal.load_asset(pa_path)
+    if not isinstance(pa, unreal.PhysicsAsset):
+        return "ERROR not a PhysicsAsset: %s" % pa_path
+    cur = mesh.get_editor_property("physics_asset")
+    curn = cur.get_name() if cur else ""
+    if cur and cur.get_path_name() == pa.get_path_name():
+        return "already assigned %s" % pa_path
+    if cur and not curn.startswith("PA_" + mesh.get_name() + "_sm2"):
+        return "kept user PhysicsAsset %s (not ours)" % cur.get_path_name()
+    mesh.set_editor_property("physics_asset", pa)
+    ok = unreal.EditorAssetLibrary.save_loaded_asset(mesh, only_if_is_dirty=False)
+    return "assigned %s (was %s)%s" % (pa_path, curn or "None", "" if ok else " SAVE FAILED")
 
 def run(json_path, mesh_path, dest="/Game/SM2_Work/Tests/physics", mode="verify"):
     data = json.load(open(json_path, encoding="utf-8"))
@@ -57,6 +84,12 @@ def run(json_path, mesh_path, dest="/Game/SM2_Work/Tests/physics", mode="verify"
         print("SM2PHYS cloth %s -> %s: %d sim verts (%d pinned), damping %.3f, gravity %s cm/s2, edge %.2f bend %.2f" %
               (c["SimMeshName"], ",".join(c["RenderMeshes"]), c["simVertices"], c["pinned"], ue["dampingCoefficient"],
                ue["gravityOverrideCm"], ue["edgeStiffness"], ue["bendingStiffness"]))
+    if mode == "assign":
+        have = _sm2_pas(dest, mesh.get_name())
+        if have:
+            print("SM2PHYS " + assign(mesh, have[-1]))
+            return not miss_j and not miss_h
+        mode = "physasset"
     if mode == "physasset":
         eal = unreal.EditorAssetLibrary
         if not eal.does_directory_exist(dest):
@@ -68,9 +101,11 @@ def run(json_path, mesh_path, dest="/Game/SM2_Work/Tests/physics", mode="verify"
         src = pa.get_path_name().split(".")[0]
         if eal.rename_asset(src, dest + "/" + target):
             eal.save_asset(dest + "/" + target)
-            print("SM2PHYS physics asset %s/%s (not assigned to the mesh)" % (dest, target))
+            print("SM2PHYS physics asset %s/%s" % (dest, target))
+            print("SM2PHYS " + assign(mesh, dest + "/" + target))
         else:
             print("SM2PHYS physics asset left at %s" % src)
+            print("SM2PHYS " + assign(mesh, src))
     return not miss_j and not miss_h
 
 if __name__ == "__main__" or True:

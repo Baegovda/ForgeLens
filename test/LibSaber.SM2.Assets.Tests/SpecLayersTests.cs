@@ -196,4 +196,31 @@ public class SpecLayersTests
     Assert.Equal(1f, b15[0]);
     Assert.True(b15[1] > 1e5f);
   }
+
+  [Fact]
+  public void Detail_ReadsGltDetailDensityAndScale()
+  {
+    // ch_calgar_coat_01.td: glt.detail { density = 16, scale = 0.75 } with tex.det = "cloth_04_det".
+    var detail = SpecLayers.Detail("""
+      {
+         shaders = {
+            glt = {
+               detail = {
+                  density = 16.000000
+                  scale = 0.750000
+               }
+               tex = {
+                  det = "cloth_04_det"
+               }
+            }
+         }
+      }
+      """)!;
+    Assert.Equal(16f, detail.Density);
+    Assert.Equal(0.75f, detail.Scale);
+    var bare = SpecLayers.Detail("{\n shaders = {\n  glt = {\n   detail = {\n    density = 5.000000\n   }\n  }\n }\n}")!;
+    Assert.Equal(5f, bare.Density);
+    Assert.Equal(1f, bare.Scale);
+    Assert.Null(SpecLayers.Detail("{\n shaders = {\n  glt = {\n  }\n }\n}"));
+  }
 }
