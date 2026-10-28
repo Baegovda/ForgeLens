@@ -240,6 +240,8 @@ public sealed class LightDef
   public Curve1 Radius { get; init; } = Curve1.One;
   public Curve1 Intensity { get; init; } = Curve1.One;
   public ColorCurve Color { get; init; } = ColorCurve.White;
+  /// <summary>mtl1-36: <c>isAdaptiveIntensity</c>, capture HDR scales with the scene average luminance (CaptureLightUnits).</summary>
+  public bool Adaptive { get; init; } = CaptureLightUnits.DefaultAdaptive;
 }
 
 /// <summary>Effect ready to simulate: every emitter and light, plus what was parsed but is not drawn yet.</summary>
@@ -359,6 +361,7 @@ public sealed class EffectDefinition
           Radius = Spline(node.Obj("RadiusCtrl"), 1f),
           Intensity = Spline(node.Obj("Intensity"), 1f),
           Color = colorCurve,
+          Adaptive = node.Bool("isAdaptiveIntensity", CaptureLightUnits.DefaultAdaptive),
         });
         break;
       }

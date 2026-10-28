@@ -118,10 +118,18 @@ public static class VfxFrameExport
   }
 
   /// <summary>
-  ///   mtl1-35: effect lights (<c>sfx_light</c>, <see cref="EffectInstance"/> Lights()) at the frame time: position, HDR colour
-  ///   (colour * intensity, sprite HDR units like the browser's lit shading) and radius in metres.
+  ///   mtl1-36: largest exposed value written to baked vertex colours (meshes, ground): the capture tonemap is saturated
+  ///   long before (white at ~11), and 64 / exposure stays below half-float max (65504) for exposure >= 1/1000.
   /// </summary>
-  public static JsonArray Lights(IEnumerable<LightSample> lights)
+  public const float MaxExposed = 64f;
+
+  /// <summary>
+  ///   mtl1-35: effect lights (<c>sfx_light</c>, <see cref="EffectInstance"/> Lights()) at the frame time.
+  ///   mtl1-36: <c>color</c> is in capture-calibrated relative units (<see cref="CaptureLightUnits.Relative"/>: capture HDR /
+  ///   avgLum, i.e. 1 = the particle ambient), <c>captureHdr</c> the CB_COMMON_LIGHTNG value at that avgLum; attenuation
+  ///   sat(1 - d^4/r^4)^2, radius in metres.
+  /// </summary>
+  public static JsonArray Lights(IEnumerable<LightSample> lights, float averageLuminance = 1f)
   {
     var a = new JsonArray();
     foreach (var l in lights)
@@ -129,7 +137,9 @@ public static class VfxFrameExport
       if (l.Radius <= 0 || l.Intensity <= 0) continue;
       a.Add(new JsonObject
       {
-        ["name"] = l.Def.Name, ["position"] = Vec(l.Position), ["color"] = Vec(l.Color * l.Intensity), ["radius"] = R(l.Radius),
+        ["name"] = l.Def.Name, ["position"] = Vec(l.Position), ["color"] = Vec(l.Relative(averageLuminance)), ["radius"] = R(l.Radius),
+        ["intensity"] = R(l.Intensity), ["srgb"] = Vec(l.Color), ["adaptive"] = l.Def.Adaptive,
+        ["captureHdr"] = Vec(CaptureLightUnits.Capture(l.Color, l.Intensity, l.Def.Adaptive, averageLuminance)),
       });
     }
     return a;

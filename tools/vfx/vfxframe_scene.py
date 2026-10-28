@@ -2,8 +2,9 @@
 tools/vfx/vfxframe_ref.py), mtl1-35.
 
 ground_batch: opaque ground plane at frame["groundY"] lit by frame["lights"] with the browser ground shading
-(EffectRenderer GroundFs, HEURISTIC light units): per channel
-  exposed = grey * (1 + sum_lights(E * 8 * colour * f^2 * max(0.2, l.y)) / 0.6),  f = sat(1 - d / radius)
+(EffectRenderer GroundFs), mtl1-36 capture-calibrated units (CaptureLightUnits): per channel
+  exposed = grey * (1 + ALBEDO / pi * sum_lights(colour * att * max(0, l.y))),  att = sat(1 - (d / radius)^4)^2
+colour = relative light (1 = particle ambient = capture avgLum), att from GPU particle CS s4462; ALBEDO 0.18 HEURISTIC
 (the browser's ambient 0.6 maps to grey), written per vertex as HDR (exposed / exposure) so the UE capture and the CPU reference interpolate the same values.
 Triangles with a vertex closer than NEAR metres to the eye plane are dropped (identical clipping in both renderers).
 """
@@ -20,15 +21,27 @@ def _norm(a):
     return [a[0] / l, a[1] / l, a[2] / l]
 
 
-def ground_light(p, lights, exposure):
-    """Browser GroundFs light factor at world point p (rgb), relative to the 0.6 ambient: 1 + sum(...)/0.6."""
+ALBEDO = 0.18
+MAX_EXPOSED = 64.0
+SURFACE = ALBEDO / math.pi
+
+
+def attenuation(dist, radius):
+    """s4462 point light attenuation sat(1 - d^4 / r^4)^2 (CaptureLightUnits.Attenuation)."""
+    q = (dist / max(radius, 1e-4)) ** 2
+    a = min(max(1.0 - q * q, 0.0), 1.0)
+    return a * a
+
+
+def ground_light(p, lights, exposure=None):
+    """Browser GroundFs light factor at world point p (rgb), relative to the ambient: 1 + albedo/pi * sum(...)."""
     out = [1.0, 1.0, 1.0]
     for l in lights:
-        d = _sub(l["position"], p); dist = math.sqrt(_dot(d, d)); r = max(0.01, l["radius"])
-        f = min(max(1.0 - dist / r, 0.0), 1.0)
+        d = _sub(l["position"], p); dist = math.sqrt(_dot(d, d))
+        f = attenuation(dist, max(0.01, l["radius"]))
         if f <= 0: continue
-        ny = max(0.2, d[1] / dist) if dist > 1e-6 else 1.0
-        k = exposure * 8.0 * f * f * ny / 0.6
+        ny = max(0.0, d[1] / dist) if dist > 1e-6 else 1.0
+        k = SURFACE * f * ny
         for c in range(3): out[c] += l["color"][c] * k
     return out
 
@@ -45,6 +58,7 @@ def ground_batch(fr, grey, cells=64):
         for i in range(n):
             p = [cx - half + 2 * half * i / cells, y, cz - half + 2 * half * j / cells]
             L = ground_light(p, lights, E)
+            L = [min(c, MAX_EXPOSED / max(grey, 1e-6)) for c in L]  # VfxFrameExport.MaxExposed (UE half-float safety)
             verts += [p[0], p[1], p[2], i / cells, j / cells, grey / E * L[0], grey / E * L[1], grey / E * L[2], 1.0, 0.0, 0.0, 0.0, 0.0]
             keep.append(_dot(_sub(p, eye), fwd) > NEAR)
     idx = []

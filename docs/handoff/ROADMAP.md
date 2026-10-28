@@ -9,7 +9,7 @@
    - 5a. Constructor fix (`--variant`, `--tex-formats`): **done + UE verified**
    - 5b. UE folder cleanup (approved deletions only): **done**
 6. Secondary physics (user request: purity seals and cloth should move as in-game in the browser and carry over to Unreal): **done + UE verified**
-7. Browser VFX (the user said go at 02:32 KST, "일단 냅두고 그담거해봐"): **in progress, ~92 %** (mtl1-35: lights, mesh particles, soft depth, grading LUT; mtl1-34: UE frozen-frame export with capture blend/tonemap/distortion rules, verified; engine VFX defaults; browser BGRA fix)
+7. Browser VFX (the user said go at 02:32 KST, "일단 냅두고 그담거해봐"): **in progress, ~94 %** (mtl1-36: light units calibrated from capture CB, missing-asset loop, half-float clamp; mtl1-35: lights, mesh particles, soft depth, grading LUT; mtl1-34: UE frozen-frame export with capture blend/tonemap/distortion rules, verified; engine VFX defaults; browser BGRA fix)
 8. In-game side-by-side comparison (VFX, physics, materials): **todo**. It needs the PC free and in-game captures.
 9. Unreal export test without Niagara (meshes/textures/materials of the compared effects → `/Game/SM2_Work/VfxExport`): **done** (2026-10-27, vfx4-2).
 10. Browser viewer polish (asset search, preview, export button): **done (vfx4-3)**.
@@ -32,7 +32,8 @@ Pushed so far: sockets/bone attach, anim-event cues and stop cues, distortion, d
 9. Next (VFX, highest impact first):
    - **[mtl1-35 done]** Lights (ground + PointLights; units HEURISTIC), mesh particles (Solid/Additive triangle batches), soft-depth fade (PS 101818), grading LUT (32³ content LUTs, baked TONEMAP_LUT strip; apply mapping HEURISTIC).
    - Dump the runtime COLOR_GRADING 16³ volumes and disassemble final PS 1209 (LUT apply mapping) from a capture.
-   - Calibrate light units (cine_bomb light ~1.3e5 saturates).
+   - **[mtl1-36 done]** Light units calibrated from CB_COMMON_LIGHTNG (plasma capture; adaptive factor and albedo 0.18 HEURISTIC). cine_bomb missing assets fetched via `missingTemplates`/`missing_assets.py`.
+   - Confirm `isAdaptiveIntensity` scaling with a second capture light (only one matched so far); identify plasma light 1 (r 3.82).
    - Take exposure from the capture's average luminance instead of 1/250.
    - Check the textureTint=0 luminance mix (still a shader heuristic) against captures.
    - Bilinear distortion resample.

@@ -23,7 +23,9 @@ import builtins, glob, hashlib, json, os, struct, sys, zlib, math
 import unreal
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "vfx"))
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import importlib
 import vfxframe_scene as S
+S = importlib.reload(S)  # mtl1-36: the editor keeps modules loaded between uerun calls
 
 EAL = unreal.EditorAssetLibrary
 MEL = unreal.MaterialEditingLibrary
@@ -337,10 +339,11 @@ elif mode == "render":
         pl.set_actor_label(f"SM2Cap_light_{li}_{l.get('name', '')}")
         lc = pl.point_light_component; mx = max(max(l["color"]), 1e-6)
         lc.set_editor_property("intensity_units", unreal.LightUnits.UNITLESS)
-        lc.set_editor_property("intensity", mx * fr["exposure"] * 8.0)  # HEURISTIC: browser ground scale (E * 8)
+        # mtl1-36: colour is relative to the ambient (CaptureLightUnits); unitless intensity = albedo/pi-scaled peak (HEURISTIC)
+        lc.set_editor_property("intensity", mx * S.SURFACE)
         lc.set_light_color(unreal.LinearColor(l["color"][0] / mx, l["color"][1] / mx, l["color"][2] / mx, 1.0))
         lc.set_editor_property("attenuation_radius", l["radius"] * 100.0)
-        lc.set_editor_property("use_inverse_squared_falloff", False); lc.set_editor_property("light_falloff_exponent", 2.0)
+        lc.set_editor_property("use_inverse_squared_falloff", False); lc.set_editor_property("light_falloff_exponent", 4.0)  # approx sat(1-(d/r)^4)^2
     drawn = 0
     for i, b in enumerate(batches):
         mi = unreal.load_asset(f"{dest}/MI/{mi_key(b)}") if b["texture"] else None

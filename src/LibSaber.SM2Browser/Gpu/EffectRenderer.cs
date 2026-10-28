@@ -118,6 +118,13 @@ internal sealed unsafe class EffectRenderer : IDisposable
     float.TryParse(Environment.GetEnvironmentVariable("SM2_VFX_SFX_LUM_K"), System.Globalization.CultureInfo.InvariantCulture, out var lk) ? lk : 1f;
   /// <summary>Bench exposure treated as average luminance 1 for <see cref="SfxExposure"/> (the EffectLayer default).</summary>
   public const float ReferenceExposure = 1f / 250f;
+
+  // mtl1-36: capture-calibrated light units (CaptureLightUnits): relative light (1 = particle ambient = capture avgLum),
+  // scaled to each pass's ambient: sprite/mesh HDR ambient 200, ground ambient 0.6 and cover ambient 0.25 times albedo/pi.
+  private static System.Numerics.Vector3 Rel(LightSample l, float exposure) => l.Relative(CaptureLightUnits.BenchAverageLuminance(exposure, ReferenceExposure));
+  internal static System.Numerics.Vector3 MeshLight(LightSample l, float exposure) => Rel(l, exposure) * CaptureLightUnits.BenchAmbient;
+  internal static System.Numerics.Vector3 GroundLight(LightSample l, float exposure) => Rel(l, exposure) * (0.6f * CaptureLightUnits.SurfaceScale);
+  internal static System.Numerics.Vector3 CoverLight(LightSample l, float exposure) => Rel(l, exposure) * (0.25f * CaptureLightUnits.SurfaceScale);
   public static float BloomGain { get; set; } = float.TryParse(Environment.GetEnvironmentVariable("SM2_VFX_BLOOM_GAIN"), System.Globalization.CultureInfo.InvariantCulture, out var bg) ? bg : 0.01f;
   public static bool ContrastEnabled { get; set; } = Environment.GetEnvironmentVariable("SM2_VFX_CONTRAST") == "1";
   private readonly Dictionary<string, (uint Vao, uint Vbo, uint Ibo)?> _meshes = new(StringComparer.OrdinalIgnoreCase);
@@ -278,7 +285,7 @@ internal sealed unsafe class EffectRenderer : IDisposable
       {
         var l = lights[i];
         _gl.Uniform4(_gl.GetUniformLocation(_ground, $"uLightPos[{i}]"), l.Position.X, l.Position.Y, l.Position.Z, Math.Max(0.01f, l.Radius));
-        _gl.Uniform3(_gl.GetUniformLocation(_ground, $"uLightColor[{i}]"), l.Color.X * l.Intensity, l.Color.Y * l.Intensity, l.Color.Z * l.Intensity);
+        var gc = GroundLight(l, layer.Exposure); _gl.Uniform3(_gl.GetUniformLocation(_ground, $"uLightColor[{i}]"), gc.X, gc.Y, gc.Z);
       }
 
       _gl.Enable(EnableCap.DepthTest);
@@ -529,7 +536,7 @@ internal sealed unsafe class EffectRenderer : IDisposable
     {
       var l = lights[i];
       _gl.Uniform4(_gl.GetUniformLocation(_mesh, $"uLightPos[{i}]"), l.Position.X, l.Position.Y, l.Position.Z, Math.Max(0.01f, l.Radius));
-      _gl.Uniform3(_gl.GetUniformLocation(_mesh, $"uLightColor[{i}]"), l.Color.X * l.Intensity, l.Color.Y * l.Intensity, l.Color.Z * l.Intensity);
+      var mc = MeshLight(l, layer.Exposure); _gl.Uniform3(_gl.GetUniformLocation(_mesh, $"uLightColor[{i}]"), mc.X, mc.Y, mc.Z);
     }
 
     var model = _gl.GetUniformLocation(_mesh, "uModel");
@@ -899,7 +906,8 @@ internal sealed unsafe class EffectRenderer : IDisposable
       {
         vec3 d = uLightPos[i].xyz - vWorld;
         float r = uLightPos[i].w;
-        float fall = clamp(1.0 - dot(d, d) / (r * r), 0.0, 1.0);
+        float q = dot(d, d) / (r * r);
+        float fall = clamp(1.0 - q * q, 0.0, 1.0); // s4462: sat(1 - d^4/r^4)^2
         light += uLightColor[i] * fall * fall * max(dot(n, normalize(d)), 0.0);
       }
       // emissive glow only for sfx (translucent) materials; lit combine_material shaders (blood splash) stay surface-lit
@@ -994,7 +1002,7 @@ internal sealed unsafe class EffectRenderer : IDisposable
     {
       var l = lights[i];
       _gl.Uniform4(_gl.GetUniformLocation(_cover, $"uLightPos[{i}]"), l.Position.X, l.Position.Y, l.Position.Z, Math.Max(0.01f, l.Radius));
-      _gl.Uniform3(_gl.GetUniformLocation(_cover, $"uLightColor[{i}]"), l.Color.X * l.Intensity, l.Color.Y * l.Intensity, l.Color.Z * l.Intensity);
+      var cc = CoverLight(l, exposure); _gl.Uniform3(_gl.GetUniformLocation(_cover, $"uLightColor[{i}]"), cc.X, cc.Y, cc.Z);
     }
 
     _gl.Enable(EnableCap.DepthTest);
@@ -1055,8 +1063,9 @@ internal sealed unsafe class EffectRenderer : IDisposable
       for (int i = 0; i < uLightCount; i++)
       {
         vec3 d = uLightPos[i].xyz - vWorld;
-        float f = clamp(1.0 - length(d) / uLightPos[i].w, 0.0, 1.0);
-        col += albedo * uLightColor[i] * uExposure * 8.0 * f * f * max(0.0, dot(n, normalize(d)));
+        float q = dot(d, d) / (uLightPos[i].w * uLightPos[i].w);
+        float f = clamp(1.0 - q * q, 0.0, 1.0);
+        col += albedo * uLightColor[i] * f * f * max(0.0, dot(n, normalize(d)));
       }
       outColor = vec4(toGamma(vec3(1.0) - exp(-col * 1.6)), 1.0);
     }
@@ -1102,8 +1111,9 @@ internal sealed unsafe class EffectRenderer : IDisposable
       {
         vec3 d = uLightPos[i].xyz - vWorld;
         float r = uLightPos[i].w;
-        float f = clamp(1.0 - length(d) / r, 0.0, 1.0);
-        light += uLightColor[i] * uExposure * 8.0 * f * f * max(0.2, normalize(d).y);
+        float q = dot(d, d) / (r * r);
+        float f = clamp(1.0 - q * q, 0.0, 1.0);
+        light += uLightColor[i] * f * f * max(0.0, normalize(d).y);
       }
       vec3 hdr = base * light;
       float fade = clamp(1.0 - length(vWorld.xz - uEye.xz) / 60.0, 0.0, 1.0);

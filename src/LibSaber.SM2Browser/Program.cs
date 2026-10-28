@@ -18,6 +18,8 @@ internal static class Program
       return Bench.HostVfxBench.Run(args);
     if (args.Length > 0 && args[0] == "--vfxue")
       return Bench.VfxUeExport.Run(args);
+    if (args.Length > 0 && args[0] == "--vfxlights")
+      return Bench.VfxLightDump.Run(args);
     if (args.Length > 0 && args[0] == "--vfxue-rules")
       return Bench.VfxUeExport.Rules(args);
     if (args.Length > 0 && args[0] == "--glbench")

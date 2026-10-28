@@ -65,7 +65,11 @@ public sealed class EmitterState(EmitterDef def, int index)
   public Matrix4x4 World = Matrix4x4.Identity;
 }
 
-public readonly record struct LightSample(LightDef Def, Vector3 Position, Vector3 Color, float Radius, float Intensity);
+public readonly record struct LightSample(LightDef Def, Vector3 Position, Vector3 Color, float Radius, float Intensity)
+{
+  /// <summary>mtl1-36: light relative to the particle ambient (<see cref="CaptureLightUnits.Relative"/>).</summary>
+  public Vector3 Relative(float averageLuminance) => CaptureLightUnits.Relative(Color, Intensity, Def.Adaptive, averageLuminance);
+}
 
 /// <summary>
 ///   Fixed-step (60 Hz), seeded particle simulation of an <see cref="EffectDefinition"/>. <see cref="Seek"/> to any

@@ -97,7 +97,7 @@ internal static class VfxUeExport
       }
 
       var lights = instance.Lights().ToList();
-      var meshBatches = MeshBatches(instance, view, eye, meshes, lights, exposure, seconds, out var meshNote);
+      var meshBatches = MeshBatches(instance, view, eye, meshes, lights, exposure, seconds, out var meshNote, out var missingTemplates);
       foreach (var j in meshBatches)
       {
         var t = (string?)j["texture"];
@@ -117,7 +117,8 @@ internal static class VfxUeExport
       var frame = VfxFrameExport.Frame(name, seconds, VfxFrameExport.Camera(eye, camera.Center, camera.Fov), exposure, written,
         "browser bench exposure (SM2_VFX_EXPOSURE, default 1/250; HEURISTIC). Game exposure = key/avgLum (CaptureTonemap.Exposure).");
       frame["pixels"] = size;
-      frame["lights"] = VfxFrameExport.Lights(lights);
+      frame["lights"] = VfxFrameExport.Lights(lights, CaptureLightUnits.BenchAverageLuminance(exposure, EffectRenderer.ReferenceExposure));
+      frame["lightUnits"] = "mtl1-36 CaptureLightUnits: color = srgbToLinear(ColorCtrl) * Intensity * (adaptive ? 1 : 1/avgLum), relative to the particle ambient (= capture avgLum); att = sat(1-(d/r)^4)^2 (s4462). Ground/cover: grey * (1 + albedo/pi * sum(color * att * max(0, n.l))), albedo 0.18 HEURISTIC.";
       frame["groundY"] = 0f;
       frame["grading"] = new System.Text.Json.Nodes.JsonObject
       {
@@ -126,6 +127,8 @@ internal static class VfxUeExport
         ["note"] = gradingName == "identity" ? "identity grading (HEURISTIC: runtime COLOR_GRADING volumes not dumped)" : "content LUT texture (outdoor 137266 NEXT input, exact)",
       };
       frame["meshNote"] = meshNote;
+      // mtl1-36: missing templates feed tools/vfx/missing_assets.py (extractor filter script), like missingTextures.
+      frame["missingTemplates"] = new System.Text.Json.Nodes.JsonArray(missingTemplates.Select(m => (System.Text.Json.Nodes.JsonNode)m).ToArray());
       frame["missingTextures"] = new System.Text.Json.Nodes.JsonArray(missing.Select(m => (System.Text.Json.Nodes.JsonNode)m).ToArray());
       var file = Path.Combine(output, $"{name}_{(int)MathF.Round(seconds * 1000)}ms.vfxframe.json");
       File.WriteAllText(file, frame.ToJsonString());
@@ -144,7 +147,7 @@ internal static class VfxUeExport
   ///   VAT deformation is not applied (rest pose). HEURISTIC: the browser shading itself (light units, key light).
   /// </summary>
   internal static List<System.Text.Json.Nodes.JsonObject> MeshBatches(EffectInstance instance, Matrix4x4 view, Vector3 eye, EffectMeshes meshes,
-    List<LightSample> lights, float exposure, float time, out string note)
+    List<LightSample> lights, float exposure, float time, out string note, out List<string> missingTemplates)
   {
     var result = new List<System.Text.Json.Nodes.JsonObject>();
     var list = EffectMeshParticles.Build(instance, view);
@@ -155,6 +158,7 @@ internal static class VfxUeExport
       meshes.Prefetch(list.Select(b => b.Geom.Template));
       meshes.WaitAll(TimeSpan.FromSeconds(60));
     }
+    var avgLum = CaptureLightUnits.BenchAverageLuminance(exposure, EffectRenderer.ReferenceExposure);
     var sfxScale = SfxExposure.Exposure(exposure, EffectRenderer.ReferenceExposure, EffectRenderer.SfxLumK) / MathF.Max(exposure, 1e-12f);
     var key = Vector3.Normalize(new Vector3(0.4f, 0.8f, 0.3f));
     foreach (var batch in list)
@@ -190,12 +194,15 @@ internal static class VfxUeExport
               var lc = Vector3.Zero;
               foreach (var l in lights.Take(8))
               {
-                var d = l.Position - p; var r = MathF.Max(0.01f, l.Radius);
-                var fall = Math.Clamp(1f - d.LengthSquared() / (r * r), 0f, 1f);
-                if (d.LengthSquared() > 1e-12f) lc += l.Color * l.Intensity * fall * fall * MathF.Max(Vector3.Dot(n, Vector3.Normalize(d)), 0f);
+                var d = l.Position - p;
+                var att = CaptureLightUnits.Attenuation(d.Length(), MathF.Max(0.01f, l.Radius));
+                if (d.LengthSquared() > 1e-12f) lc += CaptureLightUnits.BenchAmbient * l.Relative(avgLum) * att * MathF.Max(Vector3.Dot(n, Vector3.Normalize(d)), 0f);
               }
               var hdr = baseC * (new Vector3(light) + lc) + (material.Translucent ? baseC * inst.Emissive * 25f : Vector3.Zero);
               if (material.Translucent) hdr *= sfxScale;
+              // mtl1-36: cap at VfxFrameExport.MaxExposed (tonemap is flat there) so UE's half-float vertex/scene colour cannot
+              // overflow (cine_bomb debris inside a 1.4e5 light rendered cyan/blue in UE, white in the CPU reference).
+              hdr = Vector3.Min(hdr, new Vector3(VfxFrameExport.MaxExposed / MathF.Max(exposure, 1e-12f)));
               var a = material.Translucent ? c.W : 1f;
               if (material.Translucent && material.SoftFresnel > 0 && toEye.LengthSquared() > 1e-12f)
                 a *= MathF.Pow(MathF.Abs(Vector3.Dot(n, Vector3.Normalize(toEye))), material.SoftFresnel);
@@ -211,6 +218,7 @@ internal static class VfxUeExport
           result.Add(VfxFrameExport.TriangleBatch(batch.Emitter.Name, batch.Emitter.Path, material.Translucent, material.Texture, material.Translucent ? material.Clip : 0f, g.V, g.I,
             $"mesh {batch.Geom.Template}, {batch.Instances.Count} instances"));
     }
+    missingTemplates = missing.Distinct(StringComparer.OrdinalIgnoreCase).ToList();
     note = $"mesh particles: {list.Count} emitters, {result.Count} batches; missing templates [{string.Join(", ", missing.Distinct())}]{(vat > 0 ? $"; {vat} VAT parts drawn in rest pose" : "")}";
     return result;
   }

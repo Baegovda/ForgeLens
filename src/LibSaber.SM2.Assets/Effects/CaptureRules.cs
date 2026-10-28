@@ -150,3 +150,57 @@ public static class CaptureTonemapGlsl
     $"float sm2TonemapLum(float x) {{ return uTonemap == 1 ? clamp(sm2Hable(x) * {F(CaptureTonemap.WhitePointScale)}, 0.0, 1.0) : 1.0 - exp(-x); }}\n" +
     "vec3 sm2Tonemap(vec3 x) { return vec3(sm2TonemapLum(x.r), sm2TonemapLum(x.g), sm2TonemapLum(x.b)); }\n";
 }
+
+/// <summary>
+///   mtl1-36: sfx_light units calibrated against capture CB_COMMON_LIGHTNG (plasma 101917, GPU particle CS s4462).
+///   Per light i, COMMON_DYN_LIGHT_PARAMS[4i..4i+3] = (pos, mult), (colour HDR, 1/r^4), (spot dir, offset), (spot scale,
+///   shadow idx, ..); particle light = colour * mult * sat(1 - d^4 / r^4)^2 (no 1/pi), unlit particles use
+///   COMMON_HDR_AVERAGE_LUMINANCE instead (s4462 _label167), so "ambient" = avgLum in the same HDR units.
+///   Capture match: fx_plasma_exterminator_shot_venting (r 24 exact, colour (94,120,152) sRGB-decoded ratio within 1.3%):
+///   CB colour 274.0 / 269.0 vs srgbToLinear(152/255) * 200 (Intensity at t=0) * avgLum 4.150 = 260.5 (-5% / -3%);
+///   fx_plasma_charging_side (r 2 exact, ratio within 1.5%): 1145 = lin * 569 * avgLum, 569 inside its 150..4448 spline.
+///   So capture HDR = srgbToLinear(ColorCtrl) * Intensity * (isAdaptiveIntensity ? avgLum : 1). The adaptive scale is
+///   inferred from one light at one avgLum (HEURISTIC for the factor itself; non-adaptive lights were not in a capture).
+///   With exposure = key / avgLum an adaptive light's exposed value is lin * I * key, independent of scene brightness.
+/// </summary>
+public static class CaptureLightUnits
+{
+  /// <summary>Bench sprite ambient HDR (EffectRenderer mesh/sprite "200") that stands for capture avgLum.</summary>
+  public const float BenchAmbient = 200f;
+  /// <summary>Diffuse albedo used to light the bench ground/cover relative to its ambient (HEURISTIC 0.18, grey card).</summary>
+  public const float SurfaceAlbedo = 0.18f;
+  /// <summary>Ground/cover light per unit relative light: albedo / pi (Lambert; the surface BRDF itself is HEURISTIC).</summary>
+  public const float SurfaceScale = SurfaceAlbedo / MathF.PI;
+  /// <summary>Default for lights without isAdaptiveIntensity (233 of 270 authored flags are True; HEURISTIC).</summary>
+  public const bool DefaultAdaptive = true;
+
+  public static float SrgbToLinear(float c)
+  {
+    c = Math.Clamp(c, 0f, 1f);
+    return c <= 0.04045f ? c / 12.92f : MathF.Pow((c + 0.055f) / 1.055f, 2.4f);
+  }
+
+  public static System.Numerics.Vector3 Linear(System.Numerics.Vector3 srgb) => new(SrgbToLinear(srgb.X), SrgbToLinear(srgb.Y), SrgbToLinear(srgb.Z));
+
+  /// <summary>Capture HDR colour (CB_COMMON_LIGHTNG PARAMS[4i+1].rgb) for an authored colour/intensity.</summary>
+  public static System.Numerics.Vector3 Capture(System.Numerics.Vector3 srgb, float intensity, bool adaptive, float averageLuminance)
+    => Linear(srgb) * intensity * (adaptive ? averageLuminance : 1f);
+
+  /// <summary>Light relative to the particle ambient (capture HDR / avgLum): what the bench and UE export use.</summary>
+  public static System.Numerics.Vector3 Relative(System.Numerics.Vector3 srgb, float intensity, bool adaptive, float averageLuminance)
+    => Linear(srgb) * intensity * (adaptive ? 1f : 1f / MathF.Max(averageLuminance, 1e-6f));
+
+  /// <summary>s4462 distance attenuation: sat(1 - d^4 / r^4)^2.</summary>
+  public static float Attenuation(float distance, float radius)
+  {
+    var q = distance / MathF.Max(radius, 1e-4f); q *= q;
+    var a = Math.Clamp(1f - q * q, 0f, 1f);
+    return a * a;
+  }
+
+  /// <summary>CB P1.w = 1/r^4 back to the radius.</summary>
+  public static float RadiusFromInvR4(float invR4) => invR4 > 0 ? MathF.Pow(invR4, -0.25f) : 0f;
+
+  /// <summary>Bench average luminance for a bench exposure (ReferenceExposure = avgLum 1, as SfxExposure).</summary>
+  public static float BenchAverageLuminance(float exposure, float referenceExposure) => referenceExposure / MathF.Max(exposure, 1e-12f);
+}

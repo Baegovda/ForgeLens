@@ -148,3 +148,17 @@ All addresses are virtual addresses in `sm2_retail.exe` (retail Steam build, 81 
 - `common_pc_dx12_lut.sdc` (4909 B shader cache) extracted with the LUTs; not inspected.
 - Soft depth (particles PS 101818, plasma nightly dis s101818 ~l.1426-1446): sceneZ = -(n·f)/((n-f)·(d - n/(n-f))) from PART_RENDER_DEPTH + COMMON_CAMERA_NEAR_FAR_Z; fade = sat(((sceneZ - TEXCOORD3.x)·(1/softDepth) - 0.5)·sign + 0.5), flag 512 -> sign -1; rgb and alpha *= fade.
 - Hellbrute pretonemap EXR vs final_331.png (E 0.030691): mean |d| ~78; not usable as tonemap evidence (earlier snapshot, 4K upscaled final).
+
+## mtl1-36 VFX light units (CB_COMMON_LIGHTNG, particles s4462)
+- `COMMON_LIGHTS_NUM` int4 (x directional, y point), `COMMON_DYN_LIGHT_PARAMS[1024]` packoffset 16; light i = PARAMS[4i..4i+3]: P0 (pos, mult), P1 (HDR colour, 1/r^4), P2 (spot dir, offset), P3 (spot scale, shadow idx, ...); PARAMS2[i] > 127 = no projector.
+- att = sat(1 - d^4·invR4)^2 · P0.w, zeroed when P0.w > 200000. No 1/pi on particles. Unlit path (_label167) uses COMMON_HDR_AVERAGE_LUMINANCE.
+- Plasma: avgLum 4.150339, EXPOSURE_DIV_AVG_LUM 0.027324 (Key ~0.114); smoke 4.8185 / 0.023783 (no valid light).
+
+| light | match | CB | model |
+|---|---|---|---|
+| 0 fx_plasma_exterminator_shot_venting | r 24 exact, colour (94,120,152) sRGB-decoded ratio 1.3 % | 274.0 / 269.0 | lin(0.596)·200·4.150 = 260.5 (-5 %/-3 %) |
+| 2 fx_plasma_charging_side | r 2 exact | 1145 | lin·569·avgLum, 569 inside spline 150..4448 |
+| 3 fx_pve_ship_console_screen LIGHT_for_override | r 1, I 50 -> 54.6 | colour overridden | excluded |
+| 1 | r 3.82 | - | unmatched |
+
+- Raw (non-decoded) colour does not fit; ColorMultCtrl always spline [0,10], ignored. Adaptive scaling by avgLum HEURISTIC (one light).
