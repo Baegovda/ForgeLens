@@ -115,6 +115,7 @@ public partial class MainWindow : Window
         await LoadFolderAsync(_settings.LastFolder);
       await OpenLooseEffectFromEnvironmentAsync();
       await OpenLooseModelFromEnvironmentAsync();
+      await OpenCatalogFileFromEnvironmentAsync();
     };
   }
 
@@ -470,6 +471,7 @@ public partial class MainWindow : Window
     _albedo = null;
     _normals = null;
     _specular = null;
+    ResetColours();
     PreviewImage.IsVisible = false;
     GpuView.IsVisible = false;
     GpuView.Continuous = false;
@@ -509,6 +511,7 @@ public partial class MainWindow : Window
         _albedo = loaded.Item2.Albedo;
         _normals = loaded.Item2.Normals;
         _specular = loaded.Item2.Specular;
+        _ = LoadColoursAsync(mesh, index, file.Name, generation);
         _distance = 0;
         _time = 0;
         _yaw = 0.7f;
@@ -889,32 +892,42 @@ public partial class MainWindow : Window
 
     foreach (var pair in wanted)
     {
-      var index = TemplateMeshReader.ResolveTexture(catalog, hint, pair.Key);
-      if (index < 0)
+      if (LoadPreviewImage(catalog, store, hint, pair.Key, pair.Value) is not { } image)
         continue;
-      try
-      {
-        var document = TextureLoader.Load(catalog, store, index);
-        if (!document.CanDecode)
-          continue;
-        var pixels = document.Decode(0, 0, out var width, out var height, out _);
-        var image = new PreviewImage { Width = width, Height = height, Bgra = pixels, Channels = pair.Value };
-        if (pair.Value.Contains("Normal", StringComparison.OrdinalIgnoreCase))
-          normals[pair.Key] = image;
-        else if (pair.Value.Contains("Metal", StringComparison.OrdinalIgnoreCase)
-          || pair.Value.Contains("Rough", StringComparison.OrdinalIgnoreCase)
-          || pair.Value.Contains("MetGray", StringComparison.OrdinalIgnoreCase))
-          specular[pair.Key] = image;
-        else
-          albedo[pair.Key] = image;
-      }
-      catch (Exception)
-      {
-        // A missing or unsupported texture leaves that part as a lit solid.
-      }
+      if (pair.Value.Contains("Normal", StringComparison.OrdinalIgnoreCase))
+        normals[pair.Key] = image;
+      else if (IsSpecularChannels(pair.Value))
+        specular[pair.Key] = image;
+      else
+        albedo[pair.Key] = image;
     }
 
     return new PreviewTextures(albedo, normals, specular);
+  }
+
+  internal static bool IsSpecularChannels(string channels)
+    => channels.Contains("Metal", StringComparison.OrdinalIgnoreCase)
+      || channels.Contains("Rough", StringComparison.OrdinalIgnoreCase)
+      || channels.Contains("MetGray", StringComparison.OrdinalIgnoreCase);
+
+  /// <summary>Mip 0 of a texture by name as a preview image (null when missing / undecodable: the part draws as a lit solid).</summary>
+  internal static PreviewImage? LoadPreviewImage(GameCatalog catalog, ArchiveStore store, int hint, string name, string channels)
+  {
+    var index = TemplateMeshReader.ResolveTexture(catalog, hint, name);
+    if (index < 0)
+      return null;
+    try
+    {
+      var document = TextureLoader.Load(catalog, store, index);
+      if (!document.CanDecode)
+        return null;
+      var pixels = document.Decode(0, 0, out var width, out var height, out _);
+      return new PreviewImage { Width = width, Height = height, Bgra = pixels, Channels = channels };
+    }
+    catch (Exception)
+    {
+      return null;
+    }
   }
 
   private void ShowPixels(byte[] pixels, int width, int height)
@@ -1622,6 +1635,9 @@ public partial class MainWindow : Window
       return;
     _settings.LastExportFolder = choice.Folder;
     _settings.Save();
+    // mtl1-49: the colour scheme picked in the viewer exports with the previewed tpl (material=..., td variant swap)
+    if (_colourMaterial is { Length: > 0 } colour && _previewFileIndex >= 0 && indices.Contains(_previewFileIndex))
+      choice.Settings.Variant = string.IsNullOrWhiteSpace(choice.Settings.Variant) ? "material=" + colour : choice.Settings.Variant + ",material=" + colour;
     if (_mesh is not null && _previewFileIndex >= 0 && indices.Contains(_previewFileIndex))
       choice.Settings.PartVisibility = new Dictionary<int, MeshVisibility> { [_previewFileIndex] = MeshVisibility.Capture(_mesh) };
 

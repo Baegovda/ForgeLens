@@ -279,6 +279,22 @@
             <Image x:Name="PreviewImage" Stretch="Uniform" />
             <TextBox x:Name="PreviewText" IsReadOnly="True" AcceptsReturn="True" TextWrapping="NoWrap"
                      FontFamily="Consolas,Courier New,monospace" FontSize="12" Background="Transparent" BorderThickness="0" />
+            <!-- mtl1-49: in-game style colour scheme picker (td materials + game names / heraldry swatches) -->
+            <Border x:Name="ColourPanel" Classes="colourpanel" IsVisible="False" VerticalAlignment="Bottom" HorizontalAlignment="Center" Margin="0,0,0,14"
+                    PointerPressed="ColourPanelPointer" PointerMoved="ColourPanelPointer" PointerReleased="ColourPanelPointer" PointerWheelChanged="ColourPanelWheel">
+              <StackPanel Spacing="6">
+                <DockPanel>
+                  <TextBlock Text="COLOUR SCHEME" Classes="colourcaption" DockPanel.Dock="Left" VerticalAlignment="Center" />
+                  <TextBlock x:Name="ColourCount" Classes="colourcaption" DockPanel.Dock="Right" HorizontalAlignment="Right" VerticalAlignment="Center" />
+                  <Rectangle Height="1" Fill="{DynamicResource FL.Border}" Margin="10,0" VerticalAlignment="Center" />
+                </DockPanel>
+                <StackPanel x:Name="ColourSwatches" Orientation="Horizontal" Spacing="4" HorizontalAlignment="Center" />
+                <StackPanel HorizontalAlignment="Center" Spacing="1">
+                  <TextBlock x:Name="ColourName" Classes="colourname" HorizontalAlignment="Center" />
+                  <TextBlock x:Name="ColourSub" Classes="coloursub" HorizontalAlignment="Center" MaxWidth="520" TextTrimming="CharacterEllipsis" />
+                </StackPanel>
+              </StackPanel>
+            </Border>
             <Border x:Name="LoadingOverlay" IsVisible="False" Background="#CC121418">
               <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center" Spacing="12">
                 <ProgressBar IsIndeterminate="True" Width="200" Height="8" />

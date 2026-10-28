@@ -24,6 +24,10 @@ public sealed class VariantRequest
   public HashSet<string> Hide { get; } = new(StringComparer.OrdinalIgnoreCase);
   /// <summary>Weapon tpls: FirearmSkin key in firearm_skins_library (skin_01 when null).</summary>
   public string? Skin { get; private set; }
+  /// <summary>mtl1-49: explicit firearm skin group (<c>uid=arifle_auto_bolt_rifle</c>) when a tpl is shared by several weapons.</summary>
+  public string? Uid { get; private set; }
+  /// <summary>mtl1-49: td material suffix (<c>material=red</c>, the Forge Lens colour scheme); overrides the skin's material.</summary>
+  public string? Material { get; private set; }
   /// <summary>Weapon tpls: explicit geomCustomizerRegions (replaces the skin's list when set).</summary>
   public List<string>? WeaponRegions { get; private set; }
   /// <summary>ui-45: NPC template of inst_constructor_templates.sso (<c>npc=Cultist</c>); SECTION=value tokens then name its layers.</summary>
@@ -99,6 +103,14 @@ public sealed class VariantRequest
           break;
         case "skin":
           request.Skin = value;
+          break;
+        case "uid":
+          request.Uid = value;
+          break;
+        case "material":
+        case "colour":
+        case "color":
+          request.Material = value.Equals("default", StringComparison.OrdinalIgnoreCase) ? "" : value.ToLowerInvariant();
           break;
         case "npc":
           request.Npc = value;

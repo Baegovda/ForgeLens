@@ -228,6 +228,61 @@
     <Style Selector="ListBox.tiles ListBoxItem:pressed /template/ ContentPresenter">
       <Setter Property="Background" Value="Transparent" />
     </Style>
+    <!-- mtl1-49 colour scheme picker -->
+    <Style Selector="Border.colourpanel">
+      <Setter Property="Background" Value="#E6191A1D" />
+      <Setter Property="BorderBrush" Value="#55E8892B" />
+      <Setter Property="BorderThickness" Value="1" />
+      <Setter Property="CornerRadius" Value="10" />
+      <Setter Property="Padding" Value="14,9,14,10" />
+      <Setter Property="BoxShadow" Value="0 6 18 0 #99000000" />
+    </Style>
+    <Style Selector="TextBlock.colourcaption">
+      <Setter Property="FontSize" Value="10" />
+      <Setter Property="FontWeight" Value="SemiBold" />
+      <Setter Property="LetterSpacing" Value="1.6" />
+      <Setter Property="Foreground" Value="{DynamicResource FL.TextDim}" />
+    </Style>
+    <Style Selector="TextBlock.colourname">
+      <Setter Property="FontSize" Value="15" />
+      <Setter Property="FontWeight" Value="Bold" />
+      <Setter Property="LetterSpacing" Value="1.2" />
+      <Setter Property="Foreground" Value="#F2E6D3" />
+    </Style>
+    <Style Selector="TextBlock.coloursub">
+      <Setter Property="FontSize" Value="11" />
+      <Setter Property="Foreground" Value="{DynamicResource FL.TextDim}" />
+    </Style>
+    <Style Selector="Button.swatch">
+      <Setter Property="Padding" Value="0" />
+      <Setter Property="Margin" Value="0" />
+      <Setter Property="Background" Value="Transparent" />
+      <Setter Property="BorderThickness" Value="0" />
+      <Setter Property="Cursor" Value="Hand" />
+    </Style>
+    <Style Selector="Button.swatch /template/ ContentPresenter">
+      <Setter Property="Background" Value="Transparent" />
+    </Style>
+    <Style Selector="Button.swatch:pointerover /template/ ContentPresenter">
+      <Setter Property="Background" Value="Transparent" />
+    </Style>
+    <Style Selector="Button.swatch Ellipse.ring">
+      <Setter Property="Stroke" Value="Transparent" />
+      <Setter Property="StrokeThickness" Value="2" />
+    </Style>
+    <Style Selector="Button.swatch:pointerover Ellipse.ring">
+      <Setter Property="Stroke" Value="#88DCDDDF" />
+    </Style>
+    <Style Selector="Button.swatch.selected Ellipse.ring">
+      <Setter Property="Stroke" Value="{DynamicResource FL.Accent}" />
+      <Setter Property="StrokeThickness" Value="2.5" />
+    </Style>
+    <Style Selector="Button.swatch Border.tick">
+      <Setter Property="IsVisible" Value="False" />
+    </Style>
+    <Style Selector="Button.swatch.selected Border.tick">
+      <Setter Property="IsVisible" Value="True" />
+    </Style>
     <Style Selector="Border.hbadge">
       <Setter Property="Background" Value="#33E0C34F" />
       <Setter Property="BorderBrush" Value="#E0C34F" />

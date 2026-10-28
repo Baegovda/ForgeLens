@@ -62,7 +62,7 @@ public sealed class ExportSettings
   ///   <see cref="VariantRequest"/> spec. Null or <c>default</c> keeps PREDEFINED_PRESET_1 (what SetActivePresetToDefault
   ///   equips); <c>all</c> exports every armor piece. Other tpls are never filtered.
   /// </summary>
-  public string? Variant { get; init; }
+  public string? Variant { get; set; }
   /// <summary>
   ///   Secondary physics of the character class (cloth, jiggle bones; <see cref="PhysicsLocator"/>). Writes
   ///   <c>{model}.physics.json</c>, bakes the simulated jiggle bones into every clip, and adds cloth
@@ -527,6 +527,104 @@ public static class AssetExporter
     return result;
   }
 
+  private static readonly System.Runtime.CompilerServices.ConditionalWeakTable<GameCatalog, object?[]> ColourData = new();
+
+  /// <summary>
+  ///   mtl1-49: the in-game colour schemes of a weapon tpl (td materials + localized names + armor_color_library swatches);
+  ///   empty when its diffuse textures have no td materials. <paramref name="skin"/> picks the _gl names for *_gl skins.
+  /// </summary>
+  public static List<ColourScheme> ColourSchemesFor(GameCatalog catalog, ArchiveStore store, string template, ExportedMesh mesh, string? skin = null)
+  {
+    // Only td materials a skin can select (firearm_skins_library / melee_skins_library "material"): other td material blocks
+    // (sfx_blade_01, auspex_*, ...) are effect / UI shader states the game sets in code, not colour schemes.
+    var selectable = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+    if (WeaponLibrary(catalog, store) is { } wlib)
+      foreach (var m in wlib.Skins.Values.SelectMany(l => l).Select(k => k.Skin.GetValueOrDefault("material") as string))
+        if (!string.IsNullOrEmpty(m)) selectable.Add(m);
+    if (MeleeLibrary(catalog, store) is { } mlib)
+      foreach (var m in mlib.Skins.Values.SelectMany(l => l).Select(k => k.Material))
+        if (!string.IsNullOrEmpty(m)) selectable.Add(m);
+    var materials = ColourSchemes.MaterialsOf(mesh, name => TdText(catalog, store, name)).Where(m => selectable.Count == 0 || selectable.Contains(m)).ToList();
+    if (materials.Count == 0)
+      return new List<ColourScheme>();
+    var holder = ColourData.GetValue(catalog, _ => new object?[3]);
+    Dictionary<string, string> english, korean;
+    Dictionary<string, ColourSchemes.PaletteEntry> palette;
+    lock (holder)
+    {
+      Dictionary<string, string> Strings(string lang)
+      {
+        try
+        {
+          if (catalog.TryGetByPath($"texts/strings_{lang}.str", out var i))
+            return ColourSchemes.ParseStrings(store.Read(i));
+        }
+        catch { }
+
+        return new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+      }
+
+      holder[0] ??= Strings("english");
+      holder[1] ??= Strings("korean");
+      if (holder[2] is null)
+      {
+        var pal = new Dictionary<string, ColourSchemes.PaletteEntry>(StringComparer.OrdinalIgnoreCase);
+        try
+        {
+          if (catalog.TryGetByPath(ColourSchemes.PalettePath, out var pi))
+            pal = ColourSchemes.ParsePalette(Encoding.UTF8.GetString(store.Read(pi)));
+        }
+        catch { }
+
+        holder[2] = pal;
+      }
+
+      english = (Dictionary<string, string>)holder[0]!;
+      korean = (Dictionary<string, string>)holder[1]!;
+      palette = (Dictionary<string, ColourSchemes.PaletteEntry>)holder[2]!;
+    }
+
+    var lib = WeaponLibrary(catalog, store);
+    var uid = lib?.Resolve(template, skin).Uid ?? MeleeLibrary(catalog, store)?.ActorsFor(template).FirstOrDefault();
+    (byte, byte, byte)? Average(string material)
+    {
+      foreach (var tex in mesh.Parts.Concat(mesh.Levels.SelectMany(l => l.Parts)).Select(p => p.Texture).Where(t => !string.IsNullOrWhiteSpace(t)).Distinct(StringComparer.OrdinalIgnoreCase))
+      {
+        if (TdText(catalog, store, tex!) is not { } text || SkinMaterial.TdOverrides(text, material) is not { } ov)
+          continue;
+        var diffuse = ov.FirstOrDefault(p => SkinMaterial.Role(p.Key) == "diffuse").Value;
+        if (diffuse is null)
+          continue;
+        var index = TemplateMeshReader.ResolveTexture(catalog, -1, diffuse);
+        if (index < 0)
+          continue;
+        try
+        {
+          var doc = TextureLoader.Load(catalog, store, index);
+          if (!doc.CanDecode)
+            continue;
+          var px = doc.Decode(Math.Max(0, doc.MipCount - 4), 0, out _, out _, out _);
+          long r = 0, g = 0, b = 0, n = 0;
+          for (var i = 0; i + 3 < px.Length; i += 4)
+          {
+            if (px[i + 3] < 128)
+              continue;
+            b += px[i]; g += px[i + 1]; r += px[i + 2]; n++;
+          }
+
+          if (n > 0)
+            return ((byte)(r / n), (byte)(g / n), (byte)(b / n));
+        }
+        catch { }
+      }
+
+      return null;
+    }
+
+    var gl = skin?.EndsWith("_gl", StringComparison.OrdinalIgnoreCase) == true;
+    return ColourSchemes.Describe(materials, template, uid, gl, english, korean, palette, Average);
+  }
+
   private static readonly System.Runtime.CompilerServices.ConditionalWeakTable<GameCatalog, MeleeCustomization?[]> MeleeLibraries = new();
 
   /// <summary>ui-45: melee_skins_library + geom_customizer_preset_melee + melee_actor_factory (cached per catalog).</summary>
@@ -571,12 +669,26 @@ public static class AssetExporter
     if (string.IsNullOrWhiteSpace(settings.Variant) || !template.StartsWith("wpn_", StringComparison.OrdinalIgnoreCase))
       return null;
     var request = VariantRequest.Parse(settings.Variant);
-    if (request.All || (request.Skin is null && request.WeaponRegions is null && request.Show.Count == 0 && request.Hide.Count == 0))
+    if (request.All && request.Material is null || (request.Skin is null && request.WeaponRegions is null && request.Show.Count == 0 && request.Hide.Count == 0 && request.Material is null))
       return null;
+    if (request.Material is not null)
+    {
+      foreach (var cs in ColourSchemesFor(catalog, store, template, mesh, request.Skin))
+        report.Messages.Add($"{template}: colour scheme {cs.Material} = \"{cs.Name}\" {cs.Hex} ({cs.NameKey}; {cs.FullName}; {cs.LocalName}; swatch {cs.SwatchSource})");
+    }
+    // mtl1-49: material= alone (Forge Lens colour scheme on the default look) swaps textures only; visibility stays as exported
+    if (request.Material is not null && (request.All || (request.Skin is null && request.WeaponRegions is null && request.Show.Count == 0 && request.Hide.Count == 0)))
+    {
+      var plain = new VariantResult { Template = template, Spec = request.Spec, Team = "WEAPON", Appearance = "" };
+      ApplySkinMaterial(catalog, store, template, mesh, plain);
+      report.Messages.Add($"{template}: material {(plain.Material.Length == 0 ? "default" : plain.Material)} only ({plain.MaterialSource}).");
+      return plain;
+    }
+
     var lib = WeaponLibrary(catalog, store);
-    var uid = lib?.UidFor(template);
-    var overrideUid = uid is null ? lib?.OverrideUidFor(template, request.Skin) : null;
-    uid ??= overrideUid;
+    var resolved = lib?.Resolve(template, request.Skin, request.Uid);
+    var uid = resolved?.Uid;
+    var overrideUid = resolved is { Override: true } ? uid : null;
     if ((lib is null || uid is null) && MeleeLibrary(catalog, store) is { } melee && (melee.ActorsFor(template).Count > 0 || melee.OverrideSkinsFor(template).Count > 0))
     {
       var m = MeleeVariant.Apply(mesh, melee, template, request);
@@ -597,6 +709,8 @@ public static class AssetExporter
     var result = WeaponVariant.Apply(mesh, lib, uid, request);
     if (overrideUid is not null)
       result.Notes.Insert(0, $"skin {uid}/{request.Skin} switches to this tpl (overridedActorName); its regions, attachments and material apply here.");
+    if (resolved is { Candidates.Count: > 1 } && request.Uid is null)
+      result.Notes.Insert(0, $"tpl shared by {string.Join(", ", resolved.Value.Candidates)}; using {uid} (uid=... picks another).");
     result.AppearanceSource = "firearm mgs/" + uid;
     MergeAttachments(catalog, store, template, mesh, result, settings, report);
     ApplySkinMaterial(catalog, store, template, mesh, result);
@@ -675,6 +789,12 @@ public static class AssetExporter
   /// <summary>mtl1-47: swaps textures to their <c>_&lt;material&gt;</c> siblings (<see cref="SkinMaterial"/>). <c>SM2_SKIN_MATERIAL=0</c> turns it off.</summary>
   private static void ApplySkinMaterial(GameCatalog catalog, ArchiveStore store, string template, ExportedMesh mesh, VariantResult result)
   {
+    if (VariantRequest.Parse(result.Spec).Material is { } chosen)
+    {
+      if (chosen != result.Material)
+        result.Notes.Add($"material={(chosen.Length == 0 ? "default" : chosen)} replaces the skin material {(result.Material.Length == 0 ? "(none)" : result.Material)}.");
+      result.Material = chosen;
+    }
     if (result.Material.Length == 0)
       return;
     if (Environment.GetEnvironmentVariable("SM2_SKIN_MATERIAL") == "0")
@@ -712,7 +832,7 @@ public static class AssetExporter
   }
 
   /// <summary>Text of <c>td/&lt;name&gt;.td</c> (null when absent or binary).</summary>
-  private static string? TdText(GameCatalog catalog, ArchiveStore store, string name)
+  public static string? TdText(GameCatalog catalog, ArchiveStore store, string name)
   {
     foreach (var candidate in new[] { "td/" + name + ".td", name + ".td" })
     {

@@ -141,68 +141,124 @@ public sealed class WeaponCustomization
       c.LoadAttachingActors(Encoding.UTF8.GetString(store.Read(aa)), ClassText);
     }
 
-    var targets = c.OverrideTargets;
     var query = catalog.Query(null, "_client", AssetFilter.All);
     foreach (var fileIndex in query.Indices ?? Enumerable.Range(query.First, query.Count).ToArray())
     {
       var file = catalog.GetFile(fileIndex);
       if (!file.Path.StartsWith("ssl/weapons/common/firearm/", StringComparison.OrdinalIgnoreCase) || !file.Path.EndsWith("_client.cls", StringComparison.OrdinalIgnoreCase))
         continue;
-      var uid = Path.GetFileName(Path.GetDirectoryName(file.Path) ?? "");
-      var skinned = c.Skins.ContainsKey(uid);
-      if (!skinned && !targets.Contains(uid))
-        continue;
       string text;
       try { text = Encoding.UTF8.GetString(store.Read(fileIndex)); } catch { continue; }
       var m = NameTpl.Match(text);
-      if (!m.Success)
-        continue;
-      if (!skinned)
-      {
-        c.ActorTpl[uid] = m.Groups[1].Value;
-        continue;
-      }
-
-      if (!c.UidsByTpl.TryGetValue(m.Groups[1].Value, out var uids))
-        c.UidsByTpl[m.Groups[1].Value] = uids = new List<string>();
-      if (!uids.Contains(uid, StringComparer.OrdinalIgnoreCase))
-        uids.Add(uid);
+      if (m.Success)
+        c.AddActor(file.Path, m.Groups[1].Value);
     }
 
-    foreach (var uids in c.UidsByTpl.Values)
-      uids.Sort((a, b) => c.Skins[b].Count != c.Skins[a].Count ? c.Skins[b].Count.CompareTo(c.Skins[a].Count) : a.Length.CompareTo(b.Length)); // the weapon with the skin set (not an aux/attachment user), plain uid before *_tac_reserve
+    c.SortUids();
     return c;
+  }
+
+  /// <summary>
+  ///   mtl1-49: one firearm actor <c>.../&lt;actor&gt;_client.cls</c> naming <paramref name="tpl"/>. The actor is the file stem
+  ///   (not the folder: <c>firearm_versions/arifle_auto_bolt_rifle/arifle_auto_bolt_rifle_artificer_01_client.cls</c> is the actor
+  ///   <c>arifle_auto_bolt_rifle_artificer_01</c>, which mtl1-47 wrongly filed under arifle_auto_bolt_rifle).
+  /// </summary>
+  public void AddActor(string path, string tpl)
+  {
+    var stem = Path.GetFileName(path);
+    stem = stem.EndsWith("_client.cls", StringComparison.OrdinalIgnoreCase) ? stem[..^"_client.cls".Length] : Path.GetFileNameWithoutExtension(stem);
+    ActorTpl[stem] = tpl;
+    if (path.Replace('\\', '/').Contains("/mgs/", StringComparison.OrdinalIgnoreCase))
+      ActorInMgs.Add(stem);
+    if (Skins.ContainsKey(stem))
+    {
+      if (!UidsByTpl.TryGetValue(tpl, out var uids))
+        UidsByTpl[tpl] = uids = new List<string>();
+      if (!uids.Contains(stem, StringComparer.OrdinalIgnoreCase))
+        uids.Add(stem);
+    }
+  }
+
+  /// <summary>The weapon with the skin set first (not an aux/attachment user), plain uid before *_tac_reserve.</summary>
+  public void SortUids()
+  {
+    foreach (var uids in UidsByTpl.Values)
+      uids.Sort((a, b) => Skins[b].Count != Skins[a].Count ? Skins[b].Count.CompareTo(Skins[a].Count) : a.Length.CompareTo(b.Length));
   }
 
   /// <summary>overridedActorName values of every skin (mgs uids without their own skin group, e.g. arifle_bolt_rifle_artificer_01).</summary>
   public HashSet<string> OverrideTargets => Skins.Values.SelectMany(l => l).Select(s => s.Skin.GetValueOrDefault("overridedActorName") as string)
     .Where(n => !string.IsNullOrEmpty(n)).Select(n => n!).ToHashSet(StringComparer.OrdinalIgnoreCase);
 
-  /// <summary>mtl1-47: override actor uid → tpl (its mgs *_client.cls nameTpl).</summary>
+  /// <summary>Firearm actor (the <c>_client.cls</c> stem) → its geom nameTpl, for every firearm actor in the catalog (mtl1-49).</summary>
   public Dictionary<string, string> ActorTpl { get; } = new(StringComparer.OrdinalIgnoreCase);
 
-  /// <summary>
-  ///   mtl1-47: the skin-group uid whose skin <paramref name="skin"/> switches to <paramref name="template"/> via overridedActorName
-  ///   (bolt rifle 01_red → arifle_bolt_rifle_artificer_01 → wpn_bolt_rifle_01_artificer_01).
-  /// </summary>
-  public string? OverrideUidFor(string template, string? skin)
+  /// <summary>Actors defined in their own <c>mgs/&lt;actor&gt;/</c> folder (a weapon's own variant) rather than <c>firearm_versions/</c>.</summary>
+  public HashSet<string> ActorInMgs { get; } = new(StringComparer.OrdinalIgnoreCase);
+
+  /// <summary>Skin group that owns an actor: the actor itself, else the longest skin-group uid that prefixes it (<c>arifle_bolt_rifle_relic_01</c> → arifle_bolt_rifle).</summary>
+  public string? OwnerUid(string actor)
   {
-    if (skin is null)
-      return null;
-    foreach (var (uid, list) in Skins)
+    if (Skins.ContainsKey(actor))
+      return actor;
+    return Skins.Keys.Where(u => actor.StartsWith(u + "_", StringComparison.OrdinalIgnoreCase)).OrderByDescending(u => u.Length).FirstOrDefault();
+  }
+
+  /// <summary>
+  ///   mtl1-49 generic firearm resolution for a tpl (+ optional skin key, + optional explicit <c>uid=</c>):
+  ///   1. an explicit skin-group uid wins;
+  ///   2. with a skin: every group whose skin <paramref name="skin"/> has an overridedActorName whose actor names this tpl;
+  ///   3. groups whose own actor names this tpl (<see cref="UidsByTpl"/>);
+  ///   4. owners (<see cref="OwnerUid"/>) of any actor naming this tpl.
+  ///   Ties: actor in <c>mgs/</c> before <c>firearm_versions/</c> (a weapon's own version before a re-used one), then the
+  ///   shorter uid. E.g. wpn_bolt_rifle_01_artificer_01 is named by mgs/arifle_bolt_rifle_artificer_01 and by
+  ///   firearm_versions/arifle_auto_bolt_rifle/arifle_auto_bolt_rifle_artificer_01 → arifle_bolt_rifle unless uid=arifle_auto_bolt_rifle.
+  /// </summary>
+  public (string? Uid, bool Override, List<string> Candidates) Resolve(string template, string? skin, string? explicitUid = null)
+  {
+    var actors = ActorTpl.Where(a => a.Value.Equals(template, StringComparison.OrdinalIgnoreCase)).Select(a => a.Key).ToList();
+    int Rank(string actor) => ActorInMgs.Contains(actor) ? 0 : 1;
+    if (!string.IsNullOrEmpty(explicitUid) && Skins.ContainsKey(explicitUid))
     {
-      foreach (var (key, value) in list)
+      var over = skin is not null && Skins[explicitUid].Any(k => k.Key.Equals(skin, StringComparison.OrdinalIgnoreCase)
+        && k.Skin.GetValueOrDefault("overridedActorName") is string o && actors.Contains(o, StringComparer.OrdinalIgnoreCase));
+      return (explicitUid, over, new List<string> { explicitUid });
+    }
+
+    if (skin is not null)
+    {
+      var hits = new List<(string Uid, string Actor)>();
+      foreach (var (uid, list) in Skins)
       {
-        if (key.Equals(skin, StringComparison.OrdinalIgnoreCase) && value.GetValueOrDefault("overridedActorName") is string o
-            && ActorTpl.TryGetValue(o, out var t) && t.Equals(template, StringComparison.OrdinalIgnoreCase))
-          return uid;
+        foreach (var (key, value) in list)
+        {
+          if (key.Equals(skin, StringComparison.OrdinalIgnoreCase) && value.GetValueOrDefault("overridedActorName") is string o
+              && actors.Contains(o, StringComparer.OrdinalIgnoreCase))
+            hits.Add((uid, o));
+        }
+      }
+
+      if (hits.Count > 0)
+      {
+        var ordered = hits.OrderBy(h => Rank(h.Actor)).ThenBy(h => h.Uid.Length).ThenBy(h => h.Uid, StringComparer.OrdinalIgnoreCase).Select(h => h.Uid).Distinct(StringComparer.OrdinalIgnoreCase).ToList();
+        return (ordered[0], true, ordered);
       }
     }
 
-    return null;
+    if (UidsByTpl.TryGetValue(template, out var direct) && direct.Count > 0)
+      return (direct[0], false, direct.ToList());
+
+    var owners = actors.Select(a => (Actor: a, Uid: OwnerUid(a))).Where(o => o.Uid is not null)
+      .OrderBy(o => Rank(o.Actor)).ThenBy(o => o.Uid!.Length).ThenBy(o => o.Uid, StringComparer.OrdinalIgnoreCase)
+      .Select(o => o.Uid!).Distinct(StringComparer.OrdinalIgnoreCase).ToList();
+    return (owners.FirstOrDefault(), false, owners);
   }
 
-  public string? UidFor(string template) => UidsByTpl.TryGetValue(template, out var u) && u.Count > 0 ? u[0] : null;
+  /// <summary>mtl1-47 API: the skin-group uid whose skin switches to <paramref name="template"/> via overridedActorName.</summary>
+  public string? OverrideUidFor(string template, string? skin)
+    => skin is null ? null : Resolve(template, skin) is { Override: true } r ? r.Uid : null;
+
+  public string? UidFor(string template) => Resolve(template, null).Uid;
 }
 
 public static class WeaponVariant
