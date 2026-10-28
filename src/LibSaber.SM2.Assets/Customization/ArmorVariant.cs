@@ -32,6 +32,14 @@ public sealed class VariantRequest
   public string? NpcPreset { get; private set; }
   /// <summary>ui-45: melee skin of the power_fist_fake actor on a constructor tpl (<c>powerfist=03</c>).</summary>
   public string? PowerFist { get; private set; }
+  /// <summary>
+  ///   mtl1-47: body section whose active region the power fist replaces (prop_power_fist_customizer_base SetRightHandVisibility /
+  ///   FilterRightHandMeshes); its meshes are hidden except <see cref="HandKeep"/> (visibilityUnchangableMeshes).
+  /// </summary>
+  public string? HideHandSection { get; set; }
+  public HashSet<string> HandKeep { get; } = new(StringComparer.OrdinalIgnoreCase);
+  /// <summary>Power fist objects; the hand is hidden only when one of them exists in the tpl (else the arm would end bare).</summary>
+  public HashSet<string> HandFist { get; } = new(StringComparer.OrdinalIgnoreCase);
 
   public static VariantRequest Default => new();
 
@@ -132,6 +140,11 @@ public sealed class VariantResult
   public List<string> Notes { get; } = new();
   /// <summary>mtl1-46: weapon skin attachingActors (purity seals); <see cref="VariantAttachment.Merged"/> is set by the exporter.</summary>
   public List<VariantAttachment> Attachments { get; } = new();
+  /// <summary>mtl1-47: skin material (mastercrafted, red, ...); <see cref="MaterialSwaps"/> texture names swapped by the exporter.</summary>
+  public string Material { get; set; } = "";
+  public int MaterialSwaps { get; set; }
+  /// <summary>Objects (and their subtrees) the skin material does not apply to (melee excludeObjectsToApplyMaterial).</summary>
+  public HashSet<string> MaterialExclude { get; } = new(StringComparer.OrdinalIgnoreCase);
 }
 
 public sealed class VariantAttachment
@@ -455,6 +468,31 @@ public static class ArmorVariant
     {
       if (!shown.Contains(node))
         hidden.Add(node);
+    }
+
+    if (request.HideHandSection is { } noFistSection && request.HandFist.Count > 0 && !request.HandFist.Any(byName.ContainsKey))
+    {
+      result.Notes.Add($"power fist objects ({string.Join(", ", request.HandFist)}) are not in this tpl; {noFistSection} hand kept.");
+    }
+    else if (request.HideHandSection is { } handSection)
+    {
+      if (result.Regions.TryGetValue(handSection, out var handUid) && library.Region(team, appearance, handSection, handUid) is { } handRegion)
+      {
+        var hand = new HashSet<int>();
+        var keep = new HashSet<int>();
+        var handNames = SslText.Strings(handRegion.GetValueOrDefault("meshes")).Where(n => n.Length > 0 && !request.HandKeep.Contains(n)).ToList();
+        foreach (var name in handNames)
+          AddSubtree(name, hand);
+        foreach (var name in request.HandKeep)
+          AddSubtree(name, keep);
+        hand.ExceptWith(keep);
+        hidden.UnionWith(hand);
+        result.Notes.Add($"power fist hides the {handSection}={handUid} hand ({string.Join(", ", handNames)}); kept {string.Join(", ", request.HandKeep)}.");
+      }
+      else
+      {
+        result.Notes.Add($"power fist: no {handSection} region active; no hand hidden.");
+      }
     }
 
     foreach (var (name, _) in byName)

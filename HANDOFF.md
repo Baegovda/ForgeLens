@@ -1939,7 +1939,7 @@ Disassembly: /workspace/vfxsh_dis/{pc,pg,dx_pc_dx12_sfx,dx_pc_dx12_distort}, GLS
     | warrior_melee | 26 | 12 |
 
   - CLI export `npc=Cadian_Shock_Trooper,helmet=none`: 15 visible, and the variant.json lists the off layers. `wpn_tzaangor_sword_01 skin=02`: 1 visible.
-- **Limits:** `materialModifier` and melee skin materials are noted, not applied. `meleeActorOverride` is noted, not followed. The power fist doesn't hide the hand it replaces. Hovering the mouse wheel over a part combo changes it (Avalonia ComboBox default).
+- **Limits:** `materialModifier` and melee skin materials are noted, not applied (materials applied since mtl1-47). `meleeActorOverride` is noted, not followed (material-only on the target tpl since mtl1-47). The power fist doesn't hide the hand it replaces (hidden since mtl1-47). Hovering the mouse wheel over a part combo changes it (Avalonia ComboBox default).
 - **Screenshots:** `/workspace/browser_run_shots/ui45/`
   - `01_npc_cultist.png`, `02_npc_cadian_rules.png`, `03_npc_cadian_female.png`
   - `04_npc_cultist_preset.png`, `05_armor_powerfist.png`, `06_npc_randomize.png`, `07_melee_export_picker.png`
@@ -2033,10 +2033,51 @@ Disassembly: /workspace/vfxsh_dis/{pc,pg,dx_pc_dx12_sfx,dx_pc_dx12_distort}, GLS
 - **Limits:**
   - The paper cloth is not simulated: paper_rend hangs straight in its bind pose (**APPROXIMATION**). The seal's prop_cloth_sim is not baked.
   - The Forge Lens 3D preview still shows the weapon without seals; only the export merges them.
-  - The skin `material` (mastercrafted etc.) is still only noted.
+  - The skin `material` (mastercrafted etc.) is still only noted (applied since mtl1-47).
 - **Evidence:** CLI `Bin\SM2Extractor_mtl46` on wpn_bolt_rifle_01:
   - `skin=skin_03` merged 2 (seal_1 eagle, seal_3 skull);
   - `skin=skin_04` merged 3 (seal_3 eagle, seal_2 demoskull, seal_1 skull);
   - output in `Exports\mtl46\skin_0{3,4}`.
   - Box renders (`tools/glb_preview.py`): `/workspace/mtl_fix/m45/skin_03_view.png`, `skin_04_view.png` show the seals on the receiver side and the paper strips hanging down.
 - Tests: `WeaponAttachTests` (class-scale inheritance, skin parse, merge placement + bind-pose preservation, missing locator). SM2.Assets 257 pass.
+
+## Update mtl1-47 (2026-10-29 KST): skin materials (melee + firearm) and the power fist right-hand hide
+
+- **Skin material (data):**
+  - Melee (`melee_skins_library.sso`) and firearm (`firearm_skins_library.sso`) skins carry `material` = mastercrafted | red | blue | white | yellow | green | violet | twitch | chaos.
+  - Most material skins also switch actor: melee `meleeActorOverride`, firearm `overridedActorName` (e.g. chainsword 01_red → chainsword_01_artificer_01; bolt rifle 01_red → arifle_bolt_rifle_artificer_01).
+  - The textures exist as `<base>_<material>{,_nm,_spec,_em}` siblings (`td/wpn_chainsword_01_artificer_01_01_red{,_nm,_spec}`). Blue/white/violet/yellow ship the diffuse only.
+  - Melee actors list `excludeObjectsToApplyMaterial` (VFX helpers, `body` on some).
+- **Code:**
+  - `SkinMaterial.Candidate` (`base_nm` → `base_mat_nm`, else `base_mat`) and `SkinMaterial.Apply`:
+    - swaps Texture/Normal/Specular/Emissive/Maps on every part and LOD when the sibling exists in the catalog;
+    - skips excluded objects and their subtrees.
+  - `AssetExporter.ApplySkinMaterial` runs after the melee/firearm variant. `SM2_SKIN_MATERIAL=0` turns it off.
+  - `VariantResult.Material`, `MaterialSwaps` and `MaterialExclude` are written to variant.json.
+  - Override skins:
+    - `MeleeCustomization.OverrideSkinsFor(tpl)`: material-only on the target tpl;
+    - `WeaponCustomization.OverrideUidFor(tpl, skin)`: the mgs `<override>_client.cls` nameTpl → tpl; regions, attachments and material apply.
+  - So `--variant skin=01_red` on `wpn_chainsword_01_artificer_01` / `wpn_bolt_rifle_01_artificer_01` gives the in-game red look.
+  - Fixed the melee factory parse: `nameTpl` is under `type.properties.geom`, so actors with their own tpl (artificer/relic) now resolve to it, not the class tpl.
+- **Power fist hand (data):**
+  - `ssl/body/customization/prop_power_fist_customizer_base.prop` has `powerFistIds` and `visibilityUnchangableMeshes` [torso_r_gauntlet, upper_arm_librarium_T, upper_arm_librarium_G] ("Meshes (of hand), which visibility can't be changed by this system").
+  - Its sslbin has SetRightHandVisibility / FilterRightHandMeshes / handRegion.
+- **Power fist hand (code):**
+  - `powerfist=KEY` now sets `VariantRequest.HideHandSection = RIGHT_GAUNTLET` (**HEURISTIC**: the CharacterBodySection constant in the bytecode is not decoded).
+  - It also sets `HandKeep`, which is read from the .prop with a built-in fallback.
+  - ArmorVariant hides the active RIGHT_GAUNTLET region's meshes (subtrees) minus the kept ones. The fist objects stay forced on.
+  - If none of the fist objects exist in the tpl (engineer), the hand is kept and a note is added.
+- **Evidence:** CLI `Bin\SM2Extractor_mtl47`, output in `Exports\mtl47\`:
+  - `cs_art_01_red`: 303 texture references swapped to `_red`. The written textures are `wpn_chainsword_01_artificer_01_01_red{,_nm,_spec}`.
+  - `br_art_01_red`: 306 swapped.
+  - `wpn_chainsword_01 skin=01_red`: noted "no _red siblings" (the skin switches tpl in game).
+  - `raider_pf01` (cc_sm_constructor_raider preset=1, powerfist=01): hides `right_gauntlet_raider_common_01` (raider_hand_R_01, raider_arm_R_01).
+  - Box images:
+    - `/workspace/mtl_fix/m47/m47_powerfist.png`: base vs fist, the forearm replaced cleanly and the upper arm kept;
+    - `/workspace/mtl_fix/m47/m47_chainsword_red.png`: base vs `_red` diffuse.
+- **Limits:**
+  - The Forge Lens 3D preview does not swap materials.
+  - The auto-bolt and bolt rifle 01_red both target the same artificer tpl, so the first skin group wins: `UidsByTpl` maps the artificer tpl to `arifle_auto_bolt_rifle` via its firearm_versions cls.
+  - `mastercrafted` on melee is a damage modifier in melee_modifiers_library; visually it uses `_mastercrafted` siblings where they exist.
+  - The browser part-picker preset list for artificer tpls is not extended.
+- Tests: `SkinMaterialTests` (candidate, apply, exclude, melee override, firearm override, hand hide, no-fist keep). SM2.Assets 267 pass.

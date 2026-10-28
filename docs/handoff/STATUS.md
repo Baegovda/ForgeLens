@@ -3,6 +3,8 @@
 Branch `cursor/sm2-pck-extractor-4420`, PR #1. Always confirm the current state with `git fetch && git log --oneline -30 origin/cursor/sm2-pck-extractor-4420`.
 Percentages are the previous agent's estimates of how complete each track is against the "looks exactly like in-game" goal.
 
+## mtl1-47 (2026-10-29 KST): skin materials applied (texture _<material> siblings, melee/firearm override skins resolve to their artificer tpl, excludeObjectsToApplyMaterial honored; SM2_SKIN_MATERIAL=0 disables). powerfist=KEY hides the RIGHT_GAUNTLET hand region except visibilityUnchangableMeshes (HEURISTIC section). Preview unchanged (HANDOFF "Update mtl1-47")
+
 ## mtl1-46 (2026-10-29 KST): weapon skin attachingActors (purity seals) merged into firearm exports under their purity_seal_N locator with the purity_seal_01 class scale 0.7. Paper not simulated; preview unchanged; SM2_WPN_ATTACH=0 disables (HANDOFF "Update mtl1-46")
 
 ## mtl1-45 (2026-10-29 KST): hem spikes are rotation-fit flips. The cluster-fit rotation step is capped at 30°/frame (SM2_PHYS_FIT_MAXSTEP, APPROXIMATION), plus a collider sub-step lerp (SM2_PHYS_COLLIDER_LERP). run_fwd >90° steps 12 → 0, max 144.7° → 33.2°. Old/new bakes compared in UE via SIE captures (folded hem gone). Finger curl skips gaps < 5° (titus regression); Cadian jog residual ~6° final (HANDOFF "Update mtl1-45")
@@ -245,7 +247,7 @@ glt.chameleon REA'd (FUN_142576f30 + glt PS 03558_0) and implemented in sidecar 
 ## mtl1-3 (2026-10-27 KST): customization parts
 - Weapon skins decoded: firearm_skins_library → geomCustomizerRegions → geom_customizer_preset_firearm meshes.
 - `--variant skin=` option, plus a browser ExportWindow part picker for armor and weapons. Tested on the bolt rifle and the tank marine.
-- HEURISTIC: `main` is always on; skin material is not applied; attachments (purity seals) are merged into the export since mtl1-46.
+- HEURISTIC: `main` is always on; skin material is applied since mtl1-47; attachments (purity seals) are merged into the export since mtl1-46.
 
 ## mtl1-4 (2026-10-27 KST): heuristics
 - Cloth joint swing limits = atan(maxDist/segment), DERIVED. Plugin built, install pending an editor restart.

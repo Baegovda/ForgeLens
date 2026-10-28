@@ -270,7 +270,7 @@ actorDescs   =   {
     var r = MeleeVariant.Apply(mesh, lib, "wpn_tzaangor_sword_01", VariantRequest.Parse("skin=02"));
     Assert.Equal(new[] { "sword_2", "body" }.ToHashSet(), Visible(mesh)); // body: region of other tpls, untouched here
     Assert.Equal(new[] { "01", "02" }, r.Presets);
-    Assert.Contains(r.Notes, n => n.Contains("gold"));
+    Assert.Equal("gold", r.Material); // mtl1-47: applied by the exporter (texture _gold siblings), no longer a note
   }
 
   [Fact]

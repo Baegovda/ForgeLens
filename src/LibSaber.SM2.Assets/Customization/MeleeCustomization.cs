@@ -27,10 +27,21 @@ public sealed class MeleeCustomization
   public const string PresetPath = "ssl/geom_customizer/melee/geom_customizer_preset_melee.sso";
   public const string FactoryPath = "ssl/melee/weapon_actors/melee_actor_factory.sso";
   public const string PowerFistActor = "power_fist_fake";
+  /// <summary>mtl1-47: powerFistIds + visibilityUnchangableMeshes ("Meshes (of hand), which visibility can't be changed by this system").</summary>
+  public const string PowerFistPropPath = "ssl/body/customization/prop_power_fist_customizer_base.prop";
+  /// <summary>
+  ///   HEURISTIC: the hand region is the RIGHT_GAUNTLET body section. prop_power_fist_customizer_base has handRegion /
+  ///   SetRightHandVisibility / FilterRightHandMeshes and keeps torso_r_gauntlet (a right gauntlet object); the CharacterBodySection
+  ///   constant in its bytecode is not decoded.
+  /// </summary>
+  public const string HandSection = "RIGHT_GAUNTLET";
+  public List<string> HandKeep { get; } = new() { "torso_r_gauntlet", "upper_arm_librarium_T", "upper_arm_librarium_G" };
   private static readonly Regex NameTpl = new("nameTpl\\s*=\\s*\"([^\"]+)\"", RegexOptions.CultureInvariant);
 
   public Dictionary<string, List<MeleeSkin>> Skins { get; } = new(StringComparer.OrdinalIgnoreCase);
   public Dictionary<string, List<string>> Regions { get; } = new(StringComparer.OrdinalIgnoreCase);
+  /// <summary>actor → excludeObjectsToApplyMaterial (objects that keep their material when a skin material applies).</summary>
+  public Dictionary<string, List<string>> MaterialExclude { get; } = new(StringComparer.OrdinalIgnoreCase);
   /// <summary>actor → .cls name (factory type) and optional tpl override.</summary>
   public Dictionary<string, (string? Cls, string? Tpl)> Factory { get; } = new(StringComparer.OrdinalIgnoreCase);
   /// <summary>actor → tpl (after <see cref="ResolveTpls"/>).</summary>
@@ -57,6 +68,9 @@ public sealed class MeleeCustomization
         }
 
         c.Skins[actor] = list;
+        var exclude = SslText.Strings((value as Dictionary<string, object?>)?.GetValueOrDefault("excludeObjectsToApplyMaterial")).Where(n => n.Length > 0).ToList();
+        if (exclude.Count > 0)
+          c.MaterialExclude[actor] = exclude;
       }
     }
 
@@ -71,7 +85,8 @@ public sealed class MeleeCustomization
       foreach (var (actor, value) in descs)
       {
         var d = value as Dictionary<string, object?>;
-        c.Factory[actor] = (SslText.Obj(d, "type")?.GetValueOrDefault("__type") as string, SslText.Obj(d, "properties", "geom")?.GetValueOrDefault("nameTpl") as string);
+        c.Factory[actor] = (SslText.Obj(d, "type")?.GetValueOrDefault("__type") as string, (SslText.Obj(d, "type", "properties", "geom") ?? SslText.Obj(d, "properties", "geom"))?.GetValueOrDefault("nameTpl") as string);
+        // mtl1-47: retail nests the nameTpl override under type.properties.geom (chainsword_01_artificer_01 → wpn_chainsword_01_artificer_01)
       }
     }
 
@@ -99,6 +114,16 @@ public sealed class MeleeCustomization
   /// <summary>Region skins for a tpl: every skin of every region actor on it (main actor first).</summary>
   public List<MeleeSkin> SkinsFor(string tpl) => ActorsFor(tpl).SelectMany(a => Skins[a].Where(s => s.Regions.Count > 0)).ToList();
 
+  /// <summary>
+  ///   mtl1-47: skins of other actors whose meleeActorOverride resolves to this tpl (e.g. chainsword 01_red →
+  ///   chainsword_01_artificer_01): the in-game look of that skin is this tpl plus the skin's material.
+  /// </summary>
+  public List<MeleeSkin> OverrideSkinsFor(string tpl)
+    => Skins.Values.SelectMany(list => list)
+      .Where(s => s.ActorOverride is { } o && !o.Equals(s.Actor, StringComparison.OrdinalIgnoreCase)
+        && ActorTpl.TryGetValue(o, out var t) && t.Equals(tpl, StringComparison.OrdinalIgnoreCase))
+      .ToList();
+
   /// <summary>Power fist skins (actor power_fist_fake) for constructor tpls.</summary>
   public List<MeleeSkin> PowerFistSkins => Skins.GetValueOrDefault(PowerFistActor)?.Where(s => s.Regions.Count > 0).ToList() ?? new();
 
@@ -115,7 +140,7 @@ public sealed class MeleeCustomization
 
   /// <summary>
   ///   ui-45 <c>powerfist=KEY</c> on a constructor tpl: forces the skin's powerfist_* region objects on (ArmorVariant hides every
-  ///   powerfist_* otherwise). HEURISTIC: the hand the fist replaces is not hidden (prop_power_fist_customizer_by_loadout not decoded);
+  ///   powerfist_* otherwise) and hides the right hand it replaces (mtl1-47, <see cref="HandSection"/> minus <see cref="HandKeep"/>);
   ///   the ch_powerfist_01_grp arm stub is skipped on cc_sm_ tpls. Returns a note when the key is unknown.
   /// </summary>
   public string? AddPowerFist(VariantRequest request, string template)
@@ -125,11 +150,14 @@ public sealed class MeleeCustomization
     var skin = PowerFistSkins.FirstOrDefault(s => s.Key.Equals(fist, StringComparison.OrdinalIgnoreCase));
     if (skin is null)
       return $"powerfist={fist} is not a {PowerFistActor} skin in {SkinsPath}.";
+    request.HideHandSection = HandSection;
+    request.HandKeep.UnionWith(HandKeep);
     foreach (var obj in PowerFistObjects(skin))
     {
       if (obj.StartsWith("ch_", StringComparison.OrdinalIgnoreCase) && template.StartsWith("cc_sm_", StringComparison.OrdinalIgnoreCase))
         continue;
       request.Show.Add(obj);
+      request.HandFist.Add(obj);
     }
 
     return null;
@@ -141,6 +169,23 @@ public sealed class MeleeCustomization
       return null;
     string? factory = catalog.TryGetByPath(FactoryPath, out var f) ? Encoding.UTF8.GetString(store.Read(f)) : null;
     var c = FromText(Encoding.UTF8.GetString(store.Read(s)), Encoding.UTF8.GetString(store.Read(p)), factory);
+    if (catalog.TryGetByPath(PowerFistPropPath, out var fp))
+    {
+      try
+      {
+        var keep = SslText.Strings(SslText.Parse(Encoding.UTF8.GetString(store.Read(fp))).GetValueOrDefault("visibilityUnchangableMeshes")).Where(n => n.Length > 0).ToList();
+        if (keep.Count > 0)
+        {
+          c.HandKeep.Clear();
+          c.HandKeep.AddRange(keep);
+        }
+      }
+      catch
+      {
+        // keep the built-in list (same as the 2026 retail .prop)
+      }
+    }
+
     c.ResolveTpls(cls =>
     {
       foreach (var index in catalog.FindByFileName(cls + ".cls"))
@@ -177,6 +222,32 @@ public static class MeleeVariant
     var result = new VariantResult { Template = mesh.Name, Spec = request.Spec, Team = "MELEE", Appearance = main };
     result.Presets.AddRange(lib.SkinsFor(tpl).Select(s => s.Spec(main)));
     var skin = request.Skin is { } want ? lib.Find(tpl, want) : lib.SkinsFor(tpl).FirstOrDefault();
+    if (actors.Count == 0 && request.Skin is { } key)
+    {
+      // material-only: a skin of another actor that switches to this tpl (no regions here)
+      var os = lib.OverrideSkinsFor(tpl).FirstOrDefault(s => s.Key.Equals(key, StringComparison.OrdinalIgnoreCase)
+        || (s.Actor + "/" + s.Key).Equals(key, StringComparison.OrdinalIgnoreCase));
+      result.Presets.AddRange(lib.OverrideSkinsFor(tpl).Select(s => s.Actor + "/" + s.Key));
+      if (os is null)
+      {
+        result.Notes.Add($"melee skin {key} does not switch to {tpl}; nothing applied.");
+        return result;
+      }
+
+      result.Preset = os.Actor + "/" + os.Key;
+      result.Appearance = os.Actor;
+      if (os.Material is { Length: > 0 } omat)
+      {
+        result.Material = omat;
+        foreach (var a in new[] { os.Actor, os.ActorOverride! })
+          if (lib.MaterialExclude.TryGetValue(a, out var ex))
+            result.MaterialExclude.UnionWith(ex);
+      }
+
+      result.Notes.Add($"skin {os.Actor}/{os.Key} switches to actor {os.ActorOverride} (this tpl); material only, no regions.");
+      return result;
+    }
+
     if (skin is null && request.WeaponRegions is null)
     {
       result.Notes.Add($"melee skin {request.Skin} is not a region skin of {tpl} ({string.Join(", ", actors)}); nothing hidden.");
@@ -185,8 +256,13 @@ public static class MeleeVariant
 
     result.Preset = skin?.Spec(main) ?? "";
     var active = request.WeaponRegions ?? skin!.Regions.ToList();
-    if (skin?.Material is { } mat)
-      result.Notes.Add("skin material " + mat + " (not applied, mesh only)");
+    if (skin?.Material is { Length: > 0 } mat)
+    {
+      result.Material = mat;
+      foreach (var a in new[] { skin.Actor, skin.ActorOverride ?? skin.Actor })
+        if (lib.MaterialExclude.TryGetValue(a, out var exclude))
+          result.MaterialExclude.UnionWith(exclude);
+    }
     if (skin?.ActorOverride is { } over && !over.Equals(skin.Actor, StringComparison.OrdinalIgnoreCase))
       result.Notes.Add($"skin switches to actor {over}" + (lib.ActorTpl.TryGetValue(over, out var otpl) ? $" (tpl {otpl})" : "") + " in game; this tpl shows its regions only.");
     // only regions this tpl's actors use: the preset also has generic names (body, geom, tip) other tpls own

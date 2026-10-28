@@ -575,10 +575,13 @@ public static class AssetExporter
       return null;
     var lib = WeaponLibrary(catalog, store);
     var uid = lib?.UidFor(template);
-    if ((lib is null || uid is null) && MeleeLibrary(catalog, store) is { } melee && melee.ActorsFor(template).Count > 0)
+    var overrideUid = uid is null ? lib?.OverrideUidFor(template, request.Skin) : null;
+    uid ??= overrideUid;
+    if ((lib is null || uid is null) && MeleeLibrary(catalog, store) is { } melee && (melee.ActorsFor(template).Count > 0 || melee.OverrideSkinsFor(template).Count > 0))
     {
       var m = MeleeVariant.Apply(mesh, melee, template, request);
       m.AppearanceSource = MeleeCustomization.SkinsPath + "/" + m.Appearance;
+      ApplySkinMaterial(catalog, template, mesh, m);
       report.Messages.Add($"{template}: melee skin {m.Preset}: hid {m.HiddenParts} parts of {m.CustomizableObjects} customizable objects, {m.VisibleParts} visible.");
       foreach (var note in m.Notes.Take(8))
         report.Messages.Add(template + ": " + note);
@@ -592,8 +595,11 @@ public static class AssetExporter
     }
 
     var result = WeaponVariant.Apply(mesh, lib, uid, request);
+    if (overrideUid is not null)
+      result.Notes.Insert(0, $"skin {uid}/{request.Skin} switches to this tpl (overridedActorName); its regions, attachments and material apply here.");
     result.AppearanceSource = "firearm mgs/" + uid;
     MergeAttachments(catalog, store, template, mesh, result, settings, report);
+    ApplySkinMaterial(catalog, template, mesh, result);
     report.Messages.Add($"{template}: weapon skin {uid}/{result.Preset}: hid {result.HiddenParts} parts of {result.CustomizableObjects} customizable objects, {result.VisibleParts} visible.");
     foreach (var note in result.Notes.Take(8))
       report.Messages.Add(template + ": " + note);
@@ -664,6 +670,23 @@ public static class AssetExporter
     var merged = result.Attachments.Where(a => a.Merged > 0).ToList();
     if (merged.Count > 0)
       report.Messages.Add($"{template}: merged {merged.Count} skin attachments ({string.Join(", ", merged.Select(a => a.Locator + "=" + a.Template + " x" + a.Scale.ToString("0.##", System.Globalization.CultureInfo.InvariantCulture)))}).");
+  }
+
+  /// <summary>mtl1-47: swaps textures to their <c>_&lt;material&gt;</c> siblings (<see cref="SkinMaterial"/>). <c>SM2_SKIN_MATERIAL=0</c> turns it off.</summary>
+  private static void ApplySkinMaterial(GameCatalog catalog, string template, ExportedMesh mesh, VariantResult result)
+  {
+    if (result.Material.Length == 0)
+      return;
+    if (Environment.GetEnvironmentVariable("SM2_SKIN_MATERIAL") == "0")
+    {
+      result.Notes.Add($"skin material {result.Material} not applied (SM2_SKIN_MATERIAL=0).");
+      return;
+    }
+
+    result.MaterialSwaps = SkinMaterial.Apply(mesh, result.Material, name => TemplateMeshReader.ResolveTexture(catalog, -1, name) >= 0, result.MaterialExclude);
+    result.Notes.Add(result.MaterialSwaps > 0
+      ? $"skin material {result.Material}: {result.MaterialSwaps} texture references swapped to their _{result.Material} siblings."
+      : $"skin material {result.Material}: {template} has no _{result.Material} texture siblings (the skin may switch to another tpl in game); base textures kept.");
   }
 
   private static void WriteVariantSidecar(string path, VariantResult variant, ExportReport report)

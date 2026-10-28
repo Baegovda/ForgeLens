@@ -141,6 +141,7 @@ public sealed class WeaponCustomization
       c.LoadAttachingActors(Encoding.UTF8.GetString(store.Read(aa)), ClassText);
     }
 
+    var targets = c.OverrideTargets;
     var query = catalog.Query(null, "_client", AssetFilter.All);
     foreach (var fileIndex in query.Indices ?? Enumerable.Range(query.First, query.Count).ToArray())
     {
@@ -148,13 +149,20 @@ public sealed class WeaponCustomization
       if (!file.Path.StartsWith("ssl/weapons/common/firearm/", StringComparison.OrdinalIgnoreCase) || !file.Path.EndsWith("_client.cls", StringComparison.OrdinalIgnoreCase))
         continue;
       var uid = Path.GetFileName(Path.GetDirectoryName(file.Path) ?? "");
-      if (!c.Skins.ContainsKey(uid))
+      var skinned = c.Skins.ContainsKey(uid);
+      if (!skinned && !targets.Contains(uid))
         continue;
       string text;
       try { text = Encoding.UTF8.GetString(store.Read(fileIndex)); } catch { continue; }
       var m = NameTpl.Match(text);
       if (!m.Success)
         continue;
+      if (!skinned)
+      {
+        c.ActorTpl[uid] = m.Groups[1].Value;
+        continue;
+      }
+
       if (!c.UidsByTpl.TryGetValue(m.Groups[1].Value, out var uids))
         c.UidsByTpl[m.Groups[1].Value] = uids = new List<string>();
       if (!uids.Contains(uid, StringComparer.OrdinalIgnoreCase))
@@ -164,6 +172,34 @@ public sealed class WeaponCustomization
     foreach (var uids in c.UidsByTpl.Values)
       uids.Sort((a, b) => c.Skins[b].Count != c.Skins[a].Count ? c.Skins[b].Count.CompareTo(c.Skins[a].Count) : a.Length.CompareTo(b.Length)); // the weapon with the skin set (not an aux/attachment user), plain uid before *_tac_reserve
     return c;
+  }
+
+  /// <summary>overridedActorName values of every skin (mgs uids without their own skin group, e.g. arifle_bolt_rifle_artificer_01).</summary>
+  public HashSet<string> OverrideTargets => Skins.Values.SelectMany(l => l).Select(s => s.Skin.GetValueOrDefault("overridedActorName") as string)
+    .Where(n => !string.IsNullOrEmpty(n)).Select(n => n!).ToHashSet(StringComparer.OrdinalIgnoreCase);
+
+  /// <summary>mtl1-47: override actor uid → tpl (its mgs *_client.cls nameTpl).</summary>
+  public Dictionary<string, string> ActorTpl { get; } = new(StringComparer.OrdinalIgnoreCase);
+
+  /// <summary>
+  ///   mtl1-47: the skin-group uid whose skin <paramref name="skin"/> switches to <paramref name="template"/> via overridedActorName
+  ///   (bolt rifle 01_red → arifle_bolt_rifle_artificer_01 → wpn_bolt_rifle_01_artificer_01).
+  /// </summary>
+  public string? OverrideUidFor(string template, string? skin)
+  {
+    if (skin is null)
+      return null;
+    foreach (var (uid, list) in Skins)
+    {
+      foreach (var (key, value) in list)
+      {
+        if (key.Equals(skin, StringComparison.OrdinalIgnoreCase) && value.GetValueOrDefault("overridedActorName") is string o
+            && ActorTpl.TryGetValue(o, out var t) && t.Equals(template, StringComparison.OrdinalIgnoreCase))
+          return uid;
+      }
+    }
+
+    return null;
   }
 
   public string? UidFor(string template) => UidsByTpl.TryGetValue(template, out var u) && u.Count > 0 ? u[0] : null;
@@ -191,8 +227,8 @@ public static class WeaponVariant
 
     result.Preset = skinKey ?? "";
     var active = request.WeaponRegions ?? SslText.Strings(skin!.GetValueOrDefault("geomCustomizerRegions")).ToList();
-    if (skin?.GetValueOrDefault("material") is string mat)
-      result.Notes.Add("skin material " + mat + " (not applied, mesh only)");
+    if (skin?.GetValueOrDefault("material") is string mat && mat.Length > 0)
+      result.Material = mat;
     foreach (var (slot, locator, actor) in WeaponCustomization.SkinAttachments(skin))
     {
       var known = lib.AttachingActors.TryGetValue(actor, out var a);
@@ -300,3 +336,76 @@ public static class WeaponVariant
     return result;
   }
 }
+
+/// <summary>
+///   mtl1-47: skin <c>material</c> (firearm and melee skins: mastercrafted, red, blue, white, yellow, green, violet, twitch, chaos).
+///   HEURISTIC (naming, the native consumer is not decoded): every material value has textures named
+///   <c>&lt;base&gt;_&lt;material&gt;</c> beside the base ones, with optional <c>_nm</c> / <c>_spec</c> / <c>_em</c> siblings
+///   (td/wpn_chainsword_01_mastercrafted{,_nm,_spec,_em}, wpn_bolt_rifle_01_artificer_01_01_red{,_spec}; blue has only the diffuse).
+///   Each map whose material sibling exists is swapped. Maps without a sibling keep the base texture.
+/// </summary>
+public static class SkinMaterial
+{
+  private static readonly string[] Suffixes = { "_nm", "_spec", "_em" };
+
+  /// <summary><c>base_nm</c> -> <c>base_red_nm</c>; <c>base</c> -> <c>base_red</c>.</summary>
+  public static string Candidate(string name, string material)
+  {
+    foreach (var suffix in Suffixes)
+    {
+      if (name.EndsWith(suffix, StringComparison.OrdinalIgnoreCase))
+        return name[..^suffix.Length] + "_" + material + name[^suffix.Length..];
+    }
+
+    return name + "_" + material;
+  }
+
+  /// <summary>Returns the number of map names swapped (diffuse, normal, specular, emissive and the material maps of every part).</summary>
+  public static int Apply(ExportedMesh mesh, string material, Func<string, bool> exists, ICollection<string>? exclude = null)
+  {
+    var skip = new HashSet<int>();
+    if (exclude is { Count: > 0 })
+    {
+      for (var i = 0; i < mesh.Bones.Count; i++)
+      {
+        for (var b = i; b >= 0 && b < mesh.Bones.Count; b = mesh.Bones[b].Parent)
+        {
+          if (exclude.Contains(mesh.Bones[b].Name) || exclude.Contains(mesh.Bones[b].SourceName ?? ""))
+          {
+            skip.Add(i);
+            break;
+          }
+        }
+      }
+    }
+
+    var cache = new Dictionary<string, string?>(StringComparer.OrdinalIgnoreCase);
+    var swapped = 0;
+    string? Swap(string? name)
+    {
+      if (string.IsNullOrWhiteSpace(name) || name.Contains("_" + material, StringComparison.OrdinalIgnoreCase))
+        return name;
+      if (!cache.TryGetValue(name, out var hit))
+        cache[name] = hit = exists(Candidate(name, material)) ? Candidate(name, material) : null;
+      if (hit is null)
+        return name;
+      swapped++;
+      return hit;
+    }
+
+    foreach (var part in mesh.Parts.Concat(mesh.Levels.SelectMany(level => level.Parts)))
+    {
+      if (skip.Contains(part.Node) || (exclude?.Contains(part.Name ?? "") ?? false))
+        continue;
+      part.Texture = Swap(part.Texture);
+      part.Normal = Swap(part.Normal);
+      part.Specular = Swap(part.Specular);
+      part.Emissive = Swap(part.Emissive);
+      foreach (var map in part.Maps)
+        map.Name = Swap(map.Name) ?? map.Name;
+    }
+
+    return swapped;
+  }
+}
+
