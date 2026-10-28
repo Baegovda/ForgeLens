@@ -114,7 +114,8 @@ internal sealed unsafe class EffectRenderer : IDisposable
   /// </summary>
   public static bool SfxAdditive { get; set; } = Environment.GetEnvironmentVariable("SM2_VFX_SFX_ADD") != "0";
   /// <summary>
-  ///   k of the SFX exposure compensation lerp(1, avgLum, k) (plasma PS s33060; k = sfx[560].w, td field not traced: HEURISTIC 1).
+  ///   k of the SFX exposure compensation lerp(1, avgLum, k) (plasma PS s33060; k = sfx[560].w, HEURISTIC 1. Lead mtl1-50: the only per-material exposure flag the sfx loader
+  ///   reads is emissive.adaptiveIntensity (bool, desc +0x28, preset default false); the CB writer for sfx[560].w is not traced).
   ///   SM2_VFX_SFX_LUM_K overrides.
   /// </summary>
   public static float SfxLumK { get; set; } =

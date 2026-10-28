@@ -24,7 +24,7 @@
 8. `git log --oneline -30 origin/cursor/sm2-pck-extractor-4420` is the source of truth for what has landed. Always `git fetch` first.
 
 ## 3. Hard rules (non-negotiable)
-1. **REA-first.** Every format, shader or behaviour conclusion must come from reverse-engineering `sm2_retail.exe` (Ghidra / rizin / REA). **The REA tool is https://github.com/morluto/rea** (npm `rea-agents`, CLI `rea` + stdio MCP `rea mcp`); setup and caveats in `docs/handoff/WORKFLOW.md` → "REA (morluto/rea)". Do not use the old `user-rea` plugin. Cite the exe address or string (e.g. `FUN_14133eae0`, `"blendMode" @0x14355b708`) in code comments, commit messages and HANDOFF.
+1. **REA-first.** Every format, shader or behaviour conclusion must come from reverse-engineering `sm2_retail.exe` (Ghidra / rizin / REA). **The REA tool is https://github.com/morluto/rea** (npm `rea-agents`, CLI `rea` + stdio MCP `rea mcp`); setup and caveats in `docs/handoff/WORKFLOW.md` → "REA (morluto/rea)". **REA is the primary RE tool**: run it through the persistent daemon (`tools/re/rea_daemon.py`, client `tools/re/rea_call.py`); plain Ghidra headless / rizin only as fallback. Check `docs/SYMBOL_DB` (symbol database) before any new RE. Do not use the old `user-rea` plugin. Cite the exe address or string (e.g. `FUN_14133eae0`, `"blendMode" @0x14355b708`) in code comments, commit messages and HANDOFF.
    - Anything not proven must be labelled **heuristic / assumption** (see the "Heuristics" lists in STATUS.md).
    - Never "guess from bytes" without saying so.
 2. **Never delete the user's assets.** Before overwriting a file or folder, back it up as `.bakN` (UE: `_bakN`), with N the next free number.

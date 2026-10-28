@@ -26,8 +26,11 @@ public enum SfxBlendMode
 ///       34/42). Matched PS triples 173/201/256 and 588/631/743 differ only in these defines; PS 201 (neither) outputs
 ///       rgb premultiplied by alpha, PS 256 (ALPHA_BLEND) straight rgb, PS 173 (ADD) rgb·alpha.</item>
 ///   </list>
-///   HEURISTIC: <see cref="SfxBlendMode.Unspecified"/> (no blendMode in the .td; the loader requires the key, so it comes from the
-///   unextracted "sfx" preset) keeps the capture-based additive state (plasma/outdoor SFX draws One/One).
+///   PROVEN (mtl1-50, REA + data): <see cref="SfxBlendMode.Unspecified"/> (no blendMode in the .td) = add. The loader has no
+///   built-in default (FUN_1425fd580 fails without the key), the value is inherited: material <c>preset = "sfx"</c> →
+///   <c>material_templates/mtl_template_sfx.td</c> ("mtl_template_%s.td" @0x143805890) → <c>shaders.sfx.preset = "default"</c> →
+///   <c>sdr_presets/sfx_sdr_preset_default.sd</c> ("%s_sdr_preset_%s.sd" @0x143805878): <c>blendMode = "add"</c>. Matches the
+///   capture (plasma/outdoor SFX draws One/One).
 ///   <c>SM2_VFX_SFX_BLEND=0</c> restores "every sfx mesh additive".
 /// </summary>
 public static class SfxBlend

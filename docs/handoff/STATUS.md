@@ -3,6 +3,8 @@
 Branch `cursor/sm2-pck-extractor-4420`, PR #1. Always confirm the current state with `git fetch && git log --oneline -30 origin/cursor/sm2-pck-extractor-4420`.
 Percentages are the previous agent's estimates of how complete each track is against the "looks exactly like in-game" goal.
 
+## mtl1-50 (2026-10-29 KST): REA is the primary RE path (persistent daemon tools/re/rea_daemon.py + rea_call.py). docs/RE_MAP renamed to docs/SYMBOL_DB (generator tools/symbol_db/build_symbol_db.py; stub left at docs/RE_MAP/README.md). REA counts 156,646 procedures; SYMBOL_DB covers 743 (0.47 %), string-anchored asset functions 193/5,062 (3.8 %, rea_string_xrefs.tsv). HEURISTIC pass: missing sfx blendMode = add now PROVEN (sfx_sdr_preset_default.sd), .td sfx param list + defaults PROVEN; exposure (adaptiveIntensity lead), falloff (attenCurveParam schema), 0x400, UseSpecMap, power-fist section still open (RE_NOTES mtl1-50).
+
 ## mtl1-48 (2026-10-29 KST): in-game comparison done statically (no captures). ApplyMaterialSuffix PROVEN → diffuse td `materials.<suffix>` variant; skin materials now use it (blue/white = red NM/spec, yellow/violet = green spec), naming fallback HEURISTIC. VFX bench rerun vs the 6 in-game photos: muzzle/grenade closer after mtl1-44 (HANDOFF "Update mtl1-48")
 
 ## mtl1-47 (2026-10-29 KST): skin materials applied (texture _<material> siblings, melee/firearm override skins resolve to their artificer tpl, excludeObjectsToApplyMaterial honored; SM2_SKIN_MATERIAL=0 disables). powerfist=KEY hides the RIGHT_GAUNTLET hand region except visibilityUnchangableMeshes (HEURISTIC section). Preview unchanged (HANDOFF "Update mtl1-47")
@@ -627,4 +629,4 @@ Evidence: box /workspace/rdc/NOTES.md and /workspace/rdc/<scene>/{nightly,deep} 
 - Bolt rifle vs auto-bolt fixed by a generic uid rule; colour-scheme picker with game names and swatches (bddd777).
 - Context playback both directions (ContextIndex / ContextResolver): effect → character + clip + held weapon + socket + event time; model + clip → held weapon (picker) + event effects + Shoot → muzzle (slot picker). Toggles "Show props/weapons" / "Show effects". Verified in the GUI on the PC (Sorcerer stave ray prep, rubric marine bolter shoot, toggles off).
 - Tests: SM2.Assets 278 pass.
-- symbol DB: `docs/SYMBOL_DB/` (INDEX.md, 11 domains, index.tsv, 727 symbols), generator `tools/symbol_db/build_symbol_db.py`.
+- symbol DB: `docs/SYMBOL_DB/` (INDEX.md, 11 domains, index.tsv, 743 symbols), generator `tools/symbol_db/build_symbol_db.py`.
