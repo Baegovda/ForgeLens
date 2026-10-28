@@ -430,9 +430,18 @@ public static class AssetExporter
   internal static VariantResult? ApplyVariant(GameCatalog catalog, ArchiveStore store, CatalogFileInfo file, ExportedMesh mesh, ExportSettings settings, ExportReport report)
   {
     var template = AssetClassification.BaseName(file.Name);
+    if (!string.IsNullOrWhiteSpace(settings.Variant))
+    {
+      var npc = VariantRequest.Parse(settings.Variant);
+      if (npc.Npc is not null || npc.NpcPreset is not null)
+        return ApplyNpcVariant(catalog, store, template, mesh, npc, report);
+    }
+
     if (!CustomizationLibrary.IsConstructorTemplate(template))
       return ApplyWeaponVariant(catalog, store, template, mesh, settings, report);
     var request = VariantRequest.Parse(settings.Variant);
+    if (request.PowerFist is not null && MeleeLibrary(catalog, store)?.AddPowerFist(request, template) is { } fistNote)
+      report.Messages.Add(template + ": " + fistNote);
     if (request.All)
     {
       report.Messages.Add($"{template}: --variant all, every customization region exported.");
@@ -504,9 +513,46 @@ public static class AssetExporter
     var lib = WeaponLibrary(catalog, store);
     var uid = lib?.UidFor(template);
     if (lib is null || uid is null)
-      return null;
+    {
+      var melee = MeleeLibrary(catalog, store);
+      if (melee is null || melee.ActorsFor(template).Count == 0)
+        return null;
+      var m = MeleeVariant.Apply(mesh, melee, template, VariantRequest.Default);
+      m.Template = template;
+      return m;
+    }
+
     var result = WeaponVariant.Apply(mesh, lib, uid, VariantRequest.Default);
     result.Template = template;
+    return result;
+  }
+
+  private static readonly System.Runtime.CompilerServices.ConditionalWeakTable<GameCatalog, MeleeCustomization?[]> MeleeLibraries = new();
+
+  /// <summary>ui-45: melee_skins_library + geom_customizer_preset_melee + melee_actor_factory (cached per catalog).</summary>
+  public static MeleeCustomization? MeleeLibrary(GameCatalog catalog, ArchiveStore store)
+  {
+    var holder = MeleeLibraries.GetValue(catalog, _ => new MeleeCustomization?[1]);
+    lock (holder)
+      return holder[0] ??= MeleeCustomization.Load(catalog, store);
+  }
+
+  /// <summary>ui-45: <c>npc=TEMPLATE,layer=MeshTemplate|none</c> / <c>npcpreset=CLS</c> on any tpl (enemy / NPC Kitbash).</summary>
+  private static VariantResult? ApplyNpcVariant(GameCatalog catalog, ArchiveStore store, string template, ExportedMesh mesh, VariantRequest request, ExportReport report)
+  {
+    var lib = InstConstructorLibrary.Load(catalog, store);
+    if (lib is null)
+    {
+      report.Messages.Add($"{template}: {InstConstructorLibrary.TemplatesPath} is not in the catalog; every part exported.");
+      return null;
+    }
+
+    var result = NpcVariantFilter.Apply(mesh, lib, request);
+    result.Template = template;
+    result.AppearanceSource = InstConstructorLibrary.TemplatesPath;
+    report.Messages.Add($"{template}: NPC {request.Npc}{(request.NpcPreset is null ? "" : " preset " + request.NpcPreset)}: hid {result.HiddenParts} parts, {result.VisibleParts} visible ({result.ShownObjects.Count} picked objects).");
+    foreach (var note in result.Notes.Take(8))
+      report.Messages.Add(template + ": " + note);
     return result;
   }
 
@@ -529,6 +575,16 @@ public static class AssetExporter
       return null;
     var lib = WeaponLibrary(catalog, store);
     var uid = lib?.UidFor(template);
+    if ((lib is null || uid is null) && MeleeLibrary(catalog, store) is { } melee && melee.ActorsFor(template).Count > 0)
+    {
+      var m = MeleeVariant.Apply(mesh, melee, template, request);
+      m.AppearanceSource = MeleeCustomization.SkinsPath + "/" + m.Appearance;
+      report.Messages.Add($"{template}: melee skin {m.Preset}: hid {m.HiddenParts} parts of {m.CustomizableObjects} customizable objects, {m.VisibleParts} visible.");
+      foreach (var note in m.Notes.Take(8))
+        report.Messages.Add(template + ": " + note);
+      return m;
+    }
+
     if (lib is null || uid is null)
     {
       report.Messages.Add($"{template}: no firearmUid (firearm mgs *_client.cls nameTpl) found; every part exported.");

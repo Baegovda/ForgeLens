@@ -26,6 +26,12 @@ public sealed class VariantRequest
   public string? Skin { get; private set; }
   /// <summary>Weapon tpls: explicit geomCustomizerRegions (replaces the skin's list when set).</summary>
   public List<string>? WeaponRegions { get; private set; }
+  /// <summary>ui-45: NPC template of inst_constructor_templates.sso (<c>npc=Cultist</c>); SECTION=value tokens then name its layers.</summary>
+  public string? Npc { get; private set; }
+  /// <summary>ui-45: prop_inst_constructor_custom_preset .cls stem (<c>npcpreset=librarium_character_cultist</c>).</summary>
+  public string? NpcPreset { get; private set; }
+  /// <summary>ui-45: melee skin of the power_fist_fake actor on a constructor tpl (<c>powerfist=03</c>).</summary>
+  public string? PowerFist { get; private set; }
 
   public static VariantRequest Default => new();
 
@@ -85,6 +91,15 @@ public sealed class VariantRequest
           break;
         case "skin":
           request.Skin = value;
+          break;
+        case "npc":
+          request.Npc = value;
+          break;
+        case "npcpreset":
+          request.NpcPreset = value;
+          break;
+        case "powerfist":
+          request.PowerFist = value;
           break;
         case "regions":
           request.WeaponRegions = value.Split('|', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries).ToList();

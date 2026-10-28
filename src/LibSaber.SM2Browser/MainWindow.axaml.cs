@@ -1606,6 +1606,8 @@ public partial class MainWindow : Window
           Dictionary<string, List<string>>? sr = null;
           if (d is { Team: "WEAPON" } && AssetExporter.WeaponLibrary(pc, ps) is { } wl && wl.Skins.TryGetValue(d.Appearance, out var skins))
             sr = skins.ToDictionary(k => k.Key, k => SslText.Strings(k.Skin.GetValueOrDefault("geomCustomizerRegions")).ToList(), StringComparer.OrdinalIgnoreCase);
+          else if (d is { Team: "MELEE" } && AssetExporter.MeleeLibrary(pc, ps) is { } ml)
+            sr = ml.SkinsFor(d.Template).ToDictionary(k => k.Spec(d.Appearance), k => k.Regions.ToList(), StringComparer.OrdinalIgnoreCase);
           return (d, sr);
         });
       }

@@ -120,6 +120,15 @@ public static class WeaponVariant
     if (skin?.GetValueOrDefault("material") is string mat)
       result.Notes.Add("skin material " + mat + " (not applied, mesh only)");
 
+    return ApplyRegions(mesh, lib.Regions, active.Append("main"), WeaponCustomization.PresetPath, request, result);
+  }
+
+  /// <summary>
+  ///   Shared region filter (firearm and melee skins): hide every object some region of <paramref name="regions"/> lists, except
+  ///   the subtrees of the <paramref name="active"/> regions; <c>X_LODn</c> siblings count as <c>X</c>; +obj/-obj apply last.
+  /// </summary>
+  public static VariantResult ApplyRegions(ExportedMesh mesh, IReadOnlyDictionary<string, List<string>> regions, IEnumerable<string> active, string presetPath, VariantRequest request, VariantResult result)
+  {
     var bones = mesh.Bones;
     var byName = new Dictionary<string, List<int>>(StringComparer.OrdinalIgnoreCase);
     var children = new List<int>[bones.Count];
@@ -158,7 +167,7 @@ public static class WeaponVariant
     }
 
     var customizable = new HashSet<int>();
-    foreach (var (region, meshes) in lib.Regions)
+    foreach (var (region, meshes) in regions)
     {
       var present = meshes.Where(byName.ContainsKey).ToList();
       if (present.Count == 0)
@@ -170,11 +179,11 @@ public static class WeaponVariant
 
     result.CustomizableObjects = customizable.Count;
     var shown = new HashSet<int>();
-    foreach (var region in active.Append("main"))
+    foreach (var region in active)
     {
-      if (!lib.Regions.TryGetValue(region, out var meshes))
+      if (!regions.TryGetValue(region, out var meshes))
       {
-        result.Notes.Add($"region {region} is not in {WeaponCustomization.PresetPath}.");
+        result.Notes.Add($"region {region} is not in {presetPath}.");
         continue;
       }
 

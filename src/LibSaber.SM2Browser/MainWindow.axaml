@@ -302,13 +302,32 @@
             <TextBlock Text="KITBASHER" Classes="header" />
             <TextBlock x:Name="KitbashIntro" FontSize="11" TextWrapping="Wrap" Foreground="{DynamicResource FL.TextDim}"
                        Text="Parts from ssl/body/customization/character_customization_library.sso (class regions + shared outfit parts)." />
-            <Grid ColumnDefinitions="64,*" RowDefinitions="Auto,Auto,Auto" Margin="0,4,0,0">
+            <Grid ColumnDefinitions="64,*" Margin="0,4,0,0">
+              <TextBlock Grid.Column="0" Text="Mode" Classes="kblabel" />
+              <ComboBox x:Name="KitbashModeBox" Grid.Column="1" HorizontalAlignment="Stretch" SelectedIndex="0" SelectionChanged="KitbashModeChanged"
+                        ToolTip.Tip="Space Marine armor: character_customization_library.sso. Enemy / NPC: ssl/inst_constructor templates (body layers, probabilities) and the .cls custom presets.">
+                <ComboBoxItem Content="Space Marine armor" />
+                <ComboBoxItem Content="Enemy / NPC" />
+              </ComboBox>
+            </Grid>
+            <Grid x:Name="KitbashNpcGrid" ColumnDefinitions="64,*" RowDefinitions="Auto,Auto" IsVisible="False">
+              <TextBlock Grid.Row="0" Text="Template" Classes="kblabel" />
+              <ComboBox x:Name="KitbashNpcTemplateBox" Grid.Row="0" Grid.Column="1" HorizontalAlignment="Stretch" Margin="0,0,0,4" MaxDropDownHeight="520" SelectionChanged="KitbashNpcTemplateChanged"
+                        ToolTip.Tip="inst_constructor_templates.sso template. The model is the tpl a .cls prop_inst_constructor_project.fixedTemplateId names, else a name match (HEURISTIC)." />
+              <TextBlock Grid.Row="1" Text="Preset" Classes="kblabel" />
+              <ComboBox x:Name="KitbashNpcPresetBox" Grid.Row="1" Grid.Column="1" HorizontalAlignment="Stretch" MaxDropDownHeight="520" SelectionChanged="KitbashNpcPresetChanged"
+                        ToolTip.Tip="Fixed loadouts: .cls prop_inst_constructor_custom_preset (geomObjNames show list) whose geom.nameTpl is this model." />
+            </Grid>
+            <Grid x:Name="KitbashArmorGrid" ColumnDefinitions="64,*" RowDefinitions="Auto,Auto,Auto,Auto">
               <TextBlock Grid.Row="0" Text="Faction" Classes="kblabel" />
               <ComboBox x:Name="KitbashTeamBox" Grid.Row="0" Grid.Column="1" HorizontalAlignment="Stretch" Margin="0,0,0,4" SelectionChanged="KitbashTeamChanged" />
               <TextBlock Grid.Row="1" Text="Class" Classes="kblabel" />
               <ComboBox x:Name="KitbashClassBox" Grid.Row="1" Grid.Column="1" HorizontalAlignment="Stretch" Margin="0,0,0,4" SelectionChanged="KitbashClassChanged" />
               <TextBlock Grid.Row="2" Text="Preset" Classes="kblabel" />
-              <ComboBox x:Name="KitbashPresetBox" Grid.Row="2" Grid.Column="1" HorizontalAlignment="Stretch" SelectionChanged="KitbashPresetChanged" />
+              <ComboBox x:Name="KitbashPresetBox" Grid.Row="2" Grid.Column="1" HorizontalAlignment="Stretch" Margin="0,0,0,4" SelectionChanged="KitbashPresetChanged" />
+              <TextBlock Grid.Row="3" Text="Power fist" Classes="kblabel" />
+              <ComboBox x:Name="KitbashFistBox" Grid.Row="3" Grid.Column="1" HorizontalAlignment="Stretch" SelectionChanged="KitbashFistChanged"
+                        ToolTip.Tip="melee_skins_library.sso power_fist_fake skin: shows its geom_customizer_preset_melee powerfist_* region objects on the constructor tpl (powerfist=KEY)." />
             </Grid>
             <Border Classes="kbcard">
               <StackPanel Spacing="2">
@@ -316,7 +335,7 @@
                 <TextBlock x:Name="KitbashModelState" FontSize="11" TextWrapping="Wrap" Foreground="{DynamicResource FL.TextDim}" />
               </StackPanel>
             </Border>
-            <WrapPanel>
+            <WrapPanel x:Name="KitbashArmorFilters">
               <CheckBox x:Name="KitbashClassOnlyBox" Content="This class only" IsChecked="True" Click="KitbashFilterChanged" Margin="0,0,10,0"
                         ToolTip.Tip="On: shared outfit parts only when they are for all characters or list this class in appearanceUids (PVE_PVP_X = PVP_X). Off: every shared part of the faction." />
               <CheckBox x:Name="KitbashMissingBox" Content="Parts not in model" Click="KitbashFilterChanged"
@@ -326,8 +345,8 @@
             <StackPanel x:Name="KitbashSlotsPanel" Spacing="4" />
             <TextBlock x:Name="KitbashEmpty" FontSize="11" TextWrapping="Wrap" Foreground="{DynamicResource FL.TextDim}" IsVisible="False" />
             <WrapPanel Margin="0,6,0,0">
-              <Button Content="Preset parts" Click="KitbashResetClicked" Margin="0,0,6,6" ToolTip.Tip="Back to the regions of the chosen preset" />
-              <Button Content="Randomize" Click="KitbashRandomClicked" Margin="0,0,6,6" ToolTip.Tip="One random part per slot from the listed options" />
+              <Button x:Name="KitbashResetButton" Content="Preset parts" Click="KitbashResetClicked" Margin="0,0,6,6" ToolTip.Tip="Back to the regions of the chosen preset" />
+              <Button x:Name="KitbashRandomButton" Content="Randomize" Click="KitbashRandomClicked" Margin="0,0,6,6" ToolTip.Tip="One random part per slot from the listed options" />
             </WrapPanel>
             <Button x:Name="KitbashExportButton" Content="Export combination…" Classes="accent" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" Click="KitbashExportClicked"
                     ToolTip.Tip="Exports the class tpl with exactly this combination (same ArmorVariant filter as the preview; --variant spec shown below)." />

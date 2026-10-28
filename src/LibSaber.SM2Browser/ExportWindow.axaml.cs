@@ -128,7 +128,7 @@ public partial class ExportWindow : Window
   {
     _parts = parts;
     _skinRegions = skinRegions ?? new(StringComparer.OrdinalIgnoreCase);
-    var weapon = parts.Team == "WEAPON";
+    var weapon = parts.Team is "WEAPON" or "MELEE"; // ui-45: melee region skins use the same skin + region picker
     PartsPanel.IsVisible = true;
     PartsPanel.Children.Add(new TextBlock
     {
@@ -217,7 +217,7 @@ public partial class ExportWindow : Window
     if (_presetBox.SelectedIndex <= 0)
       return "all";
     var preset = (string)_presetBox.SelectedItem!;
-    if (_parts.Team == "WEAPON")
+    if (_parts.Team is "WEAPON" or "MELEE")
     {
       var on = _regionBoxes.Where(p => p.Value.IsChecked == true).Select(p => p.Key).ToList();
       var skin = _skinRegions.GetValueOrDefault(preset) ?? new();

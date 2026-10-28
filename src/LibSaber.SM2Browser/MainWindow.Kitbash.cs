@@ -50,6 +50,7 @@ public partial class MainWindow
         _kitSlots[k] = v == KitbashLibrary.NoneUid ? null : v;
     }
 
+    InitNpc();
     KitbashModelState.Text = "Open the game folder to read the customization library.";
     if (_settings.KitbashOpen)
       ShowKitbashTab(true, save: false);
@@ -87,6 +88,9 @@ public partial class MainWindow
   {
     _kit = null;
     _kitLoad = null;
+    _npc = null;
+    _npcLoad = null;
+    _melee = null;
     _kitIndex = -1;
     _kitTemplate = null;
     if (_kitOpen)
@@ -97,6 +101,14 @@ public partial class MainWindow
   {
     if (_catalog is not { } catalog || _store is not { } store)
       return;
+    if (NpcMode)
+    {
+      await EnsureNpcAsync();
+      if (_npc is not null && loadModel)
+        await LoadKitbashModelAsync();
+      return;
+    }
+
     if (_kit is null)
     {
       KitbashModelState.Text = "Reading " + CustomizationLibrary.LibraryPath + "…";
@@ -112,6 +124,9 @@ public partial class MainWindow
         return;
       }
 
+      if (_melee is null)
+        _melee = await Task.Run(() => AssetExporter.MeleeLibrary(catalog, store));
+      FillFistBox();
       FillKitbashTeams();
     }
 
@@ -180,6 +195,12 @@ public partial class MainWindow
 
   private void FillKitbashSlots()
   {
+    if (NpcMode)
+    {
+      FillNpcLayers();
+      return;
+    }
+
     KitbashSlotsPanel.Children.Clear();
     _kitBoxes.Clear();
     if (_kit is null || _kitClass is null)
@@ -352,12 +373,20 @@ public partial class MainWindow
 
   private void KitbashFilterChanged(object? sender, RoutedEventArgs e)
   {
+    if (NpcMode)
+      return;
     FillKitbashSlots();
     SaveKitbash();
   }
 
   private void KitbashResetClicked(object? sender, RoutedEventArgs e)
   {
+    if (NpcMode)
+    {
+      NpcDefaultClicked();
+      return;
+    }
+
     ResetKitbashSlots();
     FillKitbashSlots();
     ApplyKitbash();
@@ -365,6 +394,12 @@ public partial class MainWindow
 
   private void KitbashRandomClicked(object? sender, RoutedEventArgs e)
   {
+    if (NpcMode)
+    {
+      NpcRandomClicked();
+      return;
+    }
+
     _kitSuppress = true;
     foreach (var (slot, box) in _kitBoxes)
     {
@@ -384,9 +419,25 @@ public partial class MainWindow
   /// <summary>Finds the class tpl (<see cref="KitbashLibrary.TemplateCandidates"/>) and shows it; <see cref="KitbashModelLoaded"/> applies the parts.</summary>
   private async Task LoadKitbashModelAsync()
   {
-    if (_catalog is not { } catalog || _kit is null || _kitClass is null || KitbashTeamBox.SelectedItem is not string team)
+    if (_catalog is not { } catalog)
       return;
-    var candidates = KitbashLibrary.TemplateCandidates(team, _kitClass.Name, _kitPreset);
+    List<string> candidates;
+    string label;
+    if (NpcMode)
+    {
+      if (_npc is null || _npcTemplate is null)
+        return;
+      candidates = _npcTemplate.Models.Select(m => m.Tpl).ToList();
+      label = _npcTemplate.Name;
+    }
+    else
+    {
+      if (_kit is null || _kitClass is null || KitbashTeamBox.SelectedItem is not string team)
+        return;
+      candidates = KitbashLibrary.TemplateCandidates(team, _kitClass.Name, _kitPreset).ToList();
+      label = _kitClass.Name;
+    }
+
     var found = -1;
     string? template = null;
     foreach (var name in candidates)
@@ -404,15 +455,18 @@ public partial class MainWindow
     _kitTemplate = template;
     if (found < 0)
     {
-      KitbashTemplate.Text = "No tpl for " + _kitClass.Name;
-      KitbashModelState.Text = "Looked for " + string.Join(", ", candidates.Select(c => c + ".tpl")) + ". None is in this game folder.";
+      KitbashTemplate.Text = "No tpl for " + label;
+      KitbashModelState.Text = candidates.Count == 0
+        ? "No .cls fixedTemplateId names this template and no tpl matches its name (cc_<name>, cc_constructor_<name>, cc_<name>_constructor)."
+        : "Looked for " + string.Join(", ", candidates.Select(c => c + ".tpl")) + ". None is in this game folder.";
       _kitObjects = null;
       FillKitbashSlots();
       UpdateKitbashSpec(null);
       return;
     }
 
-    KitbashTemplate.Text = template + ".tpl" + (_kitPreset is { IsChampion: true } && CustomizationLibrary.IsConstructorTemplate(template!) ? "  (champion tpl not found: " + candidates[0] + ")" : "");
+    var source = NpcMode ? _npcTemplate!.Models.FirstOrDefault(m => m.Tpl == template).Source : null;
+    KitbashTemplate.Text = template + ".tpl" + (source is not null ? "  · " + source : "") + (!NpcMode && _kitPreset is { IsChampion: true } && CustomizationLibrary.IsConstructorTemplate(template!) ? "  (champion tpl not found: " + candidates[0] + ")" : "");
     KitbashModelState.Text = "Loading the model…";
     if (_previewFileIndex == found && _mesh is not null && ReferenceEquals(_mesh, _kitBaselineMesh))
     {
@@ -437,16 +491,24 @@ public partial class MainWindow
     }
 
     _kitObjects = new HashSet<string>(mesh.Bones.Select(b => b.SourceName.Length > 0 ? b.SourceName : b.Name), StringComparer.OrdinalIgnoreCase);
+    if (NpcMode && _npcPreset is not null && _npcTemplate is not null)
+    {
+      foreach (var (layer, key) in NpcVariantFilter.MatchPreset(mesh, _npcTemplate, _npcPreset))
+        _npcPicks[layer] = key;
+    }
     FillKitbashSlots();
     ApplyKitbash(draw: false);
   }
 
   private string? KitbashSpecText()
   {
+    if (NpcMode)
+      return NpcSpecText();
     if (_kitClass is null || KitbashTeamBox.SelectedItem is not string team || KitChampion)
       return null;
     var slots = _kitBoxes.Keys.ToDictionary(s => s, s => _kitSlots.GetValueOrDefault(s), StringComparer.OrdinalIgnoreCase);
-    return KitbashLibrary.Spec(team, _kitClass.Name, RegionPreset, slots);
+    var spec = KitbashLibrary.Spec(team, _kitClass.Name, RegionPreset, slots);
+    return KitbashFist is { } fist ? spec + ",powerfist=" + fist : spec;
   }
 
   private void ApplyKitbash(bool draw = true)
@@ -454,7 +516,7 @@ public partial class MainWindow
     SaveKitbash();
     var spec = KitbashSpecText();
     UpdateKitbashSpec(spec);
-    if (_kit is null || _mesh is not { } mesh || _previewFileIndex != _kitIndex || _kitIndex < 0)
+    if ((NpcMode ? _npc is null : _kit is null) || _mesh is not { } mesh || _previewFileIndex != _kitIndex || _kitIndex < 0)
     {
       if (_kitIndex >= 0 && _previewFileIndex != _kitIndex && _kitOpen)
         _ = LoadKitbashModelAsync();
@@ -470,14 +532,22 @@ public partial class MainWindow
       }
     }
 
-    if (spec is null || KitbashTeamBox.SelectedItem is not string team || _kitClass is null)
+    if (NpcMode)
+    {
+      ApplyNpc(mesh, spec);
+    }
+    else if (spec is null || KitbashTeamBox.SelectedItem is not string team || _kitClass is null)
     {
       KitbashModelState.Text = KitChampion ? "Champion model, complete." : "";
       KitbashNotes.Text = "";
     }
     else
     {
-      var result = ArmorVariant.Apply(mesh, _kit.Library, team, _kitClass.Name, VariantRequest.Parse(spec));
+      var request = VariantRequest.Parse(spec);
+      var fistNote = _melee?.AddPowerFist(request, _kitTemplate ?? mesh.Name);
+      var result = ArmorVariant.Apply(mesh, _kit.Library, team, _kitClass.Name, request);
+      if (fistNote is not null)
+        result.Notes.Insert(0, fistNote);
       var picked = _kitBoxes.Keys.Count(s => _kitSlots.GetValueOrDefault(s) is not null);
       KitbashModelState.Text = $"{picked} of {_kitBoxes.Count} slots filled · {result.VisibleParts} surfaces shown, {result.HiddenParts} hidden of {result.CustomizableObjects:N0} customizable objects.";
       var notes = result.Notes.Where(n => !n.Contains(" is not in " + mesh.Name, StringComparison.Ordinal)).ToList();
@@ -510,6 +580,7 @@ public partial class MainWindow
     _settings.KitbashSlots = _kitSlots.ToDictionary(p => p.Key, p => p.Value ?? KitbashLibrary.NoneUid, StringComparer.OrdinalIgnoreCase);
     _settings.KitbashAllClasses = KitbashClassOnlyBox.IsChecked != true;
     _settings.KitbashShowMissing = KitbashMissingBox.IsChecked == true;
+    SaveNpc();
     try { _settings.Save(); } catch { /* best effort */ }
   }
 
@@ -519,9 +590,27 @@ public partial class MainWindow
       return;
     var index = _kitIndex;
     var spec = KitbashSpecText();
-    var summary = new List<string> { $"{_kitTemplate}.tpl · {KitbashTeamBox.SelectedItem}/{_kitClass?.Name} · {_kitPreset?.Label ?? "no preset"}" };
-    if (spec is not null)
-      summary.AddRange(_kitBoxes.Keys.Select(s => $"{SlotName(s)}: {_kitSlots.GetValueOrDefault(s) ?? "— empty —"}"));
+    var summary = new List<string>();
+    if (NpcMode)
+    {
+      summary.Add($"{_kitTemplate}.tpl · NPC {_npcTemplate?.Name} · {_npcPreset?.Name ?? "template layers"}");
+      if (_npcPreset is not null)
+        summary.Add("Objects: " + string.Join(", ", _npcPreset.Objects));
+      else if (spec is not null && _npc is not null && _npcTemplate is not null)
+      {
+        var off = _npc.DisabledLayers(_npcTemplate, _npcPicks);
+        summary.AddRange(_npcTemplate.Layers.Select(l => $"{SlotName(l.Name)}: {(off.Contains(l.Name) ? "(off)" : _npcPicks.GetValueOrDefault(l.Name) ?? "— empty —")}"));
+      }
+    }
+    else
+    {
+      summary.Add($"{_kitTemplate}.tpl · {KitbashTeamBox.SelectedItem}/{_kitClass?.Name} · {_kitPreset?.Label ?? "no preset"}");
+      if (spec is not null)
+        summary.AddRange(_kitBoxes.Keys.Select(s => $"{SlotName(s)}: {_kitSlots.GetValueOrDefault(s) ?? "— empty —"}"));
+      if (KitbashFist is { } fist)
+        summary.Add("Power fist: " + fist);
+    }
+
     var window = new ExportWindow();
     var choice = await window.Choose(this, _settings.LastExportFolder, fixedVariant: spec ?? "all", fixedSummary: string.Join("\n", summary));
     if (choice is null)

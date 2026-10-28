@@ -42,6 +42,13 @@ public sealed class BrowserSettings
   public Dictionary<string, string>? KitbashSlots { get; set; }
   public bool KitbashAllClasses { get; set; }
   public bool KitbashShowMissing { get; set; }
+  /// <summary>ui-45: Kitbash mode ("npc" = enemy / NPC inst_constructor templates, else Space Marine armor), NPC template,
+  /// custom preset (.cls stem), layer picks per template (MeshTemplate key or "none"), and the armor mode's power fist skin.</summary>
+  public string? KitbashMode { get; set; }
+  public string? KitbashNpcTemplate { get; set; }
+  public string? KitbashNpcPreset { get; set; }
+  public Dictionary<string, Dictionary<string, string>>? KitbashNpcLayers { get; set; }
+  public string? KitbashPowerFist { get; set; }
 
   public static BrowserSettings Load()
   {
