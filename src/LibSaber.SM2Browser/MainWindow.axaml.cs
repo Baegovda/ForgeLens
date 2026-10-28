@@ -80,6 +80,7 @@ public partial class MainWindow : Window
     InitLayoutMemory();
     ShowAllBox.IsChecked = _settings.ShowAllFiles;
     RestoreFilterState();
+    InitContentBrowser();
     // ui-43: the wheel over a CLOSED clip / LOD / part box steps to the previous (wheel up) or next (wheel down) row of
     // the current (filtered) list and loads it like a click would (WheelComboBox; the dropdown stays closed). A clip
     // chosen with the wheel also starts playing.
@@ -161,7 +162,9 @@ public partial class MainWindow : Window
       _clipHeaders = null;
       _settings.LastFolder = path;
       _settings.Save();
+      ContentBrowserCatalogChanged(catalog, _store);
       BindTree(catalog);
+      ContentBrowserTreeBound();
       UpdateExportButton();
     }
     catch (OperationCanceledException)
@@ -196,6 +199,8 @@ public partial class MainWindow : Window
       if (source.RowSelection.SelectedItem is not CatalogDirectory directory)
         return;
       _directory = directory;
+      if (!_scopeRestorePending)
+        _scope = Scope.Folder;
       RefreshFiles();
     };
     source.RowExpanded += (_, e) => _expanded.Add(e.Row.Model.Path);
@@ -238,7 +243,10 @@ public partial class MainWindow : Window
       case Key.Down when FileList.ItemCount > 0:
         if (FileList.SelectedIndex < 0)
           FileList.SelectedIndex = 0;
-        FileList.Focus();
+        if (_gridView)
+          TileGrid.Focus();
+        else
+          FileList.Focus();
         e.Handled = true;
         break;
     }
@@ -290,6 +298,8 @@ public partial class MainWindow : Window
   {
     if (FolderText is null)
       return;
+    if (ChipAll is not null)
+      SyncChips();
     RefreshFiles();
   }
 
@@ -302,7 +312,7 @@ public partial class MainWindow : Window
 
   private async void RefreshFiles()
   {
-    if (_catalog is null)
+    if (_catalog is null || _scopeRestorePending)
       return;
 
     var catalog = _catalog;
@@ -322,11 +332,31 @@ public partial class MainWindow : Window
     var generation = ++_listGeneration;
     FileQuery query;
     var auxHidden = 0;
+    string scopeLabel = "";
     try
     {
-      // mtl1-42: All types lists only previewable assets unless Show all files is on; an explicit type filter lists the whole type.
-      var previewableOnly = ShowAllBox?.IsChecked != true && filter == AssetFilter.All;
-      query = await Task.Run(() => catalog.Query(scoped, search, filter, includeSubfolders && scoped is not null, previewableOnly, out auxHidden));
+      // ui-43: a category or collection lists its own files (search and the type chips narrow them).
+      if (_scope != Scope.Folder)
+      {
+        var showAllFiles = ShowAllBox?.IsChecked == true;
+        var picked = await Task.Run(() => ScopeFiles(catalog, filter, search, showAllFiles, out var label) is { } arr ? (arr, label) : (null, ""));
+        if (picked.arr is null)
+        {
+          _scope = Scope.Folder;
+          query = await Task.Run(() => catalog.Query(scoped, search, filter, includeSubfolders && scoped is not null, ShowAllBox?.IsChecked != true && filter == AssetFilter.All, out auxHidden));
+        }
+        else
+        {
+          query = new FileQuery(0, picked.arr.Length, picked.arr);
+          scopeLabel = picked.label;
+        }
+      }
+      else
+      {
+        // mtl1-42: All types lists only previewable assets unless Show all files is on; an explicit type filter lists the whole type.
+        var previewableOnly = ShowAllBox?.IsChecked != true && filter == AssetFilter.All;
+        query = await Task.Run(() => catalog.Query(scoped, search, filter, includeSubfolders && scoped is not null, previewableOnly, out auxHidden));
+      }
     }
     catch (Exception ex)
     {
@@ -342,7 +372,22 @@ public partial class MainWindow : Window
     if (_selectFirstAfterRefresh && query.Length > 0)
       FileList.SelectedIndex = 0;
     _selectFirstAfterRefresh = false;
+    _anchor = -1;
+    UpdateScopeText(scopeLabel);
+    RebuildGrid();
+    EmptyText.Text = query.Length > 0 ? ""
+      : !string.IsNullOrWhiteSpace(search) ? $"Nothing here matches '{search.Trim()}'."
+      : _scope == Scope.Collection ? "This collection is empty. Drag tiles onto it, or right-click › Add to collection."
+      : "No assets of this type here.";
+    EmptyText.IsVisible = query.Length == 0 && !RecentList.IsVisible;
     UpdateExportButton();
+    if (_scope != Scope.Folder)
+    {
+      StatusText.Text = $"{query.Length:N0} shown in {scopeLabel}. {catalog.FileCount:N0} files in {catalog.Archives.Count} archives."
+                        + (_scope == Scope.Category && _category?.Heuristic == true ? " This group is HEURISTIC (name / keyword rule)." : "");
+      ApplyPendingFile();
+      return;
+    }
     var scope = scoped is null
       ? "search"
       : includeSubfolders ? directory.Name + " and subfolders" : directory.Name;
@@ -366,6 +411,7 @@ public partial class MainWindow : Window
   private async void FileSelectionChanged(object? sender, SelectionChangedEventArgs e)
   {
     UpdateExportButton();
+    ContentBrowser.AssetTile.RefreshAll();
     // mtl1-42: a click / arrow key previews the row it just selected (Ctrl/Shift-adding rows previews the newest one).
     _previewRow = e.AddedItems?.OfType<FileRow>().LastOrDefault();
     await PreviewSelectionAsync();
@@ -1366,9 +1412,10 @@ public partial class MainWindow : Window
 
   private void ShowFiles()
   {
-    FileList.IsVisible = true;
+    ApplyViewVisibility();
     FileHeader.IsVisible = true;
     RecentList.IsVisible = false;
+    EmptyText.IsVisible = FileList.ItemCount == 0 && FileList.ItemsSource is not null;
     FilesTab.Classes.Set("active", true);
     RecentTab.Classes.Set("active", false);
   }
@@ -1376,6 +1423,8 @@ public partial class MainWindow : Window
   private void ShowRecent()
   {
     FileList.IsVisible = false;
+    TileGrid.IsVisible = false;
+    EmptyText.IsVisible = false;
     FileHeader.IsVisible = false;
     RecentList.IsVisible = true;
     FilesTab.Classes.Set("active", false);
@@ -1421,6 +1470,7 @@ public partial class MainWindow : Window
     }
 
     var directory = ParentPath(entry.Path);
+    EnterFolderScope();
     _pendingFileIndex = index;
     _pendingDirectory = directory;
     _suppressSearch = true;
@@ -1493,7 +1543,7 @@ public partial class MainWindow : Window
   {
     if (_pendingFileIndex < 0 || FileList.ItemsSource is not FileRowList rows)
       return;
-    if (_directory is null || !string.Equals(_directory.Path, _pendingDirectory, StringComparison.OrdinalIgnoreCase))
+    if (_scope == Scope.Folder && (_directory is null || !string.Equals(_directory.Path, _pendingDirectory, StringComparison.OrdinalIgnoreCase)))
       return;
     var pending = _pendingFileIndex;
     _pendingFileIndex = -1;
@@ -1508,6 +1558,8 @@ public partial class MainWindow : Window
 
     FileList.SelectedIndex = row;
     FileList.ScrollIntoView(rows[row]);
+    if (_gridView && _gridColumns > 0)
+      Dispatcher.UIThread.Post(() => TileGrid.ScrollIntoView(row / _gridColumns), DispatcherPriority.Background);
     RestoreScroll();
   }
 
@@ -1723,6 +1775,7 @@ public partial class MainWindow : Window
     _settings.SearchText = SearchBox.Text ?? "";
     _settings.FilterIndex = FilterBox.SelectedIndex;
     _settings.IncludeSubfolders = SubfoldersBox.IsChecked == true;
+    SaveContentBrowserState();
     if (_catalog is null)
       return;
     // Keep only folders whose parents are expanded too (a collapsed parent hides them).

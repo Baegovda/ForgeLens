@@ -3,6 +3,7 @@
 Branch `cursor/sm2-pck-extractor-4420`, PR #1. Always confirm the current state with `git fetch && git log --oneline -30 origin/cursor/sm2-pck-extractor-4420`.
 Percentages are the previous agent's estimates of how complete each track is against the "looks exactly like in-game" goal.
 
+## ui-43 (2026-10-28 KST): Forge Lens UE5-style Content Browser — Favorites / Folders|Categories / Collections, thumbnail grid + list, chips, hover-animated cached thumbnails; Anim wheel steps clips. Category name rules, effect splat and clay thumbnails are HEURISTIC (HANDOFF "Update ui-43")
 ## mtl1-42 physics/materials batch (2026-10-28 KST): Calgar cape stripe = detail tiling, 60 Hz Calgar clips, PA assign, cloth bone cap 4096, CDT sweep
 ## mtl1-42 (2026-10-28 KST): VFX black squares/fly-by fixed, cloth SIM shells hidden in preview, export In place, file list UI
 
@@ -594,3 +595,13 @@ Evidence: box /workspace/rdc/NOTES.md and /workspace/rdc/<scene>/{nightly,deep} 
 - Second lobe ("clear coat"): kept as the existing additive Substrate slab (spec only, F0 = lerp(0.04, SecondSpecTint 0.95-0.98 x lin(tex), m2), rough 0.63, anisotropy + shift). Matches the game's additive direct-only lobe; Substrate has no legacy ClearCoat pin and a vertical layer would attenuate the base. Not changed in this patch.
 - Tests: `python3 test/python/test_chameleon.py` (8 tests, `unreal` stubbed): ramp rows vs CB, sRGB colours, defaults, poly, multiply-then-linearise, GBUFFER hue order, metal whitening.
 - UE check (/Game/SM2_Work/Tests/mtl26pre = mtl1-25 importer vs mtl26 = this patch, same mtl26 export, ue_cap_lit `lit|base fit view=ref`): chameleon-pixel mean LDR before (41,68,81) -> after (36,49,58); game finals 3430/3441/3452 mean (28,51,60). Blue panels less glossy/cyan. Lighting is not matched (UE scene lights vs game), so this is a direction check, not a match. UE BaseColor capture is not a clean albedo under Substrate (red channel ~13/255 where the formula gives ~2): HEURISTIC, likely the second slab. Image: box /workspace/mtl_fix/mtl26/before_after_mtl26.png (+stats.json); PC Captures\mtl_fix\mtl26\{pre,after,pre_base,after_base}.
+
+## ui-43 (2026-10-28 KST): Content Browser
+- Categories come from data where linked: `.cls` nameTpl plus the `__type` chain, and Morpheme `linksAnimation`. Name and keyword placements are HEURISTIC and carry an `H` badge, a tooltip and a context-menu reason.
+- **All** is the default and unclassified assets go to **Other**; a test enforces that nothing is unreachable.
+- Thumbnails are disk-cached (`%LOCALAPPDATA%/LibSaber/SM2Browser/thumbs`):
+  - models are a clay render (HEURISTIC look);
+  - effects are a CPU splat approximation (HEURISTIC);
+  - clips without an owner model show a glyph.
+- Tests: SM2.Assets 233, Extractor 43, LibSaber.Tests 5, chameleon python 8 — all pass.
+- Open: the Kitbasher parts picker (optional, not started); close-time state saving is unverified under Xvfb.

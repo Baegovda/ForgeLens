@@ -1823,3 +1823,47 @@ Disassembly: /workspace/vfxsh_dis/{pc,pg,dx_pc_dx12_sfx,dx_pc_dx12_distort}, GLS
 - **UI:** mouse wheel over a closed Anim/LOD/Part combo no longer changes the selection. File list: resizable columns (header splitters; TYPE/SIZE/ARCHIVE widths persisted, PATH takes the rest), full-path tooltip, middle ellipsis (`PrefixCharacterEllipsis`; Avalonia 11.2 has no PathSegmentEllipsis — it throws at startup), pane split persisted, tab underline, section labels, dimmed secondary text. **Show all files** (persisted, `BrowserSettings.ShowAllFiles`): off = only previewable types (`AssetClassification.IsPreviewable`: .tpl, .pct/.pct.resource, .sani, .sfx) in folder view and search when the type filter is All; status bar reports "N auxiliary files hidden". Screenshot: /workspace/fix42b_shots/ui_after.png.
 - **Browser state memory:** settings.json now also keeps the expanded folder-tree nodes, selected folder and file (with archive), file list scroll, search text, type filter and Include subfolders (plus the column/pane widths above); restored when the last game folder reopens (saved scroll kept while the selected file stays on screen; the restored row gets keyboard focus). Clicking a row or moving with Up/Down previews it immediately (Ctrl/Shift-adding rows previews the newest one). Default column widths TYPE 72 / SIZE 64 / ARCHIVE 112, file pane 1.35*. Checked under Xvfb with a synthetic pak: /workspace/fix42b_shots/ui_restore.png, ui_arrow.png.
 - Tests: SM2.Assets 218 pass (+17 Mtl42Tests), Extractor 43 (+1 `--anim-root`).
+
+## Update ui-43 (2026-10-28 KST): Forge Lens Content Browser (UE5-style) + Anim wheel fix
+- **Quick fix (2fcdc22):** the mouse wheel over a *closed* Anim / LOD / Part combo now steps to the previous/next row (respecting the Anim filter), and a wheel-picked clip plays. This replaces the mtl1-42 "wheel blocked" behaviour.
+- **Categories (4c1b5e8, `SM2.Assets/Catalog/AssetCategories.cs`, 13 tests):**
+  - Builds the category tree from data where a link exists: `ssl/**/*.cls` `geom.nameTpl` plus the `__type` parent chain for templates; Morpheme bundle `linksAnimation` for clips; folders otherwise.
+  - Clip owner model: `OwnerModel` is used for the animation thumbnails.
+  - **RULE:** every visualizable asset is reachable. The tree has **All** (the default) and anything unclassified lands in **Other**; a test enforces this.
+  - Name-based placements are **HEURISTIC** and flagged in three ways: an `H` badge on the node, the node tooltip, and a "Category: reason" line in the tile context menu.
+- **UI (`src/LibSaber.SM2Browser/ContentBrowser/*`, `MainWindow.ContentBrowser.cs`):**
+  - **Left panel:**
+    - Favorites: pin a folder with ★ Pin or by right-clicking it; remove from the right-click menu.
+    - Tree toggle: **Folders | Categories**.
+    - Collections: + New; add assets by drag-drop of tiles/rows or "Add to collection ▸"; right-click to Rename, set the Colour, or Delete (with confirm).
+    - Favorites and collections save to settings.json immediately.
+  - **Centre:**
+    - Filter chips: All / Models / Animations / Effects / Textures / Text (they drive the old type filter) plus search (Ctrl+F).
+    - **Grid** (virtualized ListBox of tile rows, tile size slider 64–256) or **List** (the old file list with its resizable columns).
+    - Grid selection mirrors the list: Ctrl / Shift / Ctrl+A, arrows, Home/End, PgUp/PgDn, Delete (removes from the current collection). Selecting a tile previews it immediately in the unchanged viewer.
+  - **Thumbnails (`ThumbnailService`):**
+    - Rendered in the background and disk-cached at `%LOCALAPPDATA%/LibSaber/SM2Browser/thumbs/<sha1[..2]>/<sha1>.png`. The key is `Version|path|archive|size|ext`, so bump `Version` to invalidate the cache.
+    - Models and textures are stills. Animations and effects are 10-frame strips that loop on hover; **Animate all** loops every visible tile.
+  - **Persisted state:** tree mode, selected category or collection, Grid/List, tile size and Animate all. These sit alongside the mtl1-42 state (columns, panes, folder, file, scroll, search, filter, subfolders, Show all files).
+  - Every existing feature is kept: export window, VFX bar, Physics, LOD/Part, In place/Root, Show all files, Recent.
+- **HEURISTIC list:**
+  1. Faction keyword matching (Tyranids / Chaos / Humanoid / Space Marine) on the class chain or path.
+  2. Name-prefix rules for templates with no class (`refrt_`, `dstr_`, `wpn_`, `cc_`…).
+  3. "By action" clip groups from name tokens.
+  4. Texture map-type groups from name suffix (`_nm`, `_spec`, `_em`…).
+  5. Effect thumbnails are a CPU sprite splat of the simulated particles (no lights, meshes or distortion), not the real renderer; a soft disc stands in for a missing texture.
+  6. Model thumbnails are a CPU clay render (MeshPreview, untextured, for speed).
+  7. Animation thumbnails use the bundle's owner model. A clip with no owner shows a glyph.
+- **Screenshots (box, Xvfb, synthetic dev pak `/workspace/ui43dev/game`):** `/workspace/browser_run_shots/ui43/`
+  - `01_folders_grid.png`, `01b_hover.png`
+  - `02_categories_synced_kills.png`, `03_categories_models.png`
+  - `04_effects_hover.png`, `05_collection.png`
+  - `06_context_menu.png`, `07_list_view.png`, `08_grid_back.png`
+- **Not verified:** close-time state saving under Xvfb, because there is no WM and the window can't be closed there. Favorites and collections save immediately and were checked in settings.json.
+- **Dev aid:** `FL_THUMBDBG=1` prints thumbnail failures and effect-splat diagnostics.
+- **Avalonia gotchas:**
+  - `Border.tile` styles don't match a Border subclass unless `StyleKeyOverride => typeof(Border)`.
+  - `CroppedBitmap` must be created on the UI thread.
+  - An ItemsControl with a custom ScrollViewer did not virtualize; use ListBox.
+  - A ListBox ItemsSource that implements IList must return -1 from IndexOf for stale items.
+- **Next:** an optional Kitbasher-style customization parts picker (from the .sso; see `A/Customization/SslText.cs`, `ArmorVariant.cs`, `AssetExporter.ApplyVariant`). Not started.

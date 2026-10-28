@@ -3,6 +3,7 @@
         xmlns:tdg="using:Avalonia.Controls"
         xmlns:local="using:LibSaber.SM2Browser"
         xmlns:gpu="using:LibSaber.SM2Browser.Gpu"
+        xmlns:cb="using:LibSaber.SM2Browser.ContentBrowser"
         x:Class="LibSaber.SM2Browser.MainWindow"
         Title="Forge Lens — Space Marine 2 assets"
         Width="1440"
@@ -11,45 +12,131 @@
         MinHeight="640">
   <DockPanel>
     <Border DockPanel.Dock="Top" Padding="10,8" Background="{DynamicResource FL.Toolbar}" BorderBrush="{DynamicResource FL.Border}" BorderThickness="0,0,0,1">
-      <Grid ColumnDefinitions="Auto,*,Auto,220,140,Auto">
+      <Grid ColumnDefinitions="Auto,*,Auto">
         <Button x:Name="OpenButton" Content="Open game folder" Click="OpenClicked" Margin="0,0,8,0" ToolTip.Tip="The game root or client_pc. Caches are found in subfolders." />
         <TextBlock x:Name="FolderText" Grid.Column="1" VerticalAlignment="Center" TextTrimming="PrefixCharacterEllipsis" Margin="4,0,12,0" Foreground="{DynamicResource FL.TextDim}" ToolTip.Tip="{Binding Text, RelativeSource={RelativeSource Self}}" />
-        <StackPanel Grid.Column="2" Orientation="Horizontal" Margin="0,0,8,0">
-          <TextBox x:Name="SearchBox" Watermark="Search (Ctrl+F), e.g. bolter muzzle" Width="240" TextChanged="SearchChanged" KeyDown="SearchKeyDown"
-                   ToolTip.Tip="Words separated by spaces must all match the path. Enter previews the first result, Down moves into the list, Esc clears." />
-          <Button x:Name="SearchClear" Content="✕" Click="SearchClearClicked" IsVisible="False" Padding="6,2" Margin="2,0,0,0" ToolTip.Tip="Clear search (Esc)" />
-        </StackPanel>
-        <ComboBox x:Name="FilterBox" Grid.Column="3" SelectedIndex="0" SelectionChanged="FilterChanged" HorizontalAlignment="Stretch" ToolTip.Tip="Show only this file type">
-          <ComboBoxItem Content="All types" />
-          <ComboBoxItem Content="Textures" />
-          <ComboBoxItem Content="Models" />
-          <ComboBoxItem Content="Animations" />
-          <ComboBoxItem Content="Effects" />
-          <ComboBoxItem Content="Text / YAML" />
-        </ComboBox>
-        <Button x:Name="ExportButton" Grid.Column="4" Content="Export…" Classes="accent" Click="ExportClicked" IsEnabled="False" Margin="8,0,0,0"
-                ToolTip.Tip="Select files in the list first (Ctrl/Shift for several). Ctrl+E" />
+        <Button x:Name="ExportButton" Grid.Column="2" Content="Export…" Classes="accent" Click="ExportClicked" IsEnabled="False" Margin="8,0,0,0" MinWidth="140"
+                ToolTip.Tip="Select files in the list or grid first (Ctrl/Shift for several). Ctrl+E" />
       </Grid>
     </Border>
     <Border DockPanel.Dock="Bottom" Padding="10,5" Background="{DynamicResource FL.Toolbar}" BorderBrush="{DynamicResource FL.Border}" BorderThickness="0,1,0,0">
       <TextBlock x:Name="StatusText" Foreground="{DynamicResource FL.TextDim}" FontSize="12" TextTrimming="CharacterEllipsis" Text="Open the game folder (the one that contains the .pak files)." />
     </Border>
-    <Grid x:Name="MainColumns" ColumnDefinitions="230,6,1.35*,6,2*">
-      <tdg:TreeDataGrid x:Name="FolderTree" Grid.Column="0" MinWidth="160" Background="{DynamicResource FL.PanelDeep}" />
+    <Grid x:Name="MainColumns" ColumnDefinitions="250,6,1.35*,6,2*">
+      <!-- ui-43 Content Browser left pane: Favorites, Folders | Categories tree, Collections (all remembered). -->
+      <Grid x:Name="LeftPane" Grid.Column="0" MinWidth="170" RowDefinitions="Auto,Auto,Auto,*,Auto,Auto" Background="{DynamicResource FL.PanelDeep}">
+        <Grid Grid.Row="0" ColumnDefinitions="*,Auto" Margin="8,6,4,2">
+          <TextBlock Text="FAVORITES" Classes="header" VerticalAlignment="Center" />
+          <Button Grid.Column="1" Classes="mini" Content="★ Pin" Click="PinFolderClicked" ToolTip.Tip="Pin the selected folder to Favorites" />
+        </Grid>
+        <ListBox x:Name="FavoritesList" Grid.Row="1" MaxHeight="132" SelectionChanged="FavoriteSelected">
+          <ListBox.ItemTemplate>
+            <DataTemplate x:DataType="cb:FavoriteItem">
+              <StackPanel Orientation="Horizontal" Spacing="6" ToolTip.Tip="{Binding Tip}">
+                <TextBlock Text="★" Foreground="{DynamicResource FL.Accent}" FontSize="11" VerticalAlignment="Center" />
+                <TextBlock Text="{Binding Name}" TextTrimming="CharacterEllipsis" />
+              </StackPanel>
+            </DataTemplate>
+          </ListBox.ItemTemplate>
+        </ListBox>
+        <TextBlock x:Name="FavoritesEmpty" Grid.Row="1" Text="Pin folders with ★ or right-click a folder." FontSize="11" Margin="10,2,8,6" Foreground="{DynamicResource FL.TextDim}" TextWrapping="Wrap" />
+        <StackPanel Grid.Row="2" Orientation="Horizontal" Spacing="2" Margin="6,6,6,2">
+          <Button x:Name="FoldersTab" Classes="tab" Content="Folders" Click="FoldersTabClicked" ToolTip.Tip="Archive folders" />
+          <Button x:Name="CategoriesTab" Classes="tab" Content="Categories" Click="CategoriesTabClicked"
+                  ToolTip.Tip="Assets grouped from game data (.cls classes, Morpheme bundles, folders). Nodes marked H use name rules (HEURISTIC). Everything is under All; anything unplaced is under Other." />
+        </StackPanel>
+        <Grid Grid.Row="3">
+          <tdg:TreeDataGrid x:Name="FolderTree" MinWidth="160" Background="{DynamicResource FL.PanelDeep}" />
+          <TreeView x:Name="CategoryTree" IsVisible="False" SelectionChanged="CategorySelected" ScrollViewer.HorizontalScrollBarVisibility="Disabled">
+            <TreeView.Styles>
+              <Style Selector="TreeViewItem" x:DataType="cb:CategoryItem">
+                <Setter Property="IsExpanded" Value="{Binding IsExpanded, Mode=TwoWay}" />
+                <Setter Property="MinHeight" Value="26" />
+              </Style>
+            </TreeView.Styles>
+            <TreeView.ItemTemplate>
+              <TreeDataTemplate x:DataType="cb:CategoryItem" ItemsSource="{Binding Children}">
+                <Grid ColumnDefinitions="*,Auto,Auto" ToolTip.Tip="{Binding Tip}">
+                  <TextBlock Text="{Binding Name}" TextTrimming="CharacterEllipsis" VerticalAlignment="Center" />
+                  <Border Grid.Column="1" Classes="hbadge" IsVisible="{Binding Heuristic}" Margin="4,0,0,0"><TextBlock Text="H" FontSize="9" /></Border>
+                  <TextBlock Grid.Column="2" Text="{Binding CountText}" FontSize="11" Margin="6,0,2,0" Foreground="{DynamicResource FL.TextDim}" VerticalAlignment="Center" />
+                </Grid>
+              </TreeDataTemplate>
+            </TreeView.ItemTemplate>
+          </TreeView>
+          <TextBlock x:Name="CategoryStatus" IsVisible="False" Margin="10" TextWrapping="Wrap" Foreground="{DynamicResource FL.TextDim}" />
+        </Grid>
+        <Grid Grid.Row="4" ColumnDefinitions="*,Auto" Margin="8,6,4,2">
+          <TextBlock Text="COLLECTIONS" Classes="header" VerticalAlignment="Center" />
+          <Button Grid.Column="1" Classes="mini" Content="＋ New" Click="NewCollectionClicked" ToolTip.Tip="New collection (adds the selected assets, if any)" />
+        </Grid>
+        <ListBox x:Name="CollectionsList" Grid.Row="5" MaxHeight="220" MinHeight="40" SelectionChanged="CollectionSelected" DragDrop.AllowDrop="True">
+          <ListBox.ItemTemplate>
+            <DataTemplate x:DataType="cb:CollectionItem">
+              <Grid ColumnDefinitions="Auto,*,Auto" Background="Transparent">
+                <Ellipse Width="9" Height="9" Fill="{Binding Brush}" VerticalAlignment="Center" Margin="0,0,7,0" />
+                <TextBlock Grid.Column="1" Text="{Binding Name}" TextTrimming="CharacterEllipsis" VerticalAlignment="Center" />
+                <TextBlock Grid.Column="2" Text="{Binding CountText}" FontSize="11" Margin="6,0,0,0" Foreground="{DynamicResource FL.TextDim}" VerticalAlignment="Center" />
+              </Grid>
+            </DataTemplate>
+          </ListBox.ItemTemplate>
+        </ListBox>
+      </Grid>
       <GridSplitter Grid.Column="1" Width="4" Background="{DynamicResource FL.Border}" ResizeDirection="Columns" />
       <DockPanel Grid.Column="2" MinWidth="220">
-        <StackPanel DockPanel.Dock="Top" Orientation="Horizontal" Spacing="2" Margin="8,6,8,0">
-          <Button x:Name="FilesTab" Classes="tab" Content="Files" Click="FilesTabClicked" />
-          <Button x:Name="RecentTab" Classes="tab" Content="Recent" Click="RecentTabClicked" />
-        </StackPanel>
+        <!-- ui-43 browser bar: Files / Recent, scope, search; type chips, subfolders / all files, Grid | List, tile size. -->
+        <Grid DockPanel.Dock="Top" ColumnDefinitions="Auto,*,Auto" Margin="8,6,8,0">
+          <StackPanel Orientation="Horizontal" Spacing="2">
+            <Button x:Name="FilesTab" Classes="tab" Content="Files" Click="FilesTabClicked" />
+            <Button x:Name="RecentTab" Classes="tab" Content="Recent" Click="RecentTabClicked" />
+          </StackPanel>
+          <TextBlock x:Name="ScopeText" Grid.Column="1" VerticalAlignment="Center" Margin="10,0" FontWeight="SemiBold" TextTrimming="PrefixCharacterEllipsis"
+                     ToolTip.Tip="{Binding Text, RelativeSource={RelativeSource Self}}" />
+          <StackPanel Grid.Column="2" Orientation="Horizontal">
+            <TextBox x:Name="SearchBox" Watermark="Search (Ctrl+F)" Width="190" TextChanged="SearchChanged" KeyDown="SearchKeyDown"
+                     ToolTip.Tip="Words separated by spaces must all match the path. Folders: searches every archive. Categories / collections: searches inside the selected node. Enter previews the first result, Down moves into the list, Esc clears." />
+            <Button x:Name="SearchClear" Content="✕" Click="SearchClearClicked" IsVisible="False" Padding="6,2" Margin="2,0,0,0" ToolTip.Tip="Clear search (Esc)" />
+          </StackPanel>
+        </Grid>
         <StackPanel x:Name="FileHeader" DockPanel.Dock="Top" Margin="0,4,0,0">
-          <StackPanel Orientation="Horizontal" Spacing="16" Margin="8,0">
+          <WrapPanel Orientation="Horizontal" Margin="8,0">
+            <WrapPanel.Styles>
+              <Style Selector="WrapPanel > :is(Control)">
+                <Setter Property="Margin" Value="0,0,4,4" />
+              </Style>
+            </WrapPanel.Styles>
+            <ToggleButton x:Name="ChipAll" Classes="chip" Content="All" Tag="0" Click="ChipClicked" />
+            <ToggleButton x:Name="ChipModels" Classes="chip model" Content="Models" Tag="2" Click="ChipClicked" />
+            <ToggleButton x:Name="ChipAnims" Classes="chip anim" Content="Animations" Tag="3" Click="ChipClicked" />
+            <ToggleButton x:Name="ChipEffects" Classes="chip fx" Content="Effects" Tag="4" Click="ChipClicked" />
+            <ToggleButton x:Name="ChipTextures" Classes="chip tex" Content="Textures" Tag="1" Click="ChipClicked" />
+            <ToggleButton x:Name="ChipText" Classes="chip" Content="Text / YAML" Tag="5" Click="ChipClicked" />
+            <ComboBox x:Name="FilterBox" SelectedIndex="0" SelectionChanged="FilterChanged" IsVisible="False">
+              <ComboBoxItem Content="All types" />
+              <ComboBoxItem Content="Textures" />
+              <ComboBoxItem Content="Models" />
+              <ComboBoxItem Content="Animations" />
+              <ComboBoxItem Content="Effects" />
+              <ComboBoxItem Content="Text / YAML" />
+            </ComboBox>
+          </WrapPanel>
+          <WrapPanel Orientation="Horizontal" Margin="8,0">
+            <WrapPanel.Styles>
+              <Style Selector="WrapPanel > :is(Control)">
+                <Setter Property="Margin" Value="0,0,6,4" />
+                <Setter Property="VerticalAlignment" Value="Center" />
+              </Style>
+            </WrapPanel.Styles>
+            <ToggleButton x:Name="GridViewButton" Classes="chip" Content="▦ Grid" Click="GridViewClicked" ToolTip.Tip="Thumbnail grid" />
+            <ToggleButton x:Name="ListViewButton" Classes="chip" Content="☰ List" Click="ListViewClicked" ToolTip.Tip="Detail list (resizable columns)" />
+            <Slider x:Name="TileSizeSlider" Width="96" Minimum="64" Maximum="256" Value="112" VerticalAlignment="Center" ValueChanged="TileSizeChanged" ToolTip.Tip="Tile size" />
+            <CheckBox x:Name="AnimateAllBox" Content="Animate all" Click="AnimateAllChanged" ToolTip.Tip="Loop every animation / effect thumbnail on screen (off: only the one under the mouse)" />
             <CheckBox x:Name="SubfoldersBox" Content="Include subfolders" Click="SubfoldersChanged" ToolTip.Tip="List every file under the selected folder." />
             <CheckBox x:Name="ShowAllBox" Content="Show all files" Click="ShowAllChanged"
-                      ToolTip.Tip="Off: only assets the preview can show (.tpl models, textures, .sani clips, .sfx effects). On: also .tpl_data, .tpl_markup, .lods_base, .geom_dbg, .resource, mips and text. A type filter other than All types always lists that whole type." />
-          </StackPanel>
+                        ToolTip.Tip="Off: only assets the preview can show (.tpl models, textures, .sani clips, .sfx effects). On: also .tpl_data, .tpl_markup, .lods_base, .geom_dbg, .resource, mips and text. A type filter other than All always lists that whole type." />
+          </WrapPanel>
           <!-- mtl1-42: drag the header splitters to resize; PATH takes the rest. Widths are remembered across runs. -->
-          <Grid x:Name="FileColumnHeader" ColumnDefinitions="*,6,72,6,64,6,112" Margin="8,6,8,2" Height="22">
+          <Grid x:Name="FileColumnHeader" ColumnDefinitions="*,6,72,6,64,6,112" Margin="8,2,8,2" Height="22">
             <TextBlock Text="PATH" Classes="header" VerticalAlignment="Center" />
             <GridSplitter Grid.Column="1" Classes="column" ResizeDirection="Columns" ToolTip.Tip="Drag to resize" />
             <TextBlock Grid.Column="2" Text="TYPE" Classes="header" VerticalAlignment="Center" />
@@ -76,6 +163,15 @@
             </DataTemplate>
           </ListBox.ItemTemplate>
         </ListBox>
+        <ListBox x:Name="TileGrid" Classes="tiles" IsVisible="False" SelectionMode="Single" ScrollViewer.HorizontalScrollBarVisibility="Disabled"
+                 Background="{DynamicResource FL.PanelDeep}" Padding="2,4">
+          <ListBox.ItemTemplate>
+            <DataTemplate x:DataType="cb:TileRow">
+              <cb:TileRowPanel />
+            </DataTemplate>
+          </ListBox.ItemTemplate>
+        </ListBox>
+        <TextBlock x:Name="EmptyText" IsVisible="False" HorizontalAlignment="Center" VerticalAlignment="Center" TextWrapping="Wrap" MaxWidth="360" TextAlignment="Center" Foreground="{DynamicResource FL.TextDim}" />
         <ListBox x:Name="RecentList" IsVisible="False" SelectionChanged="RecentSelectionChanged">
           <ListBox.ItemTemplate>
             <DataTemplate x:DataType="local:RecentEntry">

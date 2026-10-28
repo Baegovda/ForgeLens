@@ -151,6 +151,7 @@ xvfb-run -a -s "-screen 0 1920x1080x24" dotnet run --project src/LibSaber.SM2Bro
 | `--hostvfxbench` | `<tplDir> <sani|-> <sfxDir> <aliases.ps> <texDir> <out> <effect|-> [bone|-] [seconds] [every]` |
 - Interactive dev mode without a game folder: `SM2_VFX_LOOSE="sfxDir|part_aliases.ps|texDir|meshDir" SM2_VFX_OPEN=<name>`, `SM2_MODEL_OPEN="tplDir[|sani]"`, `SM2_HOST_*`.
 - Make before/after sheets with Python (PIL) and save them under `/workspace/browser_run_shots/<stage>/`.
+- Interactive UI screenshots (ui-43): run the app under `Xvfb :77` with `XDG_DATA_HOME`/`XDG_CONFIG_HOME` pointed at a scratch home, drive it with `xdotool`, and grab frames with `ffmpeg -f x11grab`. `/workspace/ui43dev/ui.sh start <bindir> | shot <name> | stop` does this; its pkill pattern only matches its own instance, so leave other agents' ForgeLens processes alone. There is no WM, so dialogs need a click before they take keyboard input. `FL_THUMBDBG=1` logs thumbnail failures.
 - On the PC, `--glbench` gives real GPU numbers (RTX 4090, ANGLE D3D11). Run it only when no game is running.
 
 ## 7. Bulk validation (`tools/bulk/`, PC copies in `Scripts\bulk\`)

@@ -24,6 +24,16 @@ public sealed class BrowserSettings
   public string? SearchText { get; set; }
   public int? FilterIndex { get; set; }
   public bool IncludeSubfolders { get; set; }
+  /// <summary>ui-43 Content Browser: pinned folders, collections, tree mode (Folders / Categories), selected category or
+  /// collection, Grid / List view, tile size and "animate all thumbnails".</summary>
+  public List<string>? Favorites { get; set; }
+  public List<ContentBrowser.CollectionData>? Collections { get; set; }
+  public string? TreeMode { get; set; }
+  public string? SelectedCategory { get; set; }
+  public string? SelectedCollection { get; set; }
+  public string? ViewMode { get; set; }
+  public double? TileSize { get; set; }
+  public bool AnimateAll { get; set; }
 
   public static BrowserSettings Load()
   {

@@ -142,5 +142,72 @@
       <Setter Property="Background" Value="#F29A42" />
       <Setter Property="Foreground" Value="#1A1B1E" />
     </Style>
+    <!-- ui-43 Content Browser: type chips, small header buttons, asset tiles, the HEURISTIC badge. -->
+    <Style Selector="ToggleButton.chip">
+      <Setter Property="CornerRadius" Value="11" />
+      <Setter Property="Padding" Value="10,1" />
+      <Setter Property="MinHeight" Value="24" />
+      <Setter Property="FontSize" Value="12" />
+      <Setter Property="Background" Value="{DynamicResource FL.Panel}" />
+    </Style>
+    <Style Selector="ToggleButton.chip.model:checked /template/ ContentPresenter">
+      <Setter Property="BorderBrush" Value="#4FA3E0" />
+      <Setter Property="Background" Value="#334FA3E0" />
+    </Style>
+    <Style Selector="ToggleButton.chip.anim:checked /template/ ContentPresenter">
+      <Setter Property="BorderBrush" Value="#57C27B" />
+      <Setter Property="Background" Value="#3357C27B" />
+    </Style>
+    <Style Selector="ToggleButton.chip.fx:checked /template/ ContentPresenter">
+      <Setter Property="BorderBrush" Value="#C77BE8" />
+      <Setter Property="Background" Value="#33C77BE8" />
+    </Style>
+    <Style Selector="ToggleButton.chip.tex:checked /template/ ContentPresenter">
+      <Setter Property="BorderBrush" Value="#D0574F" />
+      <Setter Property="Background" Value="#33D0574F" />
+    </Style>
+    <Style Selector="Button.mini">
+      <Setter Property="Background" Value="Transparent" />
+      <Setter Property="BorderThickness" Value="0" />
+      <Setter Property="Padding" Value="6,0" />
+      <Setter Property="MinHeight" Value="20" />
+      <Setter Property="FontSize" Value="11" />
+      <Setter Property="Foreground" Value="{DynamicResource FL.TextDim}" />
+    </Style>
+    <Style Selector="Border.tile">
+      <Setter Property="Background" Value="{DynamicResource FL.Panel}" />
+      <Setter Property="BorderBrush" Value="Transparent" />
+      <Setter Property="Cursor" Value="Hand" />
+    </Style>
+    <Style Selector="Border.tile.hover">
+      <Setter Property="Background" Value="{DynamicResource FL.ControlHover}" />
+      <Setter Property="BorderBrush" Value="{DynamicResource FL.Border}" />
+    </Style>
+    <Style Selector="Border.tile.selected">
+      <Setter Property="Background" Value="{DynamicResource FL.AccentSoft}" />
+      <Setter Property="BorderBrush" Value="{DynamicResource FL.Accent}" />
+    </Style>
+    <Style Selector="ListBox.tiles ListBoxItem">
+      <Setter Property="Padding" Value="0" />
+      <Setter Property="Focusable" Value="False" />
+      <Setter Property="Background" Value="Transparent" />
+    </Style>
+    <Style Selector="ListBox.tiles ListBoxItem:pointerover /template/ ContentPresenter">
+      <Setter Property="Background" Value="Transparent" />
+    </Style>
+    <Style Selector="ListBox.tiles ListBoxItem:selected /template/ ContentPresenter">
+      <Setter Property="Background" Value="Transparent" />
+    </Style>
+    <Style Selector="ListBox.tiles ListBoxItem:pressed /template/ ContentPresenter">
+      <Setter Property="Background" Value="Transparent" />
+    </Style>
+    <Style Selector="Border.hbadge">
+      <Setter Property="Background" Value="#33E0C34F" />
+      <Setter Property="BorderBrush" Value="#E0C34F" />
+      <Setter Property="BorderThickness" Value="1" />
+      <Setter Property="CornerRadius" Value="3" />
+      <Setter Property="Padding" Value="3,0" />
+      <Setter Property="VerticalAlignment" Value="Center" />
+    </Style>
   </Application.Styles>
 </Application>
