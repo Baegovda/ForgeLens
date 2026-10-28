@@ -80,11 +80,10 @@ public partial class MainWindow : Window
     InitLayoutMemory();
     ShowAllBox.IsChecked = _settings.ShowAllFiles;
     RestoreFilterState();
-    // mtl1-42: the wheel over a CLOSED clip / LOD / part box steps to the previous (wheel up) or next (wheel down) row of
-    // the current (filtered) list and loads it like a click would; the dropdown stays closed. The handler is on the box,
-    // so it only fires while the pointer is over it (scrolling elsewhere never changes the clip).
-    foreach (var box in new ComboBox[] { AnimBox, LodBox, PartBox })
-      box.AddHandler(PointerWheelChangedEvent, (_, e) => ComboWheel(box, e), RoutingStrategies.Tunnel);
+    // ui-43: the wheel over a CLOSED clip / LOD / part box steps to the previous (wheel up) or next (wheel down) row of
+    // the current (filtered) list and loads it like a click would (WheelComboBox; the dropdown stays closed). A clip
+    // chosen with the wheel also starts playing.
+    AnimBox.WheelStepping += (_, _) => _playOnLoad = true;
     ShowFiles();
     _searchTimer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(250) };
     _searchTimer.Tick += (_, _) =>
@@ -1179,6 +1178,8 @@ public partial class MainWindow : Window
       return;
     _playTimer.Stop();
     PlayButton.Content = "Play";
+    var play = _playOnLoad;
+    _playOnLoad = false;
     if (choice.Index < 0)
     {
       ResetClip();
@@ -1198,8 +1199,14 @@ public partial class MainWindow : Window
     PreviewNote.Text = clip.HasCurves
       ? $"{clip.Name}: {clip.Tracks.Count} tracks, {clip.Duration:0.###}s. Bones this clip does not name stay on the bind pose."
       : (clip.Notes.Count == 0 ? "This clip has no curve keys." : clip.Notes[0]);
-    DrawMesh();
+    if (play && clip.HasCurves && PlayButton.IsVisible)
+      PlayClicked(PlayButton, new RoutedEventArgs()); // ui-43: wheel-picked clips play straight away
+    else
+      DrawMesh();
   }
+
+  /// <summary>ui-43: set by a wheel step on the clip box; the next clip that finishes loading starts playing.</summary>
+  private bool _playOnLoad;
 
   /// <summary>Back to the bind pose: no clip, time zero, slider and label reset, pending clip loads ignored.</summary>
   private void ResetClip(bool bumpGeneration = true)
@@ -1239,15 +1246,6 @@ public partial class MainWindow : Window
     _suppressAnim = false;
     if (text.Length > 0)
       StatusText.Text = $"{rows.Count - 1:N0} of {_animAll.Count:N0} animations match '{text}'.";
-  }
-
-  private static void ComboWheel(ComboBox box, PointerWheelEventArgs e)
-  {
-    if (box.IsDropDownOpen) return;
-    e.Handled = true;
-    if (!box.IsEnabled || e.Delta.Y == 0 || box.ItemCount == 0) return;
-    var next = Math.Clamp(box.SelectedIndex + (e.Delta.Y > 0 ? -1 : 1), 0, box.ItemCount - 1);
-    if (next != box.SelectedIndex) box.SelectedIndex = next;
   }
 
   private static readonly AnimChoice BindChoice = new() { Label = "Bind pose", Index = -1 };

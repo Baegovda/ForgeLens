@@ -102,9 +102,9 @@
           <TextBlock Text="Face" VerticalAlignment="Center" Foreground="{DynamicResource FL.TextDim}" />
           <ComboBox x:Name="FaceBox" Width="64" SelectionChanged="MipChanged" />
           <TextBlock x:Name="LodLabel" Text="LOD" VerticalAlignment="Center" IsVisible="False" Foreground="{DynamicResource FL.TextDim}" />
-          <ComboBox x:Name="LodBox" Width="150" IsVisible="False" SelectionChanged="LodChanged" />
+          <local:WheelComboBox x:Name="LodBox" Width="150" IsVisible="False" SelectionChanged="LodChanged" />
           <TextBlock x:Name="PartLabel" Text="Part" VerticalAlignment="Center" IsVisible="False" Foreground="{DynamicResource FL.TextDim}" />
-          <ComboBox x:Name="PartBox" Width="220" IsVisible="False" SelectionChanged="ViewChanged" />
+          <local:WheelComboBox x:Name="PartBox" Width="220" IsVisible="False" SelectionChanged="ViewChanged" />
           <ToggleButton x:Name="WireToggle" Content="Wireframe" IsChecked="False" IsVisible="False" Click="ViewChanged" />
           <ToggleButton x:Name="SkeletonToggle" Content="Skeleton" IsChecked="False" IsVisible="False" Click="ViewChanged" />
           <ToggleButton x:Name="SmoothToggle" Content="AA" IsChecked="True" IsVisible="False" Click="ViewChanged"
@@ -123,7 +123,8 @@
           <TextBlock Text="ANIM" Classes="section" />
           <TextBox x:Name="AnimFilter" Width="180" Watermark="Filter clips" TextChanged="AnimFilterChanged"
                    ToolTip.Tip="Substring, case-insensitive. Clips named after this model are listed first." />
-          <ComboBox x:Name="AnimBox" Width="360" SelectionChanged="AnimChanged" />
+          <local:WheelComboBox x:Name="AnimBox" Width="360" SelectionChanged="AnimChanged"
+                    ToolTip.Tip="Mouse wheel over the closed box: previous / next clip of the (filtered) list, and it plays." />
           <Slider x:Name="ScrubSlider" Width="180" Minimum="0" Maximum="1" IsEnabled="False" ValueChanged="ScrubChanged" />
           <TextBlock x:Name="ScrubLabel" VerticalAlignment="Center" Text="0.00s" />
           <CheckBox x:Name="InPlaceToggle" Content="In place" IsChecked="True" Click="ViewChanged"
