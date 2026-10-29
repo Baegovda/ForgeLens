@@ -7,11 +7,11 @@ Source of detail: BOT_TRANSFER §0/§5, HANDOFF ledger R01–R43. Newest dated o
 - Evidence labels PROVEN / INFERRED / HEURISTIC (HEURISTIC last, labelled, say what was searched).
 - NEVER state a number/name not measured this session → "아직 안 쟀어요".
 - Request → industry term + short Korean explanation. Handoff docs short, core-only.
-- Disk/RAM warnings only when there is a problem (alerts.txt non-empty).
+- Disk/RAM warnings: only when a problem exists; watchers log to `SM2_Work\alerts.txt`, no popups; mention only if non-empty (owner 10/30).
 
 ## Work
 - Act first, report after; work non-stop; questions at the end. Work has top priority.
-- PC jobs: High priority, hidden, never steal focus. Don't drop to Idle unasked.
+- PC jobs: High priority, hidden, never steal focus. Don't drop to Idle unasked (owner 10/29; supersedes R26 "Idle while gaming").
 - Record every owner request in the HANDOFF ledger at once.
 - Fixes are generic rules, never per-character patches. Never ask for in-game captures.
 - No untrusted exes. No Discord unasked. Niagara only after asking. Game data parsed read-only.
@@ -21,6 +21,7 @@ Source of detail: BOT_TRANSFER §0/§5, HANDOFF ledger R01–R43. Newest dated o
 
 ## Unreal (UE 5.7.4, K:\Unreal Projects\UE_VFX_57, work only in /Game/SM2_Work)
 - ROUTE RULE: check UnrealEditor running (`rules_check`) →
+  - `rules_check` UE line: editor off → headless; editor + port 3000 open → EngineWire; editor + port closed → bridge DOWN → UEMCP or fix bridge. Only `UE_VFX_57` counts (other projects, e.g. BLTest, ignored).
   - running → EngineWire MCP: `Desktop\SM2_Work\Scripts\uerun.ps1 <abs script> <args>` → `enginewire_call.py` → 127.0.0.1:3000/mcp (fallback UEMCP `uemcp_call.py`);
   - not running → headless `UnrealEditor-Cmd -run=pythonscript ... -AutoDeclinePackageRecovery` (never both at once).
   - Always state the route used in the report.
@@ -36,7 +37,7 @@ Source of detail: BOT_TRANSFER §0/§5, HANDOFF ledger R01–R43. Newest dated o
 - Never force-push. One push at a time. No secrets in the repo.
 
 ## Routine / scope
-- Routine `sm2-20`: every 20 min, silent if nothing changed; owner says "자러간다" → hourly.
+- Routine `sm2-20`: every 20 min, silent if nothing changed; owner says "자러간다" → hourly (supersedes R22/WORKFLOW "hourly").
 - BongThumbLive is NOT ours (original bot). "게임끝" = PC free. "실행해줘" = launch `Bin\ForgeLens_latest\ForgeLens.exe`.
 
 ## Tools quick index

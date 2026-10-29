@@ -95,7 +95,7 @@ You may have been given **only the repo URL** `https://github.com/Baegovda/Forge
    - BongThumbLive is not yours (original bot).
    - UE goal = Sequencer cinematic quality (Chaos Cloth + bone physics). Later: Path of Exile, then UE games — only when asked.
    **STATE (refresh at the end of every task/patch; keep it this short).** Updated 2026-10-30 KST.
-   - Tip: see `git log -1 origin/cursor/sm2-pck-extractor-4420` (last recorded: R43 skeleton rule on top of `5d13a98` R44).
+   - Tip: see `git log -1 origin/cursor/sm2-pck-extractor-4420` (last recorded: R45 checks on top of `7138b8a` R43).
    - Env: rea-agents 6.8.0 (pinned) · Ghidra 12.1.4 · Temurin JDK 25.0.5+8 · exe sha256 `4c4fb3a009a803ea5c27e9ced0a36e7c401ef95eb6dd7d651a629f54ee0252fc`.
    - Toolbox: recall.py, re_cache_build.py, ghidra_serve (gs.ps1/gs.py, `gs.py batch`), start_rea.ps1, exe_check.py, docs_check.py, rea_version.py, nmb_verify.py, pc/{mem,disk,patch}_watch.ps1 (→ `SM2_Work\alerts.txt`, read it at task start), pc/backup.ps1, box/push_lock.sh, refresh_origin.sh, tools/ue/ue_skel_audit.py (skeleton audit, R43). Risks + status: `docs/handoff/CONCERNS.md`.
    - **UE route (owner decision 10/30):** before any UE work check whether `UnrealEditor` is running. Running → drive it via EngineWire (`uerun.ps1` → `enginewire_call.py`, 127.0.0.1:3000/mcp; fallback UEMCP); never print the token. Not running → headless (`UnrealEditor-Cmd -run=pythonscript -script=<wrapper.py> -unattended -nullrhi -AutoDeclinePackageRecovery`; print() is not captured there, write results to a file). Say which route you used in the report.
@@ -220,7 +220,7 @@ Nothing is running for SM2 right now. Last SM2 activity: the repo migration comm
 - `fl_oneclick.ps1` needs Windows PowerShell 5 (`powershell.exe -File`), not pwsh 7. `uerun.ps1` needs absolute script paths and comma-joined args. Don't name a PowerShell helper `R`; `$c`/`$C` collide.
 - Headless UnrealEditor-Cmd: Interchange asserts without Slate → legacy factories (handled in `ue_forge_direct.py`).
 - Titus campaign armour `*_02` has no CC block → only helmet/acc/crux recolour (PROVEN, not a bug).
-- Older docs mention cloud-agent push, a 20-minute routine, "deletions always need approval", EngineWire port 8090 — superseded (push.ps1, hourly, R04, port 3000).
+- Older docs mention cloud-agent push, a 20-minute routine, "deletions always need approval", EngineWire port 8090 — superseded (push.ps1, R04, port 3000). Routine cadence: every 20 min, hourly after "자러간다" (RULES_CORE).
 - HANDOFF.md bootstrap block (top, "NEW AGENT: START HERE") is older; START_HERE + this file win.
 
 ## 9. Your hourly progress routine

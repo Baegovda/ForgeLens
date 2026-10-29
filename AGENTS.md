@@ -37,7 +37,7 @@
    - `/Game/SM2_Work/Original/*` is the user's original import: read-only.
    - Tool installs live in `C:\Users\Revaptor_FX\SM2Extractor*` / `SM2Browser_*` (historical) and `Desktop\SM2_Work\Bin`.
 4. **The user games on that PC.** While a game is running (e.g. Against the Storm):
-   - don't steal focus (start processes with `-WindowStyle Hidden`, priority Idle);
+   - don't steal focus (start processes with `-WindowStyle Hidden`, priority High — owner 10/29, supersedes Idle);
    - don't run heavy GPU, Unreal or export work.
    Check first with `Get-Process | ? MainWindowTitle` and see WORKFLOW.md.
    - **2026-10-27 update from the user:** heavy work during gaming is OK as long as it doesn't disrupt the game (keep it hidden + idle priority, no focus stealing).
