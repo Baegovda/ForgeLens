@@ -4,7 +4,8 @@ if (Test-Path $R) { $h = (Get-FileHash $R -Algorithm SHA256).Hash.Substring(0,12
 $all = Get-CimInstance Win32_Process -Filter "Name='UnrealEditor.exe' OR Name='UnrealEditor-Cmd.exe'"
 $ue = $all | ? { $_.CommandLine -match 'UE_VFX_57' -and $_.CommandLine -notmatch '-run=' }; $oth = $all | ? { $_.CommandLine -notmatch 'UE_VFX_57' }
 $cmd = $all | ? { $_.CommandLine -match 'UE_VFX_57' -and $_.CommandLine -match '-run=' }
-$port = [bool](Get-NetTCPConnection -LocalAddress 127.0.0.1 -LocalPort 3000 -State Listen -ErrorAction SilentlyContinue)
+# netstat, not Get-NetTCPConnection: the latter returned nothing for a live listener on this PC (R47)
+$port = [bool](netstat -ano -p tcp | Select-String '127\.0\.0\.1:3000\s+0\.0\.0\.0:0\s+LISTENING')
 if (-not $ue) { "UE: editor off -> ROUTE headless" + $(if ($cmd) { " (headless job running pid $($cmd.ProcessId -join ','))" } else { '' }) }
 elseif ($port) { "UE: editor pid $($ue.ProcessId -join ',') + port3000 open -> ROUTE EngineWire (uerun.ps1)" }
 else { "UE: editor pid $($ue.ProcessId -join ',') but port3000 CLOSED -> bridge DOWN -> UEMCP or fix bridge (Saved\Logs LogMcp)" }

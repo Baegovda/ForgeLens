@@ -13,7 +13,7 @@ async def main():
             if len(sys.argv) < 2:
                 for t in (await s.list_tools()).tools: print(t.name)
                 return
-            args = json.loads(open(sys.argv[2], encoding="utf-8").read()) if len(sys.argv) > 2 else {}
+            args = json.loads(open(sys.argv[2], encoding="utf-8-sig").read()) if len(sys.argv) > 2 else {}
             res = await s.call_tool(sys.argv[1], args)
             for c in res.content:
                 if c.type == "text": print(c.text)
