@@ -262,7 +262,7 @@ public partial class MainWindow
     foreach (var (sec, ls) in s.Sections)
       lines.Add($"{sec}: {string.Join(" / ", ls.Select(l => l.Name))}");
     if (s.Lenses is { } lens)
-      lines.Add("lenses: " + lens.Name + " (not baked)");
+      lines.Add($"lenses: {lens.Name} emissive {lens.EmissiveHex} ×{lens.EmissiveIntensity:0.#} (not baked: no emissive pass)");
     lines.Add("mask r,g,b = primary, secondary, tertiary (INFERRED slot order)");
     return string.Join("\n", lines);
   }
@@ -411,6 +411,20 @@ public partial class MainWindow
       }
     }
 
+    // rea-batch 2: texture-array slices (td texArrayDiffuse / texArraySpec), one image per pct face, cached with the other images
+    var slices = new Dictionary<string, IReadOnlyList<PreviewImage>?>(StringComparer.OrdinalIgnoreCase);
+    IReadOnlyList<PreviewImage>? Slices(string? name)
+    {
+      if (string.IsNullOrEmpty(name))
+        return null;
+      lock (slices)
+      {
+        if (!slices.TryGetValue(name, out var list))
+          slices[name] = list = LoadPreviewSlices(catalog, store, hint, name);
+        return list;
+      }
+    }
+
     // QA: SM2_COLOUR_DUMP=<dir> writes what the bake used (log + baked / mask / neutral albedo PNGs)
     var dump = Environment.GetEnvironmentVariable("SM2_COLOUR_DUMP") is { Length: > 0 } dd ? dd : null;
     var log = new System.Text.StringBuilder();
@@ -431,16 +445,18 @@ public partial class MainWindow
       var albedo = (slot.DiffOverride is { Length: > 0 } d ? Image(d) : null) ?? baseAlbedo.GetValueOrDefault(texture);
       if (albedo is null)
         continue;
-      a[texture] = ArmorSchemeBake.Albedo(albedo, mask, spec, layers, slot.Enabled, slot.BlendModes, slot.PatternModes);
+      var arrays = new ArmorSchemeBake.PatternArrays(Slices(slot.TexArrayDiffuse), Slices(slot.TexArraySpec), slot.LayerDensity, slot.UseCustomUVSet);
+      a[texture] = ArmorSchemeBake.Albedo(albedo, mask, spec, layers, slot.Enabled, slot.BlendModes, slot.PatternModes, arrays);
       if (dump is not null)
       {
+        log.AppendLine($"{part.Name}\tarrays={slot.TexArrayDiffuse}({arrays.Diffuse?.Count ?? 0}) spec={slot.TexArraySpec}({arrays.Spec?.Count ?? 0}) density={string.Join(",", slot.LayerDensity)} customUv={string.Join(",", slot.UseCustomUVSet)} idx={string.Join(",", layers.Select(l => l.TextureIndex + "/" + l.MapSpec))}");
         log.AppendLine($"{part.Name}\ttex={texture}\tbaseHit={baseAlbedo.ContainsKey(texture)}\tmask={slot.Mask} {mask.Width}x{mask.Height}\tdiff={slot.DiffOverride}\tspec={part.Specular}({spec?.Channels})\tlayers={string.Join(",", layers.Select(l => l.Colour + l.Hex))}");
         Png(texture + "__" + scheme.Id, a[texture]);
         Png(texture + "__mask", mask);
         Png(texture + "__a", albedo);
       }
       if (spec is not null && doneSpec.Add(part.Specular!))
-        s[part.Specular!] = ArmorSchemeBake.Specular(spec, mask, layers, slot.Enabled, slot.PatternModes);
+        s[part.Specular!] = ArmorSchemeBake.Specular(spec, mask, layers, slot.Enabled, slot.PatternModes, arrays);
     }
 
     if (dump is not null)

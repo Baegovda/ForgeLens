@@ -16,6 +16,27 @@ public sealed record ArmorLayer(
   bool Metallic, float MetalnessScale, float MetalnessBias, float RoughnessScale, float RoughnessBias, int TextureIndex, string Source)
 {
   public string Hex => $"#{TintR:X2}{TintG:X2}{TintB:X2}";
+
+  /// <summary>rea-batch 2: <c>density</c> (glt record +4, UV multiplier; default 1).</summary>
+  public float Density { get; init; } = 1f;
+
+  /// <summary>rea-batch 2: <c>scrollScale</c> (glt record +16: v += scrollScale × time; default 0).</summary>
+  public float ScrollScale { get; init; }
+
+  /// <summary>rea-batch 2: <c>maps_normal / maps_spec / maps_emissive</c> slice indices (glt record +0+L .y/.z/.w; -1 = none).</summary>
+  public int MapNormal { get; init; } = -1;
+  public int MapSpec { get; init; } = -1;
+  public int MapEmissive { get; init; } = -1;
+  public float NormalScale { get; init; } = 1f;
+
+  /// <summary>rea-batch 2: <c>emissive_tint</c> (sRGB bytes; record +6+L rgb), <c>emissive_intensity</c> (record +6+L w), bloom.</summary>
+  public byte EmissiveR { get; init; } = 255;
+  public byte EmissiveG { get; init; } = 255;
+  public byte EmissiveB { get; init; } = 255;
+  public float EmissiveIntensity { get; init; }
+  public float EmissiveBloom { get; init; }
+
+  public string EmissiveHex => $"#{EmissiveR:X2}{EmissiveG:X2}{EmissiveB:X2}";
 }
 
 /// <summary>mtl1-52: one character colour scheme (<c>global_armor_color_pattern_library.sso</c> characterColoringInfoCollection entry).</summary>
@@ -102,9 +123,16 @@ public static class ArmorColourSchemes
     var pattern = Color("patternTint", (255, 255, 255, 0));
     var metallic = e.GetValueOrDefault("isMetallic") is { } m && (m is bool b ? b : string.Equals(m.ToString(), "True", StringComparison.OrdinalIgnoreCase));
     var slot = section.Replace("ShaderLayers", "", StringComparison.OrdinalIgnoreCase);
+    var emissive = Color("emissive_tint", (255, 255, 255, 255));
     return new ArmorLayer(slot, name, Pretty(name), tint.R, tint.G, tint.B, tint.A, metal.R, metal.G, metal.B, pattern.R, pattern.G, pattern.B, pattern.A,
       metallic, F("spec_metalness_scale", 1), F("spec_metalness_bias", 0), F("spec_roughness_scale", 1), F("spec_roughness_bias", 0), (int)F("textureIndex", -1),
-      $"armor_color_library.sso {section}.{name}");
+      $"armor_color_library.sso {section}.{name}")
+    {
+      // rea-batch 2: the rest of CustomizationLayerParamsProject (defaults: customization_layer_params_project.sso, PROVEN data)
+      Density = F("density", 1), ScrollScale = F("scrollScale", 0), NormalScale = F("normalScale", 1),
+      MapNormal = (int)F("maps_normal", -1), MapSpec = (int)F("maps_spec", -1), MapEmissive = (int)F("maps_emissive", -1),
+      EmissiveR = emissive.R, EmissiveG = emissive.G, EmissiveB = emissive.B, EmissiveIntensity = F("emissive_intensity", 0), EmissiveBloom = F("emissive_bloomIntensity", 0),
+    };
   }
 
   /// <summary>Scheme list in heraldry-screen order (heraldry_library legions → nodes, then the rest in sso order).</summary>
@@ -251,6 +279,20 @@ public sealed record CustomizationSlot(string Variant, string Mask, string? Diff
   /// <summary>rea-batch: per-layer <c>blendMode</c> (pattern mode: tint_only / tex_hardlight / tex_blend), null when absent.</summary>
   public string?[] PatternModes { get; init; } = new string?[4];
 
+  /// <summary>rea-batch 2: <c>texArrayNormals / texArraySpec / texArrayEmissiveMask</c> (glt _58._m0[11] .y/.z/.w); null or empty = none.</summary>
+  public string? TexArrayNormals { get; init; }
+  public string? TexArraySpec { get; init; }
+  public string? TexArrayEmissiveMask { get; init; }
+
+  /// <summary>
+  ///   rea-batch 2: td <c>layerN.density</c> — INFERRED to be CB_STATIC_GLT[176+L], the second UV factor of the pattern lookup
+  ///   (uv = TEXCOORD × record density × CB[176+L]); 1 when absent (HEURISTIC default).
+  /// </summary>
+  public float[] LayerDensity { get; init; } = { 1f, 1f, 1f, 1f };
+
+  /// <summary>rea-batch 2: td <c>layerN.useCustomUVSet</c> — INFERRED to be the per-layer bit that switches the lookup to TEXCOORD_16 (UV set 2).</summary>
+  public bool[] UseCustomUVSet { get; init; } = new bool[4];
+
   /// <summary>Reads <c>"&lt;variant&gt; CC"</c> (falling back to <c>"default CC"</c>); null when the td has no customization variant.</summary>
   public static CustomizationSlot? FromTd(string tdText, string? variant)
   {
@@ -268,9 +310,15 @@ public sealed record CustomizationSlot(string Variant, string Mask, string? Diff
       var modes = new string[4];
       var patternModes = new string?[4];
       var enabled = new bool[4];
+      var density = new[] { 1f, 1f, 1f, 1f };
+      var customUv = new bool[4];
       for (var i = 0; i < 4; i++)
       {
         var layer = SslText.Obj(cust, "layer" + i);
+        if (layer?.GetValueOrDefault("density") is { } dv && float.TryParse(Convert.ToString(dv, CultureInfo.InvariantCulture), NumberStyles.Float, CultureInfo.InvariantCulture, out var df))
+          density[i] = df;
+        var cu = layer?.GetValueOrDefault("useCustomUVSet");
+        customUv[i] = cu is bool cb ? cb : string.Equals(cu?.ToString(), "True", StringComparison.OrdinalIgnoreCase);
         modes[i] = layer?.GetValueOrDefault("tintBlendMode") as string ?? "linear_blend";
         patternModes[i] = layer?.GetValueOrDefault("blendMode") as string;
         var en = layer?.GetValueOrDefault("enabled");
@@ -278,7 +326,14 @@ public sealed record CustomizationSlot(string Variant, string Mask, string? Diff
       }
 
       return new CustomizationSlot(name, mask, SslText.Obj(glt, "tex")?.GetValueOrDefault("diffOverride") as string, modes, enabled, cust.GetValueOrDefault("texArrayDiffuse") as string)
-        { PatternModes = patternModes };
+        {
+          PatternModes = patternModes,
+          TexArrayNormals = cust.GetValueOrDefault("texArrayNormals") as string,
+          TexArraySpec = cust.GetValueOrDefault("texArraySpec") as string,
+          TexArrayEmissiveMask = cust.GetValueOrDefault("texArrayEmissiveMask") as string,
+          LayerDensity = density,
+          UseCustomUVSet = customUv,
+        };
     }
 
     return null;
@@ -355,15 +410,81 @@ public static class ArmorSchemeBake
   /// <summary>rea-batch: <c>blendMode</c> enum (exe table: tint_only = 0, tex_hardlight = 1, tex_blend = 2) = glt record +80+L.</summary>
   public static bool IsTintOnly(string? blendMode) => string.Equals(blendMode, "tint_only", StringComparison.OrdinalIgnoreCase);
 
+  /// <summary>
+  ///   rea-batch 2: the decoded texture-array slices of a CC variant (td texArrayDiffuse / texArraySpec; one PreviewImage per
+  ///   face — retail arrays are pct cubemap-style faces, e.g. ch_custom_01 = 6 faces of 512², PROVEN data) and the td per-layer
+  ///   UV factors. Null arrays = the td names none (the layer then takes the plain tint path, INFERRED: the engine has nothing to bind).
+  /// </summary>
+  public sealed record PatternArrays(IReadOnlyList<PreviewImage>? Diffuse, IReadOnlyList<PreviewImage>? Spec, float[] Density, bool[] CustomUv);
+
+  /// <summary>Bilinear, wrap-addressed sample (BGRA bytes → 0..1 floats r,g,b,a).</summary>
+  private static (float R, float G, float B, float A) Sample(PreviewImage img, float u, float v)
+  {
+    var fx = u * img.Width - 0.5f;
+    var fy = v * img.Height - 0.5f;
+    var x0 = (int)MathF.Floor(fx);
+    var y0 = (int)MathF.Floor(fy);
+    var tx = fx - x0;
+    var ty = fy - y0;
+    float r = 0, g = 0, b = 0, a = 0;
+    for (var j = 0; j < 2; j++)
+    for (var i = 0; i < 2; i++)
+    {
+      var wgt = (i == 0 ? 1 - tx : tx) * (j == 0 ? 1 - ty : ty);
+      var xx = ((x0 + i) % img.Width + img.Width) % img.Width;
+      var yy = ((y0 + j) % img.Height + img.Height) % img.Height;
+      var o = (yy * img.Width + xx) * 4;
+      b += img.Bgra[o] * wgt;
+      g += img.Bgra[o + 1] * wgt;
+      r += img.Bgra[o + 2] * wgt;
+      a += img.Bgra[o + 3] * wgt;
+    }
+
+    return (r / 255f, g / 255f, b / 255f, a / 255f);
+  }
+
+  private static float Lin(float c) => c <= 0.04045f ? c / 12.92f : MathF.Pow((c + 0.055f) / 1.055f, 2.4f);
+
+  /// <summary>
+  ///   rea-batch 2: pattern slice for layer <paramref name="i"/>, or null when the layer takes the tint path: textureIndex &lt; 0,
+  ///   no td array, tint_only, or useCustomUVSet (the second UV set is not in the albedo's texture space — HEURISTIC fallback to tint).
+  /// </summary>
+  private static PreviewImage? PatternSlice(PatternArrays? arrays, ArmorLayer? layer, int i, bool tintOnly)
+  {
+    if (arrays?.Diffuse is not { Count: > 0 } d || layer is null || tintOnly || layer.TextureIndex < 0 || layer.TextureIndex >= d.Count)
+      return null;
+    if (i < arrays.CustomUv.Length && arrays.CustomUv[i])
+      return null;
+    return d[layer.TextureIndex];
+  }
+
+  private static PreviewImage? SpecSlice(PatternArrays? arrays, ArmorLayer? layer)
+    => arrays?.Spec is { Count: > 0 } s && layer is { MapSpec: >= 0 } && layer.MapSpec < s.Count ? s[layer.MapSpec] : null;
+
+  /// <summary>Pattern uv factor: record density × td layer density (CB_STATIC_GLT[176+L], INFERRED).</summary>
+  private static float UvScale(PatternArrays arrays, ArmorLayer layer, int i) => layer.Density * (i < arrays.Density.Length ? arrays.Density[i] : 1f);
+
   public static PreviewImage Albedo(PreviewImage baseAlbedo, PreviewImage mask, PreviewImage? spec, IReadOnlyList<ArmorLayer?> layers, bool[] enabled,
-    IReadOnlyList<string?>? tintModes = null, IReadOnlyList<string?>? patternModes = null)
+    IReadOnlyList<string?>? tintModes = null, IReadOnlyList<string?>? patternModes = null, PatternArrays? arrays = null)
   {
     var mul = new bool[4];
     var tintOnly = new bool[4];
+    var pattern = new PreviewImage?[4];
+    var patSpec = new PreviewImage?[4];
+    var uvScale = new float[4];
+    var patTint = new (float R, float G, float B, float A)[4];
     for (var i = 0; i < 4; i++)
     {
       mul[i] = tintModes is not null && i < tintModes.Count && MultipliesBase(tintModes[i]);
       tintOnly[i] = patternModes is not null && i < patternModes.Count && IsTintOnly(patternModes[i]);
+      var layer = i < layers.Count ? layers[i] : null;
+      pattern[i] = PatternSlice(arrays, layer, i, tintOnly[i]);
+      if (pattern[i] is not null)
+      {
+        patSpec[i] = SpecSlice(arrays, layer);
+        uvScale[i] = UvScale(arrays!, layer!, i);
+        patTint[i] = (ToLinear[layer!.PatternR], ToLinear[layer.PatternG], ToLinear[layer.PatternB], layer.PatternA / 255f);
+      }
     }
 
     var w = baseAlbedo.Width;
@@ -388,6 +509,36 @@ public static class ArmorSchemeBake
           var weight = Nearest(mask, x, y, w, h, MaskChannel[i]) / 255f * l.Ta;
           if (weight <= 0f)
             continue;
+          if (pattern[i] is { } slice)
+          {
+            // glt PS tex_blend with textureIndex >= 0 (PROVEN shader): pattern lerp, then the tint where the slice alpha is low
+            var u = (x + 0.5f) / w * uvScale[i];
+            var v = (y + 0.5f) / h * uvScale[i];
+            var t = Sample(slice, u, v);
+            var pt = patTint[i];
+            var pr = Lin(t.R) + (pt.R - Lin(t.R)) * pt.A;
+            var pg = Lin(t.G) + (pt.G - Lin(t.G)) * pt.A;
+            var pb = Lin(t.B) + (pt.B - Lin(t.B)) * pt.A;
+            if (mul[i]) { pr *= br; pg *= bg; pb *= bb; }
+            var cr = br + (pr - br) * t.A;
+            var cg = bg + (pg - bg) * t.A;
+            var cb = bb + (pb - bb) * t.A;
+            var mp = patSpec[i] is { } ps
+              ? Math.Clamp(((Sample(ps, u, v).R - metal0) * t.A + metal0) * l.MS + l.MB, 0f, 1f)
+              : Math.Clamp(metal0 * l.MS + l.MB, 0f, 1f);
+            if (l.Metallic) mp = 1f;
+            var qr = l.Tr + (l.Mr - l.Tr) * mp;
+            var qg = l.Tg + (l.Mg - l.Tg) * mp;
+            var qb = l.Tb + (l.Mb - l.Tb) * mp;
+            if (mul[i]) { qr *= br; qg *= bg; qb *= bb; }
+            var k = Math.Clamp(1f - t.A, 0f, 1f) * l.Ta;
+            r += (cr + (qr - cr) * k - r) * weight;
+            g += (cg + (qg - cg) * k - g) * weight;
+            b += (cb + (qb - cb) * k - b) * weight;
+            metal += (mp - metal) * weight;
+            continue;
+          }
+
           var ml = tintOnly[i] ? metal : l.Metallic ? 1f : Math.Clamp(metal0 * l.MS + l.MB, 0f, 1f);
           var tr = l.Tr + (l.Mr - l.Tr) * ml;
           var tg = l.Tg + (l.Mg - l.Tg) * ml;
@@ -416,13 +567,29 @@ public static class ArmorSchemeBake
   }
 
   /// <summary>Spec map with the layers' metalness / roughness blended in (same size and channel layout as <paramref name="spec"/>).</summary>
-  public static PreviewImage Specular(PreviewImage spec, PreviewImage mask, IReadOnlyList<ArmorLayer?> layers, bool[] enabled, IReadOnlyList<string?>? patternModes = null)
+  public static PreviewImage Specular(PreviewImage spec, PreviewImage mask, IReadOnlyList<ArmorLayer?> layers, bool[] enabled, IReadOnlyList<string?>? patternModes = null,
+    PatternArrays? arrays = null)
   {
     var w = spec.Width;
     var h = spec.Height;
     var dst = (byte[])spec.Bgra.Clone();
     var prepared = Prepare(layers, enabled);
     var (mo, ro) = SpecOffsets(spec.Channels);
+    var pattern = new PreviewImage?[4];
+    var patSpec = new PreviewImage?[4];
+    var uvScale = new float[4];
+    for (var i = 0; i < 4; i++)
+    {
+      var tintOnly = patternModes is not null && i < patternModes.Count && IsTintOnly(patternModes[i]);
+      var layer = i < layers.Count ? layers[i] : null;
+      pattern[i] = PatternSlice(arrays, layer, i, tintOnly);
+      if (pattern[i] is not null)
+      {
+        patSpec[i] = SpecSlice(arrays, layer);
+        uvScale[i] = UvScale(arrays!, layer!, i);
+      }
+    }
+
     Parallel.For(0, h, new ParallelOptions { MaxDegreeOfParallelism = Math.Max(1, Environment.ProcessorCount / 2) }, y =>
     {
       for (var x = 0; x < w; x++)
@@ -441,8 +608,23 @@ public static class ArmorSchemeBake
             continue;
           if (patternModes is not null && i < patternModes.Count && IsTintOnly(patternModes[i]))
             continue; // tint_only keeps metalness / roughness (glt PS branch rec+80+L == 0)
-          var ml = l.Metallic ? 1f : Math.Clamp(m0 * l.MS + l.MB, 0f, 1f);
-          var rl = Math.Clamp(r0 * l.RS + l.RB, 0f, 1f);
+          float ml, rl;
+          if (pattern[i] is { } slice && patSpec[i] is { } ps)
+          {
+            // tex_blend with a spec slice (PROVEN shader): metal/rough lerp toward the slice by the pattern alpha, then scale+bias
+            var u = (x + 0.5f) / w * uvScale[i];
+            var v = (y + 0.5f) / h * uvScale[i];
+            var ta = Sample(slice, u, v).A;
+            var sp = Sample(ps, u, v);
+            ml = l.Metallic ? 1f : Math.Clamp(((sp.R - m0) * ta + m0) * l.MS + l.MB, 0f, 1f);
+            rl = Math.Clamp(((sp.G - r0) * ta + r0) * l.RS + l.RB, 0f, 1f);
+          }
+          else
+          {
+            ml = l.Metallic ? 1f : Math.Clamp(m0 * l.MS + l.MB, 0f, 1f);
+            rl = Math.Clamp(r0 * l.RS + l.RB, 0f, 1f);
+          }
+
           metal += (ml - metal) * weight;
           rough += (rl - rough) * weight;
         }
@@ -466,13 +648,24 @@ public static class ArmorSchemeBake
     static string J(string s) => "\"" + s.Replace("\\", "\\\\").Replace("\"", "\\\"") + "\"";
     sb.Append("{\n  \"scheme\": ").Append(J(scheme.Id)).Append(",\n  \"name\": ").Append(J(scheme.Name)).Append(",\n  \"nameKey\": ").Append(J(scheme.NameKey));
     sb.Append(",\n  \"rule\": \"albedo=lerp(albedo, col, mask[L]*Tint.a), col = lerp(Tint,MetalTint,metal) (TintBlendMode linear_blend) or base*that (multiply) per layer L (glt PS layer loop, rea-batch); mask r,g,b,a = layer0..3; layer0..2 = primary/secondary/tertiary (INFERRED)\"");
+    if (scheme.Lenses is { } lens)
+    {
+      static float L2(byte c) { var x = c / 255f; return x <= 0.04045f ? x / 12.92f : MathF.Pow((x + 0.055f) / 1.055f, 2.4f); }
+      sb.Append(",\n  \"lenses\": { \"colour\": ").Append(J(lens.Colour)).Append(", \"emissiveTint\": [").Append(F(L2(lens.EmissiveR))).Append(", ").Append(F(L2(lens.EmissiveG))).Append(", ").Append(F(L2(lens.EmissiveB)))
+        .Append("], \"emissiveIntensity\": ").Append(F(lens.EmissiveIntensity)).Append(", \"bloomIntensity\": ").Append(F(lens.EmissiveBloom))
+        .Append(", \"textureIndex\": ").Append(lens.TextureIndex).Append(", \"mapsEmissive\": ").Append(lens.MapEmissive)
+        .Append(", \"rule\": \"emissive = lerp(em, lerp(baseEm, emArray[mapsEmissive].rgb, pattern.a) * emissiveTint, w); intensity log2(CB_COMMON[22].x*I+1) (glt PS, PROVEN shader; CB_COMMON[22].x unknown)\" }");
+    }
+
     sb.Append(",\n  \"parts\": [");
     var first = true;
     foreach (var (part, texture, slot) in parts)
     {
       var layers = ArmorColourSchemes.LayersFor(scheme, part, texture);
       sb.Append(first ? "\n" : ",\n").Append("    { \"part\": ").Append(J(part)).Append(", \"texture\": ").Append(J(texture ?? "")).Append(", \"variant\": ").Append(J(slot.Variant))
-        .Append(", \"mask\": ").Append(J(slot.Mask)).Append(", \"albedo\": ").Append(J(slot.DiffOverride ?? texture ?? "")).Append(", \"params\": {");
+        .Append(", \"mask\": ").Append(J(slot.Mask)).Append(", \"albedo\": ").Append(J(slot.DiffOverride ?? texture ?? ""))
+        .Append(", \"texArrayDiffuse\": ").Append(J(slot.TexArrayDiffuse ?? "")).Append(", \"texArrayNormals\": ").Append(J(slot.TexArrayNormals ?? ""))
+        .Append(", \"texArraySpec\": ").Append(J(slot.TexArraySpec ?? "")).Append(", \"texArrayEmissiveMask\": ").Append(J(slot.TexArrayEmissiveMask ?? "")).Append(", \"params\": {");
       first = false;
       var pf = true;
       void P(string k, string v)
@@ -496,6 +689,12 @@ public static class ArmorSchemeBake
         P($"Layer{i}MetalnessScaleBias", $"[{F(l.MetalnessScale)}, {F(l.MetalnessBias)}]");
         P($"Layer{i}RoughnessScaleBias", $"[{F(l.RoughnessScale)}, {F(l.RoughnessBias)}]");
         P($"Layer{i}TextureIndex", l.TextureIndex.ToString(CultureInfo.InvariantCulture));
+        P($"Layer{i}MapsNormalSpecEmissive", $"[{l.MapNormal}, {l.MapSpec}, {l.MapEmissive}]");
+        P($"Layer{i}Density", $"[{F(l.Density)}, {F(i < slot.LayerDensity.Length ? slot.LayerDensity[i] : 1f)}]");
+        P($"Layer{i}UseCustomUVSet", slot.UseCustomUVSet.ElementAtOrDefault(i) ? "1" : "0");
+        P($"Layer{i}ScrollScale", F(l.ScrollScale));
+        P($"Layer{i}NormalScale", F(l.NormalScale));
+        P($"Layer{i}PatternBlendMode", J(slot.PatternModes.ElementAtOrDefault(i) ?? ""));
         P($"Layer{i}Colour", J(l.Colour));
         P($"Layer{i}TintBlendMode", J(slot.BlendModes.ElementAtOrDefault(i) ?? "linear_blend"));
         P($"Layer{i}MultiplyBase", ArmorSchemeBake.MultipliesBase(slot.BlendModes.ElementAtOrDefault(i)) ? "1" : "0");

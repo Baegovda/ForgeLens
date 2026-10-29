@@ -950,6 +950,35 @@ public partial class MainWindow : Window
     }
   }
 
+  /// <summary>rea-batch 2: every face (array slice) of a texture at the first mip ≤ 512², or null.</summary>
+  internal static IReadOnlyList<PreviewImage>? LoadPreviewSlices(GameCatalog catalog, ArchiveStore store, int hint, string name)
+  {
+    var index = TemplateMeshReader.ResolveTexture(catalog, hint, name);
+    if (index < 0)
+      return null;
+    try
+    {
+      var document = TextureLoader.Load(catalog, store, index);
+      if (!document.CanDecode)
+        return null;
+      var mip = 0;
+      while (mip < document.MipCount - 1 && Math.Max(document.Width, document.Height) >> mip > 512)
+        mip++;
+      var list = new List<PreviewImage>();
+      for (var f = 0; f < Math.Max(1, document.FaceCount); f++)
+      {
+        var pixels = document.Decode(mip, f, out var width, out var height, out _);
+        list.Add(new PreviewImage { Width = width, Height = height, Bgra = pixels });
+      }
+
+      return list;
+    }
+    catch (Exception)
+    {
+      return null;
+    }
+  }
+
   private void ShowPixels(byte[] pixels, int width, int height)
   {
     // Two reused bitmaps: swapping the Source makes the Image redraw without a fresh allocation per frame.

@@ -147,4 +147,66 @@ materials = {
     Assert.Equal("tex_blend", slot.PatternModes[1]);
     Assert.True(ArmorSchemeBake.IsTintOnly(slot.PatternModes[0]));
   }
+
+  [Fact]
+  public void SlotReadsTexArraysDensityAndCustomUv()
+  {
+    var slot = CustomizationSlot.FromTd("materials = { \"default CC\" = { shaders = { glt = { customization = { mask = \"m_cc\" texArrayDiffuse = \"ch_custom_01\" texArraySpec = \"ch_custom_01_spec\" texArrayEmissiveMask = \"ch_custom_flat_em\" layer0 = { density = 2.000000 useCustomUVSet = false blendMode = \"tex_blend\" } layer1 = { useCustomUVSet = true } } } } } }", "default")!;
+    Assert.Equal("ch_custom_01", slot.TexArrayDiffuse);
+    Assert.Equal("ch_custom_01_spec", slot.TexArraySpec);
+    Assert.Equal("ch_custom_flat_em", slot.TexArrayEmissiveMask);
+    Assert.Equal(2f, slot.LayerDensity[0]);
+    Assert.Equal(1f, slot.LayerDensity[1]);
+    Assert.False(slot.UseCustomUVSet[0]);
+    Assert.True(slot.UseCustomUVSet[1]);
+  }
+
+  [Fact]
+  public void LayerReadsPatternAndEmissiveParams()
+  {
+    const string pal = """
+      lensesShaderLayers = {
+        Evil_Sunz_Scarlet = {
+          textureIndex = { value = 0 }
+          maps_emissive = { value = 0 }
+          emissive_tint = { value = { a = 255 r = 194 g = 25 b = 31 } }
+          emissive_intensity = { value = 35 }
+          emissive_bloomIntensity = { value = 10 }
+        }
+      }
+      """;
+    var l = ArmorColourSchemes.ParseLayers(pal)["lensesShaderLayers"]["Evil_Sunz_Scarlet"];
+    Assert.Equal(0, l.TextureIndex);
+    Assert.Equal(0, l.MapEmissive);
+    Assert.Equal(-1, l.MapSpec);
+    Assert.Equal(1f, l.Density);
+    Assert.Equal("#C2191F", l.EmissiveHex);
+    Assert.Equal(35f, l.EmissiveIntensity);
+    Assert.Equal(10f, l.EmissiveBloom);
+  }
+
+  [Fact]
+  public void TexBlendPatternFollowsSliceAlpha()
+  {
+    // glt PS tex_blend: slice alpha 1 -> lerp(slice, patternTint, patternTint.a); slice alpha 0 -> the tint
+    var baseImg = new PreviewImage { Width = 1, Height = 1, Bgra = new byte[] { 128, 128, 128, 255 } };
+    var mask = new PreviewImage { Width = 1, Height = 1, Bgra = new byte[] { 0, 0, 255, 255 } };
+    var opaque = new PreviewImage { Width = 1, Height = 1, Bgra = new byte[] { 109, 109, 109, 255 } };
+    var clear = new PreviewImage { Width = 1, Height = 1, Bgra = new byte[] { 109, 109, 109, 0 } };
+    var layer = new ArmorLayer("primary", "X", "X", 200, 10, 10, 255, 200, 10, 10, 10, 200, 10, 255, false, 0, 0, 1, 0, 0, "test");
+    var on = new[] { true, false, false, false };
+    var modes = new[] { "linear_blend", null, null, null };
+    var pm = new[] { "tex_blend", null, null, null };
+    ArmorSchemeBake.PatternArrays A(PreviewImage s, bool customUv = false) => new(new[] { s }, null, new[] { 1f, 1f, 1f, 1f }, new[] { customUv, false, false, false });
+    var pat = ArmorSchemeBake.Albedo(baseImg, mask, null, new ArmorLayer?[] { layer, null, null, null }, on, modes, pm, A(opaque));
+    Assert.Equal(new byte[] { 10, 200, 10 }, pat.Bgra[..3]); // BGR of patternTint (10,200,10)
+    var grey = ArmorSchemeBake.Albedo(baseImg, mask, null, new ArmorLayer?[] { layer with { PatternA = 0 }, null, null, null }, on, modes, pm, A(opaque));
+    Assert.Equal(109, grey.Bgra[2]); // the slice itself
+    var tint = ArmorSchemeBake.Albedo(baseImg, mask, null, new ArmorLayer?[] { layer, null, null, null }, on, modes, pm, A(clear));
+    Assert.Equal(new byte[] { 10, 10, 200 }, tint.Bgra[..3]); // tint (200,10,10)
+    var uv2 = ArmorSchemeBake.Albedo(baseImg, mask, null, new ArmorLayer?[] { layer, null, null, null }, on, modes, pm, A(opaque, customUv: true));
+    Assert.Equal(new byte[] { 10, 10, 200 }, uv2.Bgra[..3]); // useCustomUVSet: tint path
+    var none = ArmorSchemeBake.Albedo(baseImg, mask, null, new ArmorLayer?[] { layer with { TextureIndex = -1 }, null, null, null }, on, modes, pm, A(opaque));
+    Assert.Equal(new byte[] { 10, 10, 200 }, none.Bgra[..3]);
+  }
 }
