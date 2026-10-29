@@ -1,6 +1,6 @@
 # STATUS — SM2 pipeline (as of 2026-10-27 ~05:15 KST, tip 57c38f9)
 
-Branch `cursor/sm2-pck-extractor-4420`, PR #1. Always confirm the current state with `git fetch && git log --oneline -30 origin/cursor/sm2-pck-extractor-4420`.
+Repo `Baegovda/ForgeLens` (private), branch `cursor/sm2-pck-extractor-4420`. Always confirm the current state with `git fetch && git log --oneline -30 origin/cursor/sm2-pck-extractor-4420`.
 Percentages are the previous agent's estimates of how complete each track is against the "looks exactly like in-game" goal.
 
 ## oneclick (2026-10-29 KST): Direct-to-Unreal export option (ledger F60). Export window panel (checkbox, remembered .uproject, content folder `/Game/SM2_Work/<category>/<asset>`, protected paths refused) → after the normal export, import through EngineWire :3000 → Python Remote Execution → headless UnrealEditor-Cmd (only with no editor running; legacy FBX/texture factories because Interchange asserts without Slate). Existing folder → `<folder>_bakN`; mesh, materials, clips (incl. prop SEQ), Manny clips, physics PA/ABP, colour-scheme tag; saves only that folder. Progress window with live log + green/red result. PC: prop/char/Manny via EngineWire, prop via Remote Execution and headless all OK (`/Game/SM2_Work/Tests/oneclick/`). Tests 372/372, py 20/20. HANDOFF "Update oneclick".

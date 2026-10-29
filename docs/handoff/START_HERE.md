@@ -4,7 +4,7 @@
 > **Talk to the user in Korean 해요체, short.** This file is in English because it is for agents.
 
 ## 1. Project in one line
-**Forge Lens** = a Warhammer 40,000: **Space Marine 2** asset browser/viewer (textures, models, animations, physics, VFX, customisation) + selective **Unreal Engine 5.7 exporter**. Repo `Baegovda/LibSaber`, branch `cursor/sm2-pck-extractor-4420`, PR https://github.com/Baegovda/LibSaber/pull/1. Later goals (only after SM2 is done): **Path of Exile**, then **Unreal Engine games** (.pak/IoStore). Halo code in the repo is out of scope.
+**Forge Lens** = a Warhammer 40,000: **Space Marine 2** asset browser/viewer (textures, models, animations, physics, VFX, customisation) + selective **Unreal Engine 5.7 exporter**. Repo `Baegovda/ForgeLens` (private, https://github.com/Baegovda/ForgeLens), branch `cursor/sm2-pck-extractor-4420` (default branch). Migrated 2026-10-29 from the public fork `Baegovda/LibSaber` (PR #1 there was not migrated; that repo is kept untouched). Later goals (only after SM2 is done): **Path of Exile**, then **Unreal Engine games** (.pak/IoStore). Halo code in the repo is out of scope.
 
 ## 2. Environment
 | What | Where / value |

@@ -5,7 +5,7 @@
 > 이 파일이 진입점입니다. 레포 주소만 받은 새 에이전트는 이 파일부터 끝까지 읽고, 아래 "Read order"대로 따라가면 바로 작업을 이어갈 수 있습니다.
 
 ## 1. What this project is
-- **LibSaber** parses Saber3D engine game files. On branch `cursor/sm2-pck-extractor-4420` (PR https://github.com/Baegovda/LibSaber/pull/1) it has grown into a **Warhammer 40,000: Space Marine 2 (SM2) asset browser + exporter to Unreal Engine 5.7**:
+- **LibSaber** parses Saber3D engine game files. On branch `cursor/sm2-pck-extractor-4420` (private repo https://github.com/Baegovda/ForgeLens, default branch; migrated 2026-10-29 from the public fork Baegovda/LibSaber, whose PR #1 was not migrated) it has grown into a **Warhammer 40,000: Space Marine 2 (SM2) asset browser + exporter to Unreal Engine 5.7**:
   - `LibSaber.SM2Browser`: an Avalonia GUI that browses the game's `.pak`/`.pck` archives and previews textures, models, animations, secondary physics and VFX on the GPU, then exports the selected assets.
   - `LibSaber.SM2Extractor`: a CLI with `list` / `extract` / `export`, sharing the browser's export path.
   - `LibSaber.SM2.Assets`: the format logic (meshes, materials, `.sani` animation, physics, effects, customization variants).
@@ -54,10 +54,10 @@
 - When the user asks "상황보고" / "하는중?", answer immediately with what is running, the %, and the ETA.
 
 ## 5. Permissions the user has granted
-- Full permission on the SM2 project: build, install new tool builds (old ones kept as `.bakN`), push to PR #1, manage folders inside SM2_Work, and restart Unreal Editor (save first).
+- Full permission on the SM2 project: build, install new tool builds (old ones kept as `.bakN`), push to the branch on Baegovda/ForgeLens, manage folders inside SM2_Work, and restart Unreal Editor (save first).
 - **Deletions only with explicit approval**, per case. Examples already approved and done: the bulk `*.bakN` export folders, the UE `_bakN` test folders, empty `_Legacy`/`Test` folders.
   - Not approved: the DDC cache.
-- Pushing to PR #1 goes through the PC's `Scripts\mtl_fix\push.ps1` (ff-only, WORKFLOW.md §4; ledger R23).
+- Pushing (to Baegovda/ForgeLens) goes through the PC's `Scripts\mtl_fix\push.ps1` (ff-only, WORKFLOW.md §4; ledger R23).
 
 ## 6. Where things are (summary; details in WORKFLOW.md)
 | What | Where |

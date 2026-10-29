@@ -105,7 +105,7 @@ python3 test/python/test_chameleon.py         # UE importer material math (unrea
   ```
 - Pull a few game files to the box for RE/bench: on the PC, run `extract "<client_pc>" --output <Raw\...> -q --filter <glob>...` (hidden, idle priority), `Compress-Archive`, then `CopyToBox`. Example: `/workspace/vfx_raw/extract_tex6.ps1`.
 
-## 4. Pushing to PR #1
+## 4. Pushing to the branch (repo Baegovda/ForgeLens, private; `origin` = https://github.com/Baegovda/ForgeLens.git, old fork = remote `libsaber-old`)
 **Current method (ledger R23, since 2026-10-28): the PC's `push.ps1`.** The box has no GitHub write login.
 1. On the box, commit on the latest `origin/cursor/sm2-pck-extractor-4420` (fetch first), then `git format-patch origin/cursor/sm2-pck-extractor-4420..HEAD -o /workspace/patches/<stage>/`.
 2. `CopyFromBox` each patch to `C:\Users\Revaptor_FX\0NNN-*.patch` (names must start with `0`).
@@ -121,7 +121,7 @@ Older method (cloud agent, 2026-10-27; use only if the PC is unavailable):
    - `dotnet build-server shutdown`, then build serially (`-m:1`; MSB3883 otherwise);
    - run the three SM2 test projects (expected counts in STATUS.md);
    - if green, **fast-forward push** (no force push) and report the new tip and test counts.
-4. Verify with `git fetch` that the tip moved. Report the commit to the user with the PR link.
+4. Verify with `git fetch` that the tip moved. Report the commit to the user with its link on https://github.com/Baegovda/ForgeLens.
 - Fallback (older, PC-based): `git bundle create /workspace/sm2.bundle <lastpushed>..HEAD` → `CopyFromBox` to `C:\Users\Revaptor_FX\sm2.bundle` → in `C:\Users\Revaptor_FX\ls_push`: `git fetch ..\sm2.bundle HEAD; git merge --ff-only FETCH_HEAD; git push origin HEAD`.
 
 ## 5. Unreal (EngineWire primary, UEMCP fallback)

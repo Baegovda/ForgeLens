@@ -131,7 +131,7 @@ You were given only this repo link. Follow these steps in order before you do an
 ## 0. Read this whole file
 - Then read the newest dated "update" sections at the bottom; they are the latest state.
 - `git log --oneline -15` on branch `cursor/sm2-pck-extractor-4420` is the source of truth for what is done.
-- The PR is https://github.com/Baegovda/LibSaber/pull/1.
+- The repo is https://github.com/Baegovda/ForgeLens (private; migrated 2026-10-29 from the public fork https://github.com/Baegovda/LibSaber, whose PR #1 stays there and was not migrated).
 
 ## 1. Required connectors / MCP: check each one and install it if it's missing
 Check with GetMcpServerStatus / GetDynamicTools. Install missing ones with SearchPlugins and InstallPlugin, then authenticate with AuthenticateMcpServer.
@@ -211,7 +211,7 @@ For any agent continuing this work: read this whole file before you do anything.
     - Use REA first via the persistent daemon (`tools/re/rea_daemon.py` + `tools/re/rea_call.py`, WORKFLOW.md "REA"); the old timeouts came from one-shot re-imports. Ghidra headless / rizin only as fallback.
   - The .sani spec now lives in code comments: src/LibSaber.SM2.Assets/Animation/EtnaCurves.cs and SaniReader.cs (the old `/workspace/rea/out/SANI_FORMAT.md` is gone). Python reference: py/sani.py.
   - Push: on the box `git bundle create /workspace/sm2.bundle <lastpushed>..HEAD`, CopyFromBox to C:\Users\Revaptor_FX\sm2.bundle, then in C:\Users\Revaptor_FX\ls_push: `git fetch ..\sm2.bundle HEAD; git merge --ff-only FETCH_HEAD; git push origin HEAD`.
-- **Repo:** https://github.com/Baegovda/LibSaber. PR #1 is on branch `cursor/sm2-pck-extractor-4420`.
+- **Repo:** https://github.com/Baegovda/ForgeLens (private; old public fork https://github.com/Baegovda/LibSaber is kept as remote `libsaber-old`, its PR #1 was not migrated). Work is on branch `cursor/sm2-pck-extractor-4420`.
 
 ## Build and install
 1. On the box: `dotnet publish` both projects to `/workspace/sm2cli` and `/workspace/sm2browser`.
@@ -249,7 +249,7 @@ For any agent continuing this work: read this whole file before you do anything.
 3. **VFX.** There is no `.sfx` to Niagara conversion; files are extracted raw only.
 4. **Rhino parts.** Check whether destroyed or variant parts are stacked on the hull.
 5. **.sani gaps.** Done for SM2, see "sani gaps (2026-10-26)" and "sani gaps, part 2" below. v3 empty-name tracks bind by template animNmb, root rotation is applied, and unskinned tpl parts are world-baked and rigidly bound.
-6. **Push and tests.** Push the local commits to PR #1 and get the tests running.
+6. **Push and tests.** Push the local commits to the branch on Baegovda/ForgeLens and get the tests running.
 
 ## Rules
 - Keep this file updated at the end of each stage: state, open items, commit hashes.
