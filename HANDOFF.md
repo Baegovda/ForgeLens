@@ -1,5 +1,7 @@
 > **For AI agents: 2026-10-29 20:50 KST — SM2 was transferred to a NEW Grok Bot: read [`docs/BOT_TRANSFER.md`](docs/BOT_TRANSFER.md) first** (BongThumbLive stays with the original bot).
 
+> **Standing rules: `docs/RULES_CORE.md` (read once per session + after summary; then run `tools/re/pc/rules_check.ps1`). Subagent preamble: `docs/SUBAGENT_PREAMBLE.md`.**
+
 > **Conversation notes & naming (2026-10-29):** in Korean chat use 기드라 = Ghidra and 레아 = REA. When the owner is away, PC jobs may run at High priority.
 > Details: [`docs/BOT_TRANSFER.md` §11](docs/BOT_TRANSFER.md).
 
@@ -61,6 +63,7 @@
 | R40 | 10/30 | "시작하고" (질문 묶음 보내기 + .nmb 검증 자동화) | Query batching + Morpheme verification | done 10/30 KST: `gs.py batch` short-form queries, 20 queries ~0.2 s; `nmb_verify.py` 124 rows 0 mismatch, 1.4/1.51 relabelled HEURISTIC | `tools/re/README.md`, `docs/handoff/FIRE_CLIP_VERIFY.tsv` |
 | R41 | 10/30 | "이것도 다 방지책 적용해둬" + 자동 시작은 하지 말고 수동 시작 | Prevention measures C1–C7 | done 10/30 KST: watchers (mem/disk/patch → alerts.txt, silent), REA version guard, push lock, K: backup + verify, CONCERNS.md; REA/GhidraServe manual start only (no logon task) | `docs/handoff/CONCERNS.md`, `tools/re/pc/` |
 | R42 | 10/30 | "컴퓨터 로컬로 못했던것들 다하고, 푸시허가+구버전 ... 그냥 좀 지워줘 용량좀 줄이고싶다" | SM2_Work old-version cleanup + PC-local leftovers | done 10/30 KST: cleanup-plan pushed (2444424); ghidra_proj3.tar -> K:\SM2_Backup (880,998,400 B, sha256 599f7ff8… match); cat (a) 3,038 → 2,854 packages deleted (13,729.8 MB files; K: free +13,735.6 MB), 182 kept because non-deleted packages depend on them (titus_assault/hormagaunt mats+textures), 4 (d) + bak3 sm2d_white/_lin + Original/Work/PhysTestMap untouched; editor was closed; verify (headless commandlet, AssetRegistry hard+soft): 0 refs into deleted SM2_Work packages, 6 VfxUe materials load. Deleted directly after dependency-closure check (no _Archive move step). proj_sm2 not copied (GhidraServe kept running) | `docs/handoff/CLEANUP_DELETED.tsv`, `CLEANUP_PLAN.md` |
+| R44 | 10/30 | "이거 진짜 안까먹는 방법없어? ... 내 로컬에 저장해도상관없으니까 ... 방지책을정말확실하게" | Anti-forgetting: single rules file + session-start check | done 10/30 KST: `docs/RULES_CORE.md` (read once per session/after summary), `tools/re/pc/rules_check.ps1` (≤10 lines, UE route), `docs/SUBAGENT_PREAMBLE.md`, docs_check guard, PC copies in `Desktop\SM2_Work` | `docs/RULES_CORE.md` |
 
 ## B. 기능 요청 (Feature requests)
 

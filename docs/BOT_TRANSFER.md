@@ -16,6 +16,7 @@ Read order after this file: `docs/handoff/START_HERE.md` → `HANDOFF.md` top (r
 ---
 
 ## 0. Resume checklist (do this first — this file is self-sufficient)
+**FIRST, every session and after every context summary: read `docs/RULES_CORE.md` and run `rules_check` (PC: `powershell -File tools\re\pc\rules_check.ps1`, copy at `Desktop\SM2_Work\rules_check.ps1`). Subagents get `docs/SUBAGENT_PREAMBLE.md` only.**
 You may have been given **only the repo URL** `https://github.com/Baegovda/ForgeLens`. Everything you need is in this file; the other docs add detail. **The user (owner) is Baegovda** (GitHub name).
 0. **Fresh environment setup (new account) — do this before anything else.** The new SM2 bot runs on a **different Grok Bot account**: it does NOT share the old bot's box (`/workspace`, `/home/box/tools`, REA/Ghidra installs, git clones, logins, scratch files), memory, or routines, and the user's PC is not registered for it yet. Everything below rebuilds the setup from the repo + the user's PC. (Paths below keep the old layout `/workspace/...` and `/home/box/tools/...` so every doc and script path still works; if your box uses another home, keep these paths anyway or symlink them.)
 

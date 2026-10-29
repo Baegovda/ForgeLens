@@ -1,0 +1,57 @@
+# RULES_CORE — SM2 / Forge Lens standing rules (read once per session + after every context summary)
+Source of detail: BOT_TRANSFER §0/§5, HANDOFF ledger R01–R43. Newest dated owner statement wins. Run `rules_check` right after reading.
+
+## Talk
+- Short Korean 해요체. Write Ghidra = 기드라, REA = 레아. Code/paths/file names in English. Times in KST.
+- Interim reports: progress % + ETA "(추정)" KST. "상황보고"/"하는중?" → answer at once.
+- Evidence labels PROVEN / INFERRED / HEURISTIC (HEURISTIC last, labelled, say what was searched).
+- NEVER state a number/name not measured this session → "아직 안 쟀어요".
+- Request → industry term + short Korean explanation. Handoff docs short, core-only.
+- Disk/RAM warnings only when there is a problem (alerts.txt non-empty).
+
+## Work
+- Act first, report after; work non-stop; questions at the end. Work has top priority.
+- PC jobs: High priority, hidden, never steal focus. Don't drop to Idle unasked.
+- Record every owner request in the HANDOFF ledger at once.
+- Fixes are generic rules, never per-character patches. Never ask for in-game captures.
+- No untrusted exes. No Discord unasked. Niagara only after asking. Game data parsed read-only.
+- REA daemon / GhidraServe: manual start only, no autostart (R41).
+- Batch REA work in one session. Before any decompile: `python3 tools/re/recall.py <addr|words>`.
+- New tool → add a row to `tools/re/README.md` (registry) in the same commit.
+
+## Unreal (UE 5.7.4, K:\Unreal Projects\UE_VFX_57, work only in /Game/SM2_Work)
+- ROUTE RULE: check UnrealEditor running (`rules_check`) →
+  - running → EngineWire MCP: `Desktop\SM2_Work\Scripts\uerun.ps1 <abs script> <args>` → `enginewire_call.py` → 127.0.0.1:3000/mcp (fallback UEMCP `uemcp_call.py`);
+  - not running → headless `UnrealEditor-Cmd -run=pythonscript ... -AutoDeclinePackageRecovery` (never both at once).
+  - Always state the route used in the report.
+- Protected: `/Game/SM2_Work/Original/*`, `/Game/Work/*`; never save `Lightning_01`.
+- Backups `.bakN` / `_bakN` (next free N), never overwritten or reused.
+- No asset deletion unless the owner explicitly authorises that specific cleanup.
+- Editor restarts pre-authorised: save, quit, relaunch with `-AutoDeclinePackageRecovery`. Crash → read report, relaunch, resume. Stop any PIE you start.
+- Never print/commit the EngineWire token (`%USERPROFILE%\.enginewire_token`).
+
+## Git / push
+- Repo Baegovda/ForgeLens (private), branch `cursor/sm2-pck-extractor-4420`. Box can't fetch/push.
+- Own box worktree → `push_lock.sh acquire` → `git format-patch` → CopyFromBox to `C:\Users\Revaptor_FX\0NNN-*.patch` → `Desktop\SM2_Work\Scripts\mtl_fix\push.ps1` (ff-only, prints TIP) → `refresh_origin.sh` → `release`.
+- Never force-push. One push at a time. No secrets in the repo.
+
+## Routine / scope
+- Routine `sm2-20`: every 20 min, silent if nothing changed; owner says "자러간다" → hourly.
+- BongThumbLive is NOT ours (original bot). "게임끝" = PC free. "실행해줘" = launch `Bin\ForgeLens_latest\ForgeLens.exe`.
+
+## Tools quick index
+| Tool | When |
+|---|---|
+| `tools/re/pc/rules_check.ps1` | session start / after summary: rules sha, UE route, REA/GS up, alerts |
+| `tools/re/recall.py` | before ANY decompile (RE_CACHE/INDEX.tsv) |
+| `ghidra_serve/gs.ps1 start\|status` · `gs.py sum\|batch\|decompile` | own Ghidra queries (PC, proj_sm2) |
+| `pc/start_rea.ps1` · `rea_call.py` | REA 6.8.0 daemon (pinned) |
+| `re_cache_build.py` | after every RE batch |
+| `exe_check.py` | game patched? (exe sha256) |
+| `docs_check.py [--pc]` | docs/paths/REA args + this file still wired |
+| `pc/{mem,disk,patch}_watch.ps1` → `SM2_Work\alerts.txt` | silent watchers; read alerts via rules_check |
+| `pc/backup.ps1 copy\|verify` | big artefacts → K:\SM2_Backup |
+| `box/push_lock.sh`, `box/refresh_origin.sh` | push flow |
+| `uerun.ps1` / `enginewire_call.py` / `uemcp_call.py` | UE editor control (route rule) |
+| `nmb_verify.py` | fire-clip table vs primaris.nmb |
+Full registry: `tools/re/README.md`.

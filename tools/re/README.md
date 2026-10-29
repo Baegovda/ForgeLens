@@ -29,6 +29,7 @@ Needs pefile + capstone (box: /tmp/cs/bin/python), JAVA_HOME=jdk25, GHIDRA_HEADL
 | `nmb_verify.py` (R40) | fire-clip table (PlayerFireClips.cs port) vs primaris.nmb per weapon × plasma × aux; lists assumptions, re-labels rows, exit 1 on MISMATCH | `python3 tools/re/nmb_verify.py primaris.nmb --all-states --out docs/handoff/FIRE_CLIP_VERIFY.tsv` |
 | `rea_version.py` (R41) | REA guard: installed rea-agents must be 6.8.0 (called by start_rea.ps1, docs_check --pc) | `python tools/re/rea_version.py` |
 | `pc/disk_watch.ps1`, `pc/patch_watch.ps1`, `pc/mem_watch.ps1 -Once` (R41) | silent watchers → one line per tag in `SM2_Work\alerts.txt` (empty = OK), history `re_env\alerts.log`. Scheduled by `pc/install_tasks.ps1` (mem/disk every 10 min, patch daily 09:00). **Cost no tokens**: they only write alerts.txt; the bot reads it when it looks | `type %USERPROFILE%\Desktop\SM2_Work\alerts.txt` |
+| `pc/rules_check.ps1` (R44) | session start / after summary: RULES_CORE sha+mtime, UE running → route (EngineWire vs headless), REA/GhidraServe up, alerts.txt; ≤10 lines, read-only | `powershell -File rules_check.ps1` |
 | `pc/backup.ps1` (R41) | copy big artefacts to `K:\SM2_Backup` + sha256 manifest; `verify`; `record` = manifest only (proj_sm2 while served). Never deletes | `backup.ps1 copy` · `backup.ps1 verify` · `backup.ps1 record proj_sm2 <path>` |
 REA daemon and GhidraServe are **manual starts** (owner 10/30: no logon auto-start): `start_rea.ps1`, `gs.ps1 start`; both are no-ops when already running.
 
