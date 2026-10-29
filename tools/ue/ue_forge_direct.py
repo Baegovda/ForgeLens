@@ -79,6 +79,21 @@ def anim_import_fn(scripts):
     g = {}; exec(src[a:b], g); return g["sm2_anim_import"]
 
 
+# --- sm2_skel_rule (R43): mesh imports reuse the one existing {mesh}_Skeleton; same-name collisions fail loudly ---
+def sm2_mesh_skeleton(folder, mesh_name, root="/Game"):
+    import importlib.util, os, unreal
+    here = os.path.dirname(os.path.abspath(globals().get("__file__") or os.environ.get("SM2_TOOLS_UE", ".") + "/x"))
+    p = os.path.join(here, "sm2_skeleton_rule.py")
+    if not os.path.exists(p): p = os.path.join(os.environ.get("SM2_TOOLS_UE", here), "sm2_skeleton_rule.py")
+    spec = importlib.util.spec_from_file_location("sm2_skeleton_rule", p); R = importlib.util.module_from_spec(spec); spec.loader.exec_module(R)
+    ar = unreal.AssetRegistryHelpers.get_asset_registry()
+    f = unreal.ARFilter(class_paths=[unreal.TopLevelAssetPath("/Script/Engine", "Skeleton")], package_paths=[root], recursive_paths=True)
+    skels = [str(a.package_name) for a in ar.get_assets(f)]
+    sk = R.pick_mesh_skeleton(folder, mesh_name, skels)  # raises SkeletonRuleError on SKELCOLLISION
+    if sk: print("SKELREUSE %s/%s -> %s" % (folder, mesh_name, sk))
+    return unreal.load_asset(sk) if sk else None
+# --- end sm2_skel_rule ---
+
 def import_model(run, unreal, mdl, res):
     EAL = unreal.EditorAssetLibrary
     folder = normalize_dest(mdl["folder"])
@@ -108,6 +123,8 @@ def import_model(run, unreal, mdl, res):
         o = unreal.FbxImportUI(); o.import_mesh = True; o.import_materials = False; o.import_textures = False; o.import_animations = False
         if mdl.get("skeletal"):
             o.import_as_skeletal = True; o.mesh_type_to_import = unreal.FBXImportType.FBXIT_SKELETAL_MESH
+            _sk = sm2_mesh_skeleton(folder, name)
+            if _sk: o.skeleton = _sk
         else:
             o.import_as_skeletal = False; o.mesh_type_to_import = unreal.FBXImportType.FBXIT_STATIC_MESH
         t.options = o

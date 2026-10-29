@@ -74,11 +74,12 @@ def sm2_anim_import(fbx, skeleton, dest, yaw="auto", root_motion=True):
         print("SM2YAW bone0 %s ref yaw %.1f -> import yaw %g%s" % (b0, rr, y, "" if off < 10 else " (ref not a 90 multiple, check)"))
     paths = one(y)
     seqs = [a for a in (unreal.load_asset(p) for p in paths) if isinstance(a, unreal.AnimSequence)]
+    split = []
     for s in seqs:
         name = s.get_name()
         if s.get_editor_property("skeleton") != skeleton:
             # Split skeleton (R35): the clip must share the mesh's skeleton, never get its own "{mesh}_Skeleton".
-            print("SPLITSKEL %s uses %s, expected %s (run ue_fix_split_skeletons.py)" % (s.get_path_name(), s.get_editor_property("skeleton").get_path_name() if s.get_editor_property("skeleton") else None, skeleton.get_path_name()))
+            split.append((s.get_path_name(), s.get_editor_property("skeleton").get_path_name() if s.get_editor_property("skeleton") else None))
         additive = name.lower().endswith("__add")
         cinematic = name.lower() in cinematic_names or "cinematic" in name.lower()
         if additive:
@@ -90,6 +91,8 @@ def sm2_anim_import(fbx, skeleton, dest, yaw="auto", root_motion=True):
         s.set_editor_property("root_motion_root_lock", unreal.RootMotionRootLock.ANIM_FIRST_FRAME if on else unreal.RootMotionRootLock.REF_POSE)
         unreal.EditorAssetLibrary.save_loaded_asset(s)
         print("SM2ANIM %s additive %s rootmotion %s len %.3f" % (name, additive, on, s.get_play_length()))
+    if split:  # R43: fail loudly, never leave a clip on a second skeleton silently
+        raise RuntimeError("SPLITSKEL %d clip(s) not on %s: %s (run ue_fix_split_skeletons.py)" % (len(split), skeleton.get_path_name(), "; ".join("%s uses %s" % b for b in split)))
     return paths, y
 # --- end sm2_anim_import ---
 

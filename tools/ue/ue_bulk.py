@@ -7,6 +7,21 @@
 # backups) and kept out of the SM2 clip import; an export with only _Manny files stops there.
 # A re-import first DUPLICATES an existing /Game/SM2_Work/Tests/<set>/<asset> to <asset>_bakN, then reimports in place (never deletes).
 import sys, os, re, json, math, time, runpy, unreal
+
+# --- sm2_skel_rule (R43): mesh imports reuse the one existing {mesh}_Skeleton; same-name collisions fail loudly ---
+def sm2_mesh_skeleton(folder, mesh_name, root="/Game"):
+    import importlib.util, os, unreal
+    here = os.path.dirname(os.path.abspath(globals().get("__file__") or os.environ.get("SM2_TOOLS_UE", ".") + "/x"))
+    p = os.path.join(here, "sm2_skeleton_rule.py")
+    if not os.path.exists(p): p = os.path.join(os.environ.get("SM2_TOOLS_UE", here), "sm2_skeleton_rule.py")
+    spec = importlib.util.spec_from_file_location("sm2_skeleton_rule", p); R = importlib.util.module_from_spec(spec); spec.loader.exec_module(R)
+    ar = unreal.AssetRegistryHelpers.get_asset_registry()
+    f = unreal.ARFilter(class_paths=[unreal.TopLevelAssetPath("/Script/Engine", "Skeleton")], package_paths=[root], recursive_paths=True)
+    skels = [str(a.package_name) for a in ar.get_assets(f)]
+    sk = R.pick_mesh_skeleton(folder, mesh_name, skels)  # raises SkeletonRuleError on SKELCOLLISION
+    if sk: print("SKELREUSE %s/%s -> %s" % (folder, mesh_name, sk))
+    return unreal.load_asset(sk) if sk else None
+# --- end sm2_skel_rule ---
 mode, name = sys.argv[1], sys.argv[2]
 SET = sys.argv[3] if len(sys.argv) > 3 else "bulk"
 CHAOS = "chaoscloth" in [a.lower() for a in sys.argv[4:]]  # opt-in: also build <asset>_ChaosCloth (bone method stays the default)  # optional set name: Exports/<set>/<asset> -> /Game/SM2_Work/Tests/<set>/<asset>
@@ -52,6 +67,8 @@ if mode == "import":
     t.automated = True; t.replace_existing = True; t.save = True
     o = unreal.FbxImportUI(); o.import_mesh = True; o.import_materials = False; o.import_textures = False; o.import_animations = False
     o.import_as_skeletal = True; o.mesh_type_to_import = unreal.FBXImportType.FBXIT_SKELETAL_MESH
+    _sk = sm2_mesh_skeleton(folder, name)
+    if _sk: o.skeleton = _sk
     t.options = o
     unreal.AssetToolsHelpers.get_asset_tools().import_asset_tasks([t])
     res["meshImportS"] = round(time.time() - t0, 1)

@@ -8,6 +8,21 @@
 #   pose <SkeletalMesh> <AnimSequence>  then  capture <out dir> <name>  then  export    (contact sheet, 5 poses in a row)
 #   mannequin                                            look for Manny/Quinn/IK Rig/retargeter assets
 import sys, os, math, builtins, unreal
+# --- sm2_skel_rule (R43): mesh imports reuse the one existing {mesh}_Skeleton; same-name collisions fail loudly ---
+def sm2_mesh_skeleton(folder, mesh_name, root="/Game"):
+    import importlib.util, os, unreal
+    here = os.path.dirname(os.path.abspath(globals().get("__file__") or os.environ.get("SM2_TOOLS_UE", ".") + "/x"))
+    p = os.path.join(here, "sm2_skeleton_rule.py")
+    if not os.path.exists(p): p = os.path.join(os.environ.get("SM2_TOOLS_UE", here), "sm2_skeleton_rule.py")
+    spec = importlib.util.spec_from_file_location("sm2_skeleton_rule", p); R = importlib.util.module_from_spec(spec); spec.loader.exec_module(R)
+    ar = unreal.AssetRegistryHelpers.get_asset_registry()
+    f = unreal.ARFilter(class_paths=[unreal.TopLevelAssetPath("/Script/Engine", "Skeleton")], package_paths=[root], recursive_paths=True)
+    skels = [str(a.package_name) for a in ar.get_assets(f)]
+    sk = R.pick_mesh_skeleton(folder, mesh_name, skels)  # raises SkeletonRuleError on SKELCOLLISION
+    if sk: print("SKELREUSE %s/%s -> %s" % (folder, mesh_name, sk))
+    return unreal.load_asset(sk) if sk else None
+# --- end sm2_skel_rule ---
+
 # --- sm2_anim_import (same block in ue_import_anim.py, ue_anim_survey.py, ue_sani_fix.py) ---
 # Legacy FBX anim import onto an existing skeleton. yaw="auto": read skeleton bone 0's reference yaw and pick the
 # 90-degree multiple that puts it at 180 (our export convention), in one import. Interchange meshes (incl. the old
@@ -68,11 +83,12 @@ def sm2_anim_import(fbx, skeleton, dest, yaw="auto", root_motion=True):
         print("SM2YAW bone0 %s ref yaw %.1f -> import yaw %g%s" % (b0, rr, y, "" if off < 10 else " (ref not a 90 multiple, check)"))
     paths = one(y)
     seqs = [a for a in (unreal.load_asset(p) for p in paths) if isinstance(a, unreal.AnimSequence)]
+    split = []
     for s in seqs:
         name = s.get_name()
         if s.get_editor_property("skeleton") != skeleton:
             # Split skeleton (R35): the clip must share the mesh's skeleton, never get its own "{mesh}_Skeleton".
-            print("SPLITSKEL %s uses %s, expected %s (run ue_fix_split_skeletons.py)" % (s.get_path_name(), s.get_editor_property("skeleton").get_path_name() if s.get_editor_property("skeleton") else None, skeleton.get_path_name()))
+            split.append((s.get_path_name(), s.get_editor_property("skeleton").get_path_name() if s.get_editor_property("skeleton") else None))
         additive = name.lower().endswith("__add")
         cinematic = name.lower() in cinematic_names or "cinematic" in name.lower()
         if additive:
@@ -84,6 +100,8 @@ def sm2_anim_import(fbx, skeleton, dest, yaw="auto", root_motion=True):
         s.set_editor_property("root_motion_root_lock", unreal.RootMotionRootLock.ANIM_FIRST_FRAME if on else unreal.RootMotionRootLock.REF_POSE)
         unreal.EditorAssetLibrary.save_loaded_asset(s)
         print("SM2ANIM %s additive %s rootmotion %s len %.3f" % (name, additive, on, s.get_play_length()))
+    if split:  # R43: fail loudly, never leave a clip on a second skeleton silently
+        raise RuntimeError("SPLITSKEL %d clip(s) not on %s: %s (run ue_fix_split_skeletons.py)" % (len(split), skeleton.get_path_name(), "; ".join("%s uses %s" % b for b in split)))
     return paths, y
 # --- end sm2_anim_import ---
 W = "/Game/SM2_Work/Tests/anim_survey/"
@@ -105,6 +123,8 @@ if mode == "import":
         t.automated = True; t.replace_existing = False; t.save = True
         o = unreal.FbxImportUI(); o.import_mesh = True; o.import_as_skeletal = True; o.mesh_type_to_import = unreal.FBXImportType.FBXIT_SKELETAL_MESH
         o.import_materials = False; o.import_textures = False; o.import_animations = False; t.options = o
+        _sk = sm2_mesh_skeleton(dest, asset)
+        if _sk: o.skeleton = _sk
         tools.import_asset_tasks([t]); print("MESH", list(t.imported_object_paths))
     else:
         print("MESHKEEP", mesh_path)
