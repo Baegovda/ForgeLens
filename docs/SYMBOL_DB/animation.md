@@ -74,3 +74,4 @@ Long-form: RE_NOTES "Animation", HANDOFF sani gaps, Animation finishing.
 | FUN_141823e30 | 0x141823e30 | DECOMPILED | strings: alphaMask / isEnabled / normalMap / roughness / metalness / transparency (domain from its dump file) | /workspace/rea/vfxw_2.c |
 | FUN_141824520 | 0x141824520 | DECOMPILED | strings: alphaMask / isEnabled / normalMap / roughness / metalness / transparency (domain from its dump file) | /workspace/rea/vfxw_2.c |
 | FUN_1418248f0 | 0x1418248f0 | DECOMPILED | strings: alphaMask / isEnabled / normalMap / roughness / metalness / transparency (domain from its dump file) | /workspace/rea/vfxw_2.c |
+| fireRateAffectShootAnim | — | NOTED | no exe string (also no fireRate/shootAnim, ASCII or UTF-16) → player shoot-clip choice lives in script data (SSL/.sso), not exe (rea-batch 6) | RE_NOTES#rea-batch 6 |

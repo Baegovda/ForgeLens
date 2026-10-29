@@ -59,3 +59,8 @@
 - attenCurveParam → P0.w PROVEN (FUN_14224f010 + armory level-light pairing 4/4). Details: /workspace/mtl_fix/level_lights/progress.md.
 - Commit d55bbe3 (box) → pushed as d843b51 (b6cf3a1..d843b51 ff). Tests 343/343.
 - Deploy: ForgeLens.exe sha256 07210b04…42ad; previous (1b409a47…5319) → ForgeLens.exe.bak16.
+
+## rea-batch 6 (2026-10-29 ~23:00–00:00 KST, new account, headless proj3 via tools/re/box/g.sh)
+- Outputs box /workspace/rea/b6/ (c_packer.txt, dr_deac.txt, x_deac.log/json, d_*.txt, bytefind.py disp-byte scanner).
+- (2) adaptive multiplier PROVEN: FUN_141e90cb0 clamp(avgLum,0.05,50); (3) DAT_14502deac 3 READs only, BSS, INFERRED false; (1) CPU point writer PROVEN FUN_141902840/FUN_141847c30, trlPOINT map INFERRED, upload not found; (4) no exe strings → script data, HEURISTIC; (5) not attempted.
+- No code change. Worktree /workspace/LibSaber-rea-batch6 (branch rea-batch6), patch /workspace/patches/rea-batch6/.

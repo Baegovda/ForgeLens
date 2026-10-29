@@ -18,3 +18,4 @@ Symbols the keyword rules could not place. Reclassify by adding a rule in `tools
 | FUN_1418bf500 | 0x1418bf500 | DECOMPILED | decompiled (1448 B), purpose not documented | /workspace/rea/vfxp_5.c |
 | FUN_1418c1940 | 0x1418c1940 | DECOMPILED | decompiled (70 B), purpose not documented | /workspace/rea/vfxp_5.c |
 | FUN_1419ba430 | 0x1419ba430 | DECOMPILED | strings: __type | /workspace/rea/vfxj_2.c |
+| FUN_140323410 | 0x140323410 | PROVEN | float → IEEE half (round-to-nearest-even) (rea-batch 6) | RE_NOTES#rea-batch 6 |
