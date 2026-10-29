@@ -69,6 +69,32 @@ public sealed class TrailDef
   /// </summary>
   public DistanceFade? DegNear { get; init; }
   public DistanceFade? DegFar { get; init; }
+  /// <summary>
+  ///   <c>visuals.fadeParams</c> (rea-batch 3). Serializer FUN_141834320 stores distTranspFront/_useMeters/distTranspMax/_useMeters
+  ///   at visuals+0x1d0/+0x1d4/+0x1d8/+0x1dc, ctor FUN_141834200 defaults 0/False/0/False (PROVEN). It is NOT TRAIL_DEGR (that is
+  ///   optimization.degNear/degFar). The lightning trail VS (trail.sdc 000045, LIGHTNING_TRAIL_DESC_DATA dwords 15..18) applies
+  ///   front = m ? F : F*len, max = m ? M : M*len; k = (front &gt; 1e-6 ? (end - s)/front : 1) * (max &gt; 1e-6 ? (s - start)/max : 1)
+  ///   to rgb (blendType add) or alpha (PROVEN for lightning). Ribbon trails bake colour per point on the CPU (trlPOINT colour 0..255,
+  ///   writer not found), so using the same ramp here, with "end" = head and each factor saturated, is HEURISTIC and opt-in
+  ///   (<c>SM2_VFX_TRAIL_FADE=1</c>).
+  /// </summary>
+  public float FadeFront { get; init; }
+  public bool FadeFrontMeters { get; init; }
+  public float FadeMax { get; init; }
+  public bool FadeMaxMeters { get; init; }
+  /// <summary><c>SM2_VFX_TRAIL_FADE=1</c>: apply <see cref="FadeFront"/>/<see cref="FadeMax"/> along the ribbon (HEURISTIC, off by default).</summary>
+  public static bool ApplyAlongFade { get; set; } = Environment.GetEnvironmentVariable("SM2_VFX_TRAIL_FADE") == "1";
+
+  /// <summary>Along-trail fade factor at distance <paramref name="fromHead"/> from the head of a trail of <paramref name="length"/>.</summary>
+  public float AlongFade(float fromHead, float length)
+  {
+    var front = FadeFrontMeters ? FadeFront : FadeFront * length;
+    var max = FadeMaxMeters ? FadeMax : FadeMax * length;
+    var k = front > 1e-6f ? Math.Clamp(fromHead / front, 0f, 1f) : 1f;
+    if (max > 1e-6f) k *= Math.Clamp((length - fromHead) / max, 0f, 1f);
+    return k;
+  }
+
   /// <summary>Render state shared with sprite batches (texture, blend, colour over the ribbon, HDR intensity).</summary>
   public required EmitterDef Render { get; init; }
 
@@ -134,6 +160,10 @@ public sealed class TrailDef
       TexScale = SslRead.Range(transform?.Get("scale"), Vector2.One),
       DegNear = DistanceFade.Parse((node.Obj("optimization") ?? tp.Obj("optimization"))?.Obj("degNear")),
       DegFar = DistanceFade.Parse((node.Obj("optimization") ?? tp.Obj("optimization"))?.Obj("degFar")),
+      FadeFront = visuals?.Obj("fadeParams")?.Float("distTranspFront", 0f) ?? 0f,
+      FadeFrontMeters = visuals?.Obj("fadeParams")?.Bool("distTranspFront_useMeters", false) ?? false,
+      FadeMax = visuals?.Obj("fadeParams")?.Float("distTranspMax", 0f) ?? 0f,
+      FadeMaxMeters = visuals?.Obj("fadeParams")?.Bool("distTranspMax_useMeters", false) ?? false,
     };
   }
 
@@ -240,6 +270,8 @@ public static class EffectTrailSprites
           void Emit(Vector3 p, float n, float side, Vector3 sideDir)
           {
             var fade = def.Fade(Vector3.Distance(p, eye)); // per vertex, as the trail VS (TRAIL_DEGR)
+            var endFade = TrailDef.ApplyAlongFade ? def.AlongFade(n * length, length) : 1f;
+            if (endFade != 1f) fade = (fade.Size, fade.Intens * (r.Blend == EffectBlend.Add ? endFade : 1f), fade.Alpha * (r.Blend == EffectBlend.Add ? 1f : endFade));
             var w = 0.5f * def.Width.Evaluate(n) * def.Scale * fade.Size;
             var c = r.Color.Evaluate(n);
             var rgb = new Vector3(c.X, c.Y, c.Z) * r.ColorIntensity.Sample(n, 0.5f) * fade.Intens;

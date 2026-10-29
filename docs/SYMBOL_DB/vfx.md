@@ -366,6 +366,14 @@ Long-form: RE_NOTES.md "VFX", HANDOFF vfx3 parts 1-4, vfx4-1, mtl1-34..41, mtl1-
 | FUN_1419b0a00 | 0x1419b0a00 | NOTED | sfx_light factory (vtable 0x1436423c0, size 0x110) | RE_NOTES#rea-batch |
 | FUN_1418c3b30 | 0x1418c3b30 | NOTED | sfx_light update (vtable slot 19) → CreateLight; attenCurveParam reader not found | RE_NOTES#rea-batch |
 | FUN_1413831e0 | 0x1413831e0 | NOTED | gsLIGHT_MANAGER::CreateLight → FUN_141383440 / FUN_141384090 | RE_NOTES#rea-batch |
+| FUN_141384090 | 0x141384090 | PROVEN | light desc (+0x78) → render light (light+0x18): attenCurveParam → +0x54, +0x6d bits (0 adaptive, 1 useInverseSquaredFalloff, 2 isConstAtten, 4 isNoSpecular), coefIndirect +0x1fc, fog +0x68, spot +0x60/+0x64, type +0x6c (rea-batch 3) | RE_NOTES#rea-batch-3 |
+| FUN_141e72cf0 | 0x141e72cf0 | NOTED | sfx light desc serializer (attenCurveParam, useInverseSquaredFalloff, isConstAtten …) (rea-batch 3) | RE_NOTES#rea-batch-3 |
+| FUN_141a1b8a0 | 0x141a1b8a0 | NOTED | light desc copy (rea-batch 3) | RE_NOTES#rea-batch-3 |
+| FUN_14204a620 | 0x14204a620 | NOTED | render light struct copy, no CB pack (rea-batch 3) | RE_NOTES#rea-batch-3 |
+| FUN_1421dd3c0 | 0x1421dd3c0 | NOTED | render light sort comparator (rea-batch 3) | RE_NOTES#rea-batch-3 |
+| FUN_141834320 | 0x141834320 | PROVEN | sfx_trail visuals serializer: fadeParams distTranspFront +0x1d0, _useMeters +0x1d4, distTranspMax +0x1d8, _useMeters +0x1dc (rea-batch 3) | RE_NOTES#rea-batch-3 |
+| FUN_141834200 | 0x141834200 | PROVEN | sfx_trail visuals ctor: fadeParams defaults 0/False/0/False (rea-batch 3) | RE_NOTES#rea-batch-3 |
+| FUN_1421ca290 | 0x1421ca290 | PROVEN | trail CB/struct layout registration incl. TRAIL_VIS_DESC = LIGHTNING_TRAIL_DESC_DATA (fade at dword 13), RB_TRAIL_POINTS (rea-batch 3) | RE_NOTES#rea-batch-3 |
 | CB_PASS_TRAIL slot 0x12 | — | NOTED | trail pass CB slot set in FUN_1421ca290 | RE_NOTES#rea-batch |
 | FUN_14145f6c0 | 0x14145f6c0 | NOTED | stores 200000.0 at stride 0x20 — fog/cascade init, not the light writer (rea-batch 2) | RE_NOTES#rea-batch-2 |
 | FUN_1419e5250 | 0x1419e5250 | NOTED | stores 200000.0 at stride 0x20 — fog/cascade init, not the light writer (rea-batch 2) | RE_NOTES#rea-batch-2 |

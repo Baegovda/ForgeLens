@@ -251,3 +251,23 @@ All addresses are virtual addresses in `sm2_retail.exe` (retail Steam build, 81 
 - **Trail shader selection:** define table FUN_1424e32c0 (SFX/DISTORT/GBUFFER/DEFERRED bits). trail_melee_dark.sfx: deferredRender False, isDistortion False, blendType blend, nameTex trail_mgs_distort_nm (DATA) → would select the SFX forward shader; why it is not visible in game is unresolved (fix54 skip HEURISTIC).
 - **Colour-scheme texture arrays:** ch_custom_01 = pct BC7 512² 6 faces (slice 0 flat grey 109), _spec DXN 256² 4 faces, _nm DXN 4, _em BC7 2 (black), ch_custom_flat_em 4×4 2 faces. td: texArrayDiffuse ch_custom_01 in 779 td, texArrayEmissiveMask ch_custom_flat_em 252, useCustomUVSet 1,573 layers, density 1,991. Layer-param serializers FUN_141f186b0…FUN_141f19950; td loaders FUN_1425af050 / FUN_1425afd20 / FUN_1425b1c00.
 - **Prop anim:** reload_sound_seq track in 18/23,227 .sani, all reload clips (DATA). firearm_library_pve shotsPerMin (58 firearms).
+
+## rea-batch 3 (2026-10-29 KST, headless Ghidra + RenderDoc raw re-dump)
+- **Render light from desc (PROVEN, FUN_141384090, desc base +0x78):** R = light+0x18.
+  - R+0x54 = attenCurveParam (desc 0x94).
+  - R+0x6d bits: 0 isAdaptiveIntensity (0xa5), 1 useInverseSquaredFalloff (0x91), 2 isConstAtten (0x98), 3 desc 0x205, 4 isNoSpecular (0xa9).
+  - R+0x1fc coefIndirect (0x9c). R+0x68 = clamped fogAmount (0xa0).
+  - R+0x60 / +0x64: spotAngle (min-clamped DAT_1436385ec) / inner (0..DAT_14355c0f0), spot only.
+  - R+0x6c type (point 0, spot 1, directional 2). R+0x20b enableSM (0xa4). R+0x20c = 3 when isStatic (0xa6). isHiddenReflCube (0xaa) → light+0x69. R+0xd4 = desc 0xe0 (defaulted when < 0).
+  - FUN_141a1b8a0 = desc copy. FUN_14204a620, FUN_1417f7830, FUN_141a14050, FUN_141ef9110, FUN_142b7a2b0 = struct copies; FUN_1421dd3c0 = sort comparator.
+  - OffSet scans (OffSet.java, displacement sets on R) found no CB packer. P0.w writer: open.
+- **UseSpecMap raw flags (DATA):** armory 128197 raw CB bytes (`round3/usm_armory.py`, 140 PS draws with CB_OBJ_MATERIAL_DATA). asint(byte 336) counts: 8200 ×58, 4424 ×23, 4168 ×17, 88 ×11, 72 ×8, 0 ×6, 10248 ×4, 328 ×3, 7496 ×3, 11276 ×2, 8344 ×2, 6472, 8456, 11272, 64.
+  - Bit 8 is on every non-zero value except 64. It is not tested by the shader (INFERRED: a master "spec map" bit). Bit 512 (invert) is never set.
+  - The earlier "flags 0" came from rounded float dumps. Writer not found.
+- **Trail fadeParams (PROVEN):** FUN_141834320 visuals: +0x1d0 distTranspFront, +0x1d4 _useMeters, +0x1d8 distTranspMax, +0x1dc _useMeters. Ctor FUN_141834200 zeroes them. Only FUN_141834200 / FUN_141836a80 match the offset set.
+  - FUN_1421ca290 registers TRAIL_VIS_DESC = LIGHTNING_TRAIL_DESC_DATA (76 B; fade at dword 13: isLightningFlow, test, front, front_m, max, max_m).
+  - Lightning VS 000045: front/max × trail length unless useMeters; k = (end − s)/front · (s − start)/max (≤ 1e-6 → factor 1, no clamp); k on rgb when blendType == 1, else on alpha.
+  - Ribbon VS s131097: per-point colour (trlPOINT 80 B, float4 /255), no fade term → CPU-baked. TRAIL_DEGR = degNear/degFar ≠ fadeParams.
+  - Retail survey: Front 0.2 / Max 1 ×70, 1.5 / 3 ×38, …
+- **trail_melee_dark (DATA):** 15 users (weapon .cls + melee_actor_factory.sso) override it. All set isAutoStart False (base True). colorIntensityMultiplier is 0.01 ×2, 0.05 ×6, 0.3, or 1 ×5 (base 11). The knife sets alphaMult 0.1. The gradient (t, A, R, G, B) has low alpha. Texture trail_mgs_distort_nm = MNM.
+

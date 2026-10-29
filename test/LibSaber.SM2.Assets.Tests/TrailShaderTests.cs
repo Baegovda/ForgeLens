@@ -22,6 +22,11 @@ public class TrailShaderTests
              }
           }
        }
+       fadeParams   =   {
+          distTranspFront   =   0.2
+          distTranspMax   =   1
+          distTranspMax_useMeters   =   True
+       }
     }
     optimization   =   {
        degNear   =   {
@@ -64,5 +69,21 @@ public class TrailShaderTests
     Assert.Equal(0.5f, t.Fade(11f).Alpha, 0.001f); // halfway
     Assert.Equal(1f, t.Fade(30f).Alpha, 0.001f);   // beyond radEnd: unchanged
     Assert.Equal(1f, t.Fade(1f).Size, 0.001f);
+  }
+
+  [Fact]
+  public void FadeParamsAlongTrail()
+  {
+    var t = Def();
+    Assert.Equal(0.2f, t.FadeFront);
+    Assert.False(t.FadeFrontMeters);
+    Assert.Equal(1f, t.FadeMax);
+    Assert.True(t.FadeMaxMeters);
+    // length 10: front ramp over 2 m from the head, max ramp over 1 m from the tail.
+    Assert.Equal(0f, t.AlongFade(0f, 10f), 1e-4f);
+    Assert.Equal(0.5f, t.AlongFade(1f, 10f), 1e-4f);
+    Assert.Equal(1f, t.AlongFade(5f, 10f), 1e-4f);
+    Assert.Equal(0.5f, t.AlongFade(9.5f, 10f), 1e-4f);
+    Assert.Equal(1f, new TrailDef { Name = "x", Path = "x", Render = t.Render }.AlongFade(3f, 10f), 1e-4f);
   }
 }

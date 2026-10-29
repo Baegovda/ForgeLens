@@ -785,3 +785,11 @@ FUN_1419e5250	0x1419e5250	vfx	stores 200000.0 at stride 0x20 — fog/cascade ini
 FUN_1424e32c0	0x1424e32c0	vfx	trail shader define table: AKILL 0, SFX 1, DISTORT 2, GBUFFER 3, DEFERRED 4, TAPE 5, FLAT 6, FLAT_LIGHTING 7, ALPHA_MASK 8 … DISABLE_Z_TEST (rea-batch 2)	PROVEN	docs/SYMBOL_DB/vfx.md		
 FUN_1421ca290	0x1421ca290	vfx	CB_PASS_TRAIL layout initialiser (TRAIL_MISC, TRAIL_DEGR, PS_REG_TRAIL_EMISSIVE …, RB_TRAIL_POINTS, TRAIL_DIFF/DISTORT/NORMAL slots) (rea-batch 2)	NOTED	docs/SYMBOL_DB/vfx.md		
 FUN_1421aa940	0x1421aa940	materials	CB_OBJ_MATERIAL_DATA layout initialiser incl. OBJ_MTLBLEND_LAYER_CONST (0x40 float4); ~40 siblings FUN_14219f000…FUN_1421d19a0; UseSpecMap writer not found (rea-batch 2)	NOTED	docs/SYMBOL_DB/materials.md		
+FUN_141384090	0x141384090	vfx	light desc (+0x78) → render light (light+0x18): attenCurveParam → +0x54, +0x6d bits (0 adaptive, 1 useInverseSquaredFalloff, 2 isConstAtten, 4 isNoSpecular), coefIndirect +0x1fc, fog +0x68, spot +0x60/+0x64, type +0x6c (rea-batch 3)	PROVEN	docs/handoff/RE_NOTES.md#rea-batch 3		
+FUN_141e72cf0	0x141e72cf0	vfx	sfx light desc serializer (attenCurveParam, useInverseSquaredFalloff, isConstAtten …) (rea-batch 3)	NOTED	docs/handoff/RE_NOTES.md#rea-batch 3		
+FUN_141a1b8a0	0x141a1b8a0	vfx	light desc copy (rea-batch 3)	NOTED	docs/handoff/RE_NOTES.md#rea-batch 3		
+FUN_14204a620	0x14204a620	vfx	render light struct copy, no CB pack (rea-batch 3)	NOTED	docs/handoff/RE_NOTES.md#rea-batch 3		
+FUN_1421dd3c0	0x1421dd3c0	vfx	render light sort comparator (rea-batch 3)	NOTED	docs/handoff/RE_NOTES.md#rea-batch 3		
+FUN_141834320	0x141834320	vfx	sfx_trail visuals serializer: fadeParams distTranspFront +0x1d0, _useMeters +0x1d4, distTranspMax +0x1d8, _useMeters +0x1dc (rea-batch 3)	PROVEN	docs/handoff/RE_NOTES.md#rea-batch 3		
+FUN_141834200	0x141834200	vfx	sfx_trail visuals ctor: fadeParams defaults 0/False/0/False (rea-batch 3)	PROVEN	docs/handoff/RE_NOTES.md#rea-batch 3		
+FUN_1421ca290	0x1421ca290	vfx	trail CB/struct layout registration incl. TRAIL_VIS_DESC = LIGHTNING_TRAIL_DESC_DATA (fade at dword 13), RB_TRAIL_POINTS (rea-batch 3)	PROVEN	docs/handoff/RE_NOTES.md#rea-batch 3		
