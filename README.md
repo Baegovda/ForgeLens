@@ -1,3 +1,5 @@
+> **For AI agents (new SM2 / Forge Lens assistant): read [`docs/BOT_TRANSFER.md`](docs/BOT_TRANSFER.md) first (its §0 "Resume checklist"), then [`HANDOFF.md`](HANDOFF.md).** Reply to the user in short Korean 해요체.
+
 # LibSaber
 
 **Forge Lens** is the desktop asset browser/exporter built on this library (project `src/LibSaber.SM2Browser`, published as `ForgeLens.exe`; the CLI stays `LibSaber.SM2Extractor.exe`).

@@ -1,5 +1,7 @@
 # AGENTS.md — start here (new agent / Grok Bot entry point)
 
+> **2026-10-29: SM2 transferred to a new Grok Bot → read [`docs/BOT_TRANSFER.md`](docs/BOT_TRANSFER.md) first.**
+
 > **Newest single entry point: [`docs/handoff/START_HERE.md`](docs/handoff/START_HERE.md)** (cold-start handoff, 2026-10-29). Read it first; it overrides older statements here.
 
 > 이 파일이 진입점입니다. 레포 주소만 받은 새 에이전트는 이 파일부터 끝까지 읽고, 아래 "Read order"대로 따라가면 바로 작업을 이어갈 수 있습니다.

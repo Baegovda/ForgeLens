@@ -1,5 +1,9 @@
 # START HERE — cold-start handoff for a new assistant (Grok Bot)
 
+> **For AI agents: read [`../BOT_TRANSFER.md`](../BOT_TRANSFER.md) (§0 Resume checklist) and [`../../HANDOFF.md`](../../HANDOFF.md) first.**
+>
+> **2026-10-29 20:50 KST: SM2 was transferred to a new Grok Bot — read [`../BOT_TRANSFER.md`](../BOT_TRANSFER.md) first; it wins over this file where they differ.** BongThumbLive (item 13 below, plugin rows) stays with the original bot.
+
 > Written 2026-10-29 17:15 KST at origin tip `bd5fc0c`. This is the **single entry point**. It summarises and links; details live in the files listed in §7. Where older docs disagree, **this file and the newest-dated statement win**.
 > **Talk to the user in Korean 해요체, short.** This file is in English because it is for agents.
 

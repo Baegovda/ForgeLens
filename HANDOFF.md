@@ -1,3 +1,5 @@
+> **For AI agents: 2026-10-29 20:50 KST — SM2 was transferred to a NEW Grok Bot: read [`docs/BOT_TRANSFER.md`](docs/BOT_TRANSFER.md) first** (BongThumbLive stays with the original bot).
+
 > **New assistant: start at [`docs/handoff/START_HERE.md`](docs/handoff/START_HERE.md)** (single entry point, 2026-10-29). Everything below is the request ledger and chronological log.
 
 > **Then read [`AGENTS.md`](AGENTS.md)** (entry point, rules, user preferences), then `docs/handoff/` (STATUS, ROADMAP, WORKFLOW, RE_NOTES, FORMATS). Where this file's bootstrap below conflicts with them (push method, next step, owner), AGENTS.md / docs/handoff win. This file stays the chronological log: append a dated section per stage.
@@ -46,6 +48,7 @@
 | R30 | 10/28 | SM2 안티치트는 밴 위험 없음(멀티만 꺼짐) → 인게임 캡처/모드 작업 자체는 허용 (단, R13이 우선) | Risk acceptance (EAC) — 위험 수용 | standing | HANDOFF vfx3r/vfx3s |
 | R31 | 10/29 | 내 요청은 인수인계 문서에 꼼꼼히 기록(업계 용어·뜻·상태 포함), 계속 최신으로 | Requirements traceability ledger — 요구사항 추적 대장 | standing (done: 이 섹션, `docs: user request ledger`) | 이 섹션 |
 | R32 | 10/29 | HEURISTIC은 되도록 쓰지 말고, 모든 규칙은 먼저 게임 데이터/exe 근거로 정해요. 근거 찾기가 실패했을 때만 마지막 수단으로 HEURISTIC을 쓰고, 그때는 분명하게 표시해요 | Evidence-first rule derivation — 근거 우선 규칙 도출(데이터·exe·캡처 → 마지막에만 추정) | standing (fix54부터) | `docs/handoff/WORKFLOW.md` §0, 이 대장 "REA 일괄 처리 목록" |
+| R33 | 10/29 | "봉썸라이브는 계속 작업할거고 sm2는 다른 그록봇 인계해서 작업할거야 그 봇이 마치 너가 그대로옮겨간것처럼 인수인계 파일 써넣어주고 프롬프트까지 줘" | Ownership transfer / bot handoff — SM2는 새 그록봇이 그대로 이어받고, BongThumbLive는 기존 봇이 계속 | standing (done: `docs/BOT_TRANSFER.md`, box `/workspace/handoff/`) | `docs/BOT_TRANSFER.md` |
 
 ## B. 기능 요청 (Feature requests)
 
@@ -120,7 +123,7 @@
 | X02 | 10/28 | SM2 끝나면 다음은 Path of Exile 읽기 | Multi-game support (PoE) — 다른 게임 포맷 지원 | future | ROADMAP (추가 예정) |
 | X03 | 10/27–28 | 그 다음 Unreal Engine 게임 읽기(.pak/IoStore) | UE game extraction — 언리얼 게임 에셋 추출 | future | ROADMAP "Possible future development" |
 
-합계: 상시 규칙 32 · 기능 요청 60 · 미래 3 = **95건** (2026-10-29 기준; oneclick에서 실제 행 수로 다시 셌어요 — F59 행이 합계에 빠져 있었어요).
+합계: 상시 규칙 33 · 기능 요청 60 · 미래 3 = **96건** (2026-10-29 20:50 KST 기준; R33 인계 추가).
 
 ---
 
@@ -2545,3 +2548,10 @@ Owner request (ledger F60, "원클릭 내보내기를 옵션으로도 만들어�
 ### SM2_Work cleanup (2026-10-29)
 - The 10/29 SM2_Work disk cleanup freed 26.8 GB (log `Desktop\SM2_Work\cleanup_log.txt`).
 - Deleted: `Anim\Titus_Anim` (regenerable with `export --anim`), `Captures\mrq16_before` (regenerable), `Export\Step2`, old `buildNN` folders, v4 temp dirs, and the old `ForgeLens_latest\ForgeLens.exe.bak5`–`.bak13`. Backup numbering continues upward (next free number after the highest existing one, never reused).
+
+## Update bot-transfer (2026-10-29 20:50 KST): SM2 handed to a new Grok Bot
+- Owner request (ledger R33): SM2 / Forge Lens moves to a new Grok Bot that should continue as if it were the same assistant; **BongThumbLive stays with the original bot** and is not part of the handoff.
+- New single entry point for the new bot: **`docs/BOT_TRANSFER.md`** (goal, repo + push, environment, REA + Symbol DB, rules, status, ordered open list, routine). Box copy `/workspace/handoff/BOT_TRANSFER.md`; first prompt `/workspace/handoff/NEW_BOT_PROMPT.md`.
+- Box clone `/workspace/LibSaber` was fast-forwarded 1565d17 → `e5b4e8b` with an incremental bundle from the PC clone `ls_push` (box has no GitHub login), then this commit was made and pushed from the PC via `push.ps1` (patch copy box `/workspace/handoff/`).
+- State checked at 20:50 KST: no game running, UE closed (port 3000 closed), no leftover `0*.patch`, deployed `ForgeLens_latest\ForgeLens.exe` sha256 `3B74C617…2124A36` (+ `.bak14`–`.bak17`). REA daemon processes alive since 10:22 but without a Ghidra child (last answers 11:33) → treat as cold (≈22 min re-import) or use the headless fallback.
+- Open list (order): REA batch {ribbon trail per-point colour writer, adaptive light multiplier (param_3 of FUN_14224ecf0), DAT_14502deac writer, player fire clip selection (HEURISTIC)} → L/R pauldron overrides → colour scheme → UE master material → F43 .td non-texture params → muzzle flash offset + aim pose from data → physics for other characters → cloth build28 → level/prop placement extraction → later PoE / UE games.
