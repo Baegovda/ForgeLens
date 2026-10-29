@@ -64,6 +64,7 @@ public static class MaterialMaps
   {
     var cache = new Dictionary<string, List<MaterialMap>>(StringComparer.OrdinalIgnoreCase);
     var texts = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+    var tdScalars = new Dictionary<string, Dictionary<string, float>>(StringComparer.OrdinalIgnoreCase);
     var variants = new Dictionary<string, (float[]? Tint, string? Mode, SecondSpec? Second, AnisoSpec? Aniso, BaseLayer Base, ChameleonSpec? Chameleon, DetailSpec? Detail)>(StringComparer.OrdinalIgnoreCase);
     var sfxShading = new Dictionary<string, (bool Sfx, Effects.SfxBlendMode Blend, float[]? Tint)>(StringComparer.OrdinalIgnoreCase);
     Attach(mesh.Parts);
@@ -106,12 +107,14 @@ public static class MaterialMaps
             block is null ? null : SpecLayers.Chameleon(block),
             block is null ? null : SpecLayers.Detail(block));
           variants[key] = shading;
+          tdScalars[key] = block is null ? new() : SpecLayers.TdScalars(block);
         }
 
         var tint = shading.Tint;
         part.BlendMode = shading.Mode ?? "opaque";
         part.Blend = BlendOf(maps.FirstOrDefault(map => map.Role == "diffuse"), shading.Mode);
         part.AlbedoTint = tint;
+        part.TdScalars = tdScalars.TryGetValue(key, out var tds) ? tds : new();
         part.SecondSpec = shading.Second;
         part.AnisoSpec = shading.Aniso;
         part.BaseLayer = shading.Base;

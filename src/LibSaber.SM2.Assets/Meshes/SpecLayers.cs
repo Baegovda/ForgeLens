@@ -225,6 +225,24 @@ public static class SpecLayers
     return result.Anisotropy > AnisoThreshold ? result : null;
   }
 
+  /// <summary>
+  ///   R50 / F43: non-texture glt scalars not covered by the other blocks (PROVEN td fields; 38,258 retail td scanned):
+  ///   nmScale, emissive.{intensity, bloomIntensity, adaptiveIntensity}. Only keys present in the td are returned.
+  /// </summary>
+  public static Dictionary<string, float> TdScalars(string variantBlock)
+  {
+    var glt = Glt(variantBlock);
+    var result = new Dictionary<string, float>();
+    if (Number(glt, "nmScale") is { } nm) result["nmScale"] = nm;
+    if (Child(glt, "emissive") is { } em)
+    {
+      if (Number(em, "intensity") is { } i) result["emissiveIntensity"] = i;
+      if (Number(em, "bloomIntensity") is { } b) result["emissiveBloomIntensity"] = b;
+      if (Regex.IsMatch(Shallow(em), "(^|\\n)\\s*adaptiveIntensity\\s*=\\s*(true|false)\\b")) result["emissiveAdaptive"] = Flag(em, "adaptiveIntensity") ? 1f : 0f;
+    }
+    return result;
+  }
+
   /// <summary>Glt-level <c>shaders.glt</c> block of a variant, or the variant itself when there is none.</summary>
   private static string Glt(string variantBlock)
     => Child(variantBlock, "shaders") is { } shaders && Child(shaders, "glt") is { } glt ? glt : variantBlock;

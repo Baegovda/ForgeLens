@@ -517,6 +517,17 @@ def colour_scheme(material, base, metal, x, y):
     return switch(material, "UseColourScheme", base, out, x + 200, y)
 
 
+def td_scalar_tags(slot):
+    """R50 / F43: sidecar tdScalars -> asset metadata tags (SM2.td.<key>). Kept as data, not wired to the graph: the game's
+    emissive intensity units (adaptive exposure, log2 curve with an unknown CB constant) have no proven UE mapping yet."""
+    return {"SM2.td." + k: "%g" % float(v) for k, v in sorted((slot.get("tdScalars") or {}).items())}
+
+
+def apply_td_scalars(instance, slot):
+    for k, v in td_scalar_tags(slot).items():
+        unreal.EditorAssetLibrary.set_metadata_tag(instance, k, v)
+
+
 def find_scheme(sidecar_path):
     """Explicit --scheme=<json> / SM2_COLOUR_SCHEME wins; else the one *.colour_scheme.*.json beside the sidecar (the browser
     writes it only when a scheme is picked); none or several -> None (old behaviour)."""
@@ -1011,6 +1022,7 @@ def build(sidecar_path, folder):
             lin = [pow(float(c), 2.2) for c in albedo_tint[:3]]
             unreal.MaterialEditingLibrary.set_material_instance_vector_parameter_value(instance, "AlbedoTint", unreal.LinearColor(lin[0], lin[1], lin[2], 1.0))
         apply_spec_layers(instance, slot, texture_for)
+        apply_td_scalars(instance, slot)
         spart = scheme_part_for(scheme, name, (diffuse or {}).get("name")) if scheme else None
         if spart:
             sdir = os.path.dirname(os.path.abspath(scheme_path))

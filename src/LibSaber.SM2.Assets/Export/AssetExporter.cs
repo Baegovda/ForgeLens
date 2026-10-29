@@ -1495,6 +1495,7 @@ public static class AssetExporter
       variant = slot.Part.Variant,
       blend = slot.Part.Blend,
       albedoTint = slot.Part.AlbedoTint,
+      tdScalars = slot.Part.TdScalars.Count == 0 ? null : slot.Part.TdScalars,
       blendMode = slot.Part.BlendMode,
       // glt.second_spec / glt.anisotropic_spec (null when the variant leaves them disabled). Tints are R, G, B, A in 0..1.
       secondSpec = slot.Part.SecondSpec is { } second ? new

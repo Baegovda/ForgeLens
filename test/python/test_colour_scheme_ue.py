@@ -40,3 +40,10 @@ class SchemeTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class TdScalarTests(unittest.TestCase):
+    def test_tags(self):
+        self.assertEqual(m.td_scalar_tags({"tdScalars": {"nmScale": 0.5, "emissiveIntensity": 30}}),
+                         {"SM2.td.emissiveIntensity": "30", "SM2.td.nmScale": "0.5"})
+        self.assertEqual(m.td_scalar_tags({}), {})

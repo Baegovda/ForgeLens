@@ -53,6 +53,8 @@ public sealed class MeshPart
   ///   Null when the variant does not set one (white).
   /// </summary>
   public float[]? AlbedoTint { get; set; }
+  /// <summary>R50 / F43: td glt scalars (SpecLayers.TdScalars); empty when none.</summary>
+  public Dictionary<string, float> TdScalars { get; set; } = new();
   /// <summary>Raw <c>glt.blendMode</c> of the variant (<c>opaque</c> when unset).</summary>
   public string BlendMode { get; set; } = "opaque";
   /// <summary><c>glt.second_spec</c> when the variant enables it (null keeps the single-lobe look).</summary>
@@ -106,6 +108,7 @@ public sealed class MeshPart
       Variant = Variant,
       Blend = Blend,
       AlbedoTint = AlbedoTint,
+      TdScalars = TdScalars,
       BlendMode = BlendMode,
       SecondSpec = SecondSpec,
       AnisoSpec = AnisoSpec,
