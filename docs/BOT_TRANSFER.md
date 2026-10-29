@@ -9,18 +9,94 @@
 Where this file lives (if you got only the repo URL, you are already reading the right file):
 - Repo: `docs/BOT_TRANSFER.md` in `Baegovda/ForgeLens` (box clone `/workspace/LibSaber`).
 - Box copy: `/workspace/handoff/BOT_TRANSFER.md`.
-- **The box is ONE Linux machine shared by all of this user's agents** (the original bot is still working there on BongThumbLive). Files you see under `/workspace` may belong to it. Use your own worktree; never reset/delete another agent's worktree or kill its processes.
+- **You are on a different Grok Bot account (2026-10-29 update):** you do NOT share the old bot's box, memory, routines or PC registration — rebuild with §0 step 0. "Box" paths in these docs (`/workspace/...`, `/home/box/tools/...`) describe the old box; recreate them on yours. Within your own account the box is shared by your agents: use your own worktree.
 
 Read order after this file: `docs/handoff/START_HERE.md` → `HANDOFF.md` top (request ledger R01–R33 / F01–F60 / X01–X03) → `HANDOFF.md` newest "Update …" sections at the bottom → `docs/handoff/WORKFLOW.md` → `docs/handoff/STATUS.md` → `docs/SYMBOL_DB/INDEX.md` → `docs/handoff/RE_NOTES.md`. Where docs disagree, **newest dated statement wins**, and this file wins over all of them for anything about the transfer.
 
 ---
 
 ## 0. Resume checklist (do this first — this file is self-sufficient)
-You may have been given **only the repo URL** `https://github.com/Baegovda/ForgeLens`. Everything you need is in this file; the other docs add detail.
+You may have been given **only the repo URL** `https://github.com/Baegovda/ForgeLens`. Everything you need is in this file; the other docs add detail. **The user (owner) is Baegovda** (GitHub name).
+0. **Fresh environment setup (new account) — do this before anything else.** The new SM2 bot runs on a **different Grok Bot account**: it does NOT share the old bot's box (`/workspace`, `/home/box/tools`, REA/Ghidra installs, git clones, logins, scratch files), memory, or routines, and the user's PC is not registered for it yet. Everything below rebuilds the setup from the repo + the user's PC. (Paths below keep the old layout `/workspace/...` and `/home/box/tools/...` so every doc and script path still works; if your box uses another home, keep these paths anyway or symlink them.)
+
+   **0.1 Connect the user's PC.** Ask the user (in Korean) to register/connect their Windows PC to your account (Grok Bot desktop app on that PC, signed in to the new account / "add machine"). Then `ListMachines` and pick the desktop labelled **"Revaptor-FX"**. **Its machineId will NOT be the old `d3fb99ad-25ca-45c1-81af-41e5ca09104a`** — identify the PC by name and paths instead: Windows user `Revaptor_FX`, home `C:\Users\Revaptor_FX`, work folder `C:\Users\Revaptor_FX\Desktop\SM2_Work`, push clone `C:\Users\Revaptor_FX\ls_push`, game `D:\Steam\steamapps\common\Space Marine 2\client_pc`, UE `C:\Program Files\Epic Games\UE_5.7`, project `K:\Unreal Projects\UE_VFX_57`. Smoke test (PowerShell via `Shell` + machineId): `hostname; Test-Path $env:USERPROFILE\ls_push, $env:USERPROFILE\Desktop\SM2_Work\Scripts\mtl_fix\push.ps1; git -C $env:USERPROFILE\ls_push log --oneline -3`. Replace the old id wherever you note it (your memory, your routine).
+
+   **0.2 GitHub access.** Repo `https://github.com/Baegovda/ForgeLens` is **private**. Pushing never needs your own login: the PC has `git` 2.47 + `gh` 2.95 logged in as **Baegovda**, and `push.ps1` pushes from `ls_push`. For reading on GitHub, ask the user to grant your account access (connect the GitHub connector for the new account to Baegovda/ForgeLens, or add your GitHub identity as a collaborator). The box gets no git credential. To get the repo onto your box without a login, bundle it from the PC:
+   ```powershell
+   cd $env:USERPROFILE\ls_push; git fetch -q origin; git bundle create "$env:USERPROFILE\Desktop\SM2_Work\Backup\fl_full.bundle" --all   # ~30-40 MB
+   ```
+   `CopyToBox` → `/workspace/fl_full.bundle`, then on the box:
+   ```bash
+   git init -q /workspace/LibSaber && cd /workspace/LibSaber
+   git remote add origin https://github.com/Baegovda/ForgeLens.git
+   git fetch -q /workspace/fl_full.bundle 'refs/remotes/origin/*:refs/remotes/origin/*'
+   git checkout -q -b cursor/sm2-pck-extractor-4420 origin/cursor/sm2-pck-extractor-4420
+   git config user.name 'Cursor Agent'; git config user.email cursoragent@cursor.com
+   ```
+   Delete the PC bundle afterwards (your own temp file). Later syncs: incremental bundle `<old_tip>..origin/cursor/sm2-pck-extractor-4420` (see §2 step 5).
+
+   **0.3 Box tools — exact versions in use on the old box (2026-10-29).** Install into `/home/box/tools` (no root needed except apt).
+   ```bash
+   T=/home/box/tools; mkdir -p $T /workspace/rea
+   # apt (headless Forge Lens captures + video):
+   sudo apt-get install -y xvfb xdotool ffmpeg libgl1-mesa-dri libegl-mesa0 libgles2 unzip xz-utils git python3-venv
+   # .NET 8 SDK 8.0.427
+   curl -sSLo $T/dotnet-install.sh https://dot.net/v1/dotnet-install.sh && bash $T/dotnet-install.sh --version 8.0.427 --install-dir $T/dotnet
+   # Java: Temurin JDK 25 (old box: 25.0.5+8 LTS)
+   curl -sSL 'https://api.adoptium.net/v3/binary/latest/25/ga/linux/x64/jdk/hotspot/normal/eclipse' -o /tmp/jdk25.tgz && mkdir -p $T/jdk25 && tar xzf /tmp/jdk25.tgz -C $T/jdk25 --strip-components=1
+   # Ghidra 12.1.4 (REQUIRED by REA 6.8.0, it rejects 12.2) from https://github.com/NationalSecurityAgency/ghidra/releases (tag Ghidra_12.1.4_build, asset ghidra_12.1.4_PUBLIC_<date>.zip)
+   unzip -q ghidra_12.1.4_PUBLIC_*.zip -d $T            # -> $T/ghidra_12.1.4_PUBLIC
+   ln -s $T/ghidra_12.1.4_PUBLIC /home/box/ghidra        # old box had a separate 12.2 here; g.sh/gd.sh call /home/box/ghidra — 12.1.4 works for them too
+   # Node 24.22.1 (system node 20 is too old for REA)
+   curl -sSL https://nodejs.org/dist/v24.22.1/node-v24.22.1-linux-x64.tar.xz | tar xJ -C $T && mv $T/node-v24.22.1-linux-x64 $T/node24
+   # REA = https://github.com/morluto/rea, npm package rea-agents 6.8.0 (old clone at commit b61fe2506)
+   git clone https://github.com/morluto/rea $T/rea
+   mkdir -p $T/rea-cli && PATH=$T/node24/bin:$PATH npm install --prefix $T/rea-cli rea-agents@6.8.0
+   # rizin 0.9.1 (static release from https://github.com/rizinorg/rizin/releases) -> ~/.local/bin/rizin
+   # capstone venv for raw disassembly scans (old box: /tmp/cs — put it somewhere persistent)
+   python3 -m venv $T/csenv && $T/csenv/bin/pip install capstone==5.0.9 pefile==2024.8.26 && ln -sfn $T/csenv /tmp/cs
+   # Python deps for repo tools (system python 3.13): Pillow, numpy (+ OpenEXR optional)
+   pip install --user pillow numpy OpenEXR
+   # Shader tools (only for shader re-extraction): dxc v1.9.2609 (https://github.com/microsoft/DirectXShaderCompiler/releases, linux tarball -> $T/dxc),
+   #   dxil-spirv (https://github.com/HansKristian-Work/dxil-spirv, old commit 8b48f0e0, git submodule update --init) built with
+   python3 -m venv $T/buildenv && $T/buildenv/bin/pip install cmake==4.4.4 ninja==1.13.2 ziglang==0.17.0
+   mkdir -p $T/zigcc && printf '#!/bin/sh\nexec %s/buildenv/bin/python -m ziglang cc "$@"\n' $T > $T/zigcc/cc   # and c++ with "c++"; CC=$T/zigcc/cc CXX=$T/zigcc/c++ cmake -G Ninja ..
+   ```
+   Check: `PATH=$T/node24/bin:$PATH GHIDRA_INSTALL_DIR=$T/ghidra_12.1.4_PUBLIC JAVA_HOME=$T/jdk25 $T/rea-cli/node_modules/.bin/rea doctor --provider ghidra --json` → `"healthy":true`. Build check: `export DOTNET_ROOT=$T/dotnet PATH=$T/dotnet:$PATH; cd /workspace/LibSaber; dotnet build-server shutdown; dotnet build LibSaber.sln -c Release -m:1`; tests 372 / 43 / 5 and `cd test/python && python3 -m unittest` (20).
+
+   **0.4 SM2 exe + RE databases (regenerate; game binary is not in the repo).**
+   - Copy the exe from the PC: `Copy-Item "D:\Steam\steamapps\common\Space Marine 2\client_pc\root\bin\pc\Warhammer 40000 Space Marine 2 - Retail.exe" $env:USERPROFILE\Desktop\SM2_Work\Research\sm2_retail.exe` (D: can refuse direct copies → copy to C: first), `CopyToBox` → **`/workspace/rea/sm2_retail.exe`** (≈81 MB; check size). Delete the PC copy afterwards if you made one only for this.
+   - **Headless Ghidra project** (fallback route, used for rea-batch 1–5): ≈**17 min** (1,040 s on the old box) with the light analyzer set:
+     ```bash
+     cp /workspace/LibSaber/tools/re/ghidra_scripts/*.java /workspace/LibSaber/tools/re/DecompFn.java /workspace/rea/scripts/ 2>/dev/null || (mkdir -p /workspace/rea/scripts && cp /workspace/LibSaber/tools/re/ghidra_scripts/*.java /workspace/rea/scripts/)
+     cp /workspace/LibSaber/tools/re/box/*.sh /workspace/rea/ && cp /workspace/LibSaber/tools/re/rea_daemon.py /workspace/rea/
+     mkdir -p /workspace/rea/ghidra_proj3 && JAVA_HOME=$T/jdk25 GHIDRA_HEADLESS_MAXMEM=9G $T/ghidra_12.1.4_PUBLIC/support/analyzeHeadless /workspace/rea/ghidra_proj3 sm2 -import /workspace/rea/sm2_retail.exe -scriptPath /workspace/rea/scripts -preScript LightAnalysis.java > /workspace/rea/ghidra3.log 2>&1
+     ```
+     Then `tools/re/box/g.sh <Script.java> args` / `tools/re/scans/gd.sh <out.c> <addrs>` (read-only, 3.5 GB heap) and `DecompAt.java`/`DecompFn.java`. Don't run it next to a big build (15 GB box OOM'd before).
+   - **REA daemon:** `cd /workspace/rea && source rea_env.sh && nohup setsid python3 rea_daemon.py > rea_daemon.log 2>&1 &` → first start imports + analyses the exe itself (≈**22 min**, REA 6.8.0 has no project reuse; `REA_GHIDRA_PROJECT_PATH` in rea_env.sh is ignored). Then `python3 /workspace/LibSaber/tools/re/rea_call.py search_strings '{"query":"attenCurveParam"}'`. Never kill the daemon or cancel a request. Inventories `/workspace/rea/rea_procs.json` / `rea_strings.json` (156,646 procs / 56,142 strings) are regenerated from REA `list_procedures` / `search_strings` pages and used by `tools/symbol_db/rea_string_xrefs.py`.
+   - **Symbol DB:** the committed `docs/SYMBOL_DB/` is the source of truth (edit by hand). `python3 tools/symbol_db/build_symbol_db.py` (from repo root) drops hand rows — only use it on a scratch copy and merge. `python3 tools/symbol_db/rea_string_xrefs.py /workspace/rea /workspace/LibSaber` rebuilds `rea_string_xrefs.tsv` once the REA inventories exist.
+
+   **0.5 Box-only data: what was ported, what must be regenerated.**
+   - **Committed now** (small, own code/notes, no game content): Ghidra scripts `tools/re/ghidra_scripts/` (was `/workspace/rea/scripts`), box wrappers `tools/re/box/{g.sh,rea_env.sh,rea_dec.sh}`, REA-batch scanners `tools/re/scans/`, level scene parsers `tools/level/` (`cdlist.py`, `classlist.py`, `lights_tsv2.py`, `verify_armory.py`…), one-click QA `tools/ue/oneclick/`, and box notes `docs/handoff/box_notes/` (`rea_batch_progress.md`, `level_lights_progress.md`, `datapars_progress.md`, `heuristics4_progress.md`, `overnight_decisions.md`, `shaders_NOTES.md`, `rdc_NOTES.md`). Docs that cite `/workspace/mtl_fix/...md` mean these copies.
+   - **Regenerate from the PC game install (game-derived, not committable):** pull with the Forge Lens CLI on the PC (`Bin\...\LibSaber.SM2Extractor.exe extract "<client_pc>" --output Raw\<name> -q --filter <glob>`, hidden + Idle), `Compress-Archive`, `CopyToBox` (≤100 MB per file; split bigger sets). Targets: `/workspace/vfx3_raw` (ssl/td/tpl/pct, ~640 MB, filters `*.sfx *.td *.tpl* *.pct *.ssl part_aliases.ps`), `/workspace/vfx_raw`, `/workspace/phys_raw` (`*.cls`), level scene `paks/client/default/scenes/hub_battle_barge.pak` (already extracted on the PC at `SM2_Work\Raw\level_lights\hub_battle_barge\`). Shaders: `.sdc` bundles are already on the PC (`SM2_Work\Raw\sdc_all\shader_cache\prebuild\pc\`) → box `/workspace/shaders/raw/sdc/` → `tools/shaders/sdc.py`, `sdc_index.py`, `dis_all.sh` (dxc), `glsl_all.sh` (dxil-spirv) rebuild `/workspace/shaders/out` (8.4 GB; do only the families you need: sfx, trail, particles, glt, deferred_lighting, fog).
+   - **RenderDoc data:** the captures stay on the PC (`C:\Users\Revaptor_FX\rdc\sm2_frame*.rdc`, 2.4–4.2 GB each: 7894, 68141, 86676, 88302, 101917, 103008, 128197, 137266) with the analysis scripts `rdc\an_*_n.py`, `deep_*.py`, `lwi_armory.py`, `probe*.py`; RenderDoc nightly v1.47 at `C:\Users\Revaptor_FX\Tools\RD_nightly\` (1.46 crashes on replay). Re-run `an_<cat>_n.py` on the PC (hidden, Idle) and `CopyToBox` the outputs to `/workspace/rdc/<cat>/nightly/` when you need draws/cbuffers. Never ask the user for new captures.
+   - **Not portable / lost with the old box:** old stage screenshots (`/workspace/mtl_fix/*`, `/workspace/browser_run_shots/*`, ~6 GB), old patch files (`/workspace/patches`, all already pushed), `titus_seq` frames (PC copies under `Captures\`), decompile caches (`/workspace/rea/dec*`, `rea_dec/`; regenerate on demand), the Mod Tools dump `/workspace/rdc/modtools` (re-extract from Steam "Space Marine 2 Mod Tools", appid 3856330, if needed). None of these block the open list.
+
+   **0.6 PC-side tooling (already on the PC; just verify).** `C:\Users\Revaptor_FX\ls_push` (clone of ForgeLens, origin set to ForgeLens, remote `libsaber-old`), `Desktop\SM2_Work\Scripts\mtl_fix\push.ps1`, `C:\Users\Revaptor_FX\enginewire_call.py` + `uemcp_call.py`, `Desktop\SM2_Work\Scripts\uerun.ps1`, Python 3.10 (`pip install mcp uemcp`), UE **5.7.4** at `C:\Program Files\Epic Games\UE_5.7`, project `K:\Unreal Projects\UE_VFX_57` with plugins `McpAutomationBridge` 0.5.30 (EngineWire, port 3000, token `%USERPROFILE%\.enginewire_token` — never print/commit) and `SM2PhysicsSetup`; Forge Lens `Desktop\SM2_Work\Bin\ForgeLens_latest\ForgeLens.exe`; VS 2022 for plugin builds. If a script is missing, copy it from the repo `tools/ue/` (WORKFLOW §5).
+
+   **0.7 Recreate the hourly progress routine** (§9) under your account — load your `routines` skill; name `sm2-20`; silent when nothing changed.
+
+   **0.8 Re-save these memory facts** (your new account has none of the old memory):
+   - The user = owner **Baegovda** (GitHub); reply in short Korean 해요체; bot-to-bot docs in English, user quotes in Korean; interim reports with % + ETA (추정) in KST; translate requests into industry terms + short Korean explanation.
+   - Project: Forge Lens (SM2 asset browser + UE 5.7 exporter), repo Baegovda/ForgeLens (private), branch `cursor/sm2-pck-extractor-4420`; push only via PC `push.ps1` (ff-only, never force).
+   - PC "Revaptor-FX" (new machineId = whatever ListMachines shows), 128 GB RAM, RTX 4090; user often watches Chzzk while you work; work has top priority (full CPU OK); hidden + Idle while gaming, no focus stealing; "게임끝" = PC free; "실행해줘" = launch Forge Lens.
+   - Rules: evidence first, HEURISTIC last + labelled; never ask for in-game captures; never delete assets, `.bakN` never overwritten; protected `/Game/SM2_Work/Original/*`, `/Game/Work/*`, never save `Lightning_01`; act first then report; editor restarts pre-authorised with `-AutoDeclinePackageRecovery`; crash auto-recovery; stop own PIE; generic rules; no untrusted exes; no Discord unasked; Niagara only after asking; game-data parsing delegated; record every request in the HANDOFF ledger; batch REA items together.
+   - BongThumbLive is not yours (original bot).
+   - UE goal = Sequencer cinematic quality (Chaos Cloth + bone physics). Later: Path of Exile, then UE games — only when asked.
 1. **Who/how to talk:** the user (owner) is Korean. **Reply in short Korean 해요체**, interim reports with progress % + ETA "(추정)" in KST. Docs/commits in English, user quotes in Korean.
 2. **Access you should have** (check with `GetDynamicTools` / `ListMachines`):
-   - The user's Windows PC **"Revaptor-FX", machineId `d3fb99ad-25ca-45c1-81af-41e5ca09104a`** (PowerShell via `Shell`/`Read` with machineId). It has git + `gh` logged in as the repo owner, the game, UE 5.7.4, Python, VS 2022.
-   - The Linux **box** (shared by all of the user's agents; `/workspace`, `/home/box/tools`). If `/workspace/LibSaber` is missing on your box: you cannot clone a private repo without a login, so on the PC run `cd $env:USERPROFILE\ls_push; git bundle create $env:USERPROFILE\Desktop\SM2_Work\Backup\fl_full.bundle --all`, `CopyToBox` it, `git clone fl_full.bundle /workspace/LibSaber`, then delete the PC bundle. Tools missing on a fresh box (dotnet 8, Ghidra 12.1.4 + JDK, node24 + rea-agents 6.8.0, `sm2_retail.exe` copied from the game folder via the PC): reinstall per §4 and WORKFLOW §2.
+   - The user's Windows PC **"Revaptor-FX"** (old account's machineId was `d3fb99ad-25ca-45c1-81af-41e5ca09104a`; yours differs — step 0.1) (PowerShell via `Shell`/`Read` with machineId). It has git + `gh` logged in as the repo owner, the game, UE 5.7.4, Python, VS 2022.
+   - Your own Linux **box** (set up in step 0; it is shared by all agents of YOUR account, not with the old bot).
    - `cursor-github` MCP (read-only) is optional.
 3. **Repo:** `Baegovda/ForgeLens` (private), branch **`cursor/sm2-pck-extractor-4420`** (default). Read the tip on the PC: `git -C $env:USERPROFILE\ls_push log --oneline -5`.
 4. **Push:** only via PC `Desktop\SM2_Work\Scripts\mtl_fix\push.ps1` (patches named `0*.patch` in `%USERPROFILE%` → `git am -3` in `ls_push` → ff-only push). **Never force-push.** Details §2.
@@ -46,7 +122,7 @@ Code map: `src/LibSaber.SM2.Assets` (formats), `src/LibSaber.SM2Browser` (Avalon
 - **Push method (ledger R23) — fast-forward only, NEVER force-push:**
   1. Box: work in your own worktree based on the latest origin tip; commit with `-c user.name="Cursor Agent" -c user.email=cursoragent@cursor.com`.
   2. `git format-patch origin/cursor/sm2-pck-extractor-4420..HEAD -o /workspace/patches/<stage>/`
-  3. `CopyFromBox` each patch to `C:\Users\Revaptor_FX\0NNN-<name>.patch` (file name must start with `0`) on PC machine **`d3fb99ad-25ca-45c1-81af-41e5ca09104a`** ("Revaptor-FX"). Check sizes after copying.
+  3. `CopyFromBox` each patch to `C:\Users\Revaptor_FX\0NNN-<name>.patch` (file name must start with `0`) on the PC **"Revaptor-FX"** (old-account id `d3fb99ad-…`; use your own ListMachines id). Check sizes after copying.
   4. PC: `powershell -File "$env:USERPROFILE\Desktop\SM2_Work\Scripts\mtl_fix\push.ps1"` — it resets clone **`C:\Users\Revaptor_FX\ls_push`** to the origin tip, `git am -3` every `0*.patch`, deletes applied patches, pushes ff-only, prints `TIP <sha>`. On `AM FAILED` it aborts and leaves the patch in `%USERPROFILE%` → rebase your work on the new tip, delete/redo leftover `0*.patch`, rerun.
   5. Sync the box: the box can't fetch, so bring the new tip back with a bundle: PC `cd ls_push; git bundle create <SM2_Work>\Backup\x.bundle <old_tip>..origin/cursor/sm2-pck-extractor-4420` → `CopyToBox` → box `git fetch /path/x.bundle origin/cursor/sm2-pck-extractor-4420:refs/remotes/origin/cursor/sm2-pck-extractor-4420` → delete the temp bundle on the PC. (This is how `e5b4e8b` was brought to the box on 10/29 20:47 KST.) Alternatively read `git log` in `ls_push` via PC Shell.
 - The transfer commit that adds this file was pushed by the previous bot via push.ps1 on 2026-10-29 (see §10).
@@ -54,7 +130,7 @@ Code map: `src/LibSaber.SM2.Assets` (formats), `src/LibSaber.SM2Browser` (Avalon
 ## 3. Environment
 | What | Value |
 |---|---|
-| User PC | Windows "Revaptor-FX", user `Revaptor_FX`, machineId `d3fb99ad-25ca-45c1-81af-41e5ca09104a`, **128 GB RAM**, RTX 4090. PowerShell via `Shell` with machineId. PC shell works even when browser routing to the PC is offline. If the PC is offline, retry later (R21). |
+| User PC | Windows "Revaptor-FX", user `Revaptor_FX`, old-account machineId `d3fb99ad-25ca-45c1-81af-41e5ca09104a` (yours differs, step 0.1), **128 GB RAM**, RTX 4090. PowerShell via `Shell` with machineId. PC shell works even when browser routing to the PC is offline. If the PC is offline, retry later (R21). |
 | PC work folder | **`C:\Users\Revaptor_FX\Desktop\SM2_Work\`** only: `Bin` (deployed builds), `Scripts` (incl. `mtl_fix\push.ps1`, `mtl_fix\oneclick\`), `Export`/`Exports`, `Captures`, `Raw`, `Anim`, `Backup`, `Build`, `Tools`, `Research`, `cleanup_log.txt`. |
 | Game | `D:\Steam\steamapps\common\Space Marine 2\client_pc` (read-only; some D: reads are refused → copy to `C:\Users\Revaptor_FX\` first). |
 | Unreal | **UE 5.7.4**, project `K:\Unreal Projects\UE_VFX_57\UE_VFX_57.uproject`. Work only in **`/Game/SM2_Work`**. |

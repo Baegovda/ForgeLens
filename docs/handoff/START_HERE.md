@@ -13,7 +13,7 @@
 ## 2. Environment
 | What | Where / value |
 |---|---|
-| User PC | Windows, user `Revaptor_FX`, ListMachines id `d3fb99ad-25ca-45c1-81af-41e5ca09104a`. PowerShell via `Shell` with machineId. If offline, retry later (R21). PC shell works even when browser routing to the PC is offline. |
+| User PC | Windows, user `Revaptor_FX`, ListMachines id `d3fb99ad-25ca-45c1-81af-41e5ca09104a` (old account; on a new account use the id ListMachines shows for Revaptor-FX). PowerShell via `Shell` with machineId. If offline, retry later (R21). PC shell works even when browser routing to the PC is offline. |
 | PC work folder | `C:\Users\Revaptor_FX\Desktop\SM2_Work\` — `Bin` (deployed builds), `Scripts` (incl. `mtl_fix\push.ps1`, `mtl_fix\oneclick\`), `Export`/`Exports`, `Captures`, `Raw`, `Anim`, `Backup`, `Build` (plugin builds), `Tools`, `Research`, `cleanup_log.txt` |
 | Game | `D:\Steam\steamapps\common\Space Marine 2\client_pc` |
 | Unreal | UE **5.7.4**, project `K:\Unreal Projects\UE_VFX_57\UE_VFX_57.uproject`, work only in `/Game/SM2_Work`. Driven by **EngineWire / McpAutomationBridge** at `127.0.0.1:3000/mcp` (token `%USERPROFILE%\.enginewire_token`, never commit). Helpers `tools/ue/enginewire_call.py`, `uerun.ps1`. Plugins: `SM2PhysicsSetup` (repo `tools/ue/`), `BongThumbLive` (`K:\Unreal Projects\_Plugins\`, outside repo). |

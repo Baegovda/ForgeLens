@@ -6,7 +6,7 @@
 
 # 사용자 요청 대장 (User Request Ledger)
 
-> 오너(india님)가 지금까지 한 **모든 요청과 상시 규칙**을 한곳에 모은 대장이에요. 새 요청이 오면 **바로 여기에 한 줄 추가**하고, 상태가 바뀌면 같은 줄을 고쳐요(오너 요청, 2026-10-29: "내가했던 요청들은 인수인계문서에 꼼꼼히 적어놓으렴").
+> 오너(Baegovda님)가 지금까지 한 **모든 요청과 상시 규칙**을 한곳에 모은 대장이에요. 새 요청이 오면 **바로 여기에 한 줄 추가**하고, 상태가 바뀌면 같은 줄을 고쳐요(오너 요청, 2026-10-29: "내가했던 요청들은 인수인계문서에 꼼꼼히 적어놓으렴").
 > - 출처: 봇 메모리(오너 발언 요지), 이 파일의 단계별 기록, `AGENTS.md`, `docs/handoff/{STATUS,ROADMAP,WORKFLOW,RE_NOTES}.md`, box `/workspace/mtl_fix/*.md`(`overnight_decisions.md`, `datapars_progress.md`, `heuristics4_progress.md`), `/workspace/animthumb/REPORT.md`, `git log`. 중복은 합쳤어요.
 > - 날짜는 KST(2026년). 커밋 sha는 `origin/cursor/sm2-pck-extractor-4420` 기준이에요.
 > - 상태: **done**(완료, sha) · **in progress**(진행 중) · **pending**(대기, 아직 시작 전) · **future**(로드맵 밖, 요청 시에만) · **standing**(상시 규칙, 항상 적용).
@@ -49,6 +49,7 @@
 | R31 | 10/29 | 내 요청은 인수인계 문서에 꼼꼼히 기록(업계 용어·뜻·상태 포함), 계속 최신으로 | Requirements traceability ledger — 요구사항 추적 대장 | standing (done: 이 섹션, `docs: user request ledger`) | 이 섹션 |
 | R32 | 10/29 | HEURISTIC은 되도록 쓰지 말고, 모든 규칙은 먼저 게임 데이터/exe 근거로 정해요. 근거 찾기가 실패했을 때만 마지막 수단으로 HEURISTIC을 쓰고, 그때는 분명하게 표시해요 | Evidence-first rule derivation — 근거 우선 규칙 도출(데이터·exe·캡처 → 마지막에만 추정) | standing (fix54부터) | `docs/handoff/WORKFLOW.md` §0, 이 대장 "REA 일괄 처리 목록" |
 | R33 | 10/29 | "봉썸라이브는 계속 작업할거고 sm2는 다른 그록봇 인계해서 작업할거야 그 봇이 마치 너가 그대로옮겨간것처럼 인수인계 파일 써넣어주고 프롬프트까지 줘" | Ownership transfer / bot handoff — SM2는 새 그록봇이 그대로 이어받고, BongThumbLive는 기존 봇이 계속 | standing (done: `docs/BOT_TRANSFER.md`, box `/workspace/handoff/`) | `docs/BOT_TRANSFER.md` |
+| R34 | 10/29 | "새 봇이 다른 계정에 있어서 아예 컴퓨터환경도 다시 꾸려야할거야 이점도 다써놔" | Environment bootstrap / fresh-account provisioning — 새 봇은 다른 계정이라 박스·도구·로그인·메모리·루틴을 처음부터 다시 구성해야 하니 그 방법을 문서화 | done: `docs/BOT_TRANSFER.md` §0 step 0 (PC 연결, GitHub, 정확한 도구 버전 설치, exe/Ghidra/REA 재생성, box-only 스크립트·노트 커밋, 루틴, 메모리); 문서의 오너 이름 = Baegovda |
 
 ## B. 기능 요청 (Feature requests)
 
@@ -123,7 +124,7 @@
 | X02 | 10/28 | SM2 끝나면 다음은 Path of Exile 읽기 | Multi-game support (PoE) — 다른 게임 포맷 지원 | future | ROADMAP (추가 예정) |
 | X03 | 10/27–28 | 그 다음 Unreal Engine 게임 읽기(.pak/IoStore) | UE game extraction — 언리얼 게임 에셋 추출 | future | ROADMAP "Possible future development" |
 
-합계: 상시 규칙 33 · 기능 요청 60 · 미래 3 = **96건** (2026-10-29 20:50 KST 기준; R33 인계 추가).
+합계: 상시 규칙 34 · 기능 요청 60 · 미래 3 = **97건** (2026-10-29 21:10 KST 기준; R33 인계, R34 새 계정 환경 구성 추가).
 
 ---
 
@@ -143,7 +144,7 @@ Check with GetMcpServerStatus / GetDynamicTools. Install missing ones with Searc
 |---|---|---|---|
 | REA (reverse engineering) | namespace `user-rea` (plugin "REA"; Ghidra, JADX and similar) | the REA-first rule, mandatory | **Obsolete (2026-10-27):** the REA tool is now https://github.com/morluto/rea on the box — see `docs/handoff/WORKFLOW.md` → REA (morluto/rea) |
 | GitHub | `cursor-github` (read-only) | PR and commit reads | RequestScmConnect / InstallPlugin |
-| Owner's PC shell | ListMachines, then the machine named **Revaptor-FX** (id `d3fb99ad-25ca-45c1-81af-41e5ca09104a` at the time of writing) | PowerShell, Unreal control, push | the owner has to register the PC |
+| Owner's PC shell | ListMachines, then the machine named **Revaptor-FX** (id `d3fb99ad-25ca-45c1-81af-41e5ca09104a` (old account; on a new account use the id ListMachines shows for Revaptor-FX) at the time of writing) | PowerShell, Unreal control, push | the owner has to register the PC |
 | Unreal Editor | **EngineWire / MCP Automation Bridge 0.5.30** plugin in the project (https://github.com/ChiR24/Unreal_mcp), driven by `tools/ue/enginewire_call.py` via `uerun.ps1`; fallback **UEMCP** (`pip install uemcp`, https://github.com/ATDev-Inc/uemcp, `tools/ue/uemcp_call.py`) | import, materials, captures | see step 2 and WORKFLOW.md §5 |
 
 ## 2. Tools: check they exist, install them if missing
@@ -168,7 +169,7 @@ Check with GetMcpServerStatus / GetDynamicTools. Install missing ones with Searc
    - If `ls_push` is missing, clone the branch into it first.
 - Commit identity: `-c user.name="Cursor Agent" -c user.email=cursoragent@cursor.com`.
 
-## 4. Working contract with the owner (india님, Korean)
+## 4. Working contract with the owner (Baegovda님, Korean)
 - Reply in Korean, short and plain.
 - Report at each stage.
 - Do items one at a time, in order, and confirm before starting the next big step.
@@ -185,7 +186,7 @@ Check with GetMcpServerStatus / GetDynamicTools. Install missing ones with Searc
 For any agent continuing this work: read this whole file before you do anything.
 
 ## Owner and how to work with them
-- The owner is india (address them as india님). They speak Korean, so reply in Korean.
+- The owner is Baegovda (GitHub name; address them as Baegovda님). They speak Korean, so reply in Korean.
   - They want a short progress report at every stage, not just at the end ("중간중간 보고").
   - When they say "실행해줘", launch `LibSaber.SM2Browser.exe` on their PC.
 - **Investigate by reverse-engineering first (mandatory).** For any file-format, material or shader problem:
@@ -2554,4 +2555,5 @@ Owner request (ledger F60, "원클릭 내보내기를 옵션으로도 만들어�
 - New single entry point for the new bot: **`docs/BOT_TRANSFER.md`** (goal, repo + push, environment, REA + Symbol DB, rules, status, ordered open list, routine). Box copy `/workspace/handoff/BOT_TRANSFER.md`; first prompt `/workspace/handoff/NEW_BOT_PROMPT.md`.
 - Box clone `/workspace/LibSaber` was fast-forwarded 1565d17 → `e5b4e8b` with an incremental bundle from the PC clone `ls_push` (box has no GitHub login), then this commit was made and pushed from the PC via `push.ps1` (patch copy box `/workspace/handoff/`).
 - State checked at 20:50 KST: no game running, UE closed (port 3000 closed), no leftover `0*.patch`, deployed `ForgeLens_latest\ForgeLens.exe` sha256 `3B74C617…2124A36` (+ `.bak14`–`.bak17`). REA daemon processes alive since 10:22 but without a Ghidra child (last answers 11:33) → treat as cold (≈22 min re-import) or use the headless fallback.
+- 20:55 KST follow-ups: the new bot is on a **different Grok Bot account** (no shared box/memory/routines/PC registration) → BOT_TRANSFER §0 step 0 "Fresh environment setup"; box-only scripts/notes committed (`tools/re/ghidra_scripts`, `tools/re/box`, `tools/re/scans`, `tools/level`, `tools/ue/oneclick`, `docs/handoff/box_notes`); owner name in docs = **Baegovda**.
 - Open list (order): REA batch {ribbon trail per-point colour writer, adaptive light multiplier (param_3 of FUN_14224ecf0), DAT_14502deac writer, player fire clip selection (HEURISTIC)} → L/R pauldron overrides → colour scheme → UE master material → F43 .td non-texture params → muzzle flash offset + aim pose from data → physics for other characters → cloth build28 → level/prop placement extraction → later PoE / UE games.

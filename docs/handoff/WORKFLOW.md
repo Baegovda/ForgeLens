@@ -9,7 +9,7 @@
 | Kind of work | Runs on | How |
 |---|---|---|
 | Code, parsing, analysis, Ghidra/rizin RE, unit tests, headless browser captures, reports | **Bot's Linux box** (persistent, shared by the user's agents) | `Shell` without machineId |
-| Anything needing the full game install, the real exe GUI, Unreal Editor, in-game captures | **User's Windows PC "Revaptor-FX"** | `ListMachines` → machine id (`d3fb99ad-25ca-45c1-81af-41e5ca09104a` at time of writing), then `Shell`/`Read` with that machineId (PowerShell) |
+| Anything needing the full game install, the real exe GUI, Unreal Editor, in-game captures | **User's Windows PC "Revaptor-FX"** | `ListMachines` → machine id (`d3fb99ad-25ca-45c1-81af-41e5ca09104a` (old account; on a new account use the id ListMachines shows for Revaptor-FX) at time of writing), then `Shell`/`Read` with that machineId (PowerShell) |
 | Pushing to GitHub | **User's PC** (`push.ps1`, current since 10/28) | format-patch → copy `0*.patch` to `%USERPROFILE%` → `Scripts\mtl_fix\push.ps1` (`git am -3`, ff-only push) (§4) |
 - The box is cheaper per step (fewer round trips): do analysis and rendering there. Only exe/UE/game-data steps go to the PC.
 - Move files between them with `CopyToBox` (PC → `/workspace/...`) and `CopyFromBox` (box → PC). Check the size after copying; a copy once delivered a stale file.
