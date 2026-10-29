@@ -486,6 +486,75 @@ def chameleon_ramp(cham):
 CHAMELEON_CAPTURE_DEFAULT_PARAMS = chameleon_params({})
 
 
+# R49: colour scheme ({tpl}.colour_scheme.{id}.json, ArmorColourSchemes.UeParams) on the master material.
+# Static switch UseColourScheme (default off = old path, bit-identical). Per layer L (mask r,g,b,a = layer0..3):
+#   col = lerp(Tint, MetalTint, max(metal, Metallic));  col = lerp(col, base * col, MultiplyBase)
+#   albedo = lerp(albedo, col, SchemeMask[L] * Tint.a * Enabled)
+# Rule from the glt PS layer loop (RE_NOTES "Preview (code, ArmorSchemeBake)"); Metallic as max() is HEURISTIC (isMetallic).
+SCHEME_CH = ("r", "g", "b", "a")
+
+
+def colour_scheme(material, base, metal, x, y):
+    linear = unreal.MaterialSamplerType.SAMPLERTYPE_MASKS
+    smask = param_tex(material, "SchemeMask", x - 900, y, linear)
+    out = base
+    for i, ch in enumerate(SCHEME_CH):
+        yy = y + 260 * i
+        t = expr(material, unreal.MaterialExpressionVectorParameter, x - 700, yy)
+        t.set_editor_property("parameter_name", "Layer%dTint" % i)
+        t.set_editor_property("default_value", unreal.LinearColor(1.0, 1.0, 1.0, 0.0))
+        mt = expr(material, unreal.MaterialExpressionVectorParameter, x - 700, yy + 120)
+        mt.set_editor_property("parameter_name", "Layer%dMetalTint" % i)
+        mt.set_editor_property("default_value", unreal.LinearColor(1.0, 1.0, 1.0, 1.0))
+        mflag = scalar(material, "Layer%dMetallic" % i, 0.0, x - 700, yy + 200)
+        mb = scalar(material, "Layer%dMultiplyBase" % i, 0.0, x - 500, yy + 200)
+        en = scalar(material, "Layer%dEnabled" % i, 0.0, x - 300, yy + 200)
+        m = op(material, unreal.MaterialExpressionMax, metal, mflag, x - 500, yy + 120)
+        col = lerp(material, mask(material, t, "rgb", x - 500, yy), mask(material, mt, "rgb", x - 500, yy + 60), m, x - 350, yy)
+        col = lerp(material, col, mul(material, out, col, x - 250, yy + 60), mb, x - 150, yy)
+        w = mul(material, mul(material, mask(material, smask, ch, x - 350, yy + 140, "RGBA"), mask(material, t, "r", x - 350, yy + 180, "A"), x - 200, yy + 150), en, x - 100, yy + 150)
+        out = lerp(material, out, col, w, x, yy)
+    return switch(material, "UseColourScheme", base, out, x + 200, y)
+
+
+def find_scheme(sidecar_path):
+    """Explicit --scheme=<json> / SM2_COLOUR_SCHEME wins; else the one *.colour_scheme.*.json beside the sidecar (the browser
+    writes it only when a scheme is picked); none or several -> None (old behaviour)."""
+    for arg in sys.argv[1:]:
+        if arg.startswith("--scheme="):
+            return arg.split("=", 1)[1]
+    if os.environ.get("SM2_COLOUR_SCHEME"):
+        return os.environ["SM2_COLOUR_SCHEME"]
+    here = os.path.dirname(os.path.abspath(sidecar_path))
+    found = [n for n in os.listdir(here) if ".colour_scheme." in n and n.endswith(".json")]
+    return os.path.join(here, found[0]) if len(found) == 1 else None
+
+
+def scheme_part_for(scheme, slot_name, diffuse_name):
+    """Scheme part for a material slot: same part name, else same texture / albedo as the slot diffuse (case-insensitive)."""
+    keys = {k.lower() for k in (slot_name, diffuse_name) if k}
+    for part in (scheme or {}).get("parts", []):
+        if {str(part.get(k, "")).lower() for k in ("part", "texture", "albedo")} & keys:
+            return part
+    return None
+
+
+def scheme_values(part):
+    """(vectors, scalars) material-instance values for one scheme part (pure; unit-tested)."""
+    vec, sca = {}, {}
+    p = part.get("params", {})
+    for i in range(4):
+        on = str(p.get("Layer%dEnabled" % i, "0")) == "1" or p.get("Layer%dEnabled" % i) == 1
+        sca["Layer%dEnabled" % i] = 1.0 if on else 0.0
+        if not on:
+            continue
+        vec["Layer%dTint" % i] = tuple(float(v) for v in p["Layer%dTint" % i])
+        vec["Layer%dMetalTint" % i] = tuple(float(v) for v in p["Layer%dMetalTint" % i])
+        sca["Layer%dMetallic" % i] = float(p.get("Layer%dMetallic" % i, 0))
+        sca["Layer%dMultiplyBase" % i] = float(p.get("Layer%dMultiplyBase" % i, 0))
+    return vec, sca
+
+
 def make_master(folder, asset_name="M_SM2", translucent=False):
     # translucent=True is the Transp(a) parent (glass, gibs caps): diffuse alpha drives Opacity.
     tools = unreal.AssetToolsHelpers.get_asset_tools()
@@ -665,6 +734,7 @@ def make_master(folder, asset_name="M_SM2", translucent=False):
     plain_rgb = instance_tint(material, albedo_rgb, -200, -1500)
     cham_rgb = chameleon(material, albedo_rgb, plain_rgb, metal_b, detail_switch, -200, -900)
     tinted = mul(material, cham_rgb, tint_mix, -200, -260)
+    tinted = colour_scheme(material, tinted, metal_b, -200, -2600)
     front = spec_layers(material, tinted, metal_b, rough_b, detail_switch, emit_mul, albedo_rgb, metal, rough_switch, ao_source)
     if translucent:
         # Substrate translucency: coverage = diffuse alpha.
@@ -862,6 +932,11 @@ def build(sidecar_path, folder):
     hidden = make_hidden(folder)
     cache = {}
     instances = {}
+    scheme_path = find_scheme(sidecar_path)
+    scheme = load_sidecar(scheme_path) if scheme_path else None
+    scheme_hits = 0
+    if scheme:
+        unreal.log("SM2 colour scheme " + str(scheme.get("scheme")) + " from " + scheme_path)
 
     def texture_for(entry, normal):
         if entry is None:
@@ -936,10 +1011,31 @@ def build(sidecar_path, folder):
             lin = [pow(float(c), 2.2) for c in albedo_tint[:3]]
             unreal.MaterialEditingLibrary.set_material_instance_vector_parameter_value(instance, "AlbedoTint", unreal.LinearColor(lin[0], lin[1], lin[2], 1.0))
         apply_spec_layers(instance, slot, texture_for)
+        spart = scheme_part_for(scheme, name, (diffuse or {}).get("name")) if scheme else None
+        if spart:
+            sdir = os.path.dirname(os.path.abspath(scheme_path))
+            mfile = next((os.path.join(sdir, spart["mask"] + e) for e in (".png", ".tga", ".dds") if os.path.exists(os.path.join(sdir, spart["mask"] + e))), None)
+            if mfile is None:
+                unreal.log_warning("SM2 scheme part " + spart["part"] + ": mask " + spart["mask"] + " not exported beside the scheme json; skipped")
+            else:
+                mel = unreal.MaterialEditingLibrary
+                mel.set_material_instance_texture_parameter_value(instance, "SchemeMask", import_texture(mfile, folder + "/Textures", spart["mask"], False, False))
+                afile = next((os.path.join(sdir, spart["albedo"] + e) for e in (".png", ".tga", ".dds") if spart.get("albedo") and os.path.exists(os.path.join(sdir, spart["albedo"] + e))), None)
+                if afile:  # neutral _a albedo, so the scheme is not applied on top of a baked one
+                    mel.set_material_instance_texture_parameter_value(instance, "Diffuse", import_texture(afile, folder + "/Textures", spart["albedo"], True, False))
+                vec, sca = scheme_values(spart)
+                for k, v in vec.items():
+                    mel.set_material_instance_vector_parameter_value(instance, k, unreal.LinearColor(*v))
+                for k, v in sca.items():
+                    mel.set_material_instance_scalar_parameter_value(instance, k, v)
+                mel.set_material_instance_static_switch_parameter_value(instance, "UseColourScheme", True)
+                scheme_hits += 1
         unreal.EditorAssetLibrary.save_loaded_asset(instance)
         instances[name] = instance
         unreal.log("SM2 instance " + name)
 
+    if scheme:
+        unreal.log("SM2 colour scheme applied to " + str(scheme_hits) + " of " + str(len(scheme.get("parts", []))) + " scheme parts")
     mesh_name = data.get("mesh") or "mesh"
     candidates = [
         folder + "/" + mesh_name,
