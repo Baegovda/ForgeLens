@@ -16,7 +16,7 @@ public class PropAnimTests
   };
 
   /// <summary>Object 0 slides on X over frames 0..4 (SHOOT_1) and hides at frame 11 (HIDE); object 1 turns about Z over 20..30 (chain_anim).</summary>
-  private static animTRACK Track()
+  internal static animTRACK Track()
   {
     // File order w, x, y, z of the conjugate: a +90° turn about Z is stored as (cos45, 0, 0, -sin45).
     var s = MathF.Sqrt(0.5f);

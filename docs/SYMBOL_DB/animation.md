@@ -75,3 +75,12 @@ Long-form: RE_NOTES "Animation", HANDOFF sani gaps, Animation finishing.
 | FUN_141824520 | 0x141824520 | DECOMPILED | strings: alphaMask / isEnabled / normalMap / roughness / metalness / transparency (domain from its dump file) | /workspace/rea/vfxw_2.c |
 | FUN_1418248f0 | 0x1418248f0 | DECOMPILED | strings: alphaMask / isEnabled / normalMap / roughness / metalness / transparency (domain from its dump file) | /workspace/rea/vfxw_2.c |
 | fireRateAffectShootAnim | — | NOTED | no exe string (also no fireRate/shootAnim, ASCII or UTF-16) → player shoot-clip choice lives in script data (SSL/.sso), not exe (rea-batch 6) | RE_NOTES#rea-batch 6 |
+
+## Data symbols: player fire (R38, not exe functions)
+| Symbol | Where | Meaning | Label |
+|---|---|---|---|
+| `ho_shoot` | MorphemeFloat, `recoil_animation_controller.sso` → `ControlParameters\|ho_shoot` | shot pulse (20 ms) | DATA |
+| `wpnType` → `wpn_type` | firearm cls `prop_firearm_type_settings` → `ControlParameters\|wpn_type` | weapon class key for fire clip switches | INFERRED |
+| `LOCO\|minizoom\|shoot\|shoot_state` | primaris.nmb | aimed fire state (tacticus_shtN_shoot_aim) | DATA |
+| `LOCO\|loco2\|blind_shoot\|*\|shoot\|shoot_state` | primaris.nmb | hip fire states (tacticus_shtN_shoot_blind) | DATA |
+See docs/handoff/FIRE_CLIP.md.

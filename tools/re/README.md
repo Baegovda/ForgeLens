@@ -1,3 +1,6 @@
+# Morpheme network (.nmb)
+- `nmb_reader.py <x.nmb> [--state REGEX] [--map wpn.tsv]`: dumps switch/expression trees of states (default: player shoot states) and evaluates wpnType → fire clip. Layout derived from data, see docs/handoff/FIRE_CLIP.md.
+
 # SSLB scripts (datapars)
 - `sslb.py <file.sslbin> [x]`: classes / members / constants (x = also disassemble every method); `pb.py <file>`: raw protobuf dump. Layout: docs/SYMBOL_DB/scripting.md.
 

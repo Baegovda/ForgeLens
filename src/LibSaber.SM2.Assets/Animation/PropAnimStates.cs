@@ -28,9 +28,10 @@ public sealed record PropAutoPlan(List<TplPlay> Plays, List<string> Notes);
 ///       SHOOT=[SHOOT_1..3], RELOAD=[RELOAD_START,RELOAD_END,RELOAD_FULL]; <c>shootAnimation</c> default <c>SHOOT_1</c>.</item>
 ///     <item>Melee and other props (DATA): blueprint <c>Startanim</c>/<c>Stopanim</c> nodes and what triggers them
 ///       (<see cref="EventAnim" />), e.g. chainsword <c>OnHoldInArms → chain_anim (cycle)</c>, <c>hitN_start_anim → animN</c>.</item>
-///     <item>Shot = an event on the character clip's <c>Shoot</c> track (HEURISTIC); player firing clips have none, so a clip
-///       named <c>*shoot*</c>/<c>*fire*</c> fires every <c>60 / shotsPerMin</c> s of the firearm's <c>firearm_library_pve</c>
-///       barrel (rate DATA, firing clip by name HEURISTIC).</item>
+///     <item>Shot = an event on the character clip's <c>Shoot</c> track (HEURISTIC); player firing clips have none. A player fire
+///       clip (<see cref="PlayerFireClips"/>: <c>tacticus_shtN_shoot_aim|blind</c>, selected by the network from the firearm's
+///       <c>wpnType</c>, INFERRED) fires every <c>60 / shotsPerMin</c> s of the firearm's <c>firearm_library_pve</c> barrel (rate DATA).
+///       Other clips named <c>*shoot*</c>/<c>*fire*</c> keep the old name rule (HEURISTIC).</item>
 ///     <item>Reload = the clip carries a <c>reload_sound_seq</c> event track (DATA: exactly the 18 of 23,227 retail clips that
 ///       are reloads); RELOAD_END starts at its <c>snd_reload_mag_in</c> event (INFERRED).</item>
 ///   </list>
@@ -186,7 +187,8 @@ public static class PropAnimStates
   ///   the blueprints the weapon class owns.
   /// </summary>
   public static PropAutoPlan AutoPlays(TplAnimation anim, AnimationClip? character, IEnumerable<EventAnim>? triggers,
-    IReadOnlyDictionary<string, HashSet<int>>? masks = null, string? shootAnimation = null, IReadOnlyList<FirearmFireRate>? fireRates = null)
+    IReadOnlyDictionary<string, HashSet<int>>? masks = null, string? shootAnimation = null, IReadOnlyList<FirearmFireRate>? fireRates = null,
+    double? wpnType = null)
   {
     var plays = new List<TplPlay>();
     var notes = new List<string>();
@@ -245,11 +247,21 @@ public static class PropAnimStates
           plays.Add(new TplPlay(shoot, at, Why: $"shot → shootAnimation {shoot.Name} (FSM DATA; shot = Shoot track HEURISTIC)", Mask: MaskOf(shoot, masks)));
       }
 
-    // 3b. Player firing clips carry no Shoot track (only 55 NPC trooper clips do): a clip named *shoot*/*fire* (not reload)
-    // keeps firing — shootAnimation looped from 0, i.e. one shot per sequence length (HEURISTIC: name, and the rate).
+    // 3b. Player firing clips carry no Shoot track (only 55 NPC trooper clips do). The player network (primaris.nmb) fires through
+    // tacticus_shtN_shoot_aim|blind, picked by wpn_type (R38, INFERRED); the shot is the ho_shoot pulse, not a clip event.
+    // Any other clip named *shoot*/*fire* (not reload) keeps the old name rule (HEURISTIC).
+    var playerFire = PlayerFireClips.IsFireClip(character.Name);
     if (shoot is not null && !plays.Any(p => p.Seq == shoot) && character.Name is { } clipName && reloadTrack is null
-        && Regex.IsMatch(clipName, "shoot|fire", RegexOptions.IgnoreCase) && !clipName.Contains("reload", StringComparison.OrdinalIgnoreCase))
+        && (playerFire || (Regex.IsMatch(clipName, "shoot|fire", RegexOptions.IgnoreCase) && !clipName.Contains("reload", StringComparison.OrdinalIgnoreCase))))
     {
+      var clipWhy = playerFire ? "player fire clip (primaris.nmb wpn_type switch, INFERRED)" : "firing clip (name HEURISTIC)";
+      if (playerFire && wpnType is { } wt)
+      {
+        var pick = PlayerFireClips.For(wt);
+        var sht = PlayerFireClips.ShtIndex(clipName);
+        if (sht != PlayerFireClips.ShtIndex(pick.Aim) && sht != PlayerFireClips.ShtIndex(pick.Blind))
+          notes.Add($"wpnType {wt}: the network picks {pick.Aim} / {pick.Blind} ({pick.Evidence}), not {Path.GetFileName(clipName)}.");
+      }
       var rate = fireRates?.FirstOrDefault(r => r.Interval > 0);
       if (rate is not null && duration > 0)
       {
@@ -258,14 +270,14 @@ public static class PropAnimStates
         var count = Math.Min(512, Math.Max(1, (int)Math.Ceiling(duration / step - 1e-4f)));
         for (var k = 0; k < count; k++)
           plays.Add(new TplPlay(shoot, k * step, End: (k + 1) * step,
-            Why: k == 0 ? $"firing clip (name HEURISTIC) → {shoot.Name} every {step:0.000}s = 60/{rate.ShotsPerMin:0} shotsPerMin ({rate.Uid}.{rate.Barrel}, {rate.ShootLogic ?? "?"}; DATA)" : "", Mask: MaskOf(shoot, masks)));
+            Why: k == 0 ? $"{clipWhy} → {shoot.Name} every {step:0.000}s = 60/{rate.ShotsPerMin:0} shotsPerMin ({rate.Uid}.{rate.Barrel}, {rate.ShootLogic ?? "?"}; DATA)" : "", Mask: MaskOf(shoot, masks)));
         if (fireRates!.Select(r => r.ShotsPerMin).Distinct().Count() > 1)
           notes.Add($"{rate.Uid}: barrels differ in shotsPerMin ({string.Join(", ", fireRates!.Select(r => $"{r.Barrel} {r.ShotsPerMin:0}"))}); the first one is used.");
         if (rate.AffectsShootAnim == true)
           notes.Add("fireRateAffectShootAnim = True: the game also scales the shoot sequence to the fire rate (not applied here).");
       }
       else
-        plays.Add(new TplPlay(shoot, 0f, Loop: true, Why: $"firing clip (name) → shootAnimation {shoot.Name} looped (HEURISTIC: no Shoot track or firearm_library rate; rate = sequence length)", Mask: MaskOf(shoot, masks)));
+        plays.Add(new TplPlay(shoot, 0f, Loop: true, Why: $"{clipWhy} → shootAnimation {shoot.Name} looped (HEURISTIC: no Shoot track or firearm_library rate; rate = sequence length)", Mask: MaskOf(shoot, masks)));
     }
 
         // 4. Morpheme events named by blueprint triggers (DATA): start at the event (or its end for OnDeactivate/OnExit).
