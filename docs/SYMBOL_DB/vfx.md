@@ -361,3 +361,9 @@ Long-form: RE_NOTES.md "VFX", HANDOFF vfx3 parts 1-4, vfx4-1, mtl1-34..41, mtl1-
 | FUN_142618370 | 0x142618370 | DECOMPILED | decompiled (945 B), purpose not documented (domain from its dump file) | /workspace/rea/m44_c1.c |
 | FUN_142619a20 | 0x142619a20 | DECOMPILED | decompiled (679 B), purpose not documented (domain from its dump file) | /workspace/rea/m44_c1.c |
 | FUN_142836290 | 0x142836290 | DECOMPILED | decompiled (78 B), purpose not documented | /workspace/rea/m17_5.c |
+| FUN_141836a80 | 0x141836a80 | PROVEN | trail visuals serializer: +0x18 colorIntensityMultiplier, +0x58 alphaMult, +0x5c explicitBloom, +0x74 softDepth, +0x78 blendType → PS_REG_TRAIL_EMISSIVE = [cim, alphaMult, 1, explicitBloom], MISC_2.x = 1/softDepth (rea-batch) | RE_NOTES#rea-batch |
+| FUN_14198d480 | 0x14198d480 | NOTED | sfx_light_base class registration (in FUN_14174d720) | RE_NOTES#rea-batch |
+| FUN_1419b0a00 | 0x1419b0a00 | NOTED | sfx_light factory (vtable 0x1436423c0, size 0x110) | RE_NOTES#rea-batch |
+| FUN_1418c3b30 | 0x1418c3b30 | NOTED | sfx_light update (vtable slot 19) → CreateLight; attenCurveParam reader not found | RE_NOTES#rea-batch |
+| FUN_1413831e0 | 0x1413831e0 | NOTED | gsLIGHT_MANAGER::CreateLight → FUN_141383440 / FUN_141384090 | RE_NOTES#rea-batch |
+| CB_PASS_TRAIL slot 0x12 | — | NOTED | trail pass CB slot set in FUN_1421ca290 | RE_NOTES#rea-batch |

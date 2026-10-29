@@ -431,7 +431,7 @@ public partial class MainWindow
       var albedo = (slot.DiffOverride is { Length: > 0 } d ? Image(d) : null) ?? baseAlbedo.GetValueOrDefault(texture);
       if (albedo is null)
         continue;
-      a[texture] = ArmorSchemeBake.Albedo(albedo, mask, spec, layers, slot.Enabled);
+      a[texture] = ArmorSchemeBake.Albedo(albedo, mask, spec, layers, slot.Enabled, slot.BlendModes, slot.PatternModes);
       if (dump is not null)
       {
         log.AppendLine($"{part.Name}\ttex={texture}\tbaseHit={baseAlbedo.ContainsKey(texture)}\tmask={slot.Mask} {mask.Width}x{mask.Height}\tdiff={slot.DiffOverride}\tspec={part.Specular}({spec?.Channels})\tlayers={string.Join(",", layers.Select(l => l.Colour + l.Hex))}");
@@ -440,7 +440,7 @@ public partial class MainWindow
         Png(texture + "__a", albedo);
       }
       if (spec is not null && doneSpec.Add(part.Specular!))
-        s[part.Specular!] = ArmorSchemeBake.Specular(spec, mask, layers, slot.Enabled);
+        s[part.Specular!] = ArmorSchemeBake.Specular(spec, mask, layers, slot.Enabled, slot.PatternModes);
     }
 
     if (dump is not null)

@@ -54,10 +54,13 @@ public static class PhysicsParser
           if (Child(j, key) is null) joint.Defaulted.Add(key);
           return Num(j, key, fallback);
         }
+        // rea-batch: defaults PROVEN from the joint array grow path FUN_1416e9a20 / FUN_1415e28a0 (0x30-byte joint:
+        // +0x10 stiffness 0, +0x14 dampingRation 0, +0x18 mass 1.0, +0x1c isParent false, +0x20 jointAngle 10.0,
+        // +0x24 isInvertedLook false, +0x28 gravity 0); the reader FUN_141474d60 keeps them when a key is absent.
         joint.Stiffness = Field("stiffness", 0);
-        joint.DampingRation = Field("dampingRation", 1);
+        joint.DampingRation = Field("dampingRation", 0);
         joint.Mass = Field("mass", 1);
-        joint.JointAngle = Field("jointAngle", 30);
+        joint.JointAngle = Field("jointAngle", 10);
         joint.Gravity = Field("gravity", 0);
         if (Child(j, "isParent") is not null) joint.IsParent = Bool(j, "isParent", false);
         if (Child(j, "isInvertedLook") is not null) joint.IsInvertedLook = Bool(j, "isInvertedLook", false);

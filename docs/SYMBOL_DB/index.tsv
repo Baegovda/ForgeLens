@@ -762,3 +762,17 @@ DAT_144f9d068	0x144f9d068	vfx	…, 0.05, 50) (avgLum DAT_144f9d06c, stride 0x198
 DAT_144f9d06c	0x144f9d06c	vfx	…1425c8770. CB_COMMON filler FUN_141e90d00: +0x160 AVERAGE_LUMINANCE_CLAMPED = clamp(avgLum, 0.05, 50) (avgLum DAT_144f9d06c, stride 0x198 per viewport), +0x164 = avgLum, +0x150 EXPOSURE_DIV_AVG_LUM = DAT_144f9d068 / av…	PROVEN	docs/handoff/RE_NOTES.md#mtl1-50b REA pass 2 on the four open HEURISTICs (2026-10-29 		
 0x145025000	0x145025000	vfx	Trail DEGR: DataRefs over 0x145025000..+0x300 → only the WRITEs in FUN_1421ca290; callers of FUN_1418c09a0	NOTED	HANDOFF.md#vfx3p/q (2026-10-27 KST) — distortion.power + trail DEGR: no		
 0x145025180	0x145025180	vfx	Trail DEGR: the name handles 0x145025180/1a8/220/2c0 have only the registration WRITEs in FUN_1421ca290 (DataRefs);	NOTED	HANDOFF.md#vfx3o (2026-10-27 KST) — curve slots, row 4 writers, softDep		
+FUN_1414828a0	0x1414828a0	physics	spring damper solver RK4 (rea-batch)	PROVEN	docs/SYMBOL_DB/physics.md		
+FUN_1416e9a20	0x1416e9a20	physics	damper joint defaults (grow)	PROVEN	docs/SYMBOL_DB/physics.md		
+FUN_1415e28a0	0x1415e28a0	physics	damper joint array reader	PROVEN	docs/SYMBOL_DB/physics.md		
+FUN_141474d60	0x141474d60	physics	damper joint key reader	PROVEN	docs/SYMBOL_DB/physics.md		
+FUN_141475050	0x141475050	physics	damper joint writer	PROVEN	docs/SYMBOL_DB/physics.md		
+FUN_1427ab3c0	0x1427ab3c0	physics	clamped from-to rotation	PROVEN	docs/SYMBOL_DB/physics.md		
+FUN_1427aab90	0x1427aab90	physics	unclamped from-to rotation	INFERRED	docs/SYMBOL_DB/physics.md		
+0x144ccbf40	0x144ccbf40	materials	tintBlendMode enum [multiply, linear_blend]	PROVEN	docs/SYMBOL_DB/customization.md		
+0x144ccbfc8	0x144ccbfc8	materials	layer blendMode enum [tint_only, tex_hardlight, tex_blend]	PROVEN	docs/SYMBOL_DB/customization.md		
+FUN_141836a80	0x141836a80	vfx	trail visuals serializer	PROVEN	docs/SYMBOL_DB/vfx.md		
+FUN_14198d480	0x14198d480	vfx	sfx_light_base registration	NOTED	docs/SYMBOL_DB/vfx.md		
+FUN_1419b0a00	0x1419b0a00	vfx	sfx_light factory vtable 0x1436423c0	NOTED	docs/SYMBOL_DB/vfx.md		
+FUN_1418c3b30	0x1418c3b30	vfx	sfx_light update slot 19	NOTED	docs/SYMBOL_DB/vfx.md		
+FUN_1413831e0	0x1413831e0	vfx	gsLIGHT_MANAGER::CreateLight	NOTED	docs/SYMBOL_DB/vfx.md		

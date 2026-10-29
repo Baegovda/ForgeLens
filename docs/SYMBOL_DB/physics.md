@@ -138,6 +138,13 @@ Long-form: RE_NOTES "Physics", HANDOFF secondary physics, mtl1-8..13, mtl1-30..3
 | symbol | address | status | purpose | source |
 |---|---|---|---|---|
 | strings springDampers / timeScale / windFlutter / joints / stiffness / dampingRation / jointAngle / constrains / upLocatorName / downLocatorName / radius | 0x143634e30–0x143634ec0 | STRING | field names of the motion damper controller (`dampingRation` is the game's spelling) | exe strings |
-| serializer xrefs | 0x141475c10, 0x141475db0, 0x1414760c0, 0x141476260, 0x1415e1210 | XREF | functions referencing those strings (serializer registration); defaults and the solver step NOT recovered → parser defaults HEURISTIC | REA string xrefs |
+| serializer xrefs | 0x141475c10, 0x141475db0, 0x1414760c0, 0x141476260, 0x1415e1210 | XREF | functions referencing those strings (serializer registration); string registration only; defaults and solver recovered in rea-batch (rows below) | REA string xrefs |
 | data | 168 `.cls` (96 client, 61 authority) | PROVEN | Titus: only `pc_marine_pve_story_titus{,_assault}_authority.cls` carry it | `PhysicsParser.ReadMotionDamper`, `PhysicsLocator.Counterpart` |
-
+| FUN_1414828a0 | 0x1414828a0 | PROVEN | damper solver step: gravity bends rest dir toward (0,−1,0) by min(gravity,1) of the angle; jointAngle swing clamp; per-axis RK4 a = −(k/m)x − d·v, h = dt·timeScale (damper+0x20); |v|>2e6 reset; constraints at damper+0x48 (rea-batch) | RE_NOTES#rea-batch, dec/d3.c |
+| FUN_1416e9a20 | 0x1416e9a20 | PROVEN | joint array grow: 0x30-byte joint defaults stiffness 0, dampingRation 0, mass 1, isParent 0, jointAngle 10, isInvertedLook 0, gravity 0 | RE_NOTES#rea-batch, dec/d6.c |
+| FUN_1415e28a0 | 0x1415e28a0 | PROVEN | joint array reader (same defaults, then FUN_141474d60 per joint) | RE_NOTES#rea-batch, dec/d5.c |
+| FUN_141474d60 | 0x141474d60 | PROVEN | per-joint key reader (stiffness +0x10, dampingRation +0x14, mass +0x18, isParent +0x1c, jointAngle +0x20, isInvertedLook +0x24, gravity +0x28) | RE_NOTES#rea-batch |
+| FUN_141475050 | 0x141475050 | PROVEN | per-joint writer (same layout) | RE_NOTES#rea-batch |
+| FUN_1427ab3c0 | 0x1427ab3c0 | PROVEN | quaternion from→to with angle clamped to maxDeg (used for gravity bend and jointAngle limit) | RE_NOTES#rea-batch, dec/d7.c |
+| FUN_1427aab90 | 0x1427aab90 | INFERRED | unclamped from→to rotation (jointAngle ≤ 1e-6 path) | RE_NOTES#rea-batch |
+| DAT_143c84458 / DAT_1435774f8 / DAT_1435640c4 / DAT_143609df8 | — | PROVEN | RK4 0.5, 1/6, velocity reset 2e6, down vector (0,−1,0) | RE_NOTES#rea-batch |

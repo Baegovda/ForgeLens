@@ -97,7 +97,7 @@ public class SpringDamperTests
     Assert.Equal(2, d.Joints.Count);
     Assert.Equal("box_jiggle_02", d.Joints[0].Name);
     Assert.Equal((double)(2.18f), (double)(d.Joints[0].DampingRation), 3);
-    Assert.Equal(1f, d.Joints[1].Mass); // absent -> HEURISTIC default 1
+    Assert.Equal(1f, d.Joints[1].Mass); // absent -> exe default 1.0 (FUN_1416e9a20)
     Assert.Contains("mass", d.Joints[1].Defaulted);
     Assert.False(d.Joints[1].IsParent);
     var c = Assert.Single(d.Constrains);
@@ -164,11 +164,48 @@ public class SpringDamperTests
     Assert.Equal("box_jiggle_end", j0.GetProperty("segmentTo").GetString());
     var w0 = MathF.Sqrt(7.21f) * 5f;
     Assert.Equal((double)(w0 * w0), (double)(j0.GetProperty("ue").GetProperty("driveStiffness").GetSingle()), 2);
-    Assert.Equal((double)(2f * 2.18f * w0), (double)(j0.GetProperty("ue").GetProperty("driveDamping").GetSingle()), 2);
+    Assert.Equal((double)(2.18f * 5f), (double)(j0.GetProperty("ue").GetProperty("driveDamping").GetSingle()), 2); // d * timeScale (FUN_1414828a0)
     var j1 = root.GetProperty("springDampers")[0].GetProperty("joints")[1];
     Assert.Equal("", j1.GetProperty("segmentTo").GetString()); // leaf
     var c = root.GetProperty("springDampers")[0].GetProperty("constrains")[0];
     Assert.True(c.GetProperty("upFound").GetBoolean());
     Assert.Equal((double)(26f), (double)(c.GetProperty("radiusCm").GetSingle()), 2);
   }
+
+  [Fact]
+  public void JointDefaultsMatchExeConstructor()
+  {
+    const string text = """
+      properties   =   {
+         prop_motion_damper_controller   =   {
+            springDampers   =   [
+               {
+                  timeScale   =   5
+                  joints   =   [
+                     {
+                        name   =   "a"
+                        stiffness   =   3
+                     }
+                  ]
+               }
+            ]
+         }
+      }
+      """;
+    var s = PhysicsParser.Parse(text, "d.cls");
+    var j = Assert.Single(Assert.Single(s.SpringDampers).Joints);
+    Assert.Equal(0f, j.DampingRation);
+    Assert.Equal(1f, j.Mass);
+    Assert.Equal(10f, j.JointAngle);
+    Assert.Equal(0f, j.Gravity);
+    Assert.NotEqual(true, j.IsParent); // absent = exe false
+    Assert.NotEqual(true, j.IsInvertedLook);
+  }
+
+  [Theory]
+  [InlineData(0f, 180f)]
+  [InlineData(45f, 45f)]
+  [InlineData(400f, 180f)]
+  public void ConeFollowsExeClamp(float jointAngle, float cone)
+    => Assert.Equal(cone, PhysicsSidecar.SpringDamperCone(jointAngle));
 }

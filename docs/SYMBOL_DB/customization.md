@@ -48,3 +48,5 @@ Long-form: RE_NOTES "Customization", HANDOFF ui-44/45, mtl1-46..49.
 | FUN_141db88a0 | 0x141db88a0 | DECOMPILED | strings: GPU_TPL_CUSTOMIZATION_DATA / GPU_TPL_STATIC_DATA / GPU_TEMPLATE_DATA | /workspace/rea/m17_1.c |
 | FUN_142305050 | 0x142305050 | DECOMPILED | strings: tilingU / mtlID / extraVertColor / useBlendMaskAlpha / dirtModifyAlpha / customizationUVSetIndex / reliefNMUVSet | /workspace/rea/m27_7.c |
 | FUN_142308fe0 | 0x142308fe0 | DECOMPILED | strings: tilingU / mtlID / extraVertColor / useBlendMaskAlpha / dirtModifyAlpha / customizationUVSetIndex / reliefNMUVSet | /workspace/rea/m27_7.c |
+| 0x144ccbf40 | 0x144ccbf40 | PROVEN (index INFERRED) | enum table tintBlendMode = [multiply, linear_blend]; glt PS CB_STATIC_GLT[180+L] == 0 → × base, else replace (rea-batch) | RE_NOTES#rea-batch |
+| 0x144ccbfc8 | 0x144ccbfc8 | PROVEN (index INFERRED) | enum table layer blendMode = [tint_only, tex_hardlight, tex_blend]; glt record +80+L | RE_NOTES#rea-batch |

@@ -190,6 +190,8 @@ public static class PhysicsSidecar
         var next = ji + 1 < sd.Joints.Count ? ClothInstance.FindBone(bones, sd.Joints[ji + 1].Name) : -1;
         var seg = b >= 0 && next >= 0 && IsAncestor(b, next) ? next : b >= 0 ? Child(b) : -1;
         var m = jt.Mass > 0 ? jt.Mass : 1f;
+        // rea-batch PROVEN (FUN_1414828a0): per-axis RK4 on the joint position, a = -(k/m) x - d v, step h = dt * timeScale.
+        // In real time that is stiffness (k/m) s^2 and damping d s (d is a plain 1/s coefficient, not a ratio).
         var w0 = MathF.Sqrt(MathF.Max(jt.Stiffness, 0) / m) * sd.TimeScale;
         return new
         {
@@ -202,9 +204,9 @@ public static class PhysicsSidecar
           {
             omegaRadPerSec = w0,
             driveStiffness = w0 * w0,
-            driveDamping = 2f * jt.DampingRation * w0,
-            coneDeg = Math.Clamp(jt.JointAngle, 1f, 175f),
-            gravityScale = jt.Gravity,
+            driveDamping = MathF.Max(jt.DampingRation, 0) * sd.TimeScale,
+            coneDeg = SpringDamperCone(jt.JointAngle),
+            gravityScale = Math.Clamp(jt.Gravity, 0f, 1f),
             massKg = m,
           },
         };
@@ -231,8 +233,11 @@ public static class PhysicsSidecar
       jiggles,
       cloths,
       springDamperSource = setup.SpringDamperSource,
-      springDamperNote = "phys52 prop_motion_damper_controller. Model (HEURISTIC, exe step not reversed): every joint is an angular spring-damper on its bone (pivot = bone origin, body = segment to segmentTo), omega0 = sqrt(stiffness/mass) * timeScale, drive stiffness omega0^2, damping 2*dampingRation*omega0 (acceleration mode), swing cone = jointAngle, gravity on when gravity > 0 (node gravity 980*max(gravity) cm/s^2). constrains = kinematic capsule up->down locator (radius) the joint bodies collide with. isParent / isInvertedLook / hasExternalLocators / windFlutter are recorded, not simulated. Not baked into clips.",
+      springDamperNote = "phys52 prop_motion_damper_controller. Exe step PROVEN (rea-batch, FUN_1414828a0): each joint position follows a target on its parent; the rest direction is first bent toward world down (0,-1,0) by gravity * angle(rest, down) (gravity clamped to 1, <= 0 means none: gravity is a bend fraction, not a force), the current direction is limited to jointAngle degrees from it (jointAngle 0 = unlimited), then a per-axis RK4 spring a = -(stiffness/mass) x - dampingRation v advances with h = dt * timeScale; velocities above 2e6 or NaN reset to 0. UE mapping (INFERRED): drive stiffness (k/m) timeScale^2 = omega0^2, damping dampingRation * timeScale [1/s], swing cone = jointAngle, gravityScale = bend fraction (no UE equivalent: aim the rest pose instead). constrains = kinematic capsule up->down locator (radius) the joint bodies collide with. isParent / isInvertedLook / hasExternalLocators / windFlutter are recorded, not simulated. Not baked into clips.",
       springDampers,
     }, Options);
   }
+
+  /// <summary>rea-batch PROVEN: FUN_1427ab3c0 clamps the swing to jointAngle degrees; jointAngle &lt;= 1e-6 skips the clamp (FUN_1427aab90).</summary>
+  public static float SpringDamperCone(float jointAngle) => jointAngle <= 1e-6f ? 180f : MathF.Min(jointAngle, 180f);
 }

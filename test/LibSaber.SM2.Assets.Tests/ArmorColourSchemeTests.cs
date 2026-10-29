@@ -119,4 +119,32 @@ materials = {
     Assert.Contains("\"Layer0Tint\"", json);
     Assert.Contains("\"mask\": \"m_cc\"", json);
   }
+
+  [Fact]
+  public void TintBlendModeLinearReplacesMultiplyScalesBase()
+  {
+    // grey base (sRGB 128), full layer0 mask; tint white-ish from the scheme -> linear_blend gives the tint, multiply tint x base
+    var baseImg = new PreviewImage { Width = 1, Height = 1, Bgra = new byte[] { 128, 128, 128, 255 } };
+    var mask = new PreviewImage { Width = 1, Height = 1, Bgra = new byte[] { 0, 0, 255, 255 } };
+    var list = ArmorColourSchemes.Parse(Schemes, Palette, Ui, null, Strings, null);
+    var red = list.Single(s => s.Id == "Blood_Angels").Main;
+    var layers = new ArmorLayer?[] { red[0] with { TintA = 255 }, null, null, null };
+    var on = new[] { true, false, false, false };
+    var lin = ArmorSchemeBake.Albedo(baseImg, mask, null, layers, on, new[] { "linear_blend", null, null, null });
+    var mul = ArmorSchemeBake.Albedo(baseImg, mask, null, layers, on, new[] { "multiply", null, null, null });
+    Assert.Equal(red[0].TintR, lin.Bgra[2]); // replace: albedo = tint (metal 0)
+    Assert.True(mul.Bgra[2] < lin.Bgra[2]); // multiply by the 0.5 base is darker
+    Assert.True(ArmorSchemeBake.MultipliesBase("multiply"));
+    Assert.False(ArmorSchemeBake.MultipliesBase("linear_blend"));
+  }
+
+  [Fact]
+  public void SlotReadsPatternBlendMode()
+  {
+    var slot = CustomizationSlot.FromTd("materials = { \"default CC\" = { shaders = { glt = { customization = { mask = \"m_cc\" layer0 = { tintBlendMode = \"multiply\" blendMode = \"tint_only\" } layer1 = { tintBlendMode = \"linear_blend\" blendMode = \"tex_blend\" } } } } } }", "default")!;
+    Assert.Equal("multiply", slot.BlendModes[0]);
+    Assert.Equal("tint_only", slot.PatternModes[0]);
+    Assert.Equal("tex_blend", slot.PatternModes[1]);
+    Assert.True(ArmorSchemeBake.IsTintOnly(slot.PatternModes[0]));
+  }
 }

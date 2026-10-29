@@ -248,6 +248,9 @@ public static class ArmorColourSchemes
 /// </summary>
 public sealed record CustomizationSlot(string Variant, string Mask, string? DiffOverride, string[] BlendModes, bool[] Enabled, string? TexArrayDiffuse)
 {
+  /// <summary>rea-batch: per-layer <c>blendMode</c> (pattern mode: tint_only / tex_hardlight / tex_blend), null when absent.</summary>
+  public string?[] PatternModes { get; init; } = new string?[4];
+
   /// <summary>Reads <c>"&lt;variant&gt; CC"</c> (falling back to <c>"default CC"</c>); null when the td has no customization variant.</summary>
   public static CustomizationSlot? FromTd(string tdText, string? variant)
   {
@@ -263,16 +266,19 @@ public sealed record CustomizationSlot(string Variant, string Mask, string? Diff
       if (SslText.Obj(glt, "customization") is not { } cust || cust.GetValueOrDefault("mask") is not string mask || mask.Length == 0)
         continue;
       var modes = new string[4];
+      var patternModes = new string?[4];
       var enabled = new bool[4];
       for (var i = 0; i < 4; i++)
       {
         var layer = SslText.Obj(cust, "layer" + i);
         modes[i] = layer?.GetValueOrDefault("tintBlendMode") as string ?? "linear_blend";
+        patternModes[i] = layer?.GetValueOrDefault("blendMode") as string;
         var en = layer?.GetValueOrDefault("enabled");
         enabled[i] = layer is not null && !(en is bool b ? !b : string.Equals(en?.ToString(), "False", StringComparison.OrdinalIgnoreCase));
       }
 
-      return new CustomizationSlot(name, mask, SslText.Obj(glt, "tex")?.GetValueOrDefault("diffOverride") as string, modes, enabled, cust.GetValueOrDefault("texArrayDiffuse") as string);
+      return new CustomizationSlot(name, mask, SslText.Obj(glt, "tex")?.GetValueOrDefault("diffOverride") as string, modes, enabled, cust.GetValueOrDefault("texArrayDiffuse") as string)
+        { PatternModes = patternModes };
     }
 
     return null;
@@ -284,9 +290,11 @@ public sealed record CustomizationSlot(string Variant, string Mask, string? Diff
 ///   (glt PS 003784 layer loop, PROVEN shape):
 ///   <code>
 ///     w      = mask.channel[L] * tint.a                       (mask r,g,b,a = layer0..3)
-///     metalL = isMetallic ? 1 : saturate(metal*scale + bias)  (HEURISTIC isMetallic)
+///     metalL = isMetallic ? 1 : saturate(metal0*scale + bias)  (metal0 = spec metalness; HEURISTIC isMetallic)
+///              blendMode tint_only: metalL = running metal, metal/rough not changed (PS branch rec+80+L == 0)
 ///     tintC  = lerp(tint, spec_metalnessTint, metalL)          (shader: lerp(rec[+17+L], rec[+21+L], metalness))
-///     albedo = lerp(albedo, base * tintC, w)                   (blend mode 0 = linear_blend, INFERRED)
+///     col    = tintBlendMode multiply ? base * tintC : tintC   (CB_STATIC_GLT[180+L] == 0 ? x base : replace)
+///     albedo = lerp(albedo, col, w)
 ///     metal  = lerp(metal, metalL, w);  rough = lerp(rough, saturate(rough*rScale + rBias), w)
 ///   </code>
 ///   Layer L ↔ primary/secondary/tertiary is INFERRED from the slot order (color_set_types_desc_armor). texArray patterns
@@ -337,8 +345,27 @@ public static class ArmorSchemeBake
     => (2, channels.Contains("Roughness(a)", StringComparison.OrdinalIgnoreCase) ? 3 : 1);
 
   /// <summary>Tinted albedo at the base albedo's size (base = the variant's diffOverride, the neutral _a texture).</summary>
-  public static PreviewImage Albedo(PreviewImage baseAlbedo, PreviewImage mask, PreviewImage? spec, IReadOnlyList<ArmorLayer?> layers, bool[] enabled)
+  /// <summary>
+  ///   rea-batch: <c>tintBlendMode</c> enum (exe string table 0x144ccbf40: multiply = 0, linear_blend = 1) reaches the glt PS as
+  ///   CB_STATIC_GLT[180+L]: 0 multiplies the layer colour by the base albedo, anything else replaces it (PROVEN shader; enum index INFERRED
+  ///   from the table order). Retail td: linear_blend 20,052 / multiply 1,127 layers → most armour paint is the tint itself, not tint × _a.
+  /// </summary>
+  public static bool MultipliesBase(string? tintBlendMode) => string.Equals(tintBlendMode, "multiply", StringComparison.OrdinalIgnoreCase);
+
+  /// <summary>rea-batch: <c>blendMode</c> enum (exe table: tint_only = 0, tex_hardlight = 1, tex_blend = 2) = glt record +80+L.</summary>
+  public static bool IsTintOnly(string? blendMode) => string.Equals(blendMode, "tint_only", StringComparison.OrdinalIgnoreCase);
+
+  public static PreviewImage Albedo(PreviewImage baseAlbedo, PreviewImage mask, PreviewImage? spec, IReadOnlyList<ArmorLayer?> layers, bool[] enabled,
+    IReadOnlyList<string?>? tintModes = null, IReadOnlyList<string?>? patternModes = null)
   {
+    var mul = new bool[4];
+    var tintOnly = new bool[4];
+    for (var i = 0; i < 4; i++)
+    {
+      mul[i] = tintModes is not null && i < tintModes.Count && MultipliesBase(tintModes[i]);
+      tintOnly[i] = patternModes is not null && i < patternModes.Count && IsTintOnly(patternModes[i]);
+    }
+
     var w = baseAlbedo.Width;
     var h = baseAlbedo.Height;
     var src = baseAlbedo.Bgra;
@@ -352,7 +379,8 @@ public static class ArmorSchemeBake
         var p = (y * w + x) * 4;
         float br = ToLinear[src[p + 2]], bg = ToLinear[src[p + 1]], bb = ToLinear[src[p]];
         float r = br, g = bg, b = bb;
-        var metal = spec is null ? 0f : Nearest(spec, x, y, w, h, mo) / 255f;
+        var metal0 = spec is null ? 0f : Nearest(spec, x, y, w, h, mo) / 255f;
+        var metal = metal0;
         for (var i = 0; i < 4; i++)
         {
           if (prepared[i] is not { } l)
@@ -360,14 +388,22 @@ public static class ArmorSchemeBake
           var weight = Nearest(mask, x, y, w, h, MaskChannel[i]) / 255f * l.Ta;
           if (weight <= 0f)
             continue;
-          var ml = l.Metallic ? 1f : Math.Clamp(metal * l.MS + l.MB, 0f, 1f);
+          var ml = tintOnly[i] ? metal : l.Metallic ? 1f : Math.Clamp(metal0 * l.MS + l.MB, 0f, 1f);
           var tr = l.Tr + (l.Mr - l.Tr) * ml;
           var tg = l.Tg + (l.Mg - l.Tg) * ml;
           var tb = l.Tb + (l.Mb - l.Tb) * ml;
-          r += (br * tr - r) * weight;
-          g += (bg * tg - g) * weight;
-          b += (bb * tb - b) * weight;
-          metal += (ml - metal) * weight;
+          if (mul[i])
+          {
+            tr *= br;
+            tg *= bg;
+            tb *= bb;
+          }
+
+          r += (tr - r) * weight;
+          g += (tg - g) * weight;
+          b += (tb - b) * weight;
+          if (!tintOnly[i])
+            metal += (ml - metal) * weight;
         }
 
         dst[p] = ToSrgb(b);
@@ -380,7 +416,7 @@ public static class ArmorSchemeBake
   }
 
   /// <summary>Spec map with the layers' metalness / roughness blended in (same size and channel layout as <paramref name="spec"/>).</summary>
-  public static PreviewImage Specular(PreviewImage spec, PreviewImage mask, IReadOnlyList<ArmorLayer?> layers, bool[] enabled)
+  public static PreviewImage Specular(PreviewImage spec, PreviewImage mask, IReadOnlyList<ArmorLayer?> layers, bool[] enabled, IReadOnlyList<string?>? patternModes = null)
   {
     var w = spec.Width;
     var h = spec.Height;
@@ -403,6 +439,8 @@ public static class ArmorSchemeBake
           var weight = Nearest(mask, x, y, w, h, MaskChannel[i]) / 255f * l.Ta;
           if (weight <= 0f)
             continue;
+          if (patternModes is not null && i < patternModes.Count && IsTintOnly(patternModes[i]))
+            continue; // tint_only keeps metalness / roughness (glt PS branch rec+80+L == 0)
           var ml = l.Metallic ? 1f : Math.Clamp(m0 * l.MS + l.MB, 0f, 1f);
           var rl = Math.Clamp(r0 * l.RS + l.RB, 0f, 1f);
           metal += (ml - metal) * weight;
@@ -427,7 +465,7 @@ public static class ArmorSchemeBake
     static string F(float v) => v.ToString("0.#####", CultureInfo.InvariantCulture);
     static string J(string s) => "\"" + s.Replace("\\", "\\\\").Replace("\"", "\\\"") + "\"";
     sb.Append("{\n  \"scheme\": ").Append(J(scheme.Id)).Append(",\n  \"name\": ").Append(J(scheme.Name)).Append(",\n  \"nameKey\": ").Append(J(scheme.NameKey));
-    sb.Append(",\n  \"rule\": \"albedo=lerp(albedo, base*lerp(Tint,MetalTint,metal), mask[L]*Tint.a) per layer L (glt PS layer loop); mask r,g,b,a = layer0..3; layer0..2 = primary/secondary/tertiary (INFERRED)\"");
+    sb.Append(",\n  \"rule\": \"albedo=lerp(albedo, col, mask[L]*Tint.a), col = lerp(Tint,MetalTint,metal) (TintBlendMode linear_blend) or base*that (multiply) per layer L (glt PS layer loop, rea-batch); mask r,g,b,a = layer0..3; layer0..2 = primary/secondary/tertiary (INFERRED)\"");
     sb.Append(",\n  \"parts\": [");
     var first = true;
     foreach (var (part, texture, slot) in parts)
@@ -459,6 +497,8 @@ public static class ArmorSchemeBake
         P($"Layer{i}RoughnessScaleBias", $"[{F(l.RoughnessScale)}, {F(l.RoughnessBias)}]");
         P($"Layer{i}TextureIndex", l.TextureIndex.ToString(CultureInfo.InvariantCulture));
         P($"Layer{i}Colour", J(l.Colour));
+        P($"Layer{i}TintBlendMode", J(slot.BlendModes.ElementAtOrDefault(i) ?? "linear_blend"));
+        P($"Layer{i}MultiplyBase", ArmorSchemeBake.MultipliesBase(slot.BlendModes.ElementAtOrDefault(i)) ? "1" : "0");
       }
 
       sb.Append(" } }");
