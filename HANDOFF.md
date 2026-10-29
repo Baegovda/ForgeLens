@@ -108,6 +108,7 @@
 | F57 | 10/29 | (F56 조정) 맥락 뷰에 "Prop anim / 프롭 애님" 토글(기본 ON, 저장) + 재생 조건 드롭다운: "Auto(캐릭터 동작 따라감)" 기본 + 게임 데이터의 무기 상태(IDLE, SHOOT_1/2/3, SHOOT_AUX, RELOAD_START/END/FULL, anim1–4, chain_anim 1–4단, 충전 on/off …), 데이터 이름 + 짧은 한글 라벨, 단독/맥락 뷰 모두 | Playback condition override — 재생 조건 강제 선택 | done (propanim): `PropAnim`/`PropCondition` 설정 저장, env `SM2_PROP_ANIM`/`SM2_PROP_COND` | `MainWindow.PropAnim.cs`, `MainWindow.axaml` (`CtxPropAnimToggle`, `CtxPropCondBox`, `PropCondBox`) |
 | F58 | 10/29 | 인게임 체인소드 휘두르기 트레일은 저런 어두운 부채꼴이 아니에요 → 일반 규칙으로 수정(노멀맵 텍스처·distortion 트레일은 색으로 안 그림), 노란 additive 궤적이 밝은 호로 보이는지 확인 | Blend-state fix (additive trail) + distortion-trail culling — 트레일 블렌드 상태 교정, 굴절 트레일 색 패스 제외 | done (fix54, 이 커밋; HANDOFF "Update fix54"): 어두운 부채꼴의 주원인은 노란 트레일(add)이 straight-alpha로 그려져 회색 꼬리가 배경을 어둡게 한 것(캡처 PROVEN 상태 + selector INFERRED), trail_melee_dark(노멀맵) 제외는 INFERRED/HEURISTIC 표시. 실제 게임 화면 비교는 아직이에요 | `Effects/CaptureRules.cs` (`VfxBlendRules.ForTrail`), `Gpu/EffectRenderer.cs`, `Effects/EffectTrails.cs` (`SfxTextureUsage`), `Effects/HostVfx.cs` |
 | F59 | 10/29 | REA 일괄 처리 목록(감쇠, UseSpecMap, 트레일, 스프링 댐퍼, 컬러 스킴 어두움, 블렌드/패턴/렌즈, 프롭 애님)을 근거 우선으로 처리 | Batch reverse engineering — 묶음 역공학(헤드리스 Ghidra) | 일부 done (rea-batch + rea-batch 2; HANDOFF "Update rea-batch", "Update rea-batch 2"): 패턴 텍스처 배열·렌즈 파라미터, 재장전 트랙/사격 간격, 라이트 1/(d²+P0.w) 감쇠, TRAIL_DEGR 의미까지 추가했어요; 댐퍼 PROVEN, 컬러 스킴 어두움 PROVEN 셰이더 + INFERRED enum, 트레일은 증거만(코드 변경 없음), 감쇠·UseSpecMap·프롭 애님은 open. rea-batch 3(HANDOFF "Update rea-batch 3"): 라이트 desc → 렌더 라이트 필드 매핑 PROVEN(attenCurveParam → +0x54), UseSpecMap 실제 플래그 값 DATA, fadeParams 의미 PROVEN(라이트닝 트레일)·리본은 opt-in HEURISTIC, trail_melee_dark가 게임에서 안 보이는 이유 DATA(무기 .cls 덮어쓰기). rea-batch 4(HANDOFF "Update rea-batch 4"): UseSpecMap 비트 의미 DATA + 임포터 수정, P0.w writer·리본 점 작성기는 시도 기록만 하고 open. level-lights(HANDOFF "Update level-lights"): 허브 레벨 라이트를 추출해서 armory 캡처 라이트 4개와 위치 0 m로 짝지었고, P0.w 계산 함수 FUN_14224f010과 CB 패커 FUN_14224ecf0를 찾았어요. attenCurveParam → P0.w 매핑은 PROVEN(코드 + DATA)이에요. 벤치·UE 내보내기에 반영했고, 라이트 색 디코드는 2.2 감마로 바꿨어요(DATA) | `Physics/PhysicsParser.cs`, `Physics/PhysicsSidecar.cs`, `Customization/ArmorColourSchemes.cs`, `MainWindow.Colours.cs` |
+| F60 | 10/29 | 원클릭 내보내기를 옵션으로도 만들어줘 (기존 내보내기는 기본 그대로, 체크하면 .uproject + 콘텐츠 폴더로 바로 UE에 임포트, 진행·로그·성공/실패 표시, 기존 폴더는 _bakN 백업) | Direct-to-Unreal one-click export — 내보내기 직후 열린 에디터(EngineWire / Python Remote Execution) 또는 헤드리스 UnrealEditor-Cmd로 자동 임포트 | done (oneclick, 이 커밋; HANDOFF "Update oneclick"): 모델·클립·프롭 SEQ 애님·Manny 클립·머티리얼(import_sm2_materials)·물리(SM2PhysicsSetup)·컬러 스킴 태그. PC 테스트 프롭/캐릭터/Manny × EngineWire, 프롭 × Remote Execution, 프롭 × 헤드리스 전부 OK, _bak1~3 백업 확인했어요 | `Export/UnrealDirect.cs`, `Export/UnrealBridge.cs`, `tools/ue/ue_forge_direct.py`, `ExportWindow.axaml(.cs)` (DirectPanel), `UnrealImportWindow.axaml(.cs)`, `MainWindow.Direct.cs` |
 
 ## C. 미래 (Future, 로드맵 밖)
 
@@ -117,7 +118,7 @@
 | X02 | 10/28 | SM2 끝나면 다음은 Path of Exile 읽기 | Multi-game support (PoE) — 다른 게임 포맷 지원 | future | ROADMAP (추가 예정) |
 | X03 | 10/27–28 | 그 다음 Unreal Engine 게임 읽기(.pak/IoStore) | UE game extraction — 언리얼 게임 에셋 추출 | future | ROADMAP "Possible future development" |
 
-합계: 상시 규칙 32 · 기능 요청 58 · 미래 3 = **93건** (2026-10-29 기준; fix54에서 실제 행 수로 다시 셌어요).
+합계: 상시 규칙 32 · 기능 요청 60 · 미래 3 = **95건** (2026-10-29 기준; oneclick에서 실제 행 수로 다시 셌어요 — F59 행이 합계에 빠져 있었어요).
 
 ---
 
@@ -256,6 +257,7 @@ For any agent continuing this work: read this whole file before you do anything.
 ## 2026-10-26 update (Cursor Agent)
 ### Layout (all work lives here now; supersedes "never touch /Game/SM2")
 - PC: `C:\Users\Revaptor_FX\Desktop\SM2_Work\{Exports\<asset>, Anim\Titus_Anim, Captures\{TypeTest,TypeTest_overview,Item2_head}, Raw\{TypeTest_raw,titus_td}, Scripts\}` (uemcp_call.py stays in home).
+  - 10/29 disk cleanup: `Anim\Titus_Anim` was deleted (regenerable with `LibSaber.SM2Extractor export ... --anim`). See "SM2_Work cleanup (2026-10-29)" in "Update oneclick".
 - UE: `/Game/SM2_Work/{Original/cc_titus_assault (old /Game/SM2), v4/cc_titus_assault, cc_titus_assault, cc_swarm_hormagaunt, refrt_imp_rhino_01, refrt_tyr_arch_column_01, wpn_bolter_heavy_01}`; 595 assets moved via rename_assets, 0 redirectors. (Superseded by "UE layout (unified)" below.)
 - Capture: Scripts/ue_cap.py, two calls (capture, then export) - same-call export returns a stale RT.
 
@@ -2498,3 +2500,46 @@ Owner request: extract level light data to solve attenCurveParam → P0.w. Game 
   - Multi-light container objects (29 cd_list entries with several sfx_light blocks) are skipped in the TSV.
 - **Tests:** Assets 343/343 (+8: `LevelLightSoftTests` armory pairing ×4, FUN_14224f010 table, const sphere, inverse-squared, LightDef/export). Python unittest 18/18 (+3 `test_level_lights.py`).
 
+## Update oneclick (2026-10-29 KST): Direct-to-Unreal one-click export option (ledger F60)
+
+Owner request (ledger F60, "원클릭 내보내기를 옵션으로도 만들어줘"): keep the existing export as the default and add an option that imports the export straight into a UE project.
+
+- **UI.** Export window → bottom panel "Direct to Unreal: import into the project automatically after the export" (unchecked by default).
+  - Unreal project (.uproject) with Browse; remembered in settings `LastUnrealProject`; default `K:\Unreal Projects\UE_VFX_57\UE_VFX_57.uproject`.
+  - Content folder; default `/Game/SM2_Work/<category>/<asset>` (Characters / Weapons / Props / Environment / Animations for Anim Only (Manny)). It follows the Manny checkbox until the user edits it. `/Game/SM2_Work/Original/*`, `/Game/Work/*`, top-level `/Game/X`, spaces and non-/Game paths are refused (`UnrealContentPath.Validate`, also re-checked in Python).
+  - Needs "Models as FBX" and the Unreal target (FBX Z-up cm).
+  - After the export a non-modal "Forge Lens — Direct to Unreal" window shows the bridge, a progress bar, the live log (tail of `import_*.log`), a green/red result line and "Open log folder".
+  - Also wired into Kitbash export (asset name = template).
+- **Route** (`UnrealDirectImporter.Run`):
+  1. EngineWire `:3000` (MCP `system_control` / `execute_python`, token from `ENGINEWIRE_TOKEN` or `%USERPROFILE%\.enginewire_token`), only if the open editor's `project_dir` is the chosen project.
+  2. Python Remote Execution (UDP 239.0.0.1:6766 ping/pong, TCP command `ExecuteFile`), only if the pong's project root matches.
+  3. Headless `UnrealEditor-Cmd.exe "<uproject>" -run=pythonscript -script=<runner> -unattended -nop4 -nosplash -NoSound -AutoDeclinePackageRecovery` (engine from EngineAssociation + LauncherInstalled.dat), BelowNormal, hidden; stdout kept as `import_*.headless.txt`. Only when no Unreal Editor is running: an open editor without a bridge gives a red message and imports nothing (never two processes saving the same packages).
+  - Env `SM2_DIRECT_BRIDGE=enginewire|remote|headless` forces one route (QA). Forced headless also runs next to an open editor, so use it only with a fresh content folder.
+- **Import** (`tools/ue/ue_forge_direct.py`, embedded and written to `<export>/_forge_direct/` with `ue_import_anim.py`, `ue_import_manny.py`, `manifest_<ts>.json`, `run_import_<ts>.py`, `import_<ts>.log`, `result_<ts>.json`):
+  - Existing non-empty folder → `duplicate_directory` to `<folder>_bakN` (next free N, never overwritten), saved, then reimport in place. Assets the new export no longer produces stay in the folder (nothing is deleted).
+  - Skeletal/static mesh FBX → materials via the export's `import_sm2_materials.py` → clips (incl. prop SEQ clips) to `<folder>/Anims` with the shared `sm2_anim_import` block → Manny clips to `<folder>/Anims_Manny` on `/Game/Characters/Mannequins/Meshes/SK_Mannequin` (`ue_import_manny.run` also keeps per-asset `_bakN` copies of clips it replaces) → physics `SM2PhysicsSetupLibrary.setup_from_json` + `tune_rigid_body` → colour scheme as mesh metadata tags `SM2.ColourScheme` / `SM2.ColourSchemeJson` (the scheme itself is baked in the exported albedo).
+  - Fewer imported clips than FBX files is an error (found in QA: a character clip exported for the bolter failed silently).
+  - Saves only the destination folder (`save_directory`), never the level / Lightning_01.
+  - Headless: Interchange asserts `CurrentApplication.IsValid()` without Slate (mesh and texture imports, crash seen in QA), so the headless run switches FBX/PNG/TGA/DDS/JPG/EXR/BMP/TIFF/PSD/HDR to the legacy factories (`Interchange.FeatureFlags.Import.*` 0, process-local).
+  - A crash without a result json writes `{"ok": false, "errors": ["Unreal crashed: <assertion line>"]}`; the result json carries `mode`.
+- **PC tests** (UE 5.7 UE_VFX_57, editor PID 89776 kept running, PIE off, nothing outside `/Game/SM2_Work/Tests/oneclick/` and one stray folder below):
+
+| Run (KST) | Asset | Bridge | Result |
+|---|---|---|---|
+| 16:29 | wpn_bolt_rifle_01 + SEQ RELOAD_FULL | EngineWire | OK, 30 assets (SkeletalMesh, 12 MI, clip 2.40 s), 8.4 s |
+| 16:31 | same again | EngineWire | OK, old copy `wpn_bolt_rifle_01_bak1` (30 assets), 14.3 s |
+| 16:33 | cc_calgar + tacticus_wpn10_reload | EngineWire | OK, 106 assets (44 MI, clip ADD 2.73 s, `PA_cc_calgar_SM2`, post-process `ABP_cc_calgar_SM2Phys`), 60.2 s |
+| 16:42 | wpn_bolt_rifle_01 | Remote Execution (forced) | OK, `wpn_bolt_rifle_01_remote_bak1`, 18.7 s |
+| 16:44 / 16:58 | wpn_bolt_rifle_01 | headless (forced) | crash (Interchange Slate assert) → fixed with legacy factories |
+| 17:01 | wpn_bolt_rifle_01 | headless (forced) | OK, 30 assets, `_headless_bak3`, 5.8 s import (~15 s with engine start) |
+| 17:04 | cc_calgar Anim Only (Manny) | EngineWire | OK, `Anims_Manny/..._ADD_Manny` on SK_Mannequin, 2.73 s |
+
+  - The 17:02 Manny run before the QA-order fix imported into the suggested default `/Game/SM2_Work/Animations/cc_calgar` (1 new clip, no existing asset touched). It is left there; delete it in the next cleanup if not wanted.
+  - UE captures (ue_cap_lit, level not saved): box `/workspace/mtl_fix/oneclick/07_ue_cc_calgar.png`, `08_ue_bolt_rifle.png`. UI: `01_export_dialog_direct_option.png`, `02_prop_headless_ok.png`, `03_prop_remoteexec_bak1_ok.png`, `04_char_enginewire_ok.png`, `05_char_export_dialog.png`, `06_manny_ok.png`.
+- **QA env** (Forge Lens, see WORKFLOW "oneclick QA"): `SM2_OPEN`, `SM2_SEQ` / `SM2_CLIP`, `SM2_EXPORT_QA=<out dir>` (exports the opened asset through the Export window), `SM2_DIRECT_PROJECT`, `SM2_DIRECT_PATH`, `SM2_EXPORT_CLIPS` (0 none, 1 selected, 2 preview clip, 3 all), `SM2_EXPORT_MANNY=1`, `SM2_EXPORT_GO=<s>`, `SM2_DIRECT_BRIDGE`. Driver: box `/workspace/mtl_fix/oneclick/fl_oneclick.ps1` (PC copy `Scripts\mtl_fix\oneclick\`), run with Windows PowerShell 5 (`powershell.exe -File`); pwsh 7 cannot compile its System.Drawing type.
+- **Tests:** SM2.Assets 372/372 (incl. `UnrealDirectTests`), SM2Extractor 43/43, LibSaber.Tests 5/5, Python unittest 20/20 (`test_forge_direct.py`). HaloCEA out of scope (4 fail, as before).
+- **Deploy:** `Desktop\SM2_Work\Bin\ForgeLens_latest\ForgeLens.exe`; previous exe → `ForgeLens.exe.bak17`. sha256 in the final report / STATUS.
+
+### SM2_Work cleanup (2026-10-29)
+- The 10/29 SM2_Work disk cleanup freed 26.8 GB (log `Desktop\SM2_Work\cleanup_log.txt`).
+- Deleted: `Anim\Titus_Anim` (regenerable with `export --anim`), `Captures\mrq16_before` (regenerable), `Export\Step2`, old `buildNN` folders, v4 temp dirs, and the old `ForgeLens_latest\ForgeLens.exe.bak5`–`.bak13`. Backup numbering continues upward (next free number after the highest existing one, never reused).
