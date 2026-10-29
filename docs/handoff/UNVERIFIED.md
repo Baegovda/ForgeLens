@@ -3,15 +3,17 @@ Close an item = new evidence → change label here + in the source doc + `re_cac
 
 | # | Item | Label | Source | Verification plan |
 |---|------|-------|--------|-------------------|
-| U1 | slot {7,2} = RB_TRAIL_POINTS | INFERRED ~85% | R36, RE_CACHE/notes/trail_points.md | RenderDoc: draw binding "Trail points data" → shader resource name |
-| U2 | trail owner alpha `owner+0x144` (code uses 1) | HEURISTIC | R36 | xrefs writers of +0x144 in SfxTrail owner (gs.py xrefs / summary) |
-| U3 | trail gradient spans age 0..1 (curve+0x400) | INFERRED | R36 | decompile FUN_1427cd960 caller arg; visual check V1 |
-| U4 | spawn colour non-null p5 caller | open | R36 | xrefs FUN_1418bd8d0 vtbl slot callers |
-| U5 | adaptive default for lights without key (`DefaultAdaptive=true`) | HEURISTIC | R37 | trace light desc deserializer default of +0x6d bit0 |
-| U6 | bench exposure 1/250 | HEURISTIC | R37 | RenderDoc COMMON_HDR_AVERAGE in a bench-like scene |
-| U7 | LIGHTS_BUFFER (FUN_141de8140, 1.0) consumer | INFERRED | R37 | xrefs of the buffer name → shader |
+| U1 | slot {7,2} = RB_TRAIL_POINTS | INFERRED (강화, R46) | R36, trail_points.md | R46 static: `RB_TRAIL_POINTS` name in all 8 `trail.sdc` binaries; PSV0 of each: only StructuredBuffer SRV = t8 **space 2** (= set 2). Open: engine id 7 → t8 (RenderDoc binding) |
+| U2 | trail owner alpha `owner+0x144` (code uses 1) | INFERRED (R46) | R36 | R46: base ctor FUN_1418bbed0 (SfxTrail base vtbl 0x143641e50, last slot FUN_1418bd8d0) writes +0x144 = 1.0f (PROVEN). Capstone scan 0x141800000–0x141a00000: no other store covering +0x144 in the trail classes. Open: writers outside that range |
+| U3 | trail gradient spans age 0..1 (curve+0x400) | INFERRED | R36 | R46: FUN_141ab9b60 idx = t·curve[+0x400]−0.5 clamped 0..255; t = half pt+0x36 (FUN_141847640), also used as t·64 for a 64-entry table, t<0 → point skipped. Open: writer of pt+0x34 hi half (age/life?), value of curve+0x400; V1 |
+| U4 | spawn colour non-null p5 caller | open (narrowed) | R36 | R46 `callers.py`: only 1 direct call, wrapper FUN_1418c1990 (vtable entry) forwards its own p5. Open: indirect vtbl callers of the wrapper/slot |
+| U5 | adaptive default for lights without key (`DefaultAdaptive=true`) | HEURISTIC (narrowed) | R37 | R46: FUN_142745130 is in/out (missing key keeps prior byte) → default = desc ctor value of desc+0x2d (obj+0xa5); only FUN_141a1b8a0 (copy) found by scan. Open: default ctor |
+| U6 | bench exposure 1/250 | HEURISTIC | R37 | needs a running game + RenderDoc capture (user/game job) |
+| U7 | LIGHTS_BUFFER (FUN_141de8140, 1.0) consumer | INFERRED | R37 | R46: name `LIGHTS_BUFFER` absent from all 80 .sdc (resource names stripped except a few). Open: RenderDoc binding of the 0x50-stride buffer (game job) |
 | U8 | nmb NodeDef/Expression layout, Switch selection 1=floor | INFERRED | R38, FIRE_CLIP.md | visual check V3 per weapon; decode ops 95/98/c4 |
 | U9 | fire clips: unassigned wpnType → default 0 (bolt-rifle family aim, 1.41 aim), heavy aim (floor into rifle branch), 1.5/1.7 undecoded ops, 1.4 SubtractiveBlend, 1.51 SimpleTypeConvert | HEURISTIC (R40 `nmb_verify.py`: table = network for all 124 rows, 64 rows need an assumption; settled: no table/network disagreement, labels now per row in FIRE_CLIP_VERIFY.tsv) | R38, R40 | still open: Expression default value, ops 95/98/c4, index the 2 node records, heavy aim state (lead: `LOCO|heavy_bolter_turret`, `heavy_flammer_shoot`), which blind variant state is active; visual V3 |
-| U10 | split-skeleton rule covers all assets (1 case found) | INFERRED | R35 | rerun `ue_fix_split_skeletons.py scan` after each bulk import |
+| U10 | split-skeleton rule covers all assets | PROVEN for current /Game (R46) | R35, R43 | R46 EngineWire `ue_skel_audit.py /Game`: splits 0, collisions 44, dangling 97, orphan 2. Rerun after each bulk import |
 | U11 | START_HERE "Remaining HEURISTICs" list (reload/shoot by name, visibility→scale 0, spring-damper, trail emission/spacing, melee_dark skip, layer0..2, isMetallic, customUV, Champion names, Shoot→muzzle, category rules, VatDecode age/life, firearm main, overlay preview) | HEURISTIC | START_HERE.md, STATUS "Heuristics" | one REA question each; check RE_CACHE first (`recall.py`) |
 | U12 | EngineWire / UEMCP live in GUI editor | PROVEN 10/30 05:00–05:07 KST (R47): GUI `UE_VFX_57` pid 33536, bridge up 14 s after launch (log 05:00:24), smoke `execute_python` → UE 5.7.4, /Game/SM2_Work 982 assets: EngineWire 1.76 s (warm; 1st call 11.0 s), UEMCP 3.81 s; rules_check prints "editor + port3000 open -> EngineWire" | R47 | closed |
+
+R46 (2026-10-30 KST): U8/U9 unchanged (need V3 visual + op 95/98/c4 decode). U11: RE_NOTES already has PROVEN spring-damper solver FUN_1414828a0 — START_HERE list not yet synced; other U11 entries have no RE_CACHE hit.
