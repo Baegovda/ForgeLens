@@ -71,10 +71,10 @@
 | R48 | 10/30 | 폴리싱 2) 어깨 장갑 좌우 색 덮어쓰기 (t108u 자율 진행) | Per-section colour override — 부위별 색 덮어쓰기 | done 10/30 KST: `ArmorColourSchemes.SectionOf` maps `*_shoulder_L/R`→LEFT/RIGHT_PAULDRON, hand→GAUNTLET, knee/shin→GREAVE, forearm→BRACER, jumppack/manipulator/lens. Affixes PROVEN (`character_body_section_library.sso`), name→side INFERRED (cls17 part names). Tests 16/16. Undo: revert commit |
 | R49 | 10/30 | 폴리싱 3) 색 구성을 UE 마스터 머티리얼에 | Colour scheme in master material — 마스터 머티리얼 색 구성 | done 10/30 KST: `M_SM2` static switch `UseColourScheme` (default off) + importer reads the single `*.colour_scheme.*.json`. EngineWire test: M_SM2 compiled in `/Game/SM2_Work/Tests/r49_scheme`. Not yet run on a real character export. Undo: revert commit |
 | R50 | 10/30 | 폴리싱 4) F43 .td 수치 파라미터 | Material scalar import — 재질 수치 반영 | done (data only) 10/30 KST: see `docs/handoff/POLISH_R48.md` |
-| R51 | 10/30 | 폴리싱 5) 총구 화염 위치·조준 자세 | Muzzle offset / aim pose | pending: needs REA session (POLISH_R48) |
+| R51 | 10/30 | 폴리싱 5) 총구 화염 위치·조준 자세 | Muzzle offset / aim pose | partial 10/30 KST: `MUZZLE_AIM.tsv` data table (POLISH_R48); socket wiring pending |
 | R52 | 10/30 | 폴리싱 6) 다른 캐릭터 물리 | phys52 on other characters | done 10/30 KST via EngineWire, `_bak1` backups (POLISH_R48) |
-| R53 | 10/30 | 폴리싱 7) 천 build28 | Cloth plugin verify | INFERRED installed (pkg52b); functional run pending |
-| R54 | 10/30 | 폴리싱 8) 레벨·소품 배치 추출 | Level placement extraction | pending (POLISH_R48) |
+| R53 | 10/30 | 폴리싱 7) 천 build28 | Cloth plugin verify | done 10/30 KST: 4/4 cloths converted on cc_sorcerer_exalted (EngineWire) |
+| R54 | 10/30 | 폴리싱 8) 레벨·소품 배치 추출 | Level placement extraction | done (data) 10/30 KST: `tools/level/placement.py`, 5,898 objects |
 | R55 | 10/30 | 폴리싱 9) `_bakN` 점검(삭제 없음) | Backup inventory | done: `docs/handoff/BAKN_LIST.tsv` |
 | R56 | 10/30 | 폴리싱 10) proj_sm2 백업 | Ghidra project backup | done: K:\SM2_Backup\proj_sm2, sha manifests equal |
 

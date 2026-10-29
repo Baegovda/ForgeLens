@@ -32,7 +32,7 @@ for n in names:
     while EAL.does_asset_exist("%s/%s_bak%d" % (folder, n, k)):
         k += 1
     bak = "%s/%s_bak%d" % (folder, n, k)
-    print("R52 BACKUP", bak, EAL.duplicate_asset(folder + "/" + n, bak) is not None)
+    print("R52 BACKUP", bak, EAL.duplicate_asset(folder + "/" + n, bak) is not None, EAL.save_asset(bak, only_if_is_dirty=False))
     before = set(EAL.list_assets(folder, False, False))
     print("R52 SETUP", n, lib.setup_from_json(mesh, pj, folder))
     abpc = mesh.get_editor_property("post_process_anim_blueprint")
