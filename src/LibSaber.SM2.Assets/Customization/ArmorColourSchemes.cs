@@ -254,14 +254,41 @@ public static class ArmorColourSchemes
 
   public static string Pretty(string id) => string.Join(" ", id.Split('_', StringSplitOptions.RemoveEmptyEntries).Select(w => w.Length == 0 ? w : char.ToUpperInvariant(w[0]) + w[1..]));
 
-  /// <summary>Body section of a part (HEURISTIC: affix token in the part / texture name; character_body_section_library affixes).</summary>
+  /// <summary>
+  ///   Body section of a part. R48: section affixes are PROVEN data (ssl/body/customization/character_body_section_library.sso:
+  ///   HELMET, BACKPACK, CHEST, LEFT/RIGHT_PAULDRON, LEFT/RIGHT_GAUNTLET, LEFT/RIGHT_GREAVE, LEFT/RIGHT_BRACER, VANITY="SHIELD",
+  ///   VANITY_2="JUMPPACK", VANITY_3="MANIPULATOR", CLOTH, COAT, HALO, ANTENNA). Mapping a mesh part name to a section is INFERRED from
+  ///   retail part naming (cls17: "*_shoulder_L_01" 296x, "*_shoulder_r_*" 237x, "*_hand_L/R_*", "*_knee_L/R_*"): _L = LEFT, _R = RIGHT.
+  ///   Parts without a side token keep mainColoring.
+  /// </summary>
   public static string? SectionOf(string partName, string? texture)
   {
     var s = (partName + " " + texture).ToLowerInvariant();
+    if (s.Contains("helmet_lens") || s.Contains("_lens")) return "HELMET_LENSES";
     if (s.Contains("helmet") || s.Contains("_helm")) return "HELMET";
+    if (s.Contains("jumppack") || s.Contains("jump_pack")) return "VANITY_2";
     if (s.Contains("backpack")) return "BACKPACK";
+    if (s.Contains("manipulator")) return "VANITY_3";
+    if (Side(s, "shoulder", "pauldron") is { } p) return p + "_PAULDRON";
+    if (Side(s, "gauntlet", "hand") is { } g) return g + "_GAUNTLET";
+    if (Side(s, "bracer", "forearm") is { } b) return b + "_BRACER";
+    if (Side(s, "greave", "knee", "shin") is { } r) return r + "_GREAVE";
     if (s.Contains("chest") || s.Contains("torso")) return "CHEST";
     if (s.Contains("shield")) return "VANITY";
+    return null;
+  }
+
+  /// <summary>"LEFT"/"RIGHT" when a token is followed by _l/_r (or left_/right_ precedes it); null otherwise.</summary>
+  static string? Side(string s, params string[] tokens)
+  {
+    foreach (var t in tokens)
+    {
+      if (!s.Contains(t)) continue;
+      var m = System.Text.RegularExpressions.Regex.Match(s, t + @"_?([lr])(?![a-z])");
+      if (m.Success) return m.Groups[1].Value == "l" ? "LEFT" : "RIGHT";
+      if (s.Contains("left_" + t)) return "LEFT";
+      if (s.Contains("right_" + t)) return "RIGHT";
+    }
     return null;
   }
 

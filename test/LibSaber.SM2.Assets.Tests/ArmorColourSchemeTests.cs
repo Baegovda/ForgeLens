@@ -209,4 +209,15 @@ materials = {
     var none = ArmorSchemeBake.Albedo(baseImg, mask, null, new ArmorLayer?[] { layer with { TextureIndex = -1 }, null, null, null }, on, modes, pm, A(opaque));
     Assert.Equal(new byte[] { 10, 10, 200 }, none.Bgra[..3]);
   }
+
+  [Theory]
+  [InlineData("berserk_shoulder_L_01", "LEFT_PAULDRON")]
+  [InlineData("assault_shoulder_r_02", "RIGHT_PAULDRON")]
+  [InlineData("tac_hand_L_01", "LEFT_GAUNTLET")]
+  [InlineData("tac_knee_R_01", "RIGHT_GREAVE")]
+  [InlineData("chest_plate", "CHEST")]
+  [InlineData("assault_jumppack_01", "VANITY_2")]
+  [InlineData("legs", null)]
+  [InlineData("shoulders_01", null)]
+  public void R48_SectionOf_side(string part, string? expected) => Assert.Equal(expected, ArmorColourSchemes.SectionOf(part, null));
 }
