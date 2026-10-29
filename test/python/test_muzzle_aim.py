@@ -14,3 +14,13 @@ class MuzzleAimTests(unittest.TestCase):
         self.assertEqual(M.wpn_codes("1.51"), ["151"])
         self.assertEqual(M.wpn_codes("1"), ["100", "10"])
         self.assertEqual(M.wpn_codes("0"), ["000", "00"])
+
+
+class GlbNodeTests(unittest.TestCase):
+    def test_world(self):
+        import json, struct, tempfile
+        g = {"nodes": [{"name": "body", "translation": [0, 0, 1], "children": [1]}, {"name": "shootTip", "translation": [0, 0, 0.5]}]}
+        j = json.dumps(g).encode(); j += b" " * (-len(j) % 4)
+        data = struct.pack('<III', 0x46546C67, 2, 12 + 8 + len(j)) + struct.pack('<II', len(j), 0x4E4F534A) + j
+        with tempfile.NamedTemporaryFile(suffix=".glb", delete=False) as f: f.write(data)
+        self.assertEqual(M.glb_node_world(f.name, {"shootTip"})["shootTip"], (0, 0, 1.5))

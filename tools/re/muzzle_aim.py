@@ -51,3 +51,27 @@ def main(cls_root, sani_root, out):
     print(out, n, 'aim-hold codes', len(clips))
 if __name__ == '__main__':
     main(*sys.argv[1:4])
+
+
+# R51: world position (metres, glTF Y-up) of named nodes in an exported .glb, e.g. shootTip / tip.
+def _mat(x):
+    if 'matrix' in x:
+        m = x['matrix']; return [[m[c * 4 + r] for c in range(4)] for r in range(4)]
+    tx, ty, tz = x.get('translation', [0, 0, 0]); qx, qy, qz, qw = x.get('rotation', [0, 0, 0, 1]); sx, sy, sz = x.get('scale', [1, 1, 1])
+    R = [[1 - 2 * (qy * qy + qz * qz), 2 * (qx * qy - qz * qw), 2 * (qx * qz + qy * qw)],
+         [2 * (qx * qy + qz * qw), 1 - 2 * (qx * qx + qz * qz), 2 * (qy * qz - qx * qw)],
+         [2 * (qx * qz - qy * qw), 2 * (qy * qz + qx * qw), 1 - 2 * (qx * qx + qy * qy)]]
+    s = (sx, sy, sz)
+    return [[R[r][0] * s[0], R[r][1] * s[1], R[r][2] * s[2], (tx, ty, tz)[r]] for r in range(3)] + [[0, 0, 0, 1]]
+def _mul(a, b): return [[sum(a[r][k] * b[k][c] for k in range(4)) for c in range(4)] for r in range(4)]
+def glb_node_world(path, names):
+    import json, struct
+    d = open(path, 'rb').read(); n = struct.unpack_from('<I', d, 12)[0]; nodes = json.loads(d[20:20 + n])['nodes']
+    par = {c: i for i, x in enumerate(nodes) for c in x.get('children', [])}
+    out = {}
+    for i, x in enumerate(nodes):
+        if x.get('name') in names:
+            m = _mat(x); j = i
+            while j in par: j = par[j]; m = _mul(_mat(nodes[j]), m)
+            out[x['name']] = (m[0][3], m[1][3], m[2][3])
+    return out

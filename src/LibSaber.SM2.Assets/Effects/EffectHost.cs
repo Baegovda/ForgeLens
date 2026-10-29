@@ -166,7 +166,11 @@ public sealed class AnimEventEffects
             var cue = new Cue(time, track.Name, track.Name, tc.Effect, tc.Source);
             cues.Add(cue);
             var sc = scope?.Invoke(tc.Effect, tc.Source);
-            _instances.Add((cue, host.Attach(def, sc?.Root ?? "", (ulong)(cues.Count * 7919), sc?.Prefix)));
+            // R51: a cue locator (weapon shoot tip) wins when the host has that node (scoped prefix_ or plain), else the scope root.
+            var scoped = (sc?.Prefix is { Length: > 0 } px ? px + "_" : "") + tc.Locator;
+            var at = tc.Locator.Length == 0 ? sc?.Root ?? ""
+              : host.IndexOf(scoped) >= 0 ? scoped : host.IndexOf(tc.Locator) >= 0 ? tc.Locator : sc?.Root ?? "";
+            _instances.Add((cue, host.Attach(def, at, (ulong)(cues.Count * 7919), sc?.Prefix)));
           }
         }
 

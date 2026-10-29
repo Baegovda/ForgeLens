@@ -203,4 +203,33 @@ public partial class HostEffectTests
     Assert.Equal(new Vector3(5, 0, 0), inst.Socket!("tip", 0)!.Value.Translation);
     Assert.Equal(1, host.IndexOf("tip")); // host names win over aliases
   }
+
+  [Fact]
+  public void R51_ShootCuesLocatorOnlyWithSwitch()
+  {
+    var (resolver, _) = Ctx();
+    Assert.All(resolver.ShootCues("rubric_bolter_client", false), c => Assert.Equal("", c.Locator));
+    Assert.All(resolver.ShootCues("rubric_bolter_client", true), c => Assert.Equal("shootTip", c.Locator));
+    var old = ContextResolver.MuzzleLocator;
+    try { ContextResolver.MuzzleLocator = "tip"; Assert.All(resolver.ShootCues("rubric_bolter_client", true), c => Assert.Equal("tip", c.Locator)); }
+    finally { ContextResolver.MuzzleLocator = old; }
+  }
+
+  [Theory]
+  [InlineData(true, 7f)]   // wpn_shootTip exists -> muzzle at the shoot tip
+  [InlineData(false, 2f)]  // no shoot-tip node -> weapon root (old behaviour)
+  public void R51_ShootCueAttachesAtShootTip(bool hasTip, float x)
+  {
+    var clip = new AnimationClip { Duration = 2f };
+    clip.EventTracks.Add(new AnimEventTrack("Shoot", [new AnimEvent(0.25f, 0.5f, 0, [])]));
+    var lib = new EffectLibrary(new MemoryEffectSource(new Dictionary<string, string> { ["fx_flash_part"] = Part, ["fx_muzzle"] = Group }));
+    var names = hasTip ? new[] { "root", "wpn_root", "wpn_shootTip" } : new[] { "root", "wpn_root" };
+    var host = new EffectHost(names);
+    var poses = new[] { Matrix4x4.Identity, Matrix4x4.CreateTranslation(2, 0, 0), Matrix4x4.CreateTranslation(7, 0, 0) };
+    host.SetPose(poses[..names.Length]);
+    var events = new AnimEventEffects(clip, new AnimEventVfxMap(), n => lib.Resolve(n) is { } t ? EffectDefinition.Build(n, t) : null, host,
+      scope: (_, _) => ("wpn", "wpn_root"), trackCues: [new TrackCue("Shoot", "muzzle", "fx_muzzle", "gun", false) { Locator = "shootTip" }]);
+    var inst = Assert.Single(events.At(0.6f));
+    Assert.Equal(x, inst.RootMotion!(0f).Translation.X);
+  }
 }

@@ -33,7 +33,11 @@ public sealed record WeaponChoice(string Class, string Tpl, string Hold, bool Pr
 }
 
 /// <summary>An effect cue a clip track starts without a blueprint link (e.g. <c>Shoot</c> → the weapon's muzzle).</summary>
-public sealed record TrackCue(string Track, string SlotKey, string Effect, string Source, bool Proven);
+public sealed record TrackCue(string Track, string SlotKey, string Effect, string Source, bool Proven)
+{
+  /// <summary>R51: weapon node the cue attaches to (e.g. <c>shootTip</c>); empty = the scope root (old behaviour).</summary>
+  public string Locator { get; init; } = "";
+}
 
 /// <summary>
 ///   mtl1-49 context playback rules over <see cref="ContextIndex"/>.
@@ -315,12 +319,26 @@ public sealed class ContextResolver
   }
 
   /// <summary>Muzzle cues for a weapon: sfx.list keys containing "muzzle" (several → picker). HEURISTIC timing: the clip's <c>Shoot</c> track.</summary>
-  public List<TrackCue> ShootCues(string weapon)
+  public List<TrackCue> ShootCues(string weapon) => ShootCues(weapon, MuzzleAtShootTip);
+
+  /// <summary>
+  ///   R51 switch (default off = old output): attach Shoot → muzzle cues at the weapon's shoot-tip node
+  ///   (<c>prop_firearm_shoot_tip</c> locator, else <c>shootTip</c>: retail firearm default, docs/handoff/MUZZLE_AIM.tsv) instead of the
+  ///   weapon root. Env <c>SM2_MUZZLE_SHOOTTIP=1</c>. The host falls back to the root when the node is missing.
+  /// </summary>
+  public static bool MuzzleAtShootTip { get; set; } = Environment.GetEnvironmentVariable("SM2_MUZZLE_SHOOTTIP") == "1";
+
+  /// <summary>R51: forces the muzzle node name when the switch is on (env <c>SM2_MUZZLE_LOCATOR</c>, e.g. <c>tip</c> = barrel end;
+  ///   wpn_bolt_rifle_01: shootTip z 0.56 m, tip z 0.98 m from the glb), empty = data locator.</summary>
+  public static string? MuzzleLocator { get; set; } = Environment.GetEnvironmentVariable("SM2_MUZZLE_LOCATOR");
+
+  public List<TrackCue> ShootCues(string weapon, bool atShootTip)
   {
+    var tip = !atShootTip ? "" : MuzzleLocator is { Length: > 0 } forced ? forced : _index.ShootTipOf(weapon) ?? "shootTip";
     var keys = _index.SfxKeys(weapon);
     return keys.Where(k => k.Key.Contains("muzzle", StringComparison.OrdinalIgnoreCase))
       .OrderBy(k => k.Key.Equals("muzzle", StringComparison.OrdinalIgnoreCase) ? 0 : 1).ThenBy(k => k.Key, StringComparer.OrdinalIgnoreCase)
-      .Select(k => new TrackCue("Shoot", k.Key, k.Value, weapon, false))
+      .Select(k => new TrackCue("Shoot", k.Key, k.Value, weapon, false) { Locator = tip })
       .ToList();
   }
 

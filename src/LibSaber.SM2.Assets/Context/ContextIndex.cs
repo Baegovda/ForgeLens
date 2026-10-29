@@ -238,6 +238,9 @@ public sealed class ContextIndex
     return [];
   }
 
+  /// <summary>R51: nearest <c>prop_firearm_shoot_tip</c> locator up the class chain, or null (most retail clients inherit it from a base not in the index).</summary>
+  public string? ShootTipOf(string name) => Chain(name).Select(c => Detail(c.Name).ShootTip).FirstOrDefault(s => s is { Length: > 0 });
+
   public string? ShootAnimationOf(string name) => Chain(name).Select(c => Detail(c.Name).ShootAnimation).FirstOrDefault(s => s is { Length: > 0 });
 
   /// <summary>Blueprint names the class (and ancestors) run: cooked <c>linksDesc</c> .sso plus inline <c>prop_blueprints</c> (as <c>cls:Class/Name</c>).</summary>
@@ -304,6 +307,9 @@ public sealed class ClassDetail
   /// <summary><c>prop_weapon_dummy_drop.animationEvents</c>: drop event name → slot (<c>right_hand</c>/<c>left_hand</c>).</summary>
   public Dictionary<string, string> DropSlots { get; } = new(StringComparer.OrdinalIgnoreCase);
   public string? EquipCategory { get; set; }
+  /// <summary>R51: <c>prop_firearm_shoot_tip.shootTip.locator</c> (weapon tpl node; PROVEN data) and per-barrel overrides.</summary>
+  public string? ShootTip { get; set; }
+  public Dictionary<string, string> ShootTipByBarrel { get; } = new(StringComparer.OrdinalIgnoreCase);
   public List<(string Name, JsonObject Root)> InlineBlueprints { get; } = [];
   /// <summary>propanim: <c>anim.layerList</c> entries.</summary>
   public List<LibSaber.SM2.Assets.Animation.PropAnimLayer> AnimLayers { get; } = [];
@@ -356,6 +362,13 @@ public sealed class ClassDetail
         if (e.Obj("mrEvent")?.Str("name") is { Length: > 0 } ev && e.Str("slot") is { Length: > 0 } slot)
           d.DropSlots[ev] = slot;
     d.EquipCategory = props.Obj("prop_equipment")?.Str("loadoutItemCategoryUid");
+    if (props.Obj("prop_firearm_shoot_tip") is { } tip)
+    {
+      d.ShootTip = tip.Obj("shootTip")?.Str("locator");
+      if (tip.Obj("shootTipByBarrelOverrides") is { } ov)
+        foreach (var (barrel, o) in ov)
+          if (o.Str("locator") is { Length: > 0 } l) d.ShootTipByBarrel[barrel] = l;
+    }
     if (props.Obj("anim")?.Obj("layerList") is { } layerList)
       foreach (var (layerName, layer) in layerList)
         if (layer is JsonObject lo)
