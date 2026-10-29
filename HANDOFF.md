@@ -54,6 +54,7 @@
 | R33 | 10/29 | "봉썸라이브는 계속 작업할거고 sm2는 다른 그록봇 인계해서 작업할거야 그 봇이 마치 너가 그대로옮겨간것처럼 인수인계 파일 써넣어주고 프롬프트까지 줘" | Ownership transfer / bot handoff — SM2는 새 그록봇이 그대로 이어받고, BongThumbLive는 기존 봇이 계속 | standing (done: `docs/BOT_TRANSFER.md`, box `/workspace/handoff/`) | `docs/BOT_TRANSFER.md` |
 | R34 | 10/29 | "새 봇이 다른 계정에 있어서 아예 컴퓨터환경도 다시 꾸려야할거야 이점도 다써놔" | Environment bootstrap / fresh-account provisioning — 새 봇은 다른 계정이라 박스·도구·로그인·메모리·루틴을 처음부터 다시 구성해야 하니 그 방법을 문서화 | done: `docs/BOT_TRANSFER.md` §0 step 0 (PC 연결, GitHub, 정확한 도구 버전 설치, exe/Ghidra/REA 재생성, box-only 스크립트·노트 커밋, 루틴, 메모리); 문서의 오너 이름 = Baegovda |
 | R35 | 10/29 | "hologram_planet 애니가 localbake/hologram_planet_Skeleton을 쓰고 옆 메시는 같은 이름의 다른 스켈레톤을 써서 재생 불가 — 일회성 수정 말고 익스포트/임포트 규칙으로 고치고 다른 에셋도 확인" (BongThumbLive 봇 보고) | Split skeleton — 애니메이션과 메시가 서로 다른 스켈레톤을 쓰는 문제 (anim과 옆 메시는 항상 한 스켈레톤 공유) | done 10/29 ~23:00 KST: 규칙 = 애니 임포트는 옆 메시의 스켈레톤으로만(`sm2_anim_import`가 어긋나면 `SPLITSKEL` 경고), `ue_sani_fix.py` 메시 재임포트는 폴더의 기존 `{mesh}_Skeleton` 재사용; 복구 `tools/ue/ue_fix_split_skeletons.py scan|fix`; 전체 스캔 1건(hologram localbake) → 수리 후 0건 | `tools/ue/ue_fix_split_skeletons.py`, `test/python/test_split_skeleton.py`, 아래 "Split skeleton (R35)" |
+| R36 | 10/29 | 레아 일괄 작업 1번: 리본 트레일 색이 어디서 정해지는지 찾아서 HEURISTIC 대신 게임과 똑같이 | Ribbon trail colour bake — 트레일 점 색 계산 재현 (페이드·나이 기반 그라디언트) | done 10/30 KST: FUN_141ab9b60 등 PROVEN, `SM2_VFX_TRAIL_FADE` 기본 ON, 색 = 점 나이 기준 | `EffectTrails.cs`, RE_NOTES "rea-batch 7" |
 
 ## B. 기능 요청 (Feature requests)
 
@@ -128,7 +129,7 @@
 | X02 | 10/28 | SM2 끝나면 다음은 Path of Exile 읽기 | Multi-game support (PoE) — 다른 게임 포맷 지원 | future | ROADMAP (추가 예정) |
 | X03 | 10/27–28 | 그 다음 Unreal Engine 게임 읽기(.pak/IoStore) | UE game extraction — 언리얼 게임 에셋 추출 | future | ROADMAP "Possible future development" |
 
-합계: 상시 규칙 34 · 기능 요청 60 · 미래 3 = **97건** (2026-10-29 21:10 KST 기준; R33 인계, R34 새 계정 환경 구성 추가).
+합계: 상시 규칙 35 · 기능 요청 60 · 미래 3 = **98건** (2026-10-29 21:10 KST 기준; R33 인계, R34 새 계정 환경 구성 추가).
 
 ---
 

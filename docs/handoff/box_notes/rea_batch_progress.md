@@ -64,3 +64,7 @@
 - Outputs box /workspace/rea/b6/ (c_packer.txt, dr_deac.txt, x_deac.log/json, d_*.txt, bytefind.py disp-byte scanner).
 - (2) adaptive multiplier PROVEN: FUN_141e90cb0 clamp(avgLum,0.05,50); (3) DAT_14502deac 3 READs only, BSS, INFERRED false; (1) CPU point writer PROVEN FUN_141902840/FUN_141847c30, trlPOINT map INFERRED, upload not found; (4) no exe strings → script data, HEURISTIC; (5) not attempted.
 - No code change. Worktree /workspace/LibSaber-rea-batch6 (branch rea-batch6), patch /workspace/patches/rea-batch6/.
+
+## rea-batch 7 (2026-10-29 23:45 – 10-30 KST, PC REA daemon, rea-agents 6.8.0)
+- Notes/raw box /workspace/rea/b7/ (trail_points.md, raw/). Upload FUN_14184c8d0, update FUN_141909810 → FUN_141847640 → baker FUN_141ab9b60, spawn FUN_1418bd8d0 (all PROVEN); slot {7,2} INFERRED.
+- Code: branch trail-fade (worktree /workspace/LibSaber-trail-fade), patch /workspace/patches/trail-fade/. Fade default ON, age-sampled gradient.

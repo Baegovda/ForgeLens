@@ -86,4 +86,30 @@ public class TrailShaderTests
     Assert.Equal(0.5f, t.AlongFade(9.5f, 10f), 1e-4f);
     Assert.Equal(1f, new TrailDef { Name = "x", Path = "x", Render = t.Render }.AlongFade(3f, 10f), 1e-4f);
   }
+
+  [Fact]
+  public void FadeDefaultOnAndBakeFollowsFun141ab9b60()
+  {
+    Assert.True(TrailDef.ApplyAlongFade || Environment.GetEnvironmentVariable("SM2_VFX_TRAIL_FADE") == "0");
+    var prev = TrailDef.ApplyAlongFade;
+    TrailDef.ApplyAlongFade = true;
+    try
+    {
+      var grad = new ColorCurve([0f, 255f, 255f, 255f, 255f, 1f, 0f, 0f, 0f, 0f]); // white -> black/transparent over age
+      var add = new TrailDef { Name = "x", Path = "x", FadeFront = 0.2f, Render = new EmitterDef { Name = "x", Path = "x", Blend = EffectBlend.Add, Color = grad } };
+      var blend = new TrailDef { Name = "x", Path = "x", FadeFront = 0.2f, Render = new EmitterDef { Name = "x", Path = "x", Blend = EffectBlend.Blend, Color = grad } };
+      var inh = new TrailDef { Name = "x", Path = "x", FadeFront = 0.2f, AlphaInherited = true, Render = blend.Render };
+      // Gradient follows age, not position: same position, different age.
+      Assert.Equal(1f, add.BakePointColor(0f, 5f, 10f).X, 1e-4f);
+      Assert.Equal(0.5f, add.BakePointColor(0.5f, 5f, 10f).X, 1e-4f);
+      // add: fade on rgb, alpha kept; blend: fade on alpha, rgb kept.
+      var ca = add.BakePointColor(0f, 1f, 10f);
+      Assert.Equal(0.5f, ca.X, 1e-4f); Assert.Equal(1f, ca.W, 1e-4f);
+      var cb = blend.BakePointColor(0f, 1f, 10f);
+      Assert.Equal(1f, cb.X, 1e-4f); Assert.Equal(0.5f, cb.W, 1e-4f);
+      // isAlphaInherited: alpha = inherited 255 after the fade, then owner alpha.
+      Assert.Equal(0.25f, inh.BakePointColor(0.5f, 1f, 10f, 0.25f).W, 1e-4f);
+    }
+    finally { TrailDef.ApplyAlongFade = prev; }
+  }
 }

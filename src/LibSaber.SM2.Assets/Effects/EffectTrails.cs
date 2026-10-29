@@ -17,7 +17,8 @@ public enum TrailShape { Billboard, Tape, Cylinder, Cross, Star, Triangle }
 ///   0x1417b06cd (<c>colorIntensityMultiplier</c> @0x143645cf8, <c>alphaMult</c> @0x143645d30, <c>fixateTex</c>
 ///   @0x143645c00). The runtime ribbon builder was not traced: point emission (a new point every
 ///   <c>maxSegLength</c> metres, points die after <c>timeLifeSeg</c>, length clipped to <c>maxTrailLength</c>) and
-///   width/colour sampled along the ribbon (0 = head, 1 = tail) follow the field names and corpus values.
+///   width sampled along the ribbon (0 = head, 1 = tail) follow the field names and corpus values. rea-batch 7: colour is
+///   baked per point by FUN_141ab9b60 over point age (PROVEN), see <see cref="TrailDef.BakePointColor"/>.
 /// </summary>
 /// <summary>
 ///   fix54: texture usage from the name. In the retail td set (18,690 <c>.td</c>) a name ending in <c>_nm</c> has
@@ -70,22 +71,31 @@ public sealed class TrailDef
   public DistanceFade? DegNear { get; init; }
   public DistanceFade? DegFar { get; init; }
   /// <summary>
-  ///   <c>visuals.fadeParams</c> (rea-batch 3). Serializer FUN_141834320 stores distTranspFront/_useMeters/distTranspMax/_useMeters
-  ///   at visuals+0x1d0/+0x1d4/+0x1d8/+0x1dc, ctor FUN_141834200 defaults 0/False/0/False (PROVEN). It is NOT TRAIL_DEGR (that is
-  ///   optimization.degNear/degFar). The lightning trail VS (trail.sdc 000045, LIGHTNING_TRAIL_DESC_DATA dwords 15..18) applies
-  ///   front = m ? F : F*len, max = m ? M : M*len; k = (front &gt; 1e-6 ? (end - s)/front : 1) * (max &gt; 1e-6 ? (s - start)/max : 1)
-  ///   to rgb (blendType add) or alpha (PROVEN for lightning). Ribbon trails bake colour per point on the CPU (trlPOINT colour 0..255,
-  ///   writer not found), so using the same ramp here, with "end" = head and each factor saturated, is HEURISTIC and opt-in
-  ///   (<c>SM2_VFX_TRAIL_FADE=1</c>).
+  ///   <c>visuals.fadeParams</c>. Serializer FUN_141834320 stores distTranspFront/_useMeters/distTranspMax/_useMeters at
+  ///   visuals+0x1d0/+0x1d4/+0x1d8/+0x1dc, ctor FUN_141834200 defaults 0/False/0/False (PROVEN, rea-batch 3). It is NOT
+  ///   TRAIL_DEGR (that is optimization.degNear/degFar).
+  ///   rea-batch 7 (PROVEN): ribbon trails bake the fade on the CPU per point. FUN_141909810 (SfxTrail update) calls the
+  ///   per-point updater FUN_141847640, which writes trlPOINT+0x10 = FUN_141ab9b60(visuals = desc+0x90, base rgba pt+0x14,
+  ///   age t, pos pt+0x28, oldest pos, newest pos, inherited alpha pt+0x1c, alpha mult owner+0x144). In FUN_141ab9b60:
+  ///   front = flag(+0x1d4) ? F : F*len, back = flag(+0x1dc) ? M : M*len (len = newest - oldest),
+  ///   f = sat((newest - pos)/front) * sat((pos - oldest)/back); blendType (visuals+0x78) == 1 (add) -> rgb *= f, else a *= f;
+  ///   then isAlphaInherited (visuals+0x54) -> a = inherited alpha; then a *= alpha mult; clamp 0..255. The points are then
+  ///   uploaded unchanged by FUN_14184c8d0 ("Trail points data", 80-byte trlPOINT). On by default; <c>SM2_VFX_TRAIL_FADE=0</c> opts out.
+  ///   Zero front/back gives factor 1 (same guard as the lightning VS; INFERRED for the CPU body).
   /// </summary>
   public float FadeFront { get; init; }
   public bool FadeFrontMeters { get; init; }
   public float FadeMax { get; init; }
   public bool FadeMaxMeters { get; init; }
-  /// <summary><c>SM2_VFX_TRAIL_FADE=1</c>: apply <see cref="FadeFront"/>/<see cref="FadeMax"/> along the ribbon (HEURISTIC, off by default).</summary>
-  public static bool ApplyAlongFade { get; set; } = Environment.GetEnvironmentVariable("SM2_VFX_TRAIL_FADE") == "1";
+  /// <summary><c>visuals.isAlphaInherited</c> (visuals+0x54, PROVEN offset). When set, FUN_141ab9b60 replaces alpha with the
+  /// point's inherited alpha (pt+0x1c). FUN_1418bd8d0 (add point) stores 255 there on the normal emitter path
+  /// (FUN_1418bbd20 / FUN_141909810 pass NULL, PROVEN), so alpha becomes 1 (gradient alpha and alpha fade dropped).</summary>
+  public bool AlphaInherited { get; init; }
+  /// <summary>Along-trail fade (FUN_141ab9b60, PROVEN). On by default; <c>SM2_VFX_TRAIL_FADE=0</c> turns it off.</summary>
+  public static bool ApplyAlongFade { get; set; } = Environment.GetEnvironmentVariable("SM2_VFX_TRAIL_FADE") != "0";
 
-  /// <summary>Along-trail fade factor at distance <paramref name="fromHead"/> from the head of a trail of <paramref name="length"/>.</summary>
+  /// <summary>Along-trail fade factor at distance <paramref name="fromHead"/> from the newest point (head, emitter end) of a
+  /// trail of <paramref name="length"/>: sat((newest-pos)/front) * sat((pos-oldest)/back) (FUN_141ab9b60, PROVEN).</summary>
   public float AlongFade(float fromHead, float length)
   {
     var front = FadeFrontMeters ? FadeFront : FadeFront * length;
@@ -93,6 +103,22 @@ public sealed class TrailDef
     var k = front > 1e-6f ? Math.Clamp(fromHead / front, 0f, 1f) : 1f;
     if (max > 1e-6f) k *= Math.Clamp((length - fromHead) / max, 0f, 1f);
     return k;
+  }
+
+  /// <summary>
+  ///   Per-point colour as FUN_141ab9b60 bakes it (PROVEN order), in 0..1: base (white, FUN_1418bd8d0 normal path) times the
+  ///   visuals gradient sampled at normalised AGE <paramref name="ageT"/> (not position), then the along fade on rgb (add) or
+  ///   alpha, then inherited alpha (1 = 255 on the normal path), then <paramref name="ownerAlpha"/> (owner+0x144; its source
+  ///   is not traced, callers pass 1).
+  /// </summary>
+  public Vector4 BakePointColor(float ageT, float fromHead, float length, float ownerAlpha = 1f)
+  {
+    var c = Render.Color.Evaluate(Math.Clamp(ageT, 0f, 1f));
+    var f = ApplyAlongFade ? AlongFade(fromHead, length) : 1f;
+    if (Render.Blend == EffectBlend.Add) { c.X *= f; c.Y *= f; c.Z *= f; } else c.W *= f;
+    if (AlphaInherited) c.W = 1f;
+    c.W *= ownerAlpha;
+    return Vector4.Clamp(c, Vector4.Zero, Vector4.One);
   }
 
   /// <summary>Render state shared with sprite batches (texture, blend, colour over the ribbon, HDR intensity).</summary>
@@ -164,6 +190,7 @@ public sealed class TrailDef
       FadeFrontMeters = visuals?.Obj("fadeParams")?.Bool("distTranspFront_useMeters", false) ?? false,
       FadeMax = visuals?.Obj("fadeParams")?.Float("distTranspMax", 0f) ?? 0f,
       FadeMaxMeters = visuals?.Obj("fadeParams")?.Bool("distTranspMax_useMeters", false) ?? false,
+      AlphaInherited = visuals?.Bool("isAlphaInherited", false) ?? false,
     };
   }
 
@@ -228,7 +255,7 @@ public static class EffectTrailSprites
         var max = def.MaxTrailLength * def.Scale;
         var k = Array.FindIndex(dist, d => d >= max);
         var f = (max - dist[k - 1]) / Math.Max(1e-6f, dist[k] - dist[k - 1]);
-        pts[k] = (Vector3.Lerp(pts[k - 1].P, pts[k].P, f), pts[k].Age);
+        pts[k] = (Vector3.Lerp(pts[k - 1].P, pts[k].P, f), pts[k - 1].Age + (pts[k].Age - pts[k - 1].Age) * f);
         dist[k] = max;
         pts.RemoveRange(k + 1, pts.Count - k - 1);
         length = max;
@@ -267,13 +294,16 @@ public static class EffectTrailSprites
 
           var na = dist[i] / length;
           var nb = dist[i + 1] / length;
-          void Emit(Vector3 p, float n, float side, Vector3 sideDir)
+          // rea-batch 7 (PROVEN): the gradient is sampled at the point's normalised age (FUN_141847640 -> FUN_141ab9b60,
+          // trlPOINT half2 age at +0x34). Normalising by timeLifeSeg is INFERRED (the half2 holds age and life).
+          var life = Math.Max(1e-4f, def.TimeLifeSeg);
+          var ta = pts[i].Age / life;
+          var tb = pts[i + 1].Age / life;
+          void Emit(Vector3 p, float n, float tAge, float side, Vector3 sideDir)
           {
             var fade = def.Fade(Vector3.Distance(p, eye)); // per vertex, as the trail VS (TRAIL_DEGR)
-            var endFade = TrailDef.ApplyAlongFade ? def.AlongFade(n * length, length) : 1f;
-            if (endFade != 1f) fade = (fade.Size, fade.Intens * (r.Blend == EffectBlend.Add ? endFade : 1f), fade.Alpha * (r.Blend == EffectBlend.Add ? 1f : endFade));
             var w = 0.5f * def.Width.Evaluate(n) * def.Scale * fade.Size;
-            var c = r.Color.Evaluate(n);
+            var c = def.BakePointColor(tAge, n * length, length);
             var rgb = new Vector3(c.X, c.Y, c.Z) * r.ColorIntensity.Sample(n, 0.5f) * fade.Intens;
             if (r.Lighting is not ("None" or "")) rgb *= EffectSprites.LitScale * Math.Clamp(r.AmbientLight + 0.55f, 0f, 1f);
             var pos = p + sideDir * (w * side);
@@ -289,7 +319,7 @@ public static class EffectTrailSprites
 
           var sa = Side(a);
           var sb = Side(b);
-          Emit(a, na, -1, sa); Emit(b, nb, -1, sb); Emit(b, nb, 1, sb); Emit(a, na, 1, sa);
+          Emit(a, na, ta, -1, sa); Emit(b, nb, tb, -1, sb); Emit(b, nb, tb, 1, sb); Emit(a, na, ta, 1, sa);
           depth += Vector3.Distance(a, eye);
           quads++;
         }
