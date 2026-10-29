@@ -1670,6 +1670,13 @@ public partial class MainWindow : Window
     if (_catalog is null || _store is null)
       return;
     var indices = FileList.SelectedItems?.OfType<FileRow>().Select(row => row.Index).Distinct().ToArray() ?? Array.Empty<int>();
+    await ExportIndicesAsync(indices);
+  }
+
+  private async Task ExportIndicesAsync(int[] indices)
+  {
+    if (_catalog is null || _store is null)
+      return;
     if (indices.Length == 0)
     {
       StatusText.Text = "Select one or more files in the list first.";
@@ -1702,10 +1709,13 @@ public partial class MainWindow : Window
       }
     }
 
+    window.SetDirect(_settings.LastUnrealProject, DirectAssetName(indices));
     var choice = await window.Choose(this, _settings.LastExportFolder, parts, skinRegions);
     if (choice is null)
       return;
     _settings.LastExportFolder = choice.Folder;
+    if (choice.Unreal is { } un)
+      _settings.LastUnrealProject = un.Project;
     _settings.Save();
     // mtl1-49: the colour scheme picked in the viewer exports with the previewed tpl (material=..., td variant swap)
     if (!_armorMode && _colourMaterial is { Length: > 0 } colour && _previewFileIndex >= 0 && indices.Contains(_previewFileIndex))
@@ -1721,10 +1731,18 @@ public partial class MainWindow : Window
       var catalog = _catalog;
       var store = _store;
       var previewClip = _clip is { HasCurves: true } ? _clipIndex : -1;
+      // oneclick: a prop's embedded sequence (▶ SEQ row) has no .sani file index; "The clip playing in the preview"
+      // then exports that clip itself (same clip object as the Extractor's --anim seq:NAME).
+      var previewSeq = choice.Clips == ClipChoice.PreviewClip && previewClip < 0 && _clip is { HasCurves: true } seq ? seq : null;
       var notes = new List<string>();
       var report = await Task.Run(() =>
       {
         var files = ExportPlan.Apply(catalog, store, indices, choice.Settings, choice.Clips, previewClip, notes);
+        if (previewSeq is not null)
+        {
+          choice.Settings.Clips = new List<AnimationClip> { previewSeq };
+          notes.RemoveAll(n => n.StartsWith("No clip is playing", StringComparison.Ordinal));
+        }
         return AssetExporter.Export(catalog, store, files, choice.Folder, choice.Settings, progress);
       });
       report.Messages.InsertRange(0, notes);
@@ -1737,6 +1755,8 @@ public partial class MainWindow : Window
           var path = System.IO.Path.Combine(choice.Folder, $"{tpl}.colour_scheme.{_colourMaterial}.json");
           await System.IO.File.WriteAllTextAsync(path, schemeJson);
           report.Messages.Insert(0, "colour scheme params: " + System.IO.Path.GetFileName(path) + ".");
+          if (report.Models.FirstOrDefault(m => m.Name.Equals(tpl, StringComparison.OrdinalIgnoreCase)) is { } rec)
+            rec.ColourScheme = path;
         }
         catch (Exception ex)
         {
@@ -1745,6 +1765,8 @@ public partial class MainWindow : Window
       }
 
       StatusText.Text = $"Exported {report.Written} files, skipped {report.Skipped}. {string.Join(" ", report.Messages.Take(3))}";
+      if (choice.Unreal is { } direct)
+        await RunDirectImportAsync(report, choice, direct);
     }
     catch (Exception ex)
     {

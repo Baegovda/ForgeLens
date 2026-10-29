@@ -598,5 +598,6 @@ public partial class MainWindow
     if (_mesh is not null)
       DrawMesh();
     await OpenClipFromEnvironmentAsync();
+    await ExportFromEnvironmentAsync();
   }
 }

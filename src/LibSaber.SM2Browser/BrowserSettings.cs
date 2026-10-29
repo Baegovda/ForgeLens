@@ -7,6 +7,8 @@ public sealed class BrowserSettings
 
   public string? LastFolder { get; set; }
   public string? LastExportFolder { get; set; }
+  /// <summary>oneclick: last .uproject picked for "Direct to Unreal".</summary>
+  public string? LastUnrealProject { get; set; }
   /// <summary>mtl1-42: file list column widths (TYPE, SIZE, ARCHIVE; PATH takes the rest) and the folder / file pane widths.</summary>
   /// <summary>mtl1-42: list auxiliary / text files too (off = only previewable assets).</summary>
   public bool ShowAllFiles { get; set; }

@@ -16,6 +16,23 @@
           <Button Content="Export" Classes="accent" MinWidth="96" MinHeight="32" IsDefault="True" Click="ExportClicked" />
         </StackPanel>
         <TextBlock x:Name="FolderError" DockPanel.Dock="Bottom" Foreground="#E85D4C" TextWrapping="Wrap" Margin="0,4,0,0" />
+        <!-- oneclick: Direct to Unreal (원클릭 내보내기 옵션). Off by default: the plain export stays the default. -->
+        <Border x:Name="DirectPanel" DockPanel.Dock="Bottom" Margin="0,10,0,0" Padding="10" CornerRadius="6" BorderThickness="1" BorderBrush="#3A3F4B" Background="#1E2128">
+          <StackPanel Spacing="6">
+            <CheckBox x:Name="DirectBox" Content="Direct to Unreal: import into the project automatically after the export" IsCheckedChanged="DirectChanged" />
+            <StackPanel x:Name="DirectOptions" Spacing="6" IsEnabled="False">
+              <TextBlock Text="Unreal project (.uproject)" Opacity="0.85" />
+              <DockPanel>
+                <Button Content="Browse…" DockPanel.Dock="Right" MinWidth="96" MinHeight="30" Margin="8,0,0,0" Click="BrowseProjectClicked" />
+                <TextBox x:Name="ProjectBox" MinHeight="30" Watermark="K:\Unreal Projects\UE_VFX_57\UE_VFX_57.uproject" />
+              </DockPanel>
+              <TextBlock Text="Content folder" Opacity="0.85" />
+              <TextBox x:Name="ContentBox" MinHeight="30" Watermark="/Game/SM2_Work/Props/asset" TextChanged="ContentChanged" />
+              <TextBlock x:Name="DirectHint" TextWrapping="Wrap" FontSize="12" Opacity="0.7"
+                         Text="Uses the open editor (EngineWire :3000 or Python Remote Execution); with no editor open it runs UnrealEditor-Cmd headless. An existing folder is kept as a _bakN copy first. /Game/SM2_Work/Original and /Game/Work are refused." />
+            </StackPanel>
+          </StackPanel>
+        </Border>
         <TextBlock DockPanel.Dock="Top" Text="Output folder" Margin="0,0,0,4" />
         <Button Content="Browse…" DockPanel.Dock="Right" MinWidth="96" MinHeight="32" Margin="8,0,0,0" Click="BrowseClicked" />
         <TextBox x:Name="FolderBox" MinHeight="32" Watermark="Folder for the exported files" />

@@ -84,6 +84,30 @@ public sealed class ExportReport
   public int Written { get; set; }
   public int Skipped { get; set; }
   public List<string> Messages { get; } = new();
+
+  /// <summary>oneclick: the files each exported model wrote (FBX, sidecars, clips), for the Direct-to-Unreal import.</summary>
+  public List<ExportedModelFiles> Models { get; } = new();
+}
+
+/// <summary>oneclick: what one model export wrote, so an importer does not have to guess file names (or pick up stale clips).</summary>
+public sealed class ExportedModelFiles
+{
+  /// <summary>Model base name (tpl stem), e.g. <c>wpn_bolt_rifle_01</c>.</summary>
+  public required string Name { get; init; }
+  /// <summary>Game path of the model (<c>tpl/....tpl</c>).</summary>
+  public required string Source { get; init; }
+  /// <summary>The model has bones (imports as a SkeletalMesh); false = StaticMesh.</summary>
+  public bool Skeletal { get; init; }
+  public string? Fbx { get; set; }
+  public string? Materials { get; set; }
+  public string? MaterialsScript { get; set; }
+  public string? Physics { get; set; }
+  /// <summary>Anim-only clip FBX against this model's skeleton (<c>{model}__{clip}.fbx</c>).</summary>
+  public List<string> Clips { get; } = new();
+  /// <summary>Anim Only (Manny) clip FBX (<c>{model}__{clip}_Manny.fbx</c>, SK_Mannequin skeleton).</summary>
+  public List<string> Manny { get; } = new();
+  /// <summary>Optional colour-scheme parameter sidecar (<c>{tpl}.colour_scheme.{id}.json</c>), set by the browser.</summary>
+  public string? ColourScheme { get; set; }
 }
 
 public static class AssetExporter
@@ -252,6 +276,8 @@ public static class AssetExporter
     }
 
     exportMesh.Clip = null;
+    var record = new ExportedModelFiles { Name = AssetClassification.BaseName(file.Path), Source = file.Path, Skeletal = exportMesh.Bones.Count > 0 };
+    report.Models.Add(record);
     PhysicsSetup? physics = null;
     ClothBoneRig? clothRig = null;
     var physicsBaked = new Dictionary<string, PhysicsBakeReport>(StringComparer.OrdinalIgnoreCase);
@@ -298,10 +324,12 @@ public static class AssetExporter
       textureFiles = TextureFiles(catalog, store, index, exportMesh, fbxPath, outputDirectory, settings, report, batch);
       FbxWriter.Write(fbxPath, exportMesh, settings.Space, textureFiles, unrealRoot: settings.UnrealRootBone);
       report.Written++;
+      record.Fbx = fbxPath;
       if (settings.WriteMaterials)
       {
-        WriteMaterialSidecar(fbxPath, exportMesh, textureFiles, report);
-        WriteUnrealScript(Path.Combine(Path.GetDirectoryName(fbxPath)!, "import_sm2_materials.py"), report);
+        record.Materials = WriteMaterialSidecar(fbxPath, exportMesh, textureFiles, report);
+        record.MaterialsScript = Path.Combine(Path.GetDirectoryName(fbxPath)!, "import_sm2_materials.py");
+        WriteUnrealScript(record.MaterialsScript, report);
       }
     }
 
@@ -332,6 +360,7 @@ public static class AssetExporter
           var mannyPath = Path.Combine(Path.GetDirectoryName(smPath)!, Path.GetFileNameWithoutExtension(smPath) + Retarget.MannequinRetarget.Suffix + ".fbx");
           FbxWriter.Write(mannyPath, manny, settings.Space, textureFiles, animationOnly: true, unrealRoot: true);
           report.Written++;
+          record.Manny.Add(mannyPath);
           var animScript = Path.Combine(Path.GetDirectoryName(mannyPath)!, "ue_import_anim.py");
           if (!File.Exists(animScript) || usedClips.Count == 1)
             WriteUnrealScript(animScript, report);
@@ -366,6 +395,7 @@ public static class AssetExporter
         // when mesh import is off, and the legacy importer builds a second SkeletalMesh.
         FbxWriter.Write(fbxPath, exportMesh, settings.Space, textureFiles, animationOnly: true, unrealRoot: settings.UnrealRootBone);
         report.Written++;
+        record.Clips.Add(fbxPath);
         var animScript = Path.Combine(Path.GetDirectoryName(fbxPath)!, "ue_import_anim.py");
         if (!File.Exists(animScript) || usedClips.Count == 1)
           WriteUnrealScript(animScript, report);
@@ -407,6 +437,7 @@ public static class AssetExporter
       Directory.CreateDirectory(Path.GetDirectoryName(physicsPath)!);
       File.WriteAllText(physicsPath, PhysicsSidecar.Serialize(exportMesh, physics, clothRig, physicsBaked));
       report.Written++;
+      record.Physics = physicsPath;
       WriteUnrealScript(Path.Combine(Path.GetDirectoryName(physicsPath)!, "ue_sm2_physics.py"), report);
       foreach (var (name, baked) in physicsBaked)
         report.Messages.Add($"{name}: physics baked at {PhysicsBake.Rate:0} Hz, {baked.JiggleBones} jiggle and {baked.ClothBones} cloth helper bones, {baked.Frames} frames, {baked.MeanStepMs:0.00} ms/step.");
@@ -1456,7 +1487,7 @@ public static class AssetExporter
     return names;
   }
 
-  private static void WriteMaterialSidecar(string fbxPath, ExportedMesh mesh, IReadOnlyDictionary<string, string> files, ExportReport report)
+  private static string WriteMaterialSidecar(string fbxPath, ExportedMesh mesh, IReadOnlyDictionary<string, string> files, ExportReport report)
   {
     var slots = MaterialMaps.Slots(mesh).Select(slot => new
     {
@@ -1547,6 +1578,7 @@ public static class AssetExporter
       slots,
     }, JsonOptions));
     report.Written++;
+    return jsonPath;
   }
 
   private static void WriteUnrealScript(string path, ExportReport report)

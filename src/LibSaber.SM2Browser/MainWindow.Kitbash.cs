@@ -614,10 +614,13 @@ public partial class MainWindow
     }
 
     var window = new ExportWindow();
+    window.SetDirect(_settings.LastUnrealProject, _kitTemplate ?? DirectAssetName(new[] { index }));
     var choice = await window.Choose(this, _settings.LastExportFolder, fixedVariant: spec ?? "all", fixedSummary: string.Join("\n", summary));
     if (choice is null)
       return;
     _settings.LastExportFolder = choice.Folder;
+    if (choice.Unreal is { } un)
+      _settings.LastUnrealProject = un.Project;
     _settings.Save();
     if (_mesh is not null && _previewFileIndex == index)
       choice.Settings.PartVisibility = new Dictionary<int, MeshVisibility> { [index] = MeshVisibility.Capture(_mesh) };
@@ -637,6 +640,8 @@ public partial class MainWindow
       });
       report.Messages.InsertRange(0, notes);
       StatusText.Text = $"Kitbash export: {report.Written} files, skipped {report.Skipped}. {string.Join(" ", report.Messages.Take(3))}";
+      if (choice.Unreal is { } direct)
+        await RunDirectImportAsync(report, choice, direct);
     }
     catch (Exception ex)
     {

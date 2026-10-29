@@ -12,6 +12,8 @@ public sealed class ExportChoice
   public required string Folder { get; init; }
   public required ExportSettings Settings { get; init; }
   public ClipChoice Clips { get; init; }
+  /// <summary>oneclick: set when "Direct to Unreal" is checked.</summary>
+  public UnrealDirectChoice? Unreal { get; init; }
 }
 
 public partial class ExportWindow : Window
@@ -32,15 +34,48 @@ public partial class ExportWindow : Window
 
   private string? _fixedVariant;
 
+  private string _defaultContent = "";
+  private bool _contentEdited;
+  private bool _settingContent;
+
+  private string _directAsset = "asset";
+
+  /// <summary>oneclick: last project and the asset the suggested /Game folder is named after (Direct-to-Unreal option).</summary>
+  public void SetDirect(string? lastProject, string asset)
+  {
+    ProjectBox.Text = string.IsNullOrWhiteSpace(lastProject) ? UnrealContentPath.DefaultProject : lastProject;
+    _directAsset = asset;
+    SuggestContent();
+    MannyBox.IsCheckedChanged -= MannyChanged;
+    MannyBox.IsCheckedChanged += MannyChanged;
+  }
+
+  private void MannyChanged(object? sender, RoutedEventArgs e)
+  {
+    if (!_contentEdited)
+      SuggestContent();
+  }
+
+  private void SuggestContent()
+  {
+    _defaultContent = UnrealContentPath.Default(_directAsset, MannyBox.IsChecked == true);
+    _settingContent = true;
+    ContentBox.Text = _defaultContent;
+    _settingContent = false;
+  }
+
   public Task<ExportChoice?> Choose(Window owner, string? initialFolder, VariantResult? parts = null, Dictionary<string, List<string>>? skinRegions = null, string? fixedVariant = null, string? fixedSummary = null)
   {
     FolderBox.Text = initialFolder ?? "";
+    if (string.IsNullOrEmpty(ProjectBox.Text))
+      SetDirect(null, "asset");
     if (fixedVariant is not null)
       BuildFixed(fixedVariant, fixedSummary);
     else if (parts is not null)
       BuildParts(parts, skinRegions);
     FitToScreen(owner);
     _result = new TaskCompletionSource<ExportChoice?>();
+    ApplyQaEnvironment();
     ShowDialog(owner).ContinueWith(_ => _result.TrySetResult(null), TaskScheduler.FromCurrentSynchronizationContext());
     return _result.Task;
   }
@@ -84,12 +119,107 @@ public partial class ExportWindow : Window
     FolderError.Text = "";
   }
 
+  /// <summary>QA (oneclick): SM2_DIRECT_PROJECT / SM2_DIRECT_PATH check "Direct to Unreal" with those values;
+  ///   SM2_EXPORT_CLIPS = clip choice index; SM2_EXPORT_MANNY=1 checks Anim Only (Manny); SM2_EXPORT_GO = seconds after
+  ///   which Export is pressed.</summary>
+  private void ApplyQaEnvironment()
+  {
+    if (Environment.GetEnvironmentVariable("SM2_EXPORT_QA") is not { Length: > 0 })
+      return;
+    if (Environment.GetEnvironmentVariable("SM2_DIRECT_PROJECT") is { Length: > 0 } project)
+    {
+      DirectBox.IsChecked = true;
+      DirectOptions.IsEnabled = true;
+      ProjectBox.Text = project;
+    }
+
+    // Manny first: checking it re-suggests the content folder, which must not replace SM2_DIRECT_PATH.
+    if (Environment.GetEnvironmentVariable("SM2_EXPORT_MANNY") == "1")
+      MannyBox.IsChecked = true;
+    if (Environment.GetEnvironmentVariable("SM2_DIRECT_PATH") is { Length: > 0 } path)
+    {
+      ContentBox.Text = path;
+      _contentEdited = !string.Equals(UnrealContentPath.Normalize(path), UnrealContentPath.Normalize(_defaultContent), StringComparison.Ordinal);
+    }
+
+    if (int.TryParse(Environment.GetEnvironmentVariable("SM2_EXPORT_CLIPS"), out var clips) && clips >= 0 && clips < ClipBox.ItemCount)
+      ClipBox.SelectedIndex = clips;
+    if (double.TryParse(Environment.GetEnvironmentVariable("SM2_EXPORT_GO"), System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out var go))
+      Avalonia.Threading.DispatcherTimer.RunOnce(() => ExportClicked(this, new RoutedEventArgs()), TimeSpan.FromSeconds(Math.Max(0.1, go)));
+  }
+
+  private void DirectChanged(object? sender, RoutedEventArgs e)
+  {
+    DirectOptions.IsEnabled = DirectBox.IsChecked == true;
+    FolderError.Text = "";
+  }
+
+  private void ContentChanged(object? sender, TextChangedEventArgs e)
+  {
+    if (!_settingContent)
+      _contentEdited = !string.Equals(UnrealContentPath.Normalize(ContentBox.Text), UnrealContentPath.Normalize(_defaultContent), StringComparison.Ordinal);
+  }
+
+  private async void BrowseProjectClicked(object? sender, RoutedEventArgs e)
+  {
+    IStorageFolder? start = null;
+    try
+    {
+      var dir = Path.GetDirectoryName(ProjectBox.Text ?? "");
+      if (!string.IsNullOrEmpty(dir) && Directory.Exists(dir))
+        start = await StorageProvider.TryGetFolderFromPathAsync(dir);
+    }
+    catch
+    {
+      // no start folder
+    }
+
+    var files = await StorageProvider.OpenFilePickerAsync(new FilePickerOpenOptions
+    {
+      Title = "Unreal project",
+      AllowMultiple = false,
+      SuggestedStartLocation = start,
+      FileTypeFilter = new[] { new FilePickerFileType("Unreal project") { Patterns = new[] { "*.uproject" } } },
+    });
+    if (files.Count == 0)
+      return;
+    var path = files[0].TryGetLocalPath();
+    if (!string.IsNullOrWhiteSpace(path))
+      ProjectBox.Text = path;
+  }
+
+  /// <summary>oneclick: the Direct-to-Unreal choice, or an error text.</summary>
+  internal (UnrealDirectChoice? Choice, string? Error) DirectChoice()
+  {
+    if (DirectBox.IsChecked != true)
+      return (null, null);
+    var project = ProjectBox.Text?.Trim().Trim('"') ?? "";
+    if (!project.EndsWith(".uproject", StringComparison.OrdinalIgnoreCase) || !File.Exists(project))
+      return (null, "Direct to Unreal: choose an existing .uproject file.");
+    var content = UnrealContentPath.Normalize(ContentBox.Text);
+    if (UnrealContentPath.Validate(content) is { } err)
+      return (null, "Direct to Unreal: " + err);
+    return (new UnrealDirectChoice { Project = project, ContentPath = content, ContentPathIsDefault = !_contentEdited }, null);
+  }
+
   private void ExportClicked(object? sender, RoutedEventArgs e)
   {
     var folder = FolderBox.Text?.Trim() ?? "";
     if (folder.Length == 0 || !Directory.Exists(folder))
     {
       FolderError.Text = "Choose a folder that exists.";
+      return;
+    }
+
+    var (direct, directError) = DirectChoice();
+    if (directError is not null)
+    {
+      FolderError.Text = directError;
+      return;
+    }
+    if (direct is not null && (FbxBox.IsChecked != true || SpaceBox.SelectedIndex != 0))
+    {
+      FolderError.Text = "Direct to Unreal needs \"Models as FBX\" and the Unreal target (FBX Z-up centimeters).";
       return;
     }
 
@@ -112,7 +242,7 @@ public partial class ExportWindow : Window
       Physics = MannyBox.IsChecked != true,
       Variant = PartsSpec(),
     };
-    _result?.TrySetResult(new ExportChoice { Folder = folder, Settings = settings, Clips = (ClipChoice)Math.Max(0, ClipBox.SelectedIndex) });
+    _result?.TrySetResult(new ExportChoice { Folder = folder, Settings = settings, Clips = (ClipChoice)Math.Max(0, ClipBox.SelectedIndex), Unreal = direct });
     Close();
   }
 
