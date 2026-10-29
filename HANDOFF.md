@@ -57,6 +57,7 @@
 | R36 | 10/29 | 레아 일괄 작업 1번: 리본 트레일 색이 어디서 정해지는지 찾아서 HEURISTIC 대신 게임과 똑같이 | Ribbon trail colour bake — 트레일 점 색 계산 재현 (페이드·나이 기반 그라디언트) | done 10/30 KST: FUN_141ab9b60 등 PROVEN, `SM2_VFX_TRAIL_FADE` 기본 ON, 색 = 점 나이 기준 | `EffectTrails.cs`, RE_NOTES "rea-batch 7" |
 | R37 | 10/30 | 레아 일괄 작업 2번: 적응형 조명 배율을 게임과 똑같이 (clamp(avgLum, 0.05, 50)) 벤치·UE 익스포트에 적용 | Adaptive light multiplier — 자동 노출 평균 휘도로 조명 세기 보정 | done 10/30 KST: FUN_141e90cb0/FUN_141ee9e80/FUN_14224ecf0 PROVEN, FUN_141de8140는 1.0; 남은 HEURISTIC: DefaultAdaptive=true, 벤치 노출 1/250 | `CaptureRules.cs` `CaptureLightUnits.AdaptiveFactor`, RE_NOTES "rea-batch 7 item 2" |
 | R38 | 10/30 | 레아/데이터 3번: 플레이어 사격 애니 클립을 무기별로 게임과 똑같이 고르기 | Morpheme network switch decode — 애니 그래프의 스위치/식 노드 해독 | done 10/30 KST: primaris.nmb의 wpn_type 스위치·Expression 해독(INFERRED), 무기별 tacticus_shtN_shoot_aim/blind 표; HEURISTIC: 미할당 기본값, op 95/98/c4, 헤비 무기 조준 | `PlayerFireClips.cs`, `PropAnimStates` 3b, `tools/re/nmb_reader.py`, `docs/handoff/FIRE_CLIP.md` |
+| R39 | 10/30 | "분석캐시 … 까먹게 되서 또 읽을거아냐 … 새 도구도 항상 숙지하는거지?" + 시스템 개선(속도·토큰·품질) | RE toolbox — 상시 Ghidra 서버, 요약 출력, 분석 캐시 색인, 도구 목록 | done 10/30 KST: recall-before-decompile rule (BOT_TRANSFER §0), exe patch check, REA pinned 6.8.0, UNVERIFIED/VISUAL_CHECKS/BACKUPS | `tools/re/README.md` "RE toolbox", `tools/re/ghidra_serve/`, `docs/handoff/RE_CACHE/` |
 
 ## B. 기능 요청 (Feature requests)
 
