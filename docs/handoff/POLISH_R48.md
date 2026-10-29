@@ -10,3 +10,10 @@
 | R54 | Level / prop placement | `tools/level/placement.py` → `Exports\level\hub_battle_barge.placement.tsv`: 5,898 objects (2,483 geom, 1,894 light, 19 camera, 1,502 other), 2,117 with a template, 496 templates | parse PROVEN (same cd_list parser as lights); multi-part containers carry only the container matrix; not yet placed in UE/viewer | revert commit |
 | R55 | `_bakN` check (list only) | `BAKN_LIST.tsv`: 188 files, 4,123,337,408 B (186 Tests/chars_cloth, 2 VfxUe_bak3) refreshed: 191 files, 4,233,631,899 B incl. the 3 R52 `_bak1` meshes (they were saved only at 05:4x KST; script now saves the backup at once) | filesystem scan | — |
 | R56 | proj_sm2 backup | `K:\SM2_Backup\proj_sm2` 9 files, 1,218,790,475 B, source/dest sha manifests identical; GhidraServe restarted (pid 73032, ping ok) | backup.ps1 record+copy | — |
+
+## R51 wiring (10/30 ~06:10 KST)
+- Viewer: Shoot → muzzle cues attach at the weapon shoot-tip bone when `SM2_MUZZLE_SHOOTTIP=1` (default off = old root attach, unchanged). Locator = class `prop_firearm_shoot_tip` (PROVEN data) else `shootTip`; `SM2_MUZZLE_LOCATOR=tip` forces another node. Missing node → root (old).
+- wpn_bolt_rifle_01 (glb, metres): shootTip z 0.561, tip z 0.977, tip_gl z 0.820 (PROVEN, `muzzle_aim.glb_node_world`). shootTip sits ~0.42 m behind the barrel end: whether the flash spawns at shootTip or tip is NOT proven → owner compares both.
+- UE (EngineWire): skeletal import of the weapon keeps bones tip / tip_gl / shootTip (PROVEN, `/Game/SM2_Work/Tests/r51/wpn_bolt_rifle_01`). Python cannot add a socket in 5.7 (SocketName read-only) → attach to the bone name.
+- Aim pose: use the `aimHoldClips` column of `MUZZLE_AIM.tsv` instead of the generated pitchUp35 (mapping INFERRED); not yet wired into a sequence (the F46 sequence tool is gone).
+- Owner check: ForgeLens context playback, bolt rifle shoot clip, run with `SM2_MUZZLE_SHOOTTIP=1`, then also `SM2_MUZZLE_LOCATOR=tip`; say which matches the game.
