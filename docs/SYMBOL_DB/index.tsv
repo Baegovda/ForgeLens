@@ -776,3 +776,12 @@ FUN_14198d480	0x14198d480	vfx	sfx_light_base registration	NOTED	docs/SYMBOL_DB/v
 FUN_1419b0a00	0x1419b0a00	vfx	sfx_light factory vtable 0x1436423c0	NOTED	docs/SYMBOL_DB/vfx.md		
 FUN_1418c3b30	0x1418c3b30	vfx	sfx_light update slot 19	NOTED	docs/SYMBOL_DB/vfx.md		
 FUN_1413831e0	0x1413831e0	vfx	gsLIGHT_MANAGER::CreateLight	NOTED	docs/SYMBOL_DB/vfx.md		
+FUN_141f186b0..FUN_141f19950	0x141f186b0	customization	customization layer-param serializers (textureIndex / patternTint / density / maps_*); record writer not found (rea-batch 2)	NOTED	docs/SYMBOL_DB/customization.md		
+FUN_1425af050	0x1425af050	customization	td customization loader: texArrayDiffuse / texArrayNormals / texArraySpec / texArrayEmissiveMask (rea-batch 2)	NOTED	docs/SYMBOL_DB/customization.md		
+FUN_1425afd20	0x1425afd20	customization	td customization loader (texArray* strings, second variant) (rea-batch 2)	NOTED	docs/SYMBOL_DB/customization.md		
+FUN_1425b1c00	0x1425b1c00	customization	td customization loader (texArray* strings, third variant) (rea-batch 2)	NOTED	docs/SYMBOL_DB/customization.md		
+FUN_14145f6c0	0x14145f6c0	vfx	stores 200000.0 at stride 0x20 — fog/cascade init, not the light writer (rea-batch 2)	NOTED	docs/SYMBOL_DB/vfx.md		
+FUN_1419e5250	0x1419e5250	vfx	stores 200000.0 at stride 0x20 — fog/cascade init, not the light writer (rea-batch 2)	NOTED	docs/SYMBOL_DB/vfx.md		
+FUN_1424e32c0	0x1424e32c0	vfx	trail shader define table: AKILL 0, SFX 1, DISTORT 2, GBUFFER 3, DEFERRED 4, TAPE 5, FLAT 6, FLAT_LIGHTING 7, ALPHA_MASK 8 … DISABLE_Z_TEST (rea-batch 2)	PROVEN	docs/SYMBOL_DB/vfx.md		
+FUN_1421ca290	0x1421ca290	vfx	CB_PASS_TRAIL layout initialiser (TRAIL_MISC, TRAIL_DEGR, PS_REG_TRAIL_EMISSIVE …, RB_TRAIL_POINTS, TRAIL_DIFF/DISTORT/NORMAL slots) (rea-batch 2)	NOTED	docs/SYMBOL_DB/vfx.md		
+FUN_1421aa940	0x1421aa940	materials	CB_OBJ_MATERIAL_DATA layout initialiser incl. OBJ_MTLBLEND_LAYER_CONST (0x40 float4); ~40 siblings FUN_14219f000…FUN_1421d19a0; UseSpecMap writer not found (rea-batch 2)	NOTED	docs/SYMBOL_DB/materials.md		

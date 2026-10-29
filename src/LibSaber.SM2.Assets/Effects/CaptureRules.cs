@@ -366,13 +366,30 @@ public static class CaptureLightUnits
   public static System.Numerics.Vector3 Relative(System.Numerics.Vector3 srgb, float intensity, bool adaptive, float averageLuminance)
     => Linear(srgb) * intensity * (adaptive ? 1f : 1f / MathF.Max(averageLuminance, 1e-6f));
 
-  /// <summary>s4462 distance attenuation: sat(1 - d^4 / r^4)^2.</summary>
+  /// <summary>s4462 distance window: sat(1 - d^4 / r^4)^2 (the inverse-square factor is <see cref="InverseSquare"/>).</summary>
   public static float Attenuation(float distance, float radius)
   {
     var q = distance / MathF.Max(radius, 1e-4f); q *= q;
     var a = Math.Clamp(1f - q * q, 0f, 1f);
     return a * a;
   }
+
+  /// <summary>
+  ///   rea-batch 2 (PROVEN shader, plasma 101917): every consumer of COMMON_DYN_LIGHT_PARAMS (deferred s29889 _label226,
+  ///   particle CS s4462 _label132, fog s5611 _label63) multiplies the window by P0.w and then by 1 / (d^2 + P0.w), so the
+  ///   full point-light falloff is sat(1 - d^4/r^4)^2 * P0.w / (d^2 + P0.w): a softened inverse square, 1 at the light.
+  ///   P0.w = 1 on all 6 captured sfx lights (DATA); level spot lights in the armory capture carry 300 or 1. How
+  ///   attenCurveParam maps onto P0.w is not proven (its CPU writer was not found), so sfx lights use 1.
+  /// </summary>
+  public const float SfxInverseSquareSoft = 1f;
+
+  /// <summary>Softened inverse square P0.w / (d^2 + P0.w) (PROVEN shader; P0.w = 1 for sfx lights, DATA).</summary>
+  public static float InverseSquare(float distance, float soft = SfxInverseSquareSoft)
+    => soft / (distance * distance + MathF.Max(soft, 1e-6f));
+
+  /// <summary>Full captured point-light falloff: window * softened inverse square.</summary>
+  public static float SurfaceAttenuation(float distance, float radius, float soft = SfxInverseSquareSoft)
+    => Attenuation(distance, radius) * InverseSquare(distance, soft);
 
   /// <summary>CB P1.w = 1/r^4 back to the radius.</summary>
   public static float RadiusFromInvR4(float invR4) => invR4 > 0 ? MathF.Pow(invR4, -0.25f) : 0f;

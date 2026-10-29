@@ -228,7 +228,7 @@ internal static class VfxUeExport
               foreach (var l in lights.Take(8))
               {
                 var d = l.Position - p;
-                var att = CaptureLightUnits.Attenuation(d.Length(), MathF.Max(0.01f, l.Radius));
+                var att = CaptureLightUnits.SurfaceAttenuation(d.Length(), MathF.Max(0.01f, l.Radius)); // rea-batch 2: window * 1/(d^2+1)
                 if (d.LengthSquared() > 1e-12f) lc += CaptureLightUnits.BenchAmbient * l.Relative(avgLum) * att * MathF.Max(Vector3.Dot(n, Vector3.Normalize(d)), 0f);
               }
               var hdr = baseC * (new Vector3(light) + lc) + (material.Translucent ? baseC * inst.Emissive * 25f : Vector3.Zero);

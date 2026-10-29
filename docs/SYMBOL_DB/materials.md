@@ -78,3 +78,4 @@ Long-form: RE_NOTES "Materials / shaders", HANDOFF Item 2, mtl1-26/27, mtl1-47/4
 | FUN_1425ec940 | 0x1425ec940 | DECOMPILED | strings: speedScaleY / speedScaleX / texture / textureScaleX / textureScaleY / textureRotation | /workspace/rea/vfxy_1.c |
 | FUN_1425ef600 | 0x1425ef600 | DECOMPILED | strings: speedScaleY / speedScaleX / distortTexture / distortTextureScaleX / distortTextureScaleY / distortTextureRotation | /workspace/rea/vfxy_1.c |
 | FUN_1425fc510 | 0x1425fc510 | DECOMPILED | strings: speedScaleY / enable / source_texture / speedScaleX / texScaleX / texScaleY | /workspace/rea/vfxy_1.c |
+| FUN_1421aa940 | 0x1421aa940 | NOTED | CB_OBJ_MATERIAL_DATA layout initialiser incl. OBJ_MTLBLEND_LAYER_CONST (0x40 float4); ~40 siblings FUN_14219f000…FUN_1421d19a0; UseSpecMap writer not found (rea-batch 2) | RE_NOTES#rea-batch-2 |

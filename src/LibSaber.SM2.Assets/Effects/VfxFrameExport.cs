@@ -64,7 +64,7 @@ public static class VfxFrameExport
     ["lights"] = new JsonObject
     {
       ["formula"] = "lit surface hdr = albedo * (ambient + sum(color*intensity * sat(1 - d^2/r^2)^2 * max(n.l, 0)))",
-      ["evidence"] = "browser EffectRenderer mesh/ground shading (HEURISTIC: the game's light units and falloff were not traced)",
+      ["evidence"] = "browser EffectRenderer mesh/ground shading (falloff window * 1/(d^2+1) PROVEN shader + DATA P0.w=1 for sfx lights, rea-batch 2; surface BRDF HEURISTIC)",
     },
     ["blend"] = new JsonObject
     {

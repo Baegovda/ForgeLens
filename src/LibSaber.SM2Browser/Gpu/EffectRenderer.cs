@@ -949,8 +949,8 @@ internal sealed unsafe class EffectRenderer : IDisposable
         vec3 d = uLightPos[i].xyz - vWorld;
         float r = uLightPos[i].w;
         float q = dot(d, d) / (r * r);
-        float fall = clamp(1.0 - q * q, 0.0, 1.0); // s4462: sat(1 - d^4/r^4)^2
-        light += uLightColor[i] * fall * fall * max(dot(n, normalize(d)), 0.0);
+        float fall = clamp(1.0 - q * q, 0.0, 1.0); // s4462/s29889: sat(1 - d^4/r^4)^2 * P0.w/(d^2+P0.w), P0.w = 1 for sfx lights (rea-batch 2)
+        light += uLightColor[i] * fall * fall / (dot(d, d) + 1.0) * max(dot(n, normalize(d)), 0.0);
       }
       // emissive glow only for sfx (translucent) materials; lit combine_material shaders (blood splash) stay surface-lit
       vec3 hdr = base * light + base * uEmissive * (uTranslucent == 1 ? 25.0 : 0.0);
@@ -1107,7 +1107,7 @@ internal sealed unsafe class EffectRenderer : IDisposable
         vec3 d = uLightPos[i].xyz - vWorld;
         float q = dot(d, d) / (uLightPos[i].w * uLightPos[i].w);
         float f = clamp(1.0 - q * q, 0.0, 1.0);
-        col += albedo * uLightColor[i] * f * f * max(0.0, dot(n, normalize(d)));
+        col += albedo * uLightColor[i] * f * f / (dot(d, d) + 1.0) * max(0.0, dot(n, normalize(d)));
       }
       outColor = vec4(toGamma(vec3(1.0) - exp(-col * 1.6)), 1.0);
     }
@@ -1155,7 +1155,7 @@ internal sealed unsafe class EffectRenderer : IDisposable
         float r = uLightPos[i].w;
         float q = dot(d, d) / (r * r);
         float f = clamp(1.0 - q * q, 0.0, 1.0);
-        light += uLightColor[i] * f * f * max(0.0, normalize(d).y);
+        light += uLightColor[i] * f * f / (dot(d, d) + 1.0) * max(0.0, normalize(d).y);
       }
       vec3 hdr = base * light;
       float fade = clamp(1.0 - length(vWorld.xz - uEye.xz) / 60.0, 0.0, 1.0);

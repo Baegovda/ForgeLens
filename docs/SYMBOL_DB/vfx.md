@@ -367,3 +367,7 @@ Long-form: RE_NOTES.md "VFX", HANDOFF vfx3 parts 1-4, vfx4-1, mtl1-34..41, mtl1-
 | FUN_1418c3b30 | 0x1418c3b30 | NOTED | sfx_light update (vtable slot 19) → CreateLight; attenCurveParam reader not found | RE_NOTES#rea-batch |
 | FUN_1413831e0 | 0x1413831e0 | NOTED | gsLIGHT_MANAGER::CreateLight → FUN_141383440 / FUN_141384090 | RE_NOTES#rea-batch |
 | CB_PASS_TRAIL slot 0x12 | — | NOTED | trail pass CB slot set in FUN_1421ca290 | RE_NOTES#rea-batch |
+| FUN_14145f6c0 | 0x14145f6c0 | NOTED | stores 200000.0 at stride 0x20 — fog/cascade init, not the light writer (rea-batch 2) | RE_NOTES#rea-batch-2 |
+| FUN_1419e5250 | 0x1419e5250 | NOTED | stores 200000.0 at stride 0x20 — fog/cascade init, not the light writer (rea-batch 2) | RE_NOTES#rea-batch-2 |
+| FUN_1424e32c0 | 0x1424e32c0 | PROVEN | trail shader define table: AKILL 0, SFX 1, DISTORT 2, GBUFFER 3, DEFERRED 4, TAPE 5, FLAT 6, FLAT_LIGHTING 7, ALPHA_MASK 8 … DISABLE_Z_TEST (rea-batch 2) | RE_NOTES#rea-batch-2 |
+| FUN_1421ca290 | 0x1421ca290 | NOTED | CB_PASS_TRAIL layout initialiser (TRAIL_MISC, TRAIL_DEGR, PS_REG_TRAIL_EMISSIVE …, RB_TRAIL_POINTS, TRAIL_DIFF/DISTORT/NORMAL slots) (rea-batch 2) | RE_NOTES#rea-batch-2 |

@@ -17,6 +17,16 @@ public class CaptureLightUnitsTests
   }
 
   [Fact]
+  public void SurfaceFalloffAddsSoftenedInverseSquare()
+  {
+    // rea-batch 2: s29889/s4462/s5611 multiply the window by P0.w / (d^2 + P0.w); P0.w = 1 on captured sfx lights.
+    Assert.Equal(1f, CaptureLightUnits.SurfaceAttenuation(0f, 5f), 1e-6f);
+    var a = 1f - MathF.Pow(0.5f, 4f);
+    Assert.Equal(a * a / (2.5f * 2.5f + 1f), CaptureLightUnits.SurfaceAttenuation(2.5f, 5f), 1e-6f);
+    Assert.Equal(300f / (4f + 300f), CaptureLightUnits.InverseSquare(2f, 300f), 1e-6f);
+  }
+
+  [Fact]
   public void RadiusFromInvR4RoundTrips()
   {
     Assert.Equal(24f, CaptureLightUnits.RadiusFromInvR4(1f / MathF.Pow(24f, 4f)), 1e-3f);

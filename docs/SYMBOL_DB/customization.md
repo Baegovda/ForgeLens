@@ -50,3 +50,7 @@ Long-form: RE_NOTES "Customization", HANDOFF ui-44/45, mtl1-46..49.
 | FUN_142308fe0 | 0x142308fe0 | DECOMPILED | strings: tilingU / mtlID / extraVertColor / useBlendMaskAlpha / dirtModifyAlpha / customizationUVSetIndex / reliefNMUVSet | /workspace/rea/m27_7.c |
 | 0x144ccbf40 | 0x144ccbf40 | PROVEN (index INFERRED) | enum table tintBlendMode = [multiply, linear_blend]; glt PS CB_STATIC_GLT[180+L] == 0 → × base, else replace (rea-batch) | RE_NOTES#rea-batch |
 | 0x144ccbfc8 | 0x144ccbfc8 | PROVEN (index INFERRED) | enum table layer blendMode = [tint_only, tex_hardlight, tex_blend]; glt record +80+L | RE_NOTES#rea-batch |
+| FUN_141f186b0..FUN_141f19950 | 0x141f186b0 | NOTED | customization layer-param serializers (textureIndex / patternTint / density / maps_*); record writer not found (rea-batch 2) | RE_NOTES#rea-batch-2 |
+| FUN_1425af050 | 0x1425af050 | NOTED | td customization loader: texArrayDiffuse / texArrayNormals / texArraySpec / texArrayEmissiveMask (rea-batch 2) | RE_NOTES#rea-batch-2 |
+| FUN_1425afd20 | 0x1425afd20 | NOTED | td customization loader (texArray* strings, second variant) (rea-batch 2) | RE_NOTES#rea-batch-2 |
+| FUN_1425b1c00 | 0x1425b1c00 | NOTED | td customization loader (texArray* strings, third variant) (rea-batch 2) | RE_NOTES#rea-batch-2 |
