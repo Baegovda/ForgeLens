@@ -68,6 +68,9 @@ def sm2_anim_import(fbx, skeleton, dest, yaw="auto", root_motion=True):
     seqs = [a for a in (unreal.load_asset(p) for p in paths) if isinstance(a, unreal.AnimSequence)]
     for s in seqs:
         name = s.get_name()
+        if s.get_editor_property("skeleton") != skeleton:
+            # Split skeleton (R35): the clip must share the mesh's skeleton, never get its own "{mesh}_Skeleton".
+            print("SPLITSKEL %s uses %s, expected %s (run ue_fix_split_skeletons.py)" % (s.get_path_name(), s.get_editor_property("skeleton").get_path_name() if s.get_editor_property("skeleton") else None, skeleton.get_path_name()))
         additive = name.lower().endswith("__add")
         cinematic = name.lower() in cinematic_names or "cinematic" in name.lower()
         if additive:
@@ -98,6 +101,9 @@ if mode == "import":
       t.automated = True; t.replace_existing = True; t.save = True
       o = unreal.FbxImportUI(); o.import_mesh = True; o.import_materials = False; o.import_textures = False; o.import_animations = False
       o.import_as_skeletal = True; o.mesh_type_to_import = unreal.FBXImportType.FBXIT_SKELETAL_MESH
+      # Split skeleton rule (R35): a re-import reuses the folder's existing skeleton, so anims already on it keep playing.
+      sk = folder + "/" + name + "_Skeleton"
+      if unreal.EditorAssetLibrary.does_asset_exist(sk): o.skeleton = unreal.load_asset(sk)
       t.options = o
       tools.import_asset_tasks([t])
       print("MESH", list(t.imported_object_paths))
