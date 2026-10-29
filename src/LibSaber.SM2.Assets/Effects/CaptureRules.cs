@@ -95,12 +95,59 @@ public static class VfxDrawKinds
 /// <summary>
 ///   SFX mesh emissive exposure compensation, plasma PS s33060 (disasm lines 514-517):
 ///   intensity *= lerp(1, COMMON_HDR_AVERAGE_LUMINANCE_CLAMPED, sfx[560].w). With the frame exposure = key / avgLum
-///   (CaptureTonemap), k = 1 makes the emissive term scene-exposure independent. Which td field fills sfx[560].w
-///   (CB_DYNAMIC_SFX byte 560, .w) is not traced: k is HEURISTIC (default 1).
+///   (CaptureTonemap), k = 1 makes the emissive term scene-exposure independent.
+///   PROVEN (mtl1-50b, REA): k = td <c>shaders.sfx.emissive.adaptiveIntensity</c>. CB_DYNAMIC_SFX writer FUN_1424540e0
+///   (asm 0x14245470b-0x142454759) stores SFX_EMISSIVE_PARAMS (byte 560 = +0x230) = (emissive.intensity desc+0x24, 0, 0,
+///   desc+0x28 adaptiveIntensity ? 1.0 : 0.0); the same function writes SFX_BLOOM_INTENSITY (+0x12c) = desc+0x2c
+///   bloomIntensity and SFX_BLOOM_TINT (+0x130), matching loader FUN_1425fd580 / emissive reflection FUN_1425c8e70
+///   (intensity @0, adaptiveIntensity @4, bloomIntensity @8). CB_COMMON filler FUN_141e90d00: +0x160
+///   AVERAGE_LUMINANCE_CLAMPED = clamp(avgLum, 0.05, 50). Preset default (sfx_sdr_preset_default.sd) adaptiveIntensity =
+///   false, so k is 0 unless the .td sets it (<see cref="AdaptiveFromTd"/>).
 /// </summary>
 public static class SfxExposure
 {
   public static float Scale(float averageLuminanceClamped, float k) => 1f + k * (averageLuminanceClamped - 1f);
+
+  /// <summary>Clamp of COMMON_HDR_AVERAGE_LUMINANCE_CLAMPED (FUN_141e90d00).</summary>
+  public const float MinAverageLuminance = 0.05f, MaxAverageLuminance = 50f;
+
+  /// <summary>Forced k for every sfx material (SM2_VFX_SFX_LUM_K, debugging); null = per material (PROVEN rule).</summary>
+  public static float? ForcedK { get; set; } =
+    float.TryParse(Environment.GetEnvironmentVariable("SM2_VFX_SFX_LUM_K"), System.Globalization.NumberStyles.Float,
+      System.Globalization.CultureInfo.InvariantCulture, out var k) ? k : null;
+
+  /// <summary>sfx[560].w of a material: adaptiveIntensity ? 1 : 0 (or <see cref="ForcedK"/>).</summary>
+  public static float K(bool adaptiveIntensity) => ForcedK ?? (adaptiveIntensity ? 1f : 0f);
+
+  /// <summary>
+  ///   <c>emissive.adaptiveIntensity</c> of the first <c>sfx = { ... }</c> block of a material body: the top-level
+  ///   <c>emissive = { ... }</c> sub-block (or a dotted <c>emissive.adaptiveIntensity</c>). Missing = preset default false.
+  /// </summary>
+  public static bool AdaptiveFromTd(string? body)
+  {
+    if (string.IsNullOrEmpty(body)) return false;
+    var m = System.Text.RegularExpressions.Regex.Match(body, @"\bsfx\s*=\s*\{");
+    if (!m.Success) return false;
+    var depth = 1;
+    var emissiveDepth = -1;
+    for (var i = m.Index + m.Length; i < body.Length && depth > 0; i++)
+    {
+      var ch = body[i];
+      if (ch == '{') depth++;
+      else if (ch == '}') { if (depth == emissiveDepth) emissiveDepth = -1; depth--; }
+      else if (char.IsLetter(ch) && (i == 0 || !char.IsLetterOrDigit(body[i - 1]) && body[i - 1] != '.'))
+      {
+        var tail = body.AsSpan(i, Math.Min(body.Length - i, 96)).ToString();
+        if (depth == 1 && System.Text.RegularExpressions.Regex.Match(tail, @"^emissive\s*=\s*\{") is { Success: true } e)
+        { emissiveDepth = depth + 1; depth++; i += e.Length - 1; continue; }
+        var isKey = (depth == 1 && tail.StartsWith("emissive.adaptiveIntensity", StringComparison.Ordinal)) ||
+                    (depth == emissiveDepth && tail.StartsWith("adaptiveIntensity", StringComparison.Ordinal));
+        if (isKey && System.Text.RegularExpressions.Regex.Match(tail, @"^[\w.]+\s*=\s*(true|false)\b") is { Success: true } v)
+          return v.Groups[1].Value == "true";
+      }
+    }
+    return false;
+  }
 
   /// <summary>
   ///   Exposure for an SFX emissive given the frame exposure and the exposure at which the frame's average luminance

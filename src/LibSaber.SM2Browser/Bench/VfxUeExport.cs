@@ -193,7 +193,6 @@ internal static class VfxUeExport
     }
     var exposure = frameHdr.Exposure;
     var avgLum = frameHdr.AverageLuminance;
-    var sfxScale = frameHdr.SfxScale(EffectRenderer.SfxLumK);
     var key = Vector3.Normalize(new Vector3(0.4f, 0.8f, 0.3f));
     foreach (var batch in list)
     {
@@ -233,7 +232,7 @@ internal static class VfxUeExport
                 if (d.LengthSquared() > 1e-12f) lc += CaptureLightUnits.BenchAmbient * l.Relative(avgLum) * att * MathF.Max(Vector3.Dot(n, Vector3.Normalize(d)), 0f);
               }
               var hdr = baseC * (new Vector3(light) + lc) + (material.Translucent ? baseC * inst.Emissive * 25f : Vector3.Zero);
-              if (material.Translucent) hdr *= sfxScale;
+              if (material.Translucent) hdr *= frameHdr.SfxScale(EffectRenderer.SfxLumK(material)); // mtl1-50b: per-material k
               // mtl1-36: cap at VfxFrameExport.MaxExposed (tonemap is flat there) so UE's half-float vertex/scene colour cannot
               // overflow (cine_bomb debris inside a 1.4e5 light rendered cyan/blue in UE, white in the CPU reference).
               hdr = Vector3.Min(hdr, new Vector3(VfxFrameExport.MaxExposed / MathF.Max(exposure, 1e-12f)));

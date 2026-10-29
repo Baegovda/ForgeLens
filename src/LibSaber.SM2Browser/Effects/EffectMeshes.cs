@@ -19,6 +19,11 @@ internal sealed record EffectMeshMaterial(string Texture, bool Translucent, Vect
   public float Bloom { get; init; }
   /// <summary>mtl1-44 PROVEN: sfx <c>blendMode</c> (FUN_1425fd580 → FUN_142451840 define bits; see <see cref="LibSaber.SM2.Assets.Effects.SfxBlend"/>).</summary>
   public LibSaber.SM2.Assets.Effects.SfxBlendMode SfxBlend { get; init; } = LibSaber.SM2.Assets.Effects.SfxBlendMode.Unspecified;
+  /// <summary>mtl1-50b PROVEN: sfx <c>emissive.adaptiveIntensity</c> = sfx[560].w, the k of the emissive exposure
+  ///   compensation lerp(1, avgLumClamped, k) (CB_DYNAMIC_SFX writer FUN_1424540e0; see <see cref="LibSaber.SM2.Assets.Effects.SfxExposure"/>).</summary>
+  public bool SfxAdaptiveIntensity { get; init; }
+  /// <summary>k for this material (<see cref="LibSaber.SM2.Assets.Effects.SfxExposure.K"/>).</summary>
+  public float SfxLumK => LibSaber.SM2.Assets.Effects.SfxExposure.K(SfxAdaptiveIntensity);
 }
 
 /// <summary>A geometry template flattened for the effect pass: pos(3) normal(3) uv(2) uv1(2) per vertex; sub-objects by node order.</summary>
@@ -170,6 +175,7 @@ internal sealed class EffectMeshes
       Scroll = named && Regex.Match(body, @"overrideAffixScroll\s*=\s*\{\s*override\s*=\s*true\s*speedX\s*=\s*(-?[\d.]+)\s*speedY\s*=\s*(-?[\d.]+)") is { Success: true } sc
         ? new Vector2(float.Parse(sc.Groups[1].Value, CultureInfo.InvariantCulture), float.Parse(sc.Groups[2].Value, CultureInfo.InvariantCulture)) : Vector2.Zero,
       SfxBlend = sfx ? LibSaber.SM2.Assets.Effects.SfxBlend.FromTd(body) : LibSaber.SM2.Assets.Effects.SfxBlendMode.Unspecified,
+      SfxAdaptiveIntensity = sfx && LibSaber.SM2.Assets.Effects.SfxExposure.AdaptiveFromTd(body),
       Bloom = sfx && Regex.Match(body, @"bloomIntensity\s*=\s*([\d.]+)") is { Success: true } bl ? float.Parse(bl.Groups[1].Value, CultureInfo.InvariantCulture) : 0f,
     };
   }

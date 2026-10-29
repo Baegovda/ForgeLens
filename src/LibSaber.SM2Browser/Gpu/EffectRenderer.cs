@@ -114,12 +114,11 @@ internal sealed unsafe class EffectRenderer : IDisposable
   /// </summary>
   public static bool SfxAdditive { get; set; } = Environment.GetEnvironmentVariable("SM2_VFX_SFX_ADD") != "0";
   /// <summary>
-  ///   k of the SFX exposure compensation lerp(1, avgLum, k) (plasma PS s33060; k = sfx[560].w, HEURISTIC 1. Lead mtl1-50: the only per-material exposure flag the sfx loader
-  ///   reads is emissive.adaptiveIntensity (bool, desc +0x28, preset default false); the CB writer for sfx[560].w is not traced).
-  ///   SM2_VFX_SFX_LUM_K overrides.
+  ///   k of the SFX exposure compensation lerp(1, avgLum, k) (plasma PS s33060, sfx[560].w). mtl1-50b PROVEN per material:
+  ///   k = emissive.adaptiveIntensity ? 1 : 0 (CB_DYNAMIC_SFX writer FUN_1424540e0, <see cref="SfxExposure"/>); the old
+  ///   global default 1 is gone. SM2_VFX_SFX_LUM_K forces one k for every sfx material.
   /// </summary>
-  public static float SfxLumK { get; set; } =
-    float.TryParse(Environment.GetEnvironmentVariable("SM2_VFX_SFX_LUM_K"), System.Globalization.CultureInfo.InvariantCulture, out var lk) ? lk : 1f;
+  internal static float SfxLumK(LibSaber.SM2Browser.Effects.EffectMeshMaterial material) => material.SfxLumK;
   /// <summary>Bench exposure treated as average luminance 1 for <see cref="SfxExposure"/> (the EffectLayer default).</summary>
   public const float ReferenceExposure = 1f / 250f;
 
@@ -559,7 +558,9 @@ internal sealed unsafe class EffectRenderer : IDisposable
     SetMatrix(_mesh, "uVP", vp);
     _gl.Uniform1(_gl.GetUniformLocation(_mesh, "uTex"), 0);
     // mtl1-23: sfx (translucent) emissive is exposure-compensated, lerp(1, avgLum, k) (plasma PS s33060, SfxExposure).
-    _gl.Uniform1(_gl.GetUniformLocation(_mesh, "uExposure"), translucent ? SfxExposure.Exposure(layer.Exposure, ReferenceExposure, SfxLumK) : layer.Exposure);
+    // mtl1-50b: k is per material (emissive.adaptiveIntensity), set in the part loop below.
+    var exposureLoc = _gl.GetUniformLocation(_mesh, "uExposure");
+    _gl.Uniform1(exposureLoc, layer.Exposure);
     _gl.Uniform1(_gl.GetUniformLocation(_mesh, "uTonemap"), CaptureTonemapOn ? 1 : 0);
     _gl.Uniform3(_gl.GetUniformLocation(_mesh, "uEye"), eye.X, eye.Y, eye.Z);
     _gl.Uniform1(_gl.GetUniformLocation(_mesh, "uLightCount"), lights.Length);
@@ -641,7 +642,11 @@ internal sealed unsafe class EffectRenderer : IDisposable
           _gl.Uniform1(fresnel, material.SoftFresnel);
           _gl.Uniform2(scrollLoc, material.Scroll.X, material.Scroll.Y);
           _gl.Uniform1(bloomWLoc, Math.Min(1f, material.Bloom * BloomGain));
-          if (translucent) SetSfxBlend(material.SfxBlend);
+          if (translucent)
+          {
+            SetSfxBlend(material.SfxBlend);
+            _gl.Uniform1(exposureLoc, SfxExposure.Exposure(layer.Exposure, ReferenceExposure, SfxLumK(material)));
+          }
           _gl.DrawElements(PrimitiveType.Triangles, (uint)count, DrawElementsType.UnsignedInt, (void*)(start * 4));
         }
       }

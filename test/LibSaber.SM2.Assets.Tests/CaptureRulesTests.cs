@@ -26,6 +26,26 @@ public class CaptureRulesTests
   }
 
   [Fact]
+  public void SfxAdaptiveIntensityIsK()
+  {
+    // mtl1-50b PROVEN: sfx[560].w = emissive.adaptiveIntensity ? 1 : 0 (FUN_1424540e0); preset default false.
+    const string on = "preset = \"sfx\"\nshaders = { sfx = { emissive = { intensity = 55.000000 adaptiveIntensity = true bloomIntensity = 2.0 } tint = [1,1,1,1] } }";
+    Assert.True(SfxExposure.AdaptiveFromTd(on));
+    Assert.False(SfxExposure.AdaptiveFromTd("shaders = { sfx = { emissive = { intensity = 3.0 bloomIntensity = 1.0 } } }"));
+    Assert.False(SfxExposure.AdaptiveFromTd("shaders = { sfx = { emissive = { adaptiveIntensity = false } } }"));
+    Assert.True(SfxExposure.AdaptiveFromTd("shaders = { sfx = { emissive.adaptiveIntensity = true } }"));
+    // only the sfx block's own top-level emissive counts
+    Assert.False(SfxExposure.AdaptiveFromTd("shaders = { sfx = { layers = { l0 = { adaptiveIntensity = true } } } }"));
+    Assert.False(SfxExposure.AdaptiveFromTd("lights = { adaptiveIntensity = true }"));
+    Assert.False(SfxExposure.AdaptiveFromTd(null));
+    if (SfxExposure.ForcedK is null)
+    {
+      Assert.Equal(1f, SfxExposure.K(true));
+      Assert.Equal(0f, SfxExposure.K(false));
+    }
+  }
+
+  [Fact]
   public void DistortionEncodeAndPost()
   {
     Assert.Equal(0f, DistortionRules.Shift(0f, DistortionRules.Mask(0f, 0f)), 1e-6f);
