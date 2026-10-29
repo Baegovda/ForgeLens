@@ -271,3 +271,8 @@ All addresses are virtual addresses in `sm2_retail.exe` (retail Steam build, 81 
   - Retail survey: Front 0.2 / Max 1 ×70, 1.5 / 3 ×38, …
 - **trail_melee_dark (DATA):** 15 users (weapon .cls + melee_actor_factory.sso) override it. All set isAutoStart False (base True). colorIntensityMultiplier is 0.01 ×2, 0.05 ×6, 0.3, or 1 ×5 (base 11). The knife sets alphaMult 0.1. The gradient (t, A, R, G, B) has low alpha. Texture trail_mgs_distort_nm = MNM.
 
+
+## rea-batch 4 (2026-10-29 KST, headless Ghidra + RenderDoc)
+- **P0.w (open):** OffSet d:0x6c b:0x85 d:0x80 → FUN_14325ed30 only (list walker, not light). OffSet q:0x50 q:0x60 b:0x6d b:0x6c → copies/comparators only. float 300.0 only at 0x14355c104 / 0x14368b68c, refs non-light (GameStorage.TaskLogKeepAfterTaskFinishedSecs etc.) → level P0.w 300 is data. Captured sfx lights all default attenCurveParam (P0.w 1); no differing-param capture, so no empirical map.
+- **UseSpecMap bits (DATA, armory 128197, 140 draws, PS SRV names vs .td):** 0x2000 ↔ MSCRGHAO 68/68; 0x40 ↔ legacy _spec 66/67; 0x8 ↔ MNM 133/134; 0x100 → MH 31/31 (11 MH without); 0x800 → MEM 7/7 (+4); 0x1000 → MAO 40/41 (+4); 0x10 ↔ detail partial. Importer: UseSpecMap = has specular map and not chameleon.
+- **Ribbon point writer (open):** FUN_14183b3a0 trail base layout (visuals +0x90, trailParams +0x280, physics +0x3b0, degNear +0x3e8, degFar +0x400, degradationRadius +0x418, optimizeBranchQuality +0x41c, nTrailData +0x420). OffSet d:0xa8 d:0x28c → FUN_14187e8b0 (param lerp), FUN_141a9a470 (render-instance builder) plus non-trail hits. RB_TRAIL_POINTS descriptor refs: FUN_1421ca290 only. RenderDoc trlPOINT dump of sm2_frame7894 stalled late in the frame (no markers, 4,876 draws).

@@ -795,7 +795,11 @@ def apply_spec_layers(instance, slot, texture_for):
     if inst is not None:
         mel.set_material_instance_vector_parameter_value(instance, "InstanceTint", unreal.LinearColor(*inst))
     # mtl1-26: chameleon slots shade without the spec map (see UseSpecMap in make_master).
-    mel.set_material_instance_static_switch_parameter_value(instance, "UseSpecMap", not cham)
+    # rea-batch 4 (DATA, armory 128197, 140 draws): the spec-map bits of OBJ_MTLBLEND_LAYER_CONST[15].x are set exactly
+    # when a spec texture is bound: 0x2000 <-> packed MSCRGHAO td 68/68, 0x40 <-> legacy *_spec td 66/67. With no
+    # spec texture the PS uses metal 0 / rough 1 raw, so a slot without a specular map also turns UseSpecMap off.
+    has_spec = first_map(slot, "specular") is not None
+    mel.set_material_instance_static_switch_parameter_value(instance, "UseSpecMap", has_spec and not cham)
     if cham:
         # Raw .td colours (bytes / 255, sRGB space; the PS multiplies them with the sRGB texture before linearising).
         for name, value in chameleon_params(cham).items():
