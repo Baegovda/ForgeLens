@@ -224,3 +224,15 @@ The original bot ran a routine named `sm2-20` (hourly, R22). **Create your own**
 ## 10. Transfer record
 - Box clone `/workspace/LibSaber` fast-forwarded 1565d17 → `e5b4e8b` (bundle from PC `ls_push`), then this doc + README/HANDOFF/START_HERE/AGENTS pointers were committed and pushed from the PC via push.ps1 (patch copy: box `/workspace/handoff/*.patch`).
 - Ledger: R33 added (SM2 transferred to a new Grok Bot; BongThumbLive stays with the original bot).
+
+## 11. Conversation notes & naming conventions (2026-10-29, new bot)
+
+- **Naming in Korean chat** (owner request): write Ghidra as "기드라" and REA as "레아" in messages to the owner; code, paths, file names and docs stay English.
+- **PC priority**: when the owner says he is away ("일단 최대우선순위로 해 난 자리비움중이야"; he often instructs from his phone), PC jobs may run at High priority; otherwise run them hidden / low priority.
+- **PC mirror env**: `C:\Users\Revaptor_FX\Desktop\SM2_Work\Tools\re_env` (Temurin JDK 25, Ghidra 12.1.4, Node 24, rea-agents 6.8.0 + rea clone, scripts, `g.ps1`, `rea_env.ps1`, `GHIDRA_HEADLESS_MAXMEM=32G`). REA daemon workdir is `re_env\work`; it was started on the PC at High priority.
+- **Key facts**:
+  - REA 6.8.0 has no saved-analysis reuse (`REA_GHIDRA_PROJECT_PATH` is ignored), so every daemon start re-imports (~20+ min). Keep the daemon running for the whole session.
+  - Headless Ghidra projects are saved and reusable (`ghidra_proj3`, ~2.2 GB).
+  - Box: Xeon 8C, 15 GB, no GPU (headless import ~46 min). PC: i9-14900K, 128 GB, RTX 4090 (estimated 2–3x faster).
+- **push.ps1 `AM FAILED`** (a doc conflict after another patch landed): bring the new tip to the box with an incremental bundle, rebase, regenerate the patch, and push again. "NativeCommandError" is just git stderr; success prints `TIP <sha>`.
+- **Open items**: fire-clip ssl decode on the PC (`tools/re/sslb.py`); adaptive light multiplier `clamp(avgLum,0.05,50)` → bench/UE; trail point upload to `RB_TRAIL_POINTS`; check REA source (`re_env\rea`) for a persistence option; clean up the extra `_bakN` from R35 (R04).

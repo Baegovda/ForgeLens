@@ -1,5 +1,8 @@
 > **For AI agents: 2026-10-29 20:50 KST — SM2 was transferred to a NEW Grok Bot: read [`docs/BOT_TRANSFER.md`](docs/BOT_TRANSFER.md) first** (BongThumbLive stays with the original bot).
 
+> **Conversation notes & naming (2026-10-29):** in Korean chat use 기드라 = Ghidra and 레아 = REA. When the owner is away, PC jobs may run at High priority.
+> Details: [`docs/BOT_TRANSFER.md` §11](docs/BOT_TRANSFER.md).
+
 > **New assistant: start at [`docs/handoff/START_HERE.md`](docs/handoff/START_HERE.md)** (single entry point, 2026-10-29). Everything below is the request ledger and chronological log.
 
 > **Then read [`AGENTS.md`](AGENTS.md)** (entry point, rules, user preferences), then `docs/handoff/` (STATUS, ROADMAP, WORKFLOW, RE_NOTES, FORMATS). Where this file's bootstrap below conflicts with them (push method, next step, owner), AGENTS.md / docs/handoff win. This file stays the chronological log: append a dated section per stage.
