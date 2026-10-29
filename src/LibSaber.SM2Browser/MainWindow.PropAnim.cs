@@ -93,14 +93,14 @@ public partial class MainWindow
   }
 
   /// <summary>Owner class data for a template: blueprint anim triggers (owned, PROVEN filter), layer masks, shootAnimation.</summary>
-  private async Task<(List<EventAnim> Triggers, IReadOnlyList<PropAnimLayer> Layers, string? Shoot, string Note)> PropDataAsync(string? cls, TplAnimation anim)
+  private async Task<(List<EventAnim> Triggers, IReadOnlyList<PropAnimLayer> Layers, string? Shoot, string Note, IReadOnlyList<FirearmFireRate> Rates)> PropDataAsync(string? cls, TplAnimation anim)
   {
     var resolver = await EnsureContextAsync();
     var map = await LoadHostVfxMapAsync();
-    if (resolver is null) return (FallbackTriggers(map, anim), [], null, "no class index: blueprint whose anims all exist here (HEURISTIC)");
+    if (resolver is null) return (FallbackTriggers(map, anim), [], null, "no class index: blueprint whose anims all exist here (HEURISTIC)", (IReadOnlyList<FirearmFireRate>)[]);
     return await Task.Run(() =>
     {
-      if (cls is null) return (FallbackTriggers(map, anim), (IReadOnlyList<PropAnimLayer>)[], (string?)null, "no owner class: blueprint whose anims all exist here (HEURISTIC)");
+      if (cls is null) return (FallbackTriggers(map, anim), (IReadOnlyList<PropAnimLayer>)[], (string?)null, "no owner class: blueprint whose anims all exist here (HEURISTIC)", (IReadOnlyList<FirearmFireRate>)[]);
       resolver.Index.AddInlineBlueprints(cls, map);
       var bps = resolver.Index.BlueprintsOf(cls);
       var owned = map.Anims.Where(a => ContextResolver.OwnedSource(bps, a.Source)).ToList();
@@ -111,7 +111,7 @@ public partial class MainWindow
         if (owned.Count > 0) note = $"{cls}: blueprint picked by its anim names (HEURISTIC)";
       }
 
-      return (owned, resolver.Index.AnimLayersOf(cls), resolver.Index.ShootAnimationOf(cls), note);
+      return (owned, resolver.Index.AnimLayersOf(cls), resolver.Index.ShootAnimationOf(cls), note, resolver.Index.FireRatesOf(cls));
     });
   }
 
@@ -142,7 +142,7 @@ public partial class MainWindow
     }
     else
     {
-      var plan = PropAnimStates.AutoPlays(anim, null, data.Triggers, masks, data.Shoot);
+      var plan = PropAnimStates.AutoPlays(anim, null, data.Triggers, masks, data.Shoot, data.Rates);
       if (plan.Plays.Count == 0)
       {
         ResetClip();
@@ -153,7 +153,7 @@ public partial class MainWindow
 
       var duration = Math.Max(0.5f, plan.Plays.Max(p => p.Seq.Duration));
       clip = anim.Compose(plan.Plays, duration, mesh.Bones, 0, "Auto");
-      why = "Auto: " + string.Join("; ", plan.Plays.Select(p => p.Why));
+      why = "Auto: " + string.Join("; ", plan.Plays.Where(p => p.Why.Length > 0).Select(p => p.Why));
     }
 
     _playTimer.Stop();
@@ -216,7 +216,7 @@ public partial class MainWindow
     }
     else
     {
-      var plan = PropAnimStates.AutoPlays(anim, clip, data.Triggers, masks, data.Shoot);
+      var plan = PropAnimStates.AutoPlays(anim, clip, data.Triggers, masks, data.Shoot, data.Rates);
       var duration = clip is { Duration: > 0 } ? clip.Duration : Math.Max(0.5f, plan.Plays.Select(p => p.Seq.Duration).DefaultIfEmpty(1f).Max());
       overlay = anim.Compose(plan.Plays, duration, bones, first, "prop auto");
       var counts = plan.Plays.GroupBy(p => p.Seq.Name).Select(g => g.Count() > 1 ? $"{g.Key}×{g.Count()}" : g.Key + (g.First().Loop ? " (loop)" : ""));

@@ -236,4 +236,74 @@ public class PropAnimTests
     var reload = PropAnimStates.AutoPlays(anim, new AnimationClip { Name = "tacticus_wpn10_reload", Duration = 1f }, []);
     Assert.DoesNotContain(reload.Plays, p => p.Seq.Name == "SHOOT_1");
   }
+
+  private static animTRACK ReloadTrack()
+  {
+    var t = Track();
+    t.seqList.Add(new animSEQ { name = "RELOAD_START", startFrame = 0, endFrame = 4, timeSec = 4 / 30f });
+    t.seqList.Add(new animSEQ { name = "RELOAD_END", startFrame = 10, endFrame = 12, timeSec = 2 / 30f });
+    return t;
+  }
+
+  [Fact]
+  public void ReloadIsTheReloadSoundSeqTrackNotTheClipName()
+  {
+    var anim = TplAnimation.From(ReloadTrack())!;
+    var clip = new AnimationClip { Name = "some_clip", Duration = 2f };
+    clip.EventTracks.Add(new AnimEventTrack("reload_sound_seq",
+      [new AnimEvent(0.2f, 0.3f, 0, ["snd_reload_mag_out"]), new AnimEvent(0.5f, 0.2f, 0, ["snd_reload_mag_in"])]));
+    var plan = PropAnimStates.AutoPlays(anim, clip, []);
+    Assert.Contains(plan.Plays, p => p.Seq.Name == "RELOAD_START" && p.Start == 0f);
+    Assert.Contains(plan.Plays, p => p.Seq.Name == "RELOAD_END" && MathF.Abs(p.Start - 1f) < 1e-4f);
+    var named = PropAnimStates.AutoPlays(anim, new AnimationClip { Name = "tacticus_wpn10_reload", Duration = 2f }, []);
+    Assert.DoesNotContain(named.Plays, p => p.Seq.Name.StartsWith("RELOAD_"));
+  }
+
+  [Fact]
+  public void FiringClipUsesShotsPerMin()
+  {
+    var anim = TplAnimation.From(Track())!;
+    var rates = new[] { new FirearmFireRate("arifle_bolt_rifle", "auto", 300, false, "autofire", 0.9, null) };
+    var plan = PropAnimStates.AutoPlays(anim, new AnimationClip { Name = "x_shooting", Duration = 1f }, [], null, null, rates);
+    var shots = plan.Plays.Where(p => p.Seq.Name == "SHOOT_1").ToList();
+    Assert.Equal(5, shots.Count);
+    Assert.All(shots, p => Assert.False(p.Loop));
+    Assert.Equal(0.6f, shots[3].Start, 1e-4f);
+    Assert.Equal(0.8f, shots[3].End, 1e-4f);
+  }
+
+  [Fact]
+  public void FirearmLibraryReadsBarrelFireRates()
+  {
+    const string text = """
+firearms   =   {
+   arifle_bolt_rifle   =   {
+      barrelDescriptions   =   {
+         auto   =   {
+            shootSettings   =   {
+               fireRate   =   {
+                  shotsPerMin   =   280
+                  __type   =   "FixedFireRate"
+               }
+               fireRateAffectShootAnim   =   False
+               shootLogicUid   =   "autofire"
+               __type   =   "ShootSettings"
+            }
+         }
+      }
+      reloadSettings   =   {
+         reloadAnimSpeedScale   =   0.9
+         __type   =   "ReloadSettings"
+      }
+   }
+}
+""";
+    var r = Assert.Single(FirearmLibrary.Parse(text)["arifle_bolt_rifle"]);
+    Assert.Equal(280, r.ShotsPerMin);
+    Assert.False(r.AffectsShootAnim);
+    Assert.Equal("autofire", r.ShootLogic);
+    Assert.Equal(0.9, r.ReloadAnimSpeedScale!.Value, 1e-9);
+    Assert.Equal(60.0 / 280, r.Interval, 1e-9);
+    Assert.Equal("arifle_bolt_rifle", FirearmLibrary.UidOf("arifle_bolt_rifle_client"));
+  }
 }

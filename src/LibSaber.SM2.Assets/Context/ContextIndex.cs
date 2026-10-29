@@ -29,6 +29,8 @@ public sealed class ContextIndex
   private readonly Dictionary<string, HashSet<string>> _users = new(StringComparer.OrdinalIgnoreCase);
   private readonly Dictionary<string, HashSet<string>> _children = new(StringComparer.OrdinalIgnoreCase);
   private readonly Func<string, string?> _read;
+  private string? _firearmLibraryPath;
+  private Dictionary<string, List<LibSaber.SM2.Assets.Animation.FirearmFireRate>>? _firearms;
 
   public IReadOnlyDictionary<string, ContextClass> Classes => _classes;
 
@@ -39,7 +41,9 @@ public sealed class ContextIndex
   public static ContextIndex Build(IEnumerable<string> paths, Func<string, string?> read)
   {
     var index = new ContextIndex(read);
-    var list = paths.Where(p => p.EndsWith(".cls", StringComparison.OrdinalIgnoreCase)).Distinct(StringComparer.OrdinalIgnoreCase).ToList();
+    var all = paths as IReadOnlyCollection<string> ?? paths.ToList();
+    index._firearmLibraryPath = all.FirstOrDefault(p => p.Replace('\\', '/').EndsWith(LibSaber.SM2.Assets.Animation.FirearmLibrary.PathSuffix, StringComparison.OrdinalIgnoreCase));
+    var list = all.Where(p => p.EndsWith(".cls", StringComparison.OrdinalIgnoreCase)).Distinct(StringComparer.OrdinalIgnoreCase).ToList();
     var rows = new (ContextClass Cls, List<string> Types, List<string> Fx)?[list.Count];
     Parallel.For(0, list.Count, i =>
     {
@@ -215,6 +219,25 @@ public sealed class ContextIndex
   }
 
   /// <summary>propanim: <c>shootAnimation</c> set on the class or an ancestor (firearm animation property), else null.</summary>
+  /// <summary>Fire rates of the firearm a class belongs to (firearm_library_pve, DATA; class → uid by name, INFERRED).</summary>
+  public IReadOnlyList<LibSaber.SM2.Assets.Animation.FirearmFireRate> FireRatesOf(string name)
+  {
+    if (_firearms is null)
+    {
+      var map = new Dictionary<string, List<LibSaber.SM2.Assets.Animation.FirearmFireRate>>(StringComparer.OrdinalIgnoreCase);
+      try
+      {
+        if (_firearmLibraryPath is not null && _read(_firearmLibraryPath) is { } text) map = LibSaber.SM2.Assets.Animation.FirearmLibrary.Parse(text);
+      }
+      catch { }
+      _firearms = map;
+    }
+
+    foreach (var c in Chain(name))
+      if (_firearms.TryGetValue(LibSaber.SM2.Assets.Animation.FirearmLibrary.UidOf(c.Name), out var rates)) return rates;
+    return [];
+  }
+
   public string? ShootAnimationOf(string name) => Chain(name).Select(c => Detail(c.Name).ShootAnimation).FirstOrDefault(s => s is { Length: > 0 });
 
   /// <summary>Blueprint names the class (and ancestors) run: cooked <c>linksDesc</c> .sso plus inline <c>prop_blueprints</c> (as <c>cls:Class/Name</c>).</summary>

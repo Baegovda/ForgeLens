@@ -68,9 +68,10 @@ public partial class MainWindow
       for (var i = 0; i < catalog.FileCount; i++)
       {
         var p = catalog.GetFile(i).Path;
-        if (!p.EndsWith(".cls", StringComparison.OrdinalIgnoreCase) && !p.EndsWith(".cls.resource", StringComparison.OrdinalIgnoreCase)) continue;
+        var lib = p.Replace('\\', '/').EndsWith(FirearmLibrary.PathSuffix, StringComparison.OrdinalIgnoreCase);
+        if (!lib && !p.EndsWith(".cls", StringComparison.OrdinalIgnoreCase) && !p.EndsWith(".cls.resource", StringComparison.OrdinalIgnoreCase)) continue;
         byPath.TryAdd(p, i);
-        if (p.EndsWith(".cls", StringComparison.OrdinalIgnoreCase)) paths.Add(p);
+        if (lib || p.EndsWith(".cls", StringComparison.OrdinalIgnoreCase)) paths.Add(p);
       }
 
       string? Read(string path)

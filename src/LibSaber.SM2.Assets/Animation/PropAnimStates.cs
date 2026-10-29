@@ -28,7 +28,11 @@ public sealed record PropAutoPlan(List<TplPlay> Plays, List<string> Notes);
 ///       SHOOT=[SHOOT_1..3], RELOAD=[RELOAD_START,RELOAD_END,RELOAD_FULL]; <c>shootAnimation</c> default <c>SHOOT_1</c>.</item>
 ///     <item>Melee and other props (DATA): blueprint <c>Startanim</c>/<c>Stopanim</c> nodes and what triggers them
 ///       (<see cref="EventAnim" />), e.g. chainsword <c>OnHoldInArms → chain_anim (cycle)</c>, <c>hitN_start_anim → animN</c>.</item>
-///     <item>Shot = an event on the character clip's <c>Shoot</c> track; reload = a clip named <c>*reload*</c> (HEURISTIC).</item>
+///     <item>Shot = an event on the character clip's <c>Shoot</c> track (HEURISTIC); player firing clips have none, so a clip
+///       named <c>*shoot*</c>/<c>*fire*</c> fires every <c>60 / shotsPerMin</c> s of the firearm's <c>firearm_library_pve</c>
+///       barrel (rate DATA, firing clip by name HEURISTIC).</item>
+///     <item>Reload = the clip carries a <c>reload_sound_seq</c> event track (DATA: exactly the 18 of 23,227 retail clips that
+///       are reloads); RELOAD_END starts at its <c>snd_reload_mag_in</c> event (INFERRED).</item>
 ///   </list>
 /// </summary>
 public static class PropAnimStates
@@ -171,6 +175,10 @@ public static class PropAnimStates
   private static HashSet<int>? MaskOf(TplSequence seq, IReadOnlyDictionary<string, HashSet<int>>? masks) =>
     masks is not null && masks.TryGetValue(seq.Name, out var m) ? m : null;
 
+  /// <summary>The <c>reload_sound_seq</c> event track that marks a reload clip (DATA), or null.</summary>
+  public static AnimEventTrack? ReloadTrack(AnimationClip? clip) =>
+    clip?.EventTracks.FirstOrDefault(t => t.Name.Equals("reload_sound_seq", StringComparison.OrdinalIgnoreCase));
+
   private static readonly string[] HoldPins = [".OnHoldInArms", ".OnUserSet", ".OnEquip", ".OnAttached"];
 
   /// <summary>
@@ -178,7 +186,7 @@ public static class PropAnimStates
   ///   the blueprints the weapon class owns.
   /// </summary>
   public static PropAutoPlan AutoPlays(TplAnimation anim, AnimationClip? character, IEnumerable<EventAnim>? triggers,
-    IReadOnlyDictionary<string, HashSet<int>>? masks = null, string? shootAnimation = null)
+    IReadOnlyDictionary<string, HashSet<int>>? masks = null, string? shootAnimation = null, IReadOnlyList<FirearmFireRate>? fireRates = null)
   {
     var plays = new List<TplPlay>();
     var notes = new List<string>();
@@ -206,16 +214,20 @@ public static class PropAnimStates
     if (character is null)
       return new PropAutoPlan(plays, notes);
 
-    // 2. Reload clip (HEURISTIC: by clip name): RELOAD_FULL, else RELOAD_START then RELOAD_END.
-    if (character.Name.Contains("reload", StringComparison.OrdinalIgnoreCase))
+    // 2. Reload clip: it carries the reload_sound_seq track (DATA, see summary): RELOAD_FULL, else RELOAD_START then RELOAD_END.
+    var reloadTrack = ReloadTrack(character);
+    if (reloadTrack is not null)
     {
+      var magIn = reloadTrack.Events.FirstOrDefault(e => e.Tags.Any(t => t.Equals("snd_reload_mag_in", StringComparison.OrdinalIgnoreCase)));
       if (anim.Find("RELOAD_FULL") is { } full)
-        plays.Add(new TplPlay(full, 0f, Hold: false, Why: "reload clip → Reload state RELOAD_FULL (HEURISTIC: clip name)", Mask: MaskOf(full, masks)));
+        plays.Add(new TplPlay(full, 0f, Hold: false, Why: "reload clip (reload_sound_seq track, DATA) → Reload state RELOAD_FULL", Mask: MaskOf(full, masks)));
       else if (anim.Find("RELOAD_START") is { } rs)
       {
-        plays.Add(new TplPlay(rs, 0f, Why: "reload clip → RELOAD_START (HEURISTIC: clip name)", Mask: MaskOf(rs, masks)));
+        plays.Add(new TplPlay(rs, 0f, Why: "reload clip (reload_sound_seq track, DATA) → RELOAD_START", Mask: MaskOf(rs, masks)));
         if (anim.Find("RELOAD_END") is { } re)
-          plays.Add(new TplPlay(re, rs.Duration, Why: "→ RELOAD_END after START (HEURISTIC)", Mask: MaskOf(re, masks)));
+          plays.Add(magIn is not null
+            ? new TplPlay(re, magIn.Start * duration, Why: $"→ RELOAD_END at snd_reload_mag_in {magIn.Start * duration:0.00}s (INFERRED)", Mask: MaskOf(re, masks))
+            : new TplPlay(re, rs.Duration, Why: "→ RELOAD_END after START (HEURISTIC: no mag_in event)", Mask: MaskOf(re, masks)));
       }
     }
 
@@ -235,9 +247,26 @@ public static class PropAnimStates
 
     // 3b. Player firing clips carry no Shoot track (only 55 NPC trooper clips do): a clip named *shoot*/*fire* (not reload)
     // keeps firing — shootAnimation looped from 0, i.e. one shot per sequence length (HEURISTIC: name, and the rate).
-    if (shoot is not null && !plays.Any(p => p.Seq == shoot) && character.Name is { } clipName
+    if (shoot is not null && !plays.Any(p => p.Seq == shoot) && character.Name is { } clipName && reloadTrack is null
         && Regex.IsMatch(clipName, "shoot|fire", RegexOptions.IgnoreCase) && !clipName.Contains("reload", StringComparison.OrdinalIgnoreCase))
-      plays.Add(new TplPlay(shoot, 0f, Loop: true, Why: $"firing clip (name) → shootAnimation {shoot.Name} looped (HEURISTIC: no Shoot track; rate = sequence length)", Mask: MaskOf(shoot, masks)));
+    {
+      var rate = fireRates?.FirstOrDefault(r => r.Interval > 0);
+      if (rate is not null && duration > 0)
+      {
+        // FixedFireRate (DATA): one shot every 60/shotsPerMin s; each shot restarts shootAnimation (cut at the next shot).
+        var step = (float)rate.Interval;
+        var count = Math.Min(512, Math.Max(1, (int)Math.Ceiling(duration / step - 1e-4f)));
+        for (var k = 0; k < count; k++)
+          plays.Add(new TplPlay(shoot, k * step, End: (k + 1) * step,
+            Why: k == 0 ? $"firing clip (name HEURISTIC) → {shoot.Name} every {step:0.000}s = 60/{rate.ShotsPerMin:0} shotsPerMin ({rate.Uid}.{rate.Barrel}, {rate.ShootLogic ?? "?"}; DATA)" : "", Mask: MaskOf(shoot, masks)));
+        if (fireRates!.Select(r => r.ShotsPerMin).Distinct().Count() > 1)
+          notes.Add($"{rate.Uid}: barrels differ in shotsPerMin ({string.Join(", ", fireRates!.Select(r => $"{r.Barrel} {r.ShotsPerMin:0}"))}); the first one is used.");
+        if (rate.AffectsShootAnim == true)
+          notes.Add("fireRateAffectShootAnim = True: the game also scales the shoot sequence to the fire rate (not applied here).");
+      }
+      else
+        plays.Add(new TplPlay(shoot, 0f, Loop: true, Why: $"firing clip (name) → shootAnimation {shoot.Name} looped (HEURISTIC: no Shoot track or firearm_library rate; rate = sequence length)", Mask: MaskOf(shoot, masks)));
+    }
 
         // 4. Morpheme events named by blueprint triggers (DATA): start at the event (or its end for OnDeactivate/OnExit).
     var events = character.EventTracks.SelectMany(t => t.Events).SelectMany(e => e.Tags.Select(tag => (Tag: tag, Ev: e)))
