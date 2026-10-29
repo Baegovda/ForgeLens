@@ -1,0 +1,95 @@
+# START HERE — cold-start handoff for a new assistant (Grok Bot)
+
+> Written 2026-10-29 17:15 KST at origin tip `bd5fc0c`. This is the **single entry point**. It summarises and links; details live in the files listed in §7. Where older docs disagree, **this file and the newest-dated statement win**.
+> **Talk to the user in Korean 해요체, short.** This file is in English because it is for agents.
+
+## 1. Project in one line
+**Forge Lens** = a Warhammer 40,000: **Space Marine 2** asset browser/viewer (textures, models, animations, physics, VFX, customisation) + selective **Unreal Engine 5.7 exporter**. Repo `Baegovda/LibSaber`, branch `cursor/sm2-pck-extractor-4420`, PR https://github.com/Baegovda/LibSaber/pull/1. Later goals (only after SM2 is done): **Path of Exile**, then **Unreal Engine games** (.pak/IoStore). Halo code in the repo is out of scope.
+
+## 2. Environment
+| What | Where / value |
+|---|---|
+| User PC | Windows, user `Revaptor_FX`, ListMachines id `d3fb99ad-25ca-45c1-81af-41e5ca09104a`. PowerShell via `Shell` with machineId. If offline, retry later (R21). PC shell works even when browser routing to the PC is offline. |
+| PC work folder | `C:\Users\Revaptor_FX\Desktop\SM2_Work\` — `Bin` (deployed builds), `Scripts` (incl. `mtl_fix\push.ps1`, `mtl_fix\oneclick\`), `Export`/`Exports`, `Captures`, `Raw`, `Anim`, `Backup`, `Build` (plugin builds), `Tools`, `Research`, `cleanup_log.txt` |
+| Game | `D:\Steam\steamapps\common\Space Marine 2\client_pc` |
+| Unreal | UE **5.7.4**, project `K:\Unreal Projects\UE_VFX_57\UE_VFX_57.uproject`, work only in `/Game/SM2_Work`. Driven by **EngineWire / McpAutomationBridge** at `127.0.0.1:3000/mcp` (token `%USERPROFILE%\.enginewire_token`, never commit). Helpers `tools/ue/enginewire_call.py`, `uerun.ps1`. Plugins: `SM2PhysicsSetup` (repo `tools/ue/`), `BongThumbLive` (`K:\Unreal Projects\_Plugins\`, outside repo). |
+| Deployed exe | `Desktop\SM2_Work\Bin\ForgeLens_latest\ForgeLens.exe`, sha256 `3B74C6179C39A0E0D563AC4E522D4AE2ED9F6458C9210B09F32C1C9672124A36` (oneclick build). Backups `.bak14`–`.bak17`; next deploy → `.bak18`. "실행해줘" = launch Forge Lens on the PC (R28). |
+| Box repo | `/workspace/LibSaber` + many worktrees `/workspace/LibSaber-*` (e.g. `-reab`, `-handoff`). Use a fresh worktree from `origin/…` after `git fetch`. Patches in `/workspace/patches/<stage>/`, stage artefacts in `/workspace/mtl_fix/<stage>/`, Titus sequence `/workspace/titus_seq/`. |
+| .NET | `/home/box/tools/dotnet/dotnet` (build serially `-m:1`, `dotnet build-server shutdown` first). Tests: SM2.Assets 372, SM2Extractor 43, LibSaber.Tests 5, `test/python` 20 (HaloCEA failures = ignore). |
+| REA (primary RE tool) | CLI `/home/box/tools/rea-cli/node_modules/.bin/rea` (rea-agents 6.8.0, needs **Ghidra 12.1.4** at `/home/box/tools/ghidra_12.1.4_PUBLIC`). Daemon `tools/re/rea_daemon.py` + `tools/re/rea_call.py`. Exe `/workspace/rea/sm2_retail.exe`. Box has **15 GB RAM**; `open_binary` takes **~22 min** and can **OOM** → fallback headless Ghidra `DecompAt`/`DecompFn -noanalysis` (`/workspace/mtl_fix/mtl39/re/`), capstone in `/tmp/cs`. Batch RE items per daemon launch. |
+| RenderDoc captures | `/workspace/rdc` (armory 128197, plasma, sm2_frame7894 …), tools `tools/rdc`. Replays can stall late in the frame. |
+
+## 3. User preferences and standing rules
+Full list with dates and status: **HANDOFF.md → "사용자 요청 대장" A (R01–R32)**. Essentials:
+- **Reply in Korean 해요체, short**; interim reports with progress % and ETA "(추정)", times in KST (R01). Translate each request into **industry terms + a short Korean explanation** (R02).
+- **Evidence first (R32, WORKFLOW §0):** game data → exe (REA) → shader/RenderDoc. Label every conclusion **PROVEN / INFERRED / HEURISTIC**; HEURISTIC only as a last resort and clearly marked. **Never ask the user for in-game captures** (R13). Consult `docs/SYMBOL_DB` before re-running RE (R15/R16).
+- **Assets:** never delete user assets; back up as `.bakN` (UE `_bakN`), never overwrite an existing `.bakN` (next free number, never reused) (R03). Obvious test assets / unneeded backups may be deleted in **one batch cleanup pass** (R04).
+- **Scope:** never touch `/Game/SM2_Work/Original/*` or `/Game/Work/*`, never save `Lightning_01` (R05); work only in `Desktop\SM2_Work` and `/Game/SM2_Work` (R06).
+- **Autonomy:** act first, report decisions later, pending questions at the end (R07). Editor restarts are pre-authorised (save first) (R08). On a UE crash: close the crash reporter, read the report, relaunch visibly with `-AutoDeclinePackageRecovery`, continue (R09). Always stop any PIE/SIE you start (R10). Game-data parsing is delegated — do it without asking (R17).
+- **Fixes are generic rules**, never per-character patches (R11).
+- **Push** ff-only via PC `Scripts\mtl_fix\push.ps1`, **never force** (R23, WORKFLOW §4).
+- No untrusted executables (R24). No Discord actions unless asked (R25). No Niagara unless the user asks (R19).
+- Before PC-heavy work check no game is running (`Get-Process | ? MainWindowTitle`); during games use hidden + Idle priority, no focus stealing (R26).
+- **Record every user request** in the HANDOFF ledger (term, Korean meaning, status), keep it current (R31); update HANDOFF/STATUS each stage (R18).
+- Hourly report routine **`sm2-20`**, silent when nothing changed (R22).
+- Plugin options go in settings UI, not console vars (R27). UE goal is cinematic quality (Chaos Cloth, bone physics) (R29).
+
+## 4. Done so far (10/29 highlights)
+Full list: ledger **B (F01–F60)**; per-stage detail in HANDOFF "Update …" sections; commits `git log --oneline origin/cursor/sm2-pck-extractor-4420`.
+- Exposure per material: sfx emissive k = `adaptiveIntensity` PROVEN (`8bdd80a`, F50).
+- SSLB script reader + power-fist hand rule from bytecode (`fcc16bf`, F51). Request ledger (`167c99f`).
+- sfx parts hidden by default + "FX parts" toggle (`81f9a49`, F47).
+- Physics phys52: jiggle key fix, spring damper, ComplexAsSimple/double-sim fix, Titus 34/34 (`8ca0bdd`, F52/F53).
+- Titus walk-and-shoot Sequencer v2 (F46, box `/workspace/titus_seq/`).
+- Character colour-scheme picker, 104 in-game schemes (`49355fd`, F54) + darkness fix (`7aecce7`) + texture-array patterns (`ffb3ba6`).
+- Weapon swing trails (`4c4155a`) + fix54 additive blend / distortion trails out (`bcb17ff`, F55/F58).
+- Prop/weapon embedded animation decoder, toggle, condition dropdown, UE export (`a590998`, F56/F57); reload/fire timing (`58e2bea`).
+- REA batches 1–5 (F59): spring damper PROVEN (`7aecce7`), light falloff (`c6ac199`), trail fadeParams/light map (`31102cf`), UseSpecMap bits DATA + importer fix (`b6cf3a1`), **attenCurveParam → P0.w PROVEN** via level lights (`d843b51`).
+- Level scene parsing (`hub_battle_barge.pak` cd_list/class_list, lights) — started in level-lights.
+- One-click Direct-to-Unreal export (`058605a`, docs `bd5fc0c`, F60).
+- SM2_Work cleanup 26.8 GB freed (`cleanup_log.txt`); earlier 10/29 cleanup ≈159 GB (F44).
+
+## 5. Next work (priority order)
+1. **Ribbon trail per-point colour writer** (RB_TRAIL_POINTS/trlPOINT CPU writer still open). In RenderDoc replay only the trail event range (full-frame replay of sm2_frame7894 stalls).
+2. **Adaptive light multiplier** (isAdaptiveIntensity bit, +0x6d bit 0) → bench/UE.
+3. **`DAT_14502deac`** — open lead from the last REA batch (check SYMBOL_DB/RE_NOTES first).
+4. Prop-anim **player shoot clip selection** — still by name (HEURISTIC); find data/exe source.
+5. **L/R pauldron/gauntlet/greave colour overrides** (colour-scheme section ↔ part matching).
+6. **Colour scheme → UE master material** (`<tpl>.colour_scheme.<id>.json` is written; wire into M_SM2).
+7. **.td non-texture params in importer** (F43, `import_sm2_materials.py`).
+8. **Muzzle flash offset + aim-up pose from data** (Titus sequence, F46).
+9. **Physics re-run for other characters** (phys52 rules).
+10. **Cloth sim build28 install/verify** (plugin install needs UE closed → editor restart, pre-authorised).
+11. **Level/prop placement extraction** (user is interested; parser started in level-lights).
+12. One-click follow-ups: stale assets left on reimport; delete stray test clip `/Game/SM2_Work/Animations/cc_calgar` in the next cleanup pass.
+13. Check BongThumbLive "clear cache" button exists (F42).
+14. Later: artificer presets (F27), cinematic sequences (605), model UV scroll; then **PoE** (X02), then **UE games** (X03). Niagara only on request (X01).
+
+**Remaining HEURISTICs** (replace with evidence when possible): reload/shoot clip by name (prop anim); visibility→scale 0 and holding-branch pick; spring-damper UE realisation; trail ribbon generation rules + `SM2_VFX_TRAIL_FADE`; trail_melee_dark skip (MNM non-distortion path); bench exposure 1/250; layer0..2 = primary/secondary/tertiary (INFERRED), section↔part matching, isMetallic, customUV fallback; Champion scheme names (7); Shoot→muzzle link; category name rules / story-champion tpl mapping / NPC link weights; VatDecode animStage age/life; firearm `main` always on; host-mesh overlay preview. Full lists: STATUS "Heuristics", HANDOFF "REA 일괄 처리 목록".
+
+## 6. Pitfalls
+- **Box memory:** REA/Ghidra can OOM on 15 GB; don't run REA alongside big builds; fall back to headless DecompAt.
+- **push.ps1** leaves the failing `0*.patch` in `%USERPROFILE%` after `AM FAILED`; clear/redo it before the next push.
+- **SYMBOL_DB generator** (`tools/symbol_db/build_symbol_db.py`) drops hand-added rows when re-run on the box — edit `docs/SYMBOL_DB` by hand.
+- Forge Lens **rewrites `settings.json` when the exe closes** — back it up before QA, restore after.
+- `fl_oneclick.ps1` needs **Windows PowerShell 5** (`powershell.exe -File`), not pwsh 7.
+- Headless UnrealEditor-Cmd: Interchange asserts without Slate → legacy factories (already handled).
+- **Titus campaign armour (`*_02`) has no CC block** → only helmet/acc/crux change with colour schemes (PROVEN, not a bug).
+- HaloCEA test failures are expected (out of scope).
+- Browser routing to the PC may be offline while PC Shell works.
+- `uerun.ps1` needs absolute script paths and comma-joined args.
+- Older docs mention a cloud-agent push, a 20-minute routine, "deletions always need approval", EngineWire port 8090 — all **superseded** (push.ps1, hourly, R04, port 3000).
+
+## 7. Doc map
+| File | Use it for |
+|---|---|
+| `docs/handoff/START_HERE.md` | This entry point |
+| `HANDOFF.md` top | **User request ledger** (R01–R32 rules, F01–F60 features, X01–X03 future) — add every new request here |
+| `HANDOFF.md` bottom | Chronological "Update <stage>" logs (newest last), REA batch list |
+| `AGENTS.md` | Project overview + hard rules (older wording; this file wins) |
+| `docs/handoff/STATUS.md` | Per-stage status summaries (newest on top), test counts, Heuristics lists |
+| `docs/handoff/ROADMAP.md` | Approved work order, backlog, future |
+| `docs/handoff/WORKFLOW.md` | Box vs PC, paths, build/test, push (§4), UE/EngineWire (§5), captures, report routine (§9), QA env vars |
+| `docs/handoff/RE_NOTES.md` | Long-form RE evidence per stage |
+| `docs/SYMBOL_DB/` | `INDEX.md` + per-domain md + `index.tsv` + `rea_string_xrefs.tsv` — grep before any RE |
+| `docs/handoff/FORMATS.md`, `SHADERS.md` | SM2 formats → parser source files; shader analysis |

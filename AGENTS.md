@@ -1,5 +1,7 @@
 # AGENTS.md — start here (new agent / Grok Bot entry point)
 
+> **Newest single entry point: [`docs/handoff/START_HERE.md`](docs/handoff/START_HERE.md)** (cold-start handoff, 2026-10-29). Read it first; it overrides older statements here.
+
 > 이 파일이 진입점입니다. 레포 주소만 받은 새 에이전트는 이 파일부터 끝까지 읽고, 아래 "Read order"대로 따라가면 바로 작업을 이어갈 수 있습니다.
 
 ## 1. What this project is
@@ -16,7 +18,7 @@
 1. **This file.**
 2. `docs/handoff/STATUS.md`: what is done, partial or todo (with %), commits, tests and open limitations.
 3. `docs/handoff/ROADMAP.md`: the approved work order and the exact next steps.
-4. `docs/handoff/WORKFLOW.md`: where work runs (box vs the user's PC), build/test, push via the cloud agent, captures, PC paths, and the 20-minute report routine.
+4. `docs/handoff/WORKFLOW.md`: where work runs (box vs the user's PC), build/test, push via the PC `push.ps1`, captures, PC paths, and the hourly `sm2-20` report routine.
 5. `docs/SYMBOL_DB/INDEX.md` (the RE "genome map": per-domain overviews + `index.tsv` of every known exe symbol) — **grep it before starting new RE**; `docs/handoff/RE_NOTES.md` holds the long-form evidence tables.
 6. `docs/handoff/FORMATS.md`: SM2 formats, and which source file parses each one.
 7. `HANDOFF.md`: the long chronological log of every stage, with full details. Read the **newest sections at the bottom** first.
@@ -28,7 +30,7 @@
    - Anything not proven must be labelled **heuristic / assumption** (see the "Heuristics" lists in STATUS.md).
    - Never "guess from bytes" without saying so.
 2. **Never delete the user's assets.** Before overwriting a file or folder, back it up as `.bakN` (UE: `_bakN`), with N the next free number.
-   - Deleting anything (backups, UE folders, caches) needs the user's **explicit approval for that exact deletion**.
+   - Deleting anything (backups, UE folders, caches) needs the user's **explicit approval for that exact deletion** — except obvious test assets / no-longer-needed backups, which may be removed in one batch cleanup pass at the end of a batch (ledger R04, 10/29). Never overwrite an existing `.bakN`.
 3. **Work only in** the PC's `C:\Users\Revaptor_FX\Desktop\SM2_Work` and Unreal's `/Game/SM2_Work`.
    - `/Game/SM2_Work/Original/*` is the user's original import: read-only.
    - Tool installs live in `C:\Users\Revaptor_FX\SM2Extractor*` / `SM2Browser_*` (historical) and `Desktop\SM2_Work\Bin`.
@@ -55,7 +57,7 @@
 - Full permission on the SM2 project: build, install new tool builds (old ones kept as `.bakN`), push to PR #1, manage folders inside SM2_Work, and restart Unreal Editor (save first).
 - **Deletions only with explicit approval**, per case. Examples already approved and done: the bulk `*.bakN` export folders, the UE `_bakN` test folders, empty `_Legacy`/`Test` folders.
   - Not approved: the DDC cache.
-- Pushing to PR #1 goes through the Cursor cloud agent (WORKFLOW.md §4).
+- Pushing to PR #1 goes through the PC's `Scripts\mtl_fix\push.ps1` (ff-only, WORKFLOW.md §4; ledger R23).
 
 ## 6. Where things are (summary; details in WORKFLOW.md)
 | What | Where |
@@ -64,4 +66,4 @@
 | Game | `D:\Steam\steamapps\common\Space Marine 2\client_pc` |
 | Unreal | 5.7.4, project `K:\Unreal Projects\UE_VFX_57`, work in `/Game/SM2_Work`, driven by **EngineWire / MCP Automation Bridge 0.5.30** (https://github.com/ChiR24/Unreal_mcp, native MCP HTTP `127.0.0.1:3000/mcp`, `tools/ue/enginewire_call.py` + `uerun.ps1`); UEMCP (`tools/ue/uemcp_call.py`) stays as fallback. See WORKFLOW.md §5 |
 | Work folder | `C:\Users\Revaptor_FX\Desktop\SM2_Work\{Scripts,Exports,Captures,Bin,Raw,Backup,...}` |
-| Box (bot's Linux machine) | repo `/workspace/LibSaber` (+ worktrees), exe `/workspace/rea/sm2_retail.exe`, Ghidra project `/workspace/rea/ghidra_proj2.gpr` (program `sm2_retail.exe`), push agent `bc-65aed255-5102-5266-bcbd-f60b85b14984`, patches `/workspace/patches/<stage>/` |
+| Box (bot's Linux machine) | repo `/workspace/LibSaber` (+ worktrees), exe `/workspace/rea/sm2_retail.exe`, Ghidra project `/workspace/rea/ghidra_proj2.gpr` (program `sm2_retail.exe`), push via PC `push.ps1` (old cloud agent `bc-65aed255-…` is fallback only), patches `/workspace/patches/<stage>/` |

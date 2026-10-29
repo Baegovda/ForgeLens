@@ -10,7 +10,7 @@
 |---|---|---|
 | Code, parsing, analysis, Ghidra/rizin RE, unit tests, headless browser captures, reports | **Bot's Linux box** (persistent, shared by the user's agents) | `Shell` without machineId |
 | Anything needing the full game install, the real exe GUI, Unreal Editor, in-game captures | **User's Windows PC "Revaptor-FX"** | `ListMachines` → machine id (`d3fb99ad-25ca-45c1-81af-41e5ca09104a` at time of writing), then `Shell`/`Read` with that machineId (PowerShell) |
-| Pushing to GitHub | **Cursor cloud agent** | format-patch → cloud agent `git am -3`, build, test, fast-forward push (§4) |
+| Pushing to GitHub | **User's PC** (`push.ps1`, current since 10/28) | format-patch → copy `0*.patch` to `%USERPROFILE%` → `Scripts\mtl_fix\push.ps1` (`git am -3`, ff-only push) (§4) |
 - The box is cheaper per step (fewer round trips): do analysis and rendering there. Only exe/UE/game-data steps go to the PC.
 - Move files between them with `CopyToBox` (PC → `/workspace/...`) and `CopyFromBox` (box → PC). Check the size after copying; a copy once delivered a stale file.
 
@@ -105,8 +105,14 @@ python3 test/python/test_chameleon.py         # UE importer material math (unrea
   ```
 - Pull a few game files to the box for RE/bench: on the PC, run `extract "<client_pc>" --output <Raw\...> -q --filter <glob>...` (hidden, idle priority), `Compress-Archive`, then `CopyToBox`. Example: `/workspace/vfx_raw/extract_tex6.ps1`.
 
-## 4. Pushing to PR #1 (cloud agent)
-The box has no GitHub write login. Pushes go through a Cursor cloud agent with repo access (the user enabled cloud agents and granted GitHub access to Baegovda/LibSaber).
+## 4. Pushing to PR #1
+**Current method (ledger R23, since 2026-10-28): the PC's `push.ps1`.** The box has no GitHub write login.
+1. On the box, commit on the latest `origin/cursor/sm2-pck-extractor-4420` (fetch first), then `git format-patch origin/cursor/sm2-pck-extractor-4420..HEAD -o /workspace/patches/<stage>/`.
+2. `CopyFromBox` each patch to `C:\Users\Revaptor_FX\0NNN-*.patch` (names must start with `0`).
+3. On the PC: `powershell -File "$env:USERPROFILE\Desktop\SM2_Work\Scripts\mtl_fix\push.ps1"`. It resets `%USERPROFILE%\ls_push` to the origin tip, `git am -3` each patch (aborts and prints `AM FAILED` on conflict, leaving the patch file in place), deletes applied patches, ff-only pushes and prints `TIP <sha>`. **Never force-push.** After a failure, remove/redo leftover `0*.patch` files before the next run.
+4. `git fetch` on the box and confirm the tip.
+
+Older method (cloud agent, 2026-10-27; use only if the PC is unavailable):
 1. On the box, commit on top of the **latest remote tip** (`git fetch` first). Identity: `-c user.name="Cursor Agent" -c user.email=cursoragent@cursor.com`.
 2. `git format-patch origin/cursor/sm2-pck-extractor-4420..HEAD -o /workspace/patches/<stage>/`
 3. Send a follow-up to the cloud agent (CloudAgent reply, mode **queue**). Current agent (2026-10-27): `bc-65aed255-5102-5266-bcbd-f60b85b14984` (the older `bc-abf903a2-7eaf-532a-9a9c-bd757453bf47` is replaced). If it's gone, launch a new one on the repo/branch with the same instructions. Include the patch contents and these instructions:
@@ -177,11 +183,11 @@ xvfb-run -a -s "-screen 0 1920x1080x24" dotnet run --project src/LibSaber.SM2Bro
 2. Code + tests on the box, in your own worktree.
 3. Captures (box headless, and/or UE on the PC when it's free).
 4. Append a dated section to HANDOFF.md and update `docs/handoff/STATUS.md`.
-5. Format-patch → cloud agent push.
+5. Format-patch → PC `push.ps1` (§4).
 6. Short Korean report to the user with the % and what's next.
 
-## 9. The 20-minute progress report routine
-The user wants automatic interim reports. Create a recurring routine (see the bot's `routines` skill), e.g. named `sm2-20`, every 20 minutes. It should:
+## 9. The hourly progress report routine (`sm2-20`)
+The user wants automatic interim reports. The recurring routine is named `sm2-20` (historical name) and runs **every hour** (changed from 20 minutes on 10/28, ledger R22). It should:
 - check running executors/subagents, the box worktrees (`git log -3`, `git status`), new files in `/workspace/patches/*` and `/workspace/browser_run_shots/*`, and, only if cheap, the PC capture folders;
 - write a 2–4 line Korean report: what finished, what is running, **progress %**, ETA (추정), blockers;
 - **stay quiet if nothing changed** since the last report. Never send a stale or duplicate report, and never say "nothing is running" while an executor is active;

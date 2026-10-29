@@ -1,4 +1,6 @@
-> **New agent: read [`AGENTS.md`](AGENTS.md) first** (entry point, rules, user preferences), then `docs/handoff/` (STATUS, ROADMAP, WORKFLOW, RE_NOTES, FORMATS). Where this file's bootstrap below conflicts with them (push method, next step, owner), AGENTS.md / docs/handoff win. This file stays the chronological log: append a dated section per stage.
+> **New assistant: start at [`docs/handoff/START_HERE.md`](docs/handoff/START_HERE.md)** (single entry point, 2026-10-29). Everything below is the request ledger and chronological log.
+
+> **Then read [`AGENTS.md`](AGENTS.md)** (entry point, rules, user preferences), then `docs/handoff/` (STATUS, ROADMAP, WORKFLOW, RE_NOTES, FORMATS). Where this file's bootstrap below conflicts with them (push method, next step, owner), AGENTS.md / docs/handoff win. This file stays the chronological log: append a dated section per stage.
 
 # 사용자 요청 대장 (User Request Ledger)
 
@@ -33,7 +35,7 @@
 | R19 | 10/27 | Niagara 변환은 맨 마지막, 그것도 물어본 뒤에만 | Deferred scope — 범위 보류 | standing (로드맵에서 제외: 7e561f4) | AGENTS.md §3.6, ROADMAP "Possible future" |
 | R20 | 10/27 | Halo는 무시, SM2만 | Scope control — 범위 한정 | standing | AGENTS.md §1 (HaloCEA 테스트 실패 무시) |
 | R21 | 10/27 | PC가 오프라인이면 주기적으로 재시도 | Retry with backoff — 주기적 재시도 | standing | — |
-| R22 | 10/28 | 1시간마다 `sm2-20` 보고 루틴, 내용이 같으면 조용히(20분 → 1시간으로 변경) | Scheduled status digest + dedup — 정기 보고, 중복 억제 | standing | 봇 루틴 `sm2-20` (WORKFLOW.md의 "20분"은 옛 값) |
+| R22 | 10/28 | 1시간마다 `sm2-20` 보고 루틴, 내용이 같으면 조용히(20분 → 1시간으로 변경) | Scheduled status digest + dedup — 정기 보고, 중복 억제 | standing | 봇 루틴 `sm2-20` (WORKFLOW.md §9, 10/29 1시간으로 정정) |
 | R23 | 10/28 | push는 PC의 `push.ps1`로 | Release pipeline (patch → `git am -3` → ff-only push) — 배포 스크립트 | standing | PC `Desktop\SM2_Work\Scripts\mtl_fix\push.ps1` (`0*.patch` in `%USERPROFILE%`) |
 | R24 | 10/27 | 신뢰할 수 없는 실행파일은 실행 금지 | Supply-chain safety — 출처 불명 바이너리 차단 | standing | — |
 | R25 | 10/27 | 요청 없으면 Discord에서 아무것도 하지 않기 | No unsolicited external comms — 요청 없는 외부 발신 금지 | standing | — |
