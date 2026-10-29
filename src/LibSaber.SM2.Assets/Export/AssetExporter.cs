@@ -920,7 +920,7 @@ public static class AssetExporter
     copy.Skin.AddRange(level.Skin);
     foreach (var part in level.Parts)
     {
-      if (part.IndexCount < 3 || part.HideReason == "clothSim")
+      if (part.IndexCount < 3 || part.HideReason is "clothSim" or "sfx" or "sfxSource")
         continue;
       var copied = part.Copy(part.IndexStart, part.IndexCount);
       copied.Visible = true;

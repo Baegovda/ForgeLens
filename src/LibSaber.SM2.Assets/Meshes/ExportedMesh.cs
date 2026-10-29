@@ -65,9 +65,21 @@ public sealed class MeshPart
   public DetailSpec? Detail { get; set; }
   /// <summary>Glt-level metallicTint, reflectance, metalness and roughness scale/bias (engine defaults when unset).</summary>
   public BaseLayer BaseLayer { get; set; } = new();
+  /// <summary>
+  ///   mtl1-51: the part's .td material variant is an sfx shader (<c>preset = "sfx"</c>, <c>shaders.sfx</c>,
+  ///   <c>__type_id = "sfx_sh_templ"</c>), e.g. the chainsword's sfx_chainsword_attack_* blade cards
+  ///   (chainsword_blade_01.td <c>sfx_blade_01</c>). The game draws these through the sfx pipeline (FUN_1425fd580 loader),
+  ///   not the glt opaque path. See <see cref="MaterialMaps.IsSfxPart"/>.
+  /// </summary>
+  public bool Sfx { get; set; }
+  /// <summary>sfx <c>blendMode</c> of <see cref="Sfx"/> parts (Unspecified = add, PROVEN mtl1-50).</summary>
+  public LibSaber.SM2.Assets.Effects.SfxBlendMode SfxBlend { get; set; }
+  /// <summary>sfx <c>tint</c> as R, G, B, A in 0..1 (the .td stores A, R, G, B bytes); null = white.</summary>
+  public float[]? SfxTint { get; set; }
   /// <summary>Index leaves LOD and collision shells unchecked. Defaults on so hand-built meshes still export whole.</summary>
   public bool Visible { get; set; } = true;
-  /// <summary>"LOD" or "volume" when <see cref="Visible"/> was cleared by Index's default filter.</summary>
+  /// <summary>"LOD" or "volume" when <see cref="Visible"/> was cleared by Index's default filter; "clothSim"; mtl1-51 "sfx"
+  /// (sfx shader card) or "sfxSource" (placeholder-material sfx emitter geometry), see <see cref="MaterialMaps.HideSfxParts"/>.</summary>
   public string? HideReason { get; set; }
   /// <summary>Template object (geometry graph node) the submesh belongs to, or -1. Indexes <see cref="ExportedMesh.Bones"/>.</summary>
   public int Node { get; set; } = -1;
@@ -100,6 +112,9 @@ public sealed class MeshPart
       Chameleon = Chameleon,
       Detail = Detail,
       BaseLayer = BaseLayer,
+      Sfx = Sfx,
+      SfxBlend = SfxBlend,
+      SfxTint = SfxTint,
       Visible = Visible,
       HideReason = HideReason,
       Node = Node,

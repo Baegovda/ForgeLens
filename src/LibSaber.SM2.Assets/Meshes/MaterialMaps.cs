@@ -65,9 +65,11 @@ public static class MaterialMaps
     var cache = new Dictionary<string, List<MaterialMap>>(StringComparer.OrdinalIgnoreCase);
     var texts = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
     var variants = new Dictionary<string, (float[]? Tint, string? Mode, SecondSpec? Second, AnisoSpec? Aniso, BaseLayer Base, ChameleonSpec? Chameleon, DetailSpec? Detail)>(StringComparer.OrdinalIgnoreCase);
+    var sfxShading = new Dictionary<string, (bool Sfx, Effects.SfxBlendMode Blend, float[]? Tint)>(StringComparer.OrdinalIgnoreCase);
     Attach(mesh.Parts);
     foreach (var level in mesh.Levels)
       Attach(level.Parts);
+    HideSfxParts(mesh);
 
     void Attach(IList<MeshPart> parts)
     {
@@ -115,6 +117,18 @@ public static class MaterialMaps
         part.BaseLayer = shading.Base;
         part.Chameleon = shading.Chameleon;
         part.Detail = shading.Detail;
+        if (!sfxShading.TryGetValue(key, out var fx))
+        {
+          var text = DefinitionText(catalog, store, hint, key[..key.IndexOf('\n')], texts);
+          fx = SfxShading(text is null ? null : VariantBlock(text, part.Variant));
+          sfxShading[key] = fx;
+        }
+
+        part.Sfx = fx.Sfx;
+        part.SfxBlend = fx.Blend;
+        part.SfxTint = fx.Tint;
+        if (fx.Sfx)
+          part.Blend = "translucent"; // never the glt opaque path; GPU preview draws it with its sfx blend (PreviewBlend.Sfx)
       }
     }
 
@@ -386,6 +400,91 @@ public static class MaterialMaps
     var map = maps.FirstOrDefault(candidate => candidate.Role == role && !candidate.Missing);
     return map?.Name;
   }
+
+  private static readonly Regex SfxPreset = new(@"\bpreset\s*=\s*""sfx""", RegexOptions.Compiled);
+  private static readonly Regex SfxTintSpec = new(@"\btint\s*=\s*\[\s*([\d.]+)\s*,\s*([\d.]+)\s*,\s*([\d.]+)\s*,\s*([\d.]+)", RegexOptions.Compiled);
+
+  /// <summary>
+  ///   mtl1-51: sfx shading of one .td material variant block. A variant whose <c>preset</c> is <c>"sfx"</c> is drawn by the
+  ///   sfx shader (shaders.sfx, <c>sfx_sh_templ</c>; loader FUN_1425fd580), not glt: blend from <see cref="Effects.SfxBlend.FromTd"/>
+  ///   (no blendMode = add, PROVEN mtl1-50), tint [A,R,G,B] bytes as RGBA 0..1.
+  /// </summary>
+  internal static (bool Sfx, Effects.SfxBlendMode Blend, float[]? Tint) SfxShading(string? variantBlock)
+  {
+    if (variantBlock is null || !SfxPreset.IsMatch(variantBlock))
+      return (false, Effects.SfxBlendMode.Unspecified, null);
+    float[]? tint = null;
+    var t = SfxTintSpec.Match(Block(variantBlock, "sfx") ?? variantBlock);
+    if (t.Success)
+    {
+      float F(int i) => float.Parse(t.Groups[i].Value, CultureInfo.InvariantCulture) / 255f;
+      tint = new[] { F(2), F(3), F(4), F(1) };
+    }
+
+    return (true, Effects.SfxBlend.FromTd(variantBlock), tint);
+  }
+
+  /// <summary>Placeholder material stem: the engine's default td (no materials block) that helper geometry carries.</summary>
+  public static bool IsPlaceholderMaterial(string? texture)
+    => !string.IsNullOrWhiteSpace(texture) && Stem(texture).Equals("__default_material__", StringComparison.OrdinalIgnoreCase);
+
+  /// <summary>SM2_SHOW_SFX_PARTS=1 keeps sfx cards / sfx sources visible by default (pre-mtl1-51 behaviour).</summary>
+  public static bool ShowSfxPartsByDefault { get; set; } = Environment.GetEnvironmentVariable("SM2_SHOW_SFX_PARTS") == "1";
+
+  /// <summary>True for a part <see cref="HideSfxParts"/> hides (reason "sfx" or "sfxSource").</summary>
+  public static bool IsSfxPart(MeshPart part) => part.HideReason is "sfx" or "sfxSource" || part.Sfx;
+
+  /// <summary>
+  ///   mtl1-51: effect geometry embedded in models starts hidden (like Index's LOD / volume shells):
+  ///   <list type="bullet">
+  ///     <item>"sfx": the material variant is an sfx shader (<see cref="MeshPart.Sfx"/>). DATA: wpn_chainsword_01
+  ///       sfx_chainsword_attack_01..04 → chainsword_blade_01.td sfx_blade_01 / sfx_blade_03 (preset "sfx", tint, scroll,
+  ///       distort, <c>dynamicAlphaMask</c>). dynamicAlphaMask (loader FUN_1425f1900: mask, doNotUseDynamic, alphaVal_min/max)
+  ///       scales alpha by a runtime value, so the card is only seen while the attack sfx drives it (INFERRED). Drawing it
+  ///       through glt as opaque gave the black blade strips.</item>
+  ///     <item>"sfxSource": SFX_SOURCE_RULE (see below).</item>
+  ///   </list>
+  ///   The Meshes list can still turn each one on (the GPU preview then uses the sfx blend); SM2_SHOW_SFX_PARTS=1 restores
+  ///   the old default. Export LOD0 follows Visible, so these cards are no longer written as opaque planes.
+  /// </summary>
+  public static void HideSfxParts(ExportedMesh mesh)
+  {
+    if (ShowSfxPartsByDefault)
+      return;
+    var all = mesh.Parts.Concat(mesh.Levels.SelectMany(level => level.Parts)).ToList();
+    // An effect-only model (fx_*.tpl: every drawn part is an sfx card) keeps its cards, else the view would be empty.
+    if (!all.Any(part => part.Visible && part.IndexCount >= 3 && !part.Sfx && !IsSfxSource(part)))
+      return;
+    foreach (var part in all)
+    {
+      if (!part.Visible)
+        continue;
+      if (part.Sfx)
+      {
+        part.Visible = false;
+        part.HideReason = "sfx";
+      }
+      else if (IsSfxSource(part))
+      {
+        part.Visible = false;
+        part.HideReason = "sfxSource";
+      }
+    }
+  }
+
+  /// <summary>
+  ///   "sfxSource": the placeholder material (<c>__default_material__</c>: no materials block) on an sfx emitter / trail /
+  ///   collision locator (sfx_*, *_source, flame_area*, exaust*, *colission). HEURISTIC, data: mtl1-51 --fxparts survey
+  ///   (401 weapon + 119 character tpls) found exactly sfx_trail, exaust_source, shells_source, lightning_source, flame_area(1)
+  ///   and bullet_colission visible with that material; melee_skins_library excludeObjectsToApplyMaterial lists the chainsword
+  ///   ones as non-skin objects. The name filter is needed: characters also carry visible placeholder geometry (backpack,
+  ///   TECH_robo_hand*, R_4_a..) that must stay.
+  /// </summary>
+  public static bool IsSfxSource(MeshPart part)
+    => IsPlaceholderMaterial(part.Texture) && SfxSourceName.IsMatch(part.Name ?? "");
+
+  private static readonly Regex SfxSourceName =
+    new(@"^(sfx_.*|.*_source|flame_area\d*|exaust.*|exhaust.*|.*colission|.*collision)$", RegexOptions.IgnoreCase | RegexOptions.Compiled);
 
   private static readonly Regex BlendModeSpec = new(@"\bblendMode\s*=\s*""([A-Za-z_0-9]+)""", RegexOptions.Compiled);
 

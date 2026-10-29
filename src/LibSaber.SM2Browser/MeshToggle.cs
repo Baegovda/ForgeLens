@@ -18,6 +18,8 @@ public sealed class MeshToggle : INotifyPropertyChanged
     {
       "LOD" => $"{texture} · {tris:N0} tris · Index hides this LOD",
       "volume" => $"{texture} · {tris:N0} tris · Index hides this collision volume",
+      "sfx" => $"{texture} · {tris:N0} tris · sfx shader card (td preset \"sfx\"): only shown while its effect drives it; drawn with the sfx blend",
+      "sfxSource" => $"{texture} · {tris:N0} tris · sfx helper with the placeholder material (emitter / trail source), not drawn by the game",
       "clothSim" => $"{texture} · {tris:N0} tris · cloth simulation shell (the game never draws it)",
       _ => $"{texture} · {tris:N0} tris",
     };

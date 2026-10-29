@@ -24,6 +24,8 @@ internal static class Program
       return Bench.VfxEmitterDump.Run(args);
     if (args.Length > 0 && args[0] == "--vfxue-rules")
       return Bench.VfxUeExport.Rules(args);
+    if (args.Length > 0 && args[0] == "--fxparts")
+      return Bench.FxPartsBench.Run(args);
     if (args.Length > 0 && args[0] == "--glbench")
       return Bench.GpuBench.Run(args);
     return BuildAvaloniaApp().StartWithClassicDesktopLifetime(args);

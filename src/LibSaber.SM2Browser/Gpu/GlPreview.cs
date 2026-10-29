@@ -575,6 +575,9 @@ internal sealed unsafe class GlPreview : IDisposable
     _gl.BlendFuncSeparate(BlendingFactor.One, BlendingFactor.OneMinusSrcAlpha, BlendingFactor.One, BlendingFactor.OneMinusSrcAlpha);
     _gl.DepthMask(false);
     DrawPass(scene, skin, budget, PreviewBlend.Translucent);
+    // mtl1-51: sfx cards (shown from the Meshes list): same One/InvSrcAlpha state; the shader writes alpha 0 for additive
+    // (blendMode add / unspecified), so the destination is kept and the colour adds.
+    DrawPass(scene, skin, budget, PreviewBlend.Sfx);
     _gl.DepthMask(true);
     _gl.Disable(EnableCap.Blend);
     if (Effect is { } effect)
@@ -674,13 +677,13 @@ internal sealed unsafe class GlPreview : IDisposable
         var blend = LegacyOpaque ? PreviewBlend.Opaque : part.Blend;
         if (!part.Draw || part.IndexCount < 3 || blend != pass)
           continue;
-        items.Add((batch, part, pass == PreviewBlend.Translucent ? Vector3.DistanceSquared(part.Center, scene.Eye) : 0));
+        items.Add((batch, part, pass is PreviewBlend.Translucent or PreviewBlend.Sfx ? Vector3.DistanceSquared(part.Center, scene.Eye) : 0));
       }
     }
 
     if (items.Count == 0)
       return;
-    if (pass == PreviewBlend.Translucent)
+    if (pass is PreviewBlend.Translucent or PreviewBlend.Sfx)
       items.Sort((a, b) => b.Depth.CompareTo(a.Depth));
     _gl.Uniform1(U("uBlend"), (int)pass);
     object? bound = null;
@@ -711,6 +714,8 @@ internal sealed unsafe class GlPreview : IDisposable
       _gl.Uniform1(U("uUseAlpha"), pass != PreviewBlend.Opaque && part.AlphaFromAlbedo ? 1 : 0);
       SetVec3("uSolid", part.Solid);
       SetVec3("uTint", part.Tint);
+      _gl.Uniform1(U("uSfxAlpha"), part.SfxAlpha);
+      _gl.Uniform1(U("uSfxAdd"), part.SfxAdditive ? 1 : 0);
       var metalRough = LegacyOpaque ? new Vector4(1f, 0f, 1f, 0f) : part.MetalRough;
       var metalTint = LegacyOpaque ? Vector3.One : part.MetalTint;
       _gl.Uniform4(U("uMetalRough"), metalRough.X, metalRough.Y, metalRough.Z, metalRough.W);
@@ -730,7 +735,7 @@ internal sealed unsafe class GlPreview : IDisposable
 
       SetChameleon(LegacyOpaque ? null : part.Chameleon);
 
-      _gl.DepthFunc(pass == PreviewBlend.Translucent ? DepthFunction.Less : DepthFunction.Lequal);
+      _gl.DepthFunc(pass is PreviewBlend.Translucent or PreviewBlend.Sfx ? DepthFunction.Less : DepthFunction.Lequal);
       _gl.DrawElements(PrimitiveType.Triangles, (uint)part.IndexCount, DrawElementsType.UnsignedInt, (void*)(part.IndexStart * 4L));
     }
 
@@ -892,6 +897,8 @@ internal sealed unsafe class GlPreview : IDisposable
     uniform vec3 uEye;
     uniform vec3 uTint;
     uniform int uBlend;
+    uniform float uSfxAlpha;
+    uniform int uSfxAdd;
     uniform int uUseAlpha;
     uniform int uAniso;
     uniform vec2 uAnisoDir;
@@ -935,6 +942,16 @@ internal sealed unsafe class GlPreview : IDisposable
       vec4 albedo = uHasAlbedo == 1 ? texture(uAlbedo, vUv) : vec4(toLinear(uSolid), 1.0);
       vec3 base = albedo.rgb * uTint;
       float alpha = uUseAlpha == 1 ? albedo.a : 1.0;
+      if (uBlend == 3)
+      {
+        // mtl1-51 sfx card: unlit albedo * sfx tint; premultiplied, alpha 0 when additive (One/InvSrcAlpha state).
+        float a = alpha * uSfxAlpha;
+        if (a < 0.004)
+          discard;
+        vec3 c = toSrgb(base) * a;
+        oColor = vec4(c, uSfxAdd == 1 ? 0.0 : a);
+        return;
+      }
       if (uBlend == 1)
       {
         // Alpha test at 0.5, sharpened to about one pixel so alpha-to-coverage gives clean anti-aliased edges.

@@ -12,6 +12,12 @@ public enum PreviewBlend
   Masked = 1,
   /// <summary><c>glt.blendMode</c> other than opaque: alpha blended after the opaque pass, no depth write, sorted.</summary>
   Translucent = 2,
+  /// <summary>
+  ///   mtl1-51: sfx shader card (<see cref="MeshPart.Sfx"/>), drawn after the translucent pass, unlit, no depth write:
+  ///   colour = albedo.rgb * sfx tint, alpha = albedo.a * tint.a; additive for blendMode add / unspecified (PROVEN mtl1-50),
+  ///   premultiplied over for blend / premul_a. dynamicAlphaMask is taken at alphaVal_max (HEURISTIC: the runtime value).
+  /// </summary>
+  Sfx = 3,
 }
 
 public sealed class PreviewPartDraw
@@ -47,6 +53,10 @@ public sealed class PreviewPartDraw
   public bool AoInBlue { get; init; }
   /// <summary>Lit solid colour (sRGB 0..1) for parts without an albedo map, same tint as the CPU renderer.</summary>
   public Vector3 Solid { get; init; }
+  /// <summary><see cref="PreviewBlend.Sfx"/>: sfx tint alpha (0..1).</summary>
+  public float SfxAlpha { get; init; } = 1f;
+  /// <summary><see cref="PreviewBlend.Sfx"/>: additive (blendMode add or unspecified) rather than premultiplied over.</summary>
+  public bool SfxAdditive { get; init; } = true;
 }
 
 /// <summary>
@@ -156,7 +166,10 @@ public static partial class MeshPreview
           Name = part.Name,
           Blend = BlendOf(part),
           AlphaFromAlbedo = AlphaChannel(part),
-          Tint = part.AlbedoTint is { Length: >= 3 } t ? new Vector3(t[0], t[1], t[2]) : Vector3.One,
+          Tint = part.Sfx ? (part.SfxTint is { Length: >= 3 } st ? new Vector3(st[0], st[1], st[2]) : Vector3.One)
+            : part.AlbedoTint is { Length: >= 3 } t ? new Vector3(t[0], t[1], t[2]) : Vector3.One,
+          SfxAlpha = part.SfxTint is { Length: >= 4 } sa ? sa[3] : 1f,
+          SfxAdditive = Effects.SfxBlend.IsAdditive(part.SfxBlend),
           Aniso = part.AnisoSpec,
           SecondSpec = part.SecondSpec is not null,
           Chameleon = part.Chameleon,
@@ -294,7 +307,7 @@ public static partial class MeshPreview
   }
 
   private static PreviewBlend BlendOf(MeshPart part)
-    => part.Blend.ToLowerInvariant() switch
+    => part.Sfx ? PreviewBlend.Sfx : part.Blend.ToLowerInvariant() switch
     {
       "translucent" => PreviewBlend.Translucent,
       "masked" => PreviewBlend.Masked,

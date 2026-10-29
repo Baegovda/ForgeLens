@@ -338,6 +338,8 @@
           <Button x:Name="MeshesTab" Classes="tab active" Content="Meshes" Click="MeshesTabClicked" ToolTip.Tip="Objects of the previewed model (check to show)" />
           <Button x:Name="KitbashTab" Classes="tab" Content="⚒ Kitbash" Click="KitbashTabClicked"
                   ToolTip.Tip="Kitbasher: pick a faction, class and preset, then one armor part per slot from the character customization library. Only the chosen parts show and export." />
+          <CheckBox x:Name="SfxPartsBox" Content="FX parts" IsVisible="False" Margin="8,0,0,0" Click="SfxPartsClicked"
+                    ToolTip.Tip="Effect geometry inside the model: sfx-shader cards (td preset &quot;sfx&quot;, e.g. chainsword sfx_chainsword_attack_*, power sword glow) and placeholder-material sfx helpers (sfx_trail, exaust_source). The game only shows them while an attack / power effect drives them, so they start hidden. On: drawn with their sfx blend (additive unless the td says otherwise)." />
         </StackPanel>
         <Grid>
         <ScrollViewer x:Name="KitbashPanel" IsVisible="False" HorizontalScrollBarVisibility="Disabled" Background="{DynamicResource FL.PanelDeep}">

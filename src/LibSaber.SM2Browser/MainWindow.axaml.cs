@@ -697,7 +697,23 @@ public partial class MainWindow : Window
     foreach (var level in mesh.Levels)
       Add(level.Parts);
     MeshList.ItemsSource = MeshToggle.Group(toggles);
+    var fx = mesh.Parts.Concat(mesh.Levels.SelectMany(level => level.Parts)).Where(MaterialMaps.IsSfxPart).ToList();
+    SfxPartsBox.IsVisible = fx.Count > 0;
+    SfxPartsBox.IsChecked = fx.Count > 0 && fx.Any(part => part.Visible);
     _suppressMesh = false;
+  }
+
+  /// <summary>mtl1-51: FX parts toggle: shows / hides every part <see cref="MaterialMaps.HideSfxParts"/> hid by default.</summary>
+  private void SfxPartsClicked(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
+  {
+    if (_mesh is not { } mesh)
+      return;
+    var show = SfxPartsBox.IsChecked == true;
+    foreach (var part in mesh.Parts.Concat(mesh.Levels.SelectMany(level => level.Parts)))
+      if (part.HideReason is "sfx" or "sfxSource")
+        part.Visible = show;
+    FillMeshes(mesh);
+    DrawMesh(false);
   }
 
   private void MeshToggled(object? sender, EventArgs e)

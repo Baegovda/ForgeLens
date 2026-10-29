@@ -327,7 +327,7 @@ public static class TemplateMeshReader
     var shown = mesh.Parts.Count(part => part.Visible) + mesh.Levels.Sum(level => level.Parts.Count(part => part.Visible));
     var listed = mesh.Parts.Count + mesh.Levels.Sum(level => level.Parts.Count);
     notes.Add($"LOD0 is every part on the largest vertex pool: {mesh.Positions.Count:N0} vertices, {mesh.Indices.Count / 3:N0} triangles, {mesh.Parts.Count} parts.");
-    notes.Add($"Index shows {shown} of {listed} submeshes. Names containing _LOD, and collision volumes (cdt, _glr, rb_, visibility affixes), start hidden. _SIM stays checked.");
+    notes.Add($"Index shows {shown} of {listed} submeshes. Names containing _LOD, and collision volumes (cdt, _glr, rb_, visibility affixes), start hidden. _SIM stays checked. mtl1-51: sfx-shader cards (td preset \"sfx\") and placeholder-material sfx locators start hidden too (FX parts toggle).");
     if (mesh.Levels.Count > 0)
       notes.Add("Other LODs: " + string.Join(", ", mesh.Levels.Select(level => level.Positions.Count.ToString("N0"))) + " vertices.");
     if (rejected > 0)
