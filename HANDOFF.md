@@ -1,5 +1,117 @@
 > **New agent: read [`AGENTS.md`](AGENTS.md) first** (entry point, rules, user preferences), then `docs/handoff/` (STATUS, ROADMAP, WORKFLOW, RE_NOTES, FORMATS). Where this file's bootstrap below conflicts with them (push method, next step, owner), AGENTS.md / docs/handoff win. This file stays the chronological log: append a dated section per stage.
 
+# 사용자 요청 대장 (User Request Ledger)
+
+> 오너(india님)가 지금까지 한 **모든 요청과 상시 규칙**을 한곳에 모은 대장이에요. 새 요청이 오면 **바로 여기에 한 줄 추가**하고, 상태가 바뀌면 같은 줄을 고쳐요(오너 요청, 2026-10-29: "내가했던 요청들은 인수인계문서에 꼼꼼히 적어놓으렴").
+> - 출처: 봇 메모리(오너 발언 요지), 이 파일의 단계별 기록, `AGENTS.md`, `docs/handoff/{STATUS,ROADMAP,WORKFLOW,RE_NOTES}.md`, box `/workspace/mtl_fix/*.md`(`overnight_decisions.md`, `datapars_progress.md`, `heuristics4_progress.md`), `/workspace/animthumb/REPORT.md`, `git log`. 중복은 합쳤어요.
+> - 날짜는 KST(2026년). 커밋 sha는 `origin/cursor/sm2-pck-extractor-4420` 기준이에요.
+> - 상태: **done**(완료, sha) · **in progress**(진행 중) · **pending**(대기, 아직 시작 전) · **future**(로드맵 밖, 요청 시에만) · **standing**(상시 규칙, 항상 적용).
+> - 규칙이 서로 충돌하면 **날짜가 늦은 쪽이 이겨요**(예: R04가 AGENTS.md §3.2/§5의 "삭제는 건별 승인"을 테스트 자산·불필요 백업에 한해 대체).
+
+## A. 상시 규칙 (Standing rules)
+
+| # | 날짜 | 요청 (요지) | 업계 용어 — 뜻 | 상태 | 적용 위치 |
+|---|---|---|---|---|---|
+| R01 | 10/26 | 한국어 해요체로 짧게 답하고, 중간중간 보고(진행률 %, 추정 ETA) | Status reporting / progress % — 진행 상황 보고와 완료율 | standing | AGENTS.md §4 |
+| R02 | 10/28 | 내 요청을 업계 용어로 바꿔서 일하고, 바꿀 때마다 용어를 짧게 설명 | Requirements translation + glossary — 요구사항을 표준 용어로 옮기고 뜻 풀이 | standing | 이 대장의 "업계 용어 — 뜻" 열 |
+| R03 | 10/27 | 내 자산은 절대 지우지 말고, 덮어쓰기 전에 `.bakN`으로 백업(이미 있는 `.bakN`은 덮어쓰지 말고 다음 번호) | Non-destructive workflow / versioned backup — 원본 보존, 번호 붙은 백업 | standing | AGENTS.md §3.2; UE는 `_bakN` |
+| R04 | 10/29 | 테스트 자산·더는 필요 없는 백업은 배치 끝에 한 번에 정리 삭제해도 됨 | Batch cleanup pass — 작업 묶음 끝 일괄 정리 | standing (첫 실행 done: 10/29 04:15–04:35, ≈159 GB 정리) | `/workspace/mtl_fix/overnight_decisions.md` "Item 4"; PC `Scripts\mtl_fix\ue_tests_cleanup.py` |
+| R05 | 10/26 | `/Game/SM2_Work/Original/*`, `/Game/Work/*`는 건드리지 말고, `Lightning_01`은 절대 저장하지 않기 | Protected / read-only paths — 보호 경로(읽기 전용) | standing | AGENTS.md §3.3 |
+| R06 | 10/26 | 작업은 PC `Desktop\SM2_Work`, UE `/Game/SM2_Work` 안에서만 | Sandboxed workspace — 작업 공간 격리 | standing | AGENTS.md §3.3, WORKFLOW.md |
+| R07 | 10/27–28 | 논스톱으로 일하고, 먼저 실행한 뒤 결정사항은 나중에 한 번에 보고, 보류 질문은 맨 끝에 | Autonomous batch execution + decision log — 자율 일괄 실행과 결정 기록 | standing | `/workspace/mtl_fix/overnight_decisions.md` 방식 |
+| R08 | 10/27 | 에디터 재시작은 묻지 말고 해도 됨(저장 먼저) | Pre-authorized restart — 사전 승인된 재시작 | standing | AGENTS.md §5 |
+| R09 | 10/28 | UE가 죽으면 크래시 리포터 닫고, 리포트 읽고, `-AutoDeclinePackageRecovery`로 보이게 다시 띄우고 이어서 작업 | Crash recovery automation — 장애 자동 복구 | standing | `/workspace/animthumb/REPORT.md` "Final restart" (`btl_restart.ps1`) |
+| R10 | 10/28 | 내가(에이전트가) 시작한 PIE/SIE는 항상 직접 종료 | Session hygiene (PIE/SIE teardown) — 플레이 세션 뒷정리 | standing | overnight_decisions.md "UE learnings" |
+| R11 | 10/27 | 수정은 캐릭터별 땜질이 아니라 일반 규칙으로(브라우저만으로 export해도 똑같이 되게) | Generic / data-driven rules — 개별 예외 대신 공통 규칙 | standing | 물리: `Physics/PhysicsBake.cs`, SM2PhysicsSetup 플러그인 |
+| R12 | 10/27 | 포맷 결론은 exe/셰이더/캡처 근거가 있어야 하고, 없으면 HEURISTIC으로 표시 | Evidence-based RE + provenance labels (PROVEN/INFERRED/HEURISTIC) — 근거 등급 표기 | standing | AGENTS.md §3.1, STATUS.md Heuristics |
+| R13 | 10/28 | 인게임 캡처를 나한테 부탁하지 말고, 셰이더 번들·exe 정적 분석을 우선 | Static analysis first — 실행 없이 바이너리/셰이더 분석 | standing | mtl1-48 (30563e4) 정적 비교, SHADERS.md |
+| R14 | 10/28 | 셰이더/머티리얼 공식은 캡처 비교 튜닝보다 셰이더 바이트코드 역분석으로 | Shader disassembly — 셰이더 바이트코드 역어셈블 | standing | shaders-1 / mtl1-38 (a7c22eb), `docs/handoff/SHADERS.md` |
+| R15 | 10/27 | RE는 REA(github.com/morluto/rea)가 1순위, Ghidra headless는 대안, 설정은 핸드오프에 기록 | Toolchain policy: REA primary — 리버스 엔지니어링 도구 우선순위 | standing (설정 done: ddc9118, 28489a0) | WORKFLOW.md "REA (morluto/rea)", `tools/re/rea_daemon.py`, `tools/re/rea_call.py` |
+| R16 | 10/29 | REA 전체 분석 결과를 재사용 가능한 "Symbol DB"로 (구 RE_MAP) | Symbol database — 함수·주소·문자열 색인 DB | standing (done: 463f383 → ebbe309 rename → 28489a0, 8bdd80a 재생성) | `docs/SYMBOL_DB/`, `tools/symbol_db/build_symbol_db.py`, `rea_string_xrefs.py` |
+| R17 | 10/29 | 게임 데이터 파싱(예: 파워피스트 손 숨김 규칙)은 묻지 말고 알아서 | Autonomous data mining — 게임 데이터 해석 위임 | standing (예시 done: fcc16bf) | `Scripting/Sslb.cs`, `tools/re/sslb.py` |
+| R18 | 10/27 | HANDOFF.md를 매 단계 갱신 | Living documentation — 상시 갱신 문서 | standing | 이 파일, STATUS.md |
+| R19 | 10/27 | Niagara 변환은 맨 마지막, 그것도 물어본 뒤에만 | Deferred scope — 범위 보류 | standing (로드맵에서 제외: 7e561f4) | AGENTS.md §3.6, ROADMAP "Possible future" |
+| R20 | 10/27 | Halo는 무시, SM2만 | Scope control — 범위 한정 | standing | AGENTS.md §1 (HaloCEA 테스트 실패 무시) |
+| R21 | 10/27 | PC가 오프라인이면 주기적으로 재시도 | Retry with backoff — 주기적 재시도 | standing | — |
+| R22 | 10/28 | 1시간마다 `sm2-20` 보고 루틴, 내용이 같으면 조용히(20분 → 1시간으로 변경) | Scheduled status digest + dedup — 정기 보고, 중복 억제 | standing | 봇 루틴 `sm2-20` (WORKFLOW.md의 "20분"은 옛 값) |
+| R23 | 10/28 | push는 PC의 `push.ps1`로 | Release pipeline (patch → `git am -3` → ff-only push) — 배포 스크립트 | standing | PC `Desktop\SM2_Work\Scripts\mtl_fix\push.ps1` (`0*.patch` in `%USERPROFILE%`) |
+| R24 | 10/27 | 신뢰할 수 없는 실행파일은 실행 금지 | Supply-chain safety — 출처 불명 바이너리 차단 | standing | — |
+| R25 | 10/27 | 요청 없으면 Discord에서 아무것도 하지 않기 | No unsolicited external comms — 요청 없는 외부 발신 금지 | standing | — |
+| R26 | 10/27 | 게임 중엔 포커스 뺏지 말고 hidden + Idle 우선순위면 무거운 작업도 OK, "게임끝"이면 PC 자유 | Background priority / non-intrusive ops — 백그라운드 저우선 실행 | standing | AGENTS.md §3.4, WORKFLOW.md |
+| R27 | 10/28 | 플러그인 옵션은 콘솔 명령 말고 전부 설정 UI에서, 즉시 적용·저장 | Settings UI (no console vars) — 설정 화면 기반 옵션 | standing | BongThumbLive 설정 페이지 |
+| R28 | 10/26 | "실행해줘" = PC에서 Forge Lens 실행 | Command alias — 명령 단축어 | standing | `C:\Users\Revaptor_FX\SM2Extractor\ForgeLens.exe` |
+| R29 | 10/27 | UE 목표는 Sequencer 시네마틱 렌더 → 천은 Chaos Cloth, 본 파츠는 본 물리 선호(실시간 성능보다 품질) | Offline cinematic quality — 오프라인 렌더 품질 우선 | standing | mtl1-10 Chaos Cloth 옵션 (9e99c31) |
+| R30 | 10/28 | SM2 안티치트는 밴 위험 없음(멀티만 꺼짐) → 인게임 캡처/모드 작업 자체는 허용 (단, R13이 우선) | Risk acceptance (EAC) — 위험 수용 | standing | HANDOFF vfx3r/vfx3s |
+| R31 | 10/29 | 내 요청은 인수인계 문서에 꼼꼼히 기록(업계 용어·뜻·상태 포함), 계속 최신으로 | Requirements traceability ledger — 요구사항 추적 대장 | standing (done: 이 섹션, `docs: user request ledger`) | 이 섹션 |
+
+## B. 기능 요청 (Feature requests)
+
+| # | 날짜 | 요청 (요지) | 업계 용어 — 뜻 | 상태 | 구현 위치 |
+|---|---|---|---|---|---|
+| F01 | 10/24 | SM2 리소스를 탐색기처럼 보고 미리보기한 뒤, 고른 것만 Unreal/Blender로 내보내기(통째 추출기 아님) | Asset browser + selective exporter — 선택형 에셋 브라우저/익스포터 | done (aa632fa…bedc6aa) | `src/LibSaber.SM2Browser`, `src/LibSaber.SM2Extractor` |
+| F02 | 10/26 | 초기 오픈 항목: 타이라니드 색, 얼굴 투명 슬롯, 라이노 겹친 파츠, .sani 공백, push/테스트 | Bug triage backlog — 초기 결함 목록 | done (ef29997, 04db5dc, 09cae49, e732a67, 3558e4c) | HANDOFF "Open items", "2026-10-26 update" |
+| F03 | 10/26 | 승인한 작업 순서(GPU 렌더러 → 애니 마무리 → 리타겟 → 머티리얼 재점검 → 벌크 검증 → 2차 물리 → 브라우저 VFX → 인게임 비교 → UE export 테스트 → 뷰어 다듬기) | Approved roadmap — 승인된 작업 순서 | done (VFX만 ≈95 %) | `docs/handoff/ROADMAP.md` 1–10 |
+| F04 | 10/26 | 머티리얼을 인게임처럼(second spec 금속 틴트, aniso, blendMode, albedo tint) | Material parity (PBR/Substrate) — 게임과 같은 재질 재현 | done (19c7eb0, c1c4de0, e6cadfa) | `M_SM2`, `import_sm2_materials.py`, `tools/ue/ue_mat_apply.py` |
+| F05 | 10/26 | .sani 애니메이션 디코딩·내보내기(루트모션, additive, 멀티클립) | Animation codec RE + export — 애니 포맷 해독 | done (b5b1225, e7278b0, 4b2cd67) | `Animation/SaniReader.cs`, `EtnaCurves.cs` |
+| F06 | 10/26 | 마네킹 → SM2 리타겟 프로토타입 | IK Retargeting — 골격 간 모션 옮기기 | done 70 % (d2fafab, 05bb958, db3e4a5, 4df3cab); 손가락 컬 잔차 open | `Retarget/MannequinRetarget.cs`, `tools/ue/ue_sm2_retarget.py`, `ue_sm2_finger_curl.py` |
+| F07 | 10/27 | 퓨리티 씰·천이 브라우저에서 인게임처럼 흔들리고 Unreal까지 이어지게 | Secondary physics (cloth / jiggle) — 2차 물리 | done + UE 검증 (642fb56, c556a97, 4df3cab) | `Physics/PhysicsBake.cs`, `PhysicsSidecar.cs` |
+| F08 | 10/27 | Unreal export 시 물리 흔들림 설정이 자동 적용(작은 플러그인/EngineWire 괜찮음) | Auto physics setup on import (PhysicsAsset + post-process AnimBP) — 임포트 시 물리 자동 구성 | done (1ec13c4, 4e83d0a, bc1ac55) | `tools/ue/SM2PhysicsSetup/`, `tools/ue/ue_sm2_physics.py`, `ue_bulk.py` |
+| F09 | 10/27 | 프로그램 이름 "Forge Lens" | Product branding — 제품명 | done (5ff18a4) | `ForgeLens.exe` (csproj AssemblyName) |
+| F10 | 10/27 | 모던 다크 UI | Dark theme — 어두운 테마 | done (5ff18a4) | `src/LibSaber.SM2Browser/App.axaml` |
+| F11 | 10/27 | UE5 마네킹 스켈레톤에 바로 얹히는 애니만 export(언리얼에서 리타겟 없이) — "Anim Only (Manny)"; 이후 "몸이 떠서 기울어짐" 신고 수정 | Export-time retarget bake — 내보낼 때 리타겟을 구워 넣기 | done (07bf169, e1fd655 root fix) | `--anim-only-manny`, `tools/ue/ue_import_manny.py` |
+| F12 | 10/27 | 인게임과 나란히 비교(VFX·물리·머티리얼), 사용자 사진 6장 기준 | Side-by-side reference comparison — 기준 이미지 대조 | done (정적, 30563e4); 물리 모션 비교는 F45 | HANDOFF vfx3u, mtl1-48; `tools/vfxbench/side_by_side.py` |
+| F13 | 10/27 | Niagara 없이 Unreal export 테스트 | Export smoke test — 내보내기 시험 | done (afcc556) | `tools/ue/ue_vfx_export_test.py`, `/Game/SM2_Work/VfxExport` |
+| F14 | 10/28 | 인게임 캡처(RenderDoc식)를 에이전트가 직접 분석, Mod Loader 활용 | GPU frame capture analysis — 그래픽 프레임 캡처 해석 | done (e27737d mtl1-23, 94e77d0) | `tools/rdc`, STATUS mtl1-23 |
+| F15 | 10/28 | VFX 볼 때 이펙트 전체가 화면에 들어오게 카메라 거리 자동 | Auto-framing (fit to bounds) — 경계 맞춤 카메라 | done (9de6033) | `EffectCamera.FitAll/FitBox`, Fit 버튼·F 키 |
+| F16 | 10/28 | 데모 샘플 메시(구/평면)에 오버레이 셰이더로 표면 효과 미리보기 | Preview host mesh / overlay (decal) layer — 시연용 메시와 덧칠 레이어 | done (b5605ab, HEURISTIC) | `MainWindow.HostVfx.cs` |
+| F17 | 10/28 | VFX 검은 사각형·옆으로 흐름, 티투스 흰 타바드(천 SIM 껍데기) 버그 수정 | Bug fix (alpha-less sprite, fly-by, cloth SIM shell) — 렌더 결함 수정 | done (9de6033) | `VfxDrawKinds.Resolve`, `TemplateMeshReader` |
+| F18 | 10/28 | export에 In place / Root motion 선택(Anim Only (Manny) 포함) | Root motion extraction option — 이동량 제거/유지 선택 | done (9de6033) | Export 창 "Root" 콤보, CLI `--anim-root` |
+| F19 | 10/28 | UI 직관적·깔끔하게, 파일 리스트 열 드래그로 폭 조절 + 저장(긴 PATH 다 보이게) | Resizable / persisted columns — 열 너비 조절·저장 | done (9de6033) | `FileColumns.cs`, `BrowserSettings.cs` |
+| F20 | 10/28 | 기본은 미리보기 가능한 에셋만, "모든 파일 보기" 체크박스(상태 유지) | Asset type filter — 종류별 표시 필터 | done (9de6033) | `MainWindow.axaml.cs`, settings.json |
+| F21 | 10/28 | 트리 펼침·선택 폴더/파일·스크롤·검색 상태 복원, 클릭/방향키로 즉시 미리보기 | Session state persistence — 마지막 화면 상태 복원 | done (9de6033) | `BrowserSettings.cs` |
+| F22 | 10/28 | 애니 리스트 위 마우스 휠 = 이전/다음 클립 선택 후 바로 재생(필터 안에서) | Wheel navigation — 휠로 목록 이동 | done (2fcdc22) | `WheelComboBox.cs` |
+| F23 | 10/28 | UE5 Content Browser 스타일 전면 개편(즐겨찾기, 폴더/카테고리 트리, 색·개수 있는 컬렉션, 썸네일 그리드, 루프 애니 썸네일, 필터, 검색), 즐겨찾기/컬렉션 저장 | UI overhaul (Content Browser pattern) — 언리얼식 에셋 브라우저 | done (eb95c03, 7d60486; ui-43) | `src/LibSaber.SM2Browser/ContentBrowser/`, `MainWindow.ContentBrowser.cs`, `Catalog/AssetCategories.cs` |
+| F24 | 10/28 | Kitbasher처럼 .sso 의상에서 진영/클래스/프리셋/슬롯별 파츠 선택, 그대로 export | Modular character kitbashing — 조립식 파츠 구성 | done (68d38aa, 61815b7; ui-44) | `Customization/Kitbash.cs`, `MainWindow.Kitbash.cs` |
+| F25 | 10/28 | Kitbash를 적/NPC 파츠로 확장 | Enemy/NPC variant support — 적 캐릭터 변형 | done (998a770; ui-45) | `MainWindow.Npc.cs`, `npc=` `--variant` |
+| F26 | 10/28 | 다음으로 근접무기 스킨 선택(+ 스킨 재질) | Weapon skin variants — 무기 외형 선택 | done (998a770, c95af37, 30563e4) | `MeleeCustomization`, skin materials (td `materials` block) |
+| F27 | 10/28 | 파츠 선택기에 artificer 프리셋 | Preset catalog (artificer) — 고급 외형 프리셋 목록 | pending | (예정) `Customization/Kitbash.cs` |
+| F28 | 10/28 | 밤샘 TODO #1–7 질문 없이: BongThumbLive, VFX 블렌드 확인, 물리 육안 확인, 밑단 스파이크/카디안 손가락, 총 스킨 부착물, 근접 재질/손 숨김, 인게임 비교 | Overnight batch — 야간 일괄 작업 | done (2454ba3, 4df3cab, 2ce469a, c95af37, 30563e4) | overnight_decisions.md |
+| F29 | 10/29 | 인게임 같은 컬러 스킴 선택(게임 데이터의 같은 이름·색), UI 신경 써서 | Colour scheme / palette swap — 색 구성 교체 | done (bddd777) | `Customization/ColourSchemes.cs`, `MainWindow.Colours.cs` |
+| F30 | 10/29 | 이펙트 단독 ↔ 관련 모델 + 시전 애니와 함께 보기 토글(타이밍·위치는 게임 데이터) | In-context playback — 맥락 재생 | done (e0eb012); Shoot→muzzle 링크는 HEURISTIC | `Context/ContextIndex.cs`, `ContextResolver.cs`, `MainWindow.Context.cs` |
+| F31 | 10/29 | 반대로 모델 선택 → 연결 애니 + 액션별 맞는 소품/총·이펙트를 정확한 위치·타이밍에, 후보가 여럿이면 고르기 | Reverse lookup / asset linkage — 역방향 연결 탐색 | done (e0eb012) | 같은 Context 모듈 (`SM2_CTX_WEAPON` 등) |
+| F32 | 10/29 | 소품과 이펙트 따로 켜고 끄는 토글 | Visibility toggles — 표시 토글 | done (e0eb012) | `MainWindow.Context.cs` (`SM2_SHOW_PROPS/FX`) |
+| F33 | 10/28 | 언리얼 라이브 썸네일 플러그인 이름 "BongThumbLive"(구 AnimThumbLive) | Plugin branding — 플러그인명 | done | `K:\Unreal Projects\_Plugins\BongThumbLive` (repo 밖) |
+| F34 | 10/28 | 폴더 열면 애니 썸네일이 hover 없이 계속 재생 | Live thumbnails (auto-play) — 자동 재생 썸네일 | done | BongThumbLive; `/workspace/animthumb/REPORT.md` |
+| F35 | 10/28 | 머티리얼·머티리얼 인스턴스 썸네일도 라이브 | Live material thumbnails — 재질 썸네일 실시간 | done | BongThumbLive |
+| F36 | 10/28 | Niagara 썸네일도 라이브, 전체가 들어오게 프레이밍, 설정에서 on/off | Live Niagara thumbnails + framing — 이펙트 썸네일 | done | BongThumbLive |
+| F37 | 10/28 | Cascade 썸네일도 라이브 | Live Cascade thumbnails — 구형 파티클 썸네일 | done | BongThumbLive |
+| F38 | 10/28 | 설정 UI 항목 이름·설명 한국어, 타입별 라벨은 언리얼 Content Browser 타입 색 | Localization + type colour coding — 현지화, 타입 색 구분 | done | BongThumbLive 설정 (IDetailCustomization) |
+| F39 | 10/28 | 전역 on/off, FPS, 재생 범위 모드(선택만/보이는 것만/폴더 전체), 기본 "보이는 것만" | Playback scope settings — 재생 범위 설정 | done (실제 모드: hover만/선택만/보이는 것 전부) | BongThumbLive 설정 |
+| F40 | 10/28 | Hover FPS 따로(기본 60), 나머지는 Max FPS | Per-state frame-rate cap — 상태별 프레임 제한 | done (Hover 60, Max 20) | BongThumbLive 설정 |
+| F41 | 10/28 | "보이는 것만" 모드에서 동시 재생 수 = 보이는 개수 자동(아이콘 크기 변경 포함), 수동 최대치는 고급 옵션 기본 0=자동, 대기 썸네일은 마지막 프레임 유지 | Adaptive concurrency + last-frame hold — 자동 동시성, 마지막 프레임 유지 | done | BongThumbLive ("틱당 최대 갱신 썸네일 수" 0=auto, no revert) |
+| F42 | 10/28 | 프레임 캐시 방식(Cache FPS 기본 60, 작게), 캐시 크기 표시 + 캐시 지우기 버튼 | Frame cache (LRU) — 미리 렌더한 프레임 저장 | done (캐시 60 FPS, 256 MB LRU); "캐시 지우기" 버튼은 REPORT에 기록 없음 → 다음 작업 때 확인 | BongThumbLive |
+| F43 | 10/28 | .td의 텍스처 아닌 파라미터도 임포터에 반영 | Material parameter import — 재질 수치 파라미터 반영 | pending | (예정) `import_sm2_materials.py` / sidecar |
+| F44 | 10/29 | 디스크 정리(테스트 export·옛 빌드·전송 zip) | Storage cleanup — 저장 공간 정리 | done (≈159 GB, 10/29 04:35) | overnight_decisions.md "Item 4" |
+| F45 | 10/27 | 물리 움직임을 게임과 비교 | Physics motion validation — 물리 거동 검증 | pending (캡처 없이 할 방법 필요, R13) | ROADMAP "Later / backlog" |
+| F46 | 10/29 | 티투스 걸으며 사격 시퀀스(Sequencer, 본별 레이어 블렌드) | Layered blend per bone (upper/lower body) — 상하체 분리 블렌드 | done v2 (Gun_pose 부착, 총구 끝 머즐, 반동은 별도 additive 슬롯, 생성한 pitchUp35 조준 포즈); 남음: 머즐 플래시를 총구 앞·측면 각도로, 생성 조준 포즈 다듬기 → in progress | UE `/Game/SM2_Work` Sequencer; box `/workspace/titus_seq/` |
+| F47 | 10/29 | 체인소드 sfx 검은 판 수정 + 캐릭터 컬러 스킴 스크린샷 | Bug fix (sfx black quads) + visual QA — 렌더 결함 수정, 결과 캡처 | in progress | (진행 중) `Effects/`, `MainWindow.Colours.cs` |
+| F48 | 10/29 | 티투스 물리 sim 본 전수 점검(앞치마 해골 장식 포함, 빠짐없이) | Sim-bone audit / coverage check — 시뮬 대상 누락 점검 | in progress | box `/workspace/mtl_fix/titus_phys/` |
+| F49 | 10/29 | OOM 이후 REA 재개: 라이트 감쇠 `attenCurveParam`, `UseSpecMap` | RE follow-up (resume after OOM) — 메모리 부족 후 분석 재개 | pending | `heuristics4_progress.md` items 2·4, `tools/re/` |
+| F50 | 10/29 | 노출(exposure) 규칙 증명 | sfx emissive exposure k = `adaptiveIntensity` (FUN_1424540e0) — 자동 노출 계수 | done (8bdd80a) | VFX 렌더 (`SM2_VFX_SFX_LUM_K`) |
+| F51 | 10/29 | 파워피스트 손 숨김 규칙을 게임 스크립트에서 | SSLB bytecode rule (RIGHT_GAUNTLET = 6 PROVEN) — 컴파일된 스크립트에서 규칙 추출 | done (fcc16bf) | `Scripting/Sslb.cs`, `PowerFistHandRule.cs` |
+
+## C. 미래 (Future, 로드맵 밖)
+
+| # | 날짜 | 요청 (요지) | 업계 용어 — 뜻 | 상태 | 위치 |
+|---|---|---|---|---|---|
+| X01 | 10/27 | `.sfx` → Niagara 변환(물어본 뒤에만) | Niagara conversion — 언리얼 파티클 시스템으로 변환 | future | ROADMAP "Possible future development" |
+| X02 | 10/28 | SM2 끝나면 다음은 Path of Exile 읽기 | Multi-game support (PoE) — 다른 게임 포맷 지원 | future | ROADMAP (추가 예정) |
+| X03 | 10/27–28 | 그 다음 Unreal Engine 게임 읽기(.pak/IoStore) | UE game extraction — 언리얼 게임 에셋 추출 | future | ROADMAP "Possible future development" |
+
+합계: 상시 규칙 31 · 기능 요청 51 · 미래 3 = **85건** (2026-10-29 기준).
+
+---
+
 # >>> NEW AGENT: START HERE (bootstrap) <<<
 
 You were given only this repo link. Follow these steps in order before you do anything else. When you finish, you should be able to continue exactly where the previous agent stopped.
