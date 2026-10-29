@@ -315,7 +315,14 @@
                   <TextBlock x:Name="ColourCount" Classes="colourcaption" DockPanel.Dock="Right" HorizontalAlignment="Right" VerticalAlignment="Center" />
                   <Rectangle Height="1" Fill="{DynamicResource FL.Border}" Margin="10,0" VerticalAlignment="Center" />
                 </DockPanel>
-                <StackPanel x:Name="ColourSwatches" Orientation="Horizontal" Spacing="4" HorizontalAlignment="Center" />
+                <!-- mtl1-52: characters list ~100 chapters: scrollable strip with step arrows (wheel steps too) -->
+                <DockPanel HorizontalAlignment="Center">
+                  <Button DockPanel.Dock="Left" Classes="colourstep" Content="‹" Tag="prev" Click="ColourStep" Focusable="False" VerticalAlignment="Center" />
+                  <Button DockPanel.Dock="Right" Classes="colourstep" Content="›" Tag="next" Click="ColourStep" Focusable="False" VerticalAlignment="Center" />
+                  <ScrollViewer x:Name="ColourScroll" HorizontalScrollBarVisibility="Hidden" VerticalScrollBarVisibility="Disabled" MaxWidth="736">
+                    <StackPanel x:Name="ColourSwatches" Orientation="Horizontal" Spacing="4" HorizontalAlignment="Center" Margin="0,0,0,8" />
+                  </ScrollViewer>
+                </DockPanel>
                 <StackPanel HorizontalAlignment="Center" Spacing="1">
                   <TextBlock x:Name="ColourName" Classes="colourname" HorizontalAlignment="Center" />
                   <TextBlock x:Name="ColourSub" Classes="coloursub" HorizontalAlignment="Center" MaxWidth="520" TextTrimming="CharacterEllipsis" />

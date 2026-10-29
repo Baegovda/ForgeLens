@@ -530,6 +530,81 @@ public static class AssetExporter
   }
 
   private static readonly System.Runtime.CompilerServices.ConditionalWeakTable<GameCatalog, object?[]> ColourData = new();
+  private static readonly System.Runtime.CompilerServices.ConditionalWeakTable<GameCatalog, List<ArmorScheme>> ArmorSchemeData = new();
+
+  /// <summary>
+  ///   mtl1-52: the character colour schemes (heraldry chapters) with their in-game names; cached per catalog. Empty when
+  ///   global_armor_color_pattern_library.sso or armor_color_library.sso is missing.
+  /// </summary>
+  public static List<ArmorScheme> ArmorSchemesFor(GameCatalog catalog, ArchiveStore store)
+  {
+    return ArmorSchemeData.GetValue(catalog, c =>
+    {
+      string? Text(string path)
+      {
+        try
+        {
+          return c.TryGetByPath(path, out var i) ? Encoding.UTF8.GetString(store.Read(i)) : null;
+        }
+        catch (Exception)
+        {
+          return null;
+        }
+      }
+
+      Dictionary<string, string> Strings(string lang)
+      {
+        try
+        {
+          if (c.TryGetByPath($"texts/strings_{lang}.str", out var i))
+            return ColourSchemes.ParseStrings(store.Read(i));
+        }
+        catch { }
+
+        return new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+      }
+
+      if (Text(ArmorColourSchemes.SchemesPath) is not { } schemes || Text(ColourSchemes.PalettePath) is not { } palette)
+        return new List<ArmorScheme>();
+      try
+      {
+        return ArmorColourSchemes.Parse(schemes, palette, Text(ArmorColourSchemes.UiLibraryPath), Text(ArmorColourSchemes.HeraldryLibraryPath), Strings("english"), Strings("korean"));
+      }
+      catch (Exception)
+      {
+        return new List<ArmorScheme>();
+      }
+    });
+  }
+
+  /// <summary>mtl1-52: parts of <paramref name="mesh"/> whose diffuse td has a customization ("&lt;variant&gt; CC") block.</summary>
+  public static List<(MeshPart Part, CustomizationSlot Slot)> CustomizationParts(GameCatalog catalog, ArchiveStore store, ExportedMesh mesh)
+  {
+    var cache = new Dictionary<string, CustomizationSlot?>(StringComparer.OrdinalIgnoreCase);
+    var list = new List<(MeshPart, CustomizationSlot)>();
+    foreach (var part in mesh.Parts.Concat(mesh.Levels.SelectMany(l => l.Parts)))
+    {
+      if (string.IsNullOrWhiteSpace(part.Texture))
+        continue;
+      var key = part.Texture + "|" + part.Variant;
+      if (!cache.TryGetValue(key, out var slot))
+      {
+        try
+        {
+          cache[key] = slot = TdText(catalog, store, part.Texture!) is { } text ? CustomizationSlot.FromTd(text, part.Variant) : null;
+        }
+        catch (Exception)
+        {
+          cache[key] = slot = null;
+        }
+      }
+
+      if (slot is not null)
+        list.Add((part, slot));
+    }
+
+    return list;
+  }
 
   /// <summary>
   ///   mtl1-49: the in-game colour schemes of a weapon tpl (td materials + localized names + armor_color_library swatches);

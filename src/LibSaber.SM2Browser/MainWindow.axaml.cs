@@ -1658,7 +1658,7 @@ public partial class MainWindow : Window
     _settings.LastExportFolder = choice.Folder;
     _settings.Save();
     // mtl1-49: the colour scheme picked in the viewer exports with the previewed tpl (material=..., td variant swap)
-    if (_colourMaterial is { Length: > 0 } colour && _previewFileIndex >= 0 && indices.Contains(_previewFileIndex))
+    if (!_armorMode && _colourMaterial is { Length: > 0 } colour && _previewFileIndex >= 0 && indices.Contains(_previewFileIndex))
       choice.Settings.Variant = string.IsNullOrWhiteSpace(choice.Settings.Variant) ? "material=" + colour : choice.Settings.Variant + ",material=" + colour;
     if (_mesh is not null && _previewFileIndex >= 0 && indices.Contains(_previewFileIndex))
       choice.Settings.PartVisibility = new Dictionary<int, MeshVisibility> { [_previewFileIndex] = MeshVisibility.Capture(_mesh) };
@@ -1678,6 +1678,22 @@ public partial class MainWindow : Window
         return AssetExporter.Export(catalog, store, files, choice.Folder, choice.Settings, progress);
       });
       report.Messages.InsertRange(0, notes);
+      // mtl1-52: the picked character scheme as UE material-instance parameters (masks / layer tints) next to the export
+      if (_previewFileIndex >= 0 && indices.Contains(_previewFileIndex) && ArmorSchemeExportJson() is { } schemeJson && _catalog is { } cat)
+      {
+        try
+        {
+          var tpl = AssetClassification.BaseName(cat.GetFile(_previewFileIndex).Name);
+          var path = System.IO.Path.Combine(choice.Folder, $"{tpl}.colour_scheme.{_colourMaterial}.json");
+          await System.IO.File.WriteAllTextAsync(path, schemeJson);
+          report.Messages.Insert(0, "colour scheme params: " + System.IO.Path.GetFileName(path) + ".");
+        }
+        catch (Exception ex)
+        {
+          report.Messages.Insert(0, "colour scheme params not written: " + ex.Message);
+        }
+      }
+
       StatusText.Text = $"Exported {report.Written} files, skipped {report.Skipped}. {string.Join(" ", report.Messages.Take(3))}";
     }
     catch (Exception ex)

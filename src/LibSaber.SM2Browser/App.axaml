@@ -283,6 +283,15 @@
     <Style Selector="Button.swatch.selected Border.tick">
       <Setter Property="IsVisible" Value="True" />
     </Style>
+    <Style Selector="Button.colourstep">
+      <Setter Property="Padding" Value="6,2" />
+      <Setter Property="Margin" Value="2,0" />
+      <Setter Property="FontSize" Value="20" />
+      <Setter Property="Background" Value="Transparent" />
+      <Setter Property="BorderThickness" Value="0" />
+      <Setter Property="Foreground" Value="{DynamicResource FL.TextDim}" />
+      <Setter Property="Cursor" Value="Hand" />
+    </Style>
     <Style Selector="Border.hbadge">
       <Setter Property="Background" Value="#33E0C34F" />
       <Setter Property="BorderBrush" Value="#E0C34F" />
