@@ -356,15 +356,25 @@ public static class CaptureLightUnits
     return c <= 0.04045f ? c / 12.92f : MathF.Pow((c + 0.055f) / 1.055f, 2.4f);
   }
 
-  public static System.Numerics.Vector3 Linear(System.Numerics.Vector3 srgb) => new(SrgbToLinear(srgb.X), SrgbToLinear(srgb.Y), SrgbToLinear(srgb.Z));
+  /// <summary>
+  ///   level-lights: ColorCtrl bytes / 255 decode with a pure 2.2 power, not the piecewise sRGB curve. PROVEN DATA: the four
+  ///   armory capture lights (128197 eid 9799, paired with hub_battle_barge character_customization spot_light_bot_set1 /
+  ///   bot_3 / kick_2 / bot_5 at 0 m position error) give P1.rgb = (c/255)^2.2 * Intensity in 12 / 12 channels to 1e-3
+  ///   (piecewise sRGB is up to 1.5 % off, e.g. 197 -> 4.466 vs captured 4.534 at Intensity 8).
+  /// </summary>
+  public const float LightColorGamma = 2.2f;
+
+  public static float LightColorToLinear(float c) => MathF.Pow(Math.Clamp(c, 0f, 1f), LightColorGamma);
+
+  public static System.Numerics.Vector3 Linear(System.Numerics.Vector3 srgb) => new(LightColorToLinear(srgb.X), LightColorToLinear(srgb.Y), LightColorToLinear(srgb.Z));
 
   /// <summary>Capture HDR colour (CB_COMMON_LIGHTNG PARAMS[4i+1].rgb) for an authored colour/intensity.</summary>
-  public static System.Numerics.Vector3 Capture(System.Numerics.Vector3 srgb, float intensity, bool adaptive, float averageLuminance)
-    => Linear(srgb) * intensity * (adaptive ? averageLuminance : 1f);
+  public static System.Numerics.Vector3 Capture(System.Numerics.Vector3 srgb, float intensity, bool adaptive, float averageLuminance, float colorScale = 1f)
+    => Linear(srgb) * intensity * colorScale * (adaptive ? averageLuminance : 1f);
 
   /// <summary>Light relative to the particle ambient (capture HDR / avgLum): what the bench and UE export use.</summary>
-  public static System.Numerics.Vector3 Relative(System.Numerics.Vector3 srgb, float intensity, bool adaptive, float averageLuminance)
-    => Linear(srgb) * intensity * (adaptive ? 1f : 1f / MathF.Max(averageLuminance, 1e-6f));
+  public static System.Numerics.Vector3 Relative(System.Numerics.Vector3 srgb, float intensity, bool adaptive, float averageLuminance, float colorScale = 1f)
+    => Linear(srgb) * intensity * colorScale * (adaptive ? 1f : 1f / MathF.Max(averageLuminance, 1e-6f));
 
   /// <summary>s4462 distance window: sat(1 - d^4 / r^4)^2 (the inverse-square factor is <see cref="InverseSquare"/>).</summary>
   public static float Attenuation(float distance, float radius)
@@ -378,18 +388,50 @@ public static class CaptureLightUnits
   ///   rea-batch 2 (PROVEN shader, plasma 101917): every consumer of COMMON_DYN_LIGHT_PARAMS (deferred s29889 _label226,
   ///   particle CS s4462 _label132, fog s5611 _label63) multiplies the window by P0.w and then by 1 / (d^2 + P0.w), so the
   ///   full point-light falloff is sat(1 - d^4/r^4)^2 * P0.w / (d^2 + P0.w): a softened inverse square, 1 at the light.
-  ///   P0.w = 1 on all 6 captured sfx lights (DATA); level spot lights in the armory capture carry 300 or 1. How
-  ///   attenCurveParam maps onto P0.w is not proven (its CPU writer was not found), so sfx lights use 1.
+  ///   level-lights (PROVEN code + DATA): P0.w comes from <see cref="InverseSquareSoft"/>; attenCurveParam 0 (the default)
+  ///   gives 1, which is what every captured sfx light carries.
   /// </summary>
   public const float SfxInverseSquareSoft = 1f;
 
-  /// <summary>Softened inverse square P0.w / (d^2 + P0.w) (PROVEN shader; P0.w = 1 for sfx lights, DATA).</summary>
+  /// <summary>FUN_14224f010: P0.w for useInverseSquaredFalloff (DAT_1437e9930 = 1/400).</summary>
+  public const float InverseSquaredSoft = 0.0025f;
+  /// <summary>FUN_14224f010: P0.w for isConstAtten without useInverseSquaredFalloff (DAT_1437e9990 = 8e22).</summary>
+  public const float ConstAttenSoft = 8e22f;
+  /// <summary>FUN_14224ecf0: P1.rgb *= 400 (DAT_14355c10c) when useInverseSquaredFalloff, so 400 * 0.0025 / (d^2 + 0.0025) ~ 1/d^2.</summary>
+  public const float InverseSquaredColorScale = 400f;
+  /// <summary>Shader: P0.w above this (with d^4 &gt; -P1.w) zeroes the light, i.e. the isConstAtten hard sphere.</summary>
+  public const float ConstAttenThreshold = 200000f;
+
+  /// <summary>
+  ///   level-lights, PROVEN (code + DATA). The COMMON_DYN_LIGHT_PARAMS packer FUN_14224ecf0 writes P0.w = FUN_14224f010(light):
+  ///   directional (light+0x6c == 2) 0; useInverseSquaredFalloff (+0x6d bit 1, or the global DAT_14502deac) 1/400;
+  ///   isConstAtten (+0x6d bit 2) 8e22; else with a = attenCurveParam (+0x54): a &gt; 0 -> 299 a^4 + 1 (DAT_1437e9974 = 299,
+  ///   DAT_143c844b4 = 1), a &lt;= 0 -> 256^a (DAT_1436dba7c). Armory capture 128197: spot_light_bot_set1 / bot_3 / bot_5
+  ///   (attenCurveParam 1) P0.w 300, spot_light_kick_2 (default) P0.w 1; radius, cone, colour fit too (armory_pairing.tsv).
+  /// </summary>
+  public static float InverseSquareSoft(float attenCurveParam, bool useInverseSquaredFalloff = false, bool isConstAtten = false, bool directional = false)
+  {
+    if (directional) return 0f;
+    if (useInverseSquaredFalloff) return InverseSquaredSoft;
+    if (isConstAtten) return ConstAttenSoft;
+    if (attenCurveParam <= 0f) return MathF.Pow(256f, attenCurveParam);
+    var a2 = attenCurveParam * attenCurveParam;
+    return a2 * a2 * 299f + 1f;
+  }
+
+  /// <summary>FUN_14224ecf0 colour factor: 400 for useInverseSquaredFalloff, else 1.</summary>
+  public static float LightColorScale(bool useInverseSquaredFalloff) => useInverseSquaredFalloff ? InverseSquaredColorScale : 1f;
+
+  /// <summary>Softened inverse square P0.w / (d^2 + P0.w) (PROVEN shader; P0.w = 1 for default sfx lights).</summary>
   public static float InverseSquare(float distance, float soft = SfxInverseSquareSoft)
     => soft / (distance * distance + MathF.Max(soft, 1e-6f));
 
-  /// <summary>Full captured point-light falloff: window * softened inverse square.</summary>
+  /// <summary>
+  ///   Full captured point-light falloff: window * softened inverse square. P0.w above <see cref="ConstAttenThreshold"/>
+  ///   (isConstAtten: P1.w = -r^4) is the shader's constant sphere: 1 inside the radius, 0 outside.
+  /// </summary>
   public static float SurfaceAttenuation(float distance, float radius, float soft = SfxInverseSquareSoft)
-    => Attenuation(distance, radius) * InverseSquare(distance, soft);
+    => soft > ConstAttenThreshold ? (distance < radius ? 1f : 0f) : Attenuation(distance, radius) * InverseSquare(distance, soft);
 
   /// <summary>CB P1.w = 1/r^4 back to the radius.</summary>
   public static float RadiusFromInvR4(float invR4) => invR4 > 0 ? MathF.Pow(invR4, -0.25f) : 0f;

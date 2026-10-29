@@ -264,6 +264,16 @@ public sealed class LightDef
   public ColorCurve Color { get; init; } = ColorCurve.White;
   /// <summary>mtl1-36: <c>isAdaptiveIntensity</c>, capture HDR scales with the scene average luminance (CaptureLightUnits).</summary>
   public bool Adaptive { get; init; } = CaptureLightUnits.DefaultAdaptive;
+  /// <summary>level-lights: <c>attenCurveParam</c> (desc +0x1c, render light +0x54), default 0 -> P0.w 1 (PROVEN).</summary>
+  public float AttenCurveParam { get; init; }
+  /// <summary>level-lights: <c>useInverseSquaredFalloff</c> (render light +0x6d bit 1), default false (kick_2 DATA: P0.w 1).</summary>
+  public bool UseInverseSquaredFalloff { get; init; }
+  /// <summary>level-lights: <c>isConstAtten</c> (render light +0x6d bit 2), default false.</summary>
+  public bool IsConstAtten { get; init; }
+  /// <summary>CB P0.w for this light (<see cref="CaptureLightUnits.InverseSquareSoft"/>, FUN_14224f010).</summary>
+  public float InverseSquareSoft => CaptureLightUnits.InverseSquareSoft(AttenCurveParam, UseInverseSquaredFalloff, IsConstAtten);
+  /// <summary>CB P1.rgb factor (400 for useInverseSquaredFalloff, FUN_14224ecf0).</summary>
+  public float ColorScale => CaptureLightUnits.LightColorScale(UseInverseSquaredFalloff);
 }
 
 /// <summary>Effect ready to simulate: every emitter and light, plus what was parsed but is not drawn yet.</summary>
@@ -413,6 +423,9 @@ public sealed class EffectDefinition
           Intensity = Spline(node.Obj("Intensity"), 1f),
           Color = colorCurve,
           Adaptive = node.Bool("isAdaptiveIntensity", CaptureLightUnits.DefaultAdaptive),
+          AttenCurveParam = node.Float("attenCurveParam", 0f),
+          UseInverseSquaredFalloff = node.Bool("useInverseSquaredFalloff", false),
+          IsConstAtten = node.Bool("isConstAtten", false),
         });
         break;
       }

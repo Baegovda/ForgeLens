@@ -3,7 +3,8 @@ tools/vfx/vfxframe_ref.py), mtl1-35.
 
 ground_batch: opaque ground plane at frame["groundY"] lit by frame["lights"] with the browser ground shading
 (EffectRenderer GroundFs), mtl1-36 capture-calibrated units (CaptureLightUnits): per channel
-  exposed = grey * (1 + ALBEDO / pi * sum_lights(colour * att * max(0, l.y))),  att = sat(1 - (d / radius)^4)^2
+  exposed = grey * (1 + ALBEDO / pi * sum_lights(colour * att * max(0, l.y))),  att = sat(1 - (d / radius)^4)^2 * s / (d^2 + s)
+  (s = CB P0.w from attenCurveParam, level-lights PROVEN; same as browser GroundFs)
 colour = relative light (1 = particle ambient = capture avgLum), att from GPU particle CS s4462; ALBEDO 0.18 HEURISTIC
 (the browser's ambient 0.6 maps to grey), written per vertex as HDR (exposed / exposure) so the UE capture and the CPU reference interpolate the same values.
 Triangles with a vertex closer than NEAR metres to the eye plane are dropped (identical clipping in both renderers).
@@ -33,12 +34,20 @@ def attenuation(dist, radius):
     return a * a
 
 
+def falloff(dist, radius, soft=1.0):
+    """level-lights (PROVEN FUN_14224f010 + armory DATA): window * P0.w / (d^2 + P0.w) (CaptureLightUnits.SurfaceAttenuation).
+    soft = frame light "inverseSquareSoft" (CB P0.w; default 1 = attenCurveParam 0); -1 marks isConstAtten (1 inside r, 0 outside)."""
+    if soft is None: soft = 1.0
+    if soft < 0: return 1.0 if dist < radius else 0.0
+    return attenuation(dist, radius) * soft / (dist * dist + max(soft, 1e-6))
+
+
 def ground_light(p, lights, exposure=None):
     """Browser GroundFs light factor at world point p (rgb), relative to the ambient: 1 + albedo/pi * sum(...)."""
     out = [1.0, 1.0, 1.0]
     for l in lights:
         d = _sub(l["position"], p); dist = math.sqrt(_dot(d, d))
-        f = attenuation(dist, max(0.01, l["radius"]))
+        f = falloff(dist, max(0.01, l["radius"]), l.get("inverseSquareSoft", 1.0))
         if f <= 0: continue
         ny = max(0.0, d[1] / dist) if dist > 1e-6 else 1.0
         k = SURFACE * f * ny

@@ -64,7 +64,7 @@ public static class VfxFrameExport
     ["lights"] = new JsonObject
     {
       ["formula"] = "lit surface hdr = albedo * (ambient + sum(color*intensity * sat(1 - d^2/r^2)^2 * max(n.l, 0)))",
-      ["evidence"] = "browser EffectRenderer mesh/ground shading (falloff window * 1/(d^2+1) PROVEN shader + DATA P0.w=1 for sfx lights, rea-batch 2; surface BRDF HEURISTIC)",
+      ["evidence"] = "browser EffectRenderer mesh/ground shading (falloff window * P0.w/(d^2+P0.w), P0.w from attenCurveParam / useInverseSquaredFalloff / isConstAtten, PROVEN FUN_14224f010 + armory DATA, level-lights; surface BRDF HEURISTIC)",
     },
     ["blend"] = new JsonObject
     {
@@ -140,7 +140,10 @@ public static class VfxFrameExport
       {
         ["name"] = l.Def.Name, ["position"] = Vec(l.Position), ["color"] = Vec(l.Relative(averageLuminance)), ["radius"] = R(l.Radius),
         ["intensity"] = R(l.Intensity), ["srgb"] = Vec(l.Color), ["adaptive"] = l.Def.Adaptive,
-        ["captureHdr"] = Vec(CaptureLightUnits.Capture(l.Color, l.Intensity, l.Def.Adaptive, averageLuminance)),
+        ["captureHdr"] = Vec(CaptureLightUnits.Capture(l.Color, l.Intensity, l.Def.Adaptive, averageLuminance, l.Def.ColorScale)),
+        // level-lights (PROVEN FUN_14224f010): CB P0.w; falloff = sat(1 - d^4/r^4)^2 * soft / (d^2 + soft), soft > 2e5 = constant sphere
+        ["inverseSquareSoft"] = l.Def.InverseSquareSoft > CaptureLightUnits.ConstAttenThreshold ? -1f : R(l.Def.InverseSquareSoft),
+        ["attenCurveParam"] = R(l.Def.AttenCurveParam), ["useInverseSquaredFalloff"] = l.Def.UseInverseSquaredFalloff, ["isConstAtten"] = l.Def.IsConstAtten,
       });
     }
     return a;

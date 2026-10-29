@@ -370,7 +370,10 @@ elif mode == "render":
         lc.set_editor_property("intensity", mx * S.SURFACE)
         lc.set_light_color(unreal.LinearColor(l["color"][0] / mx, l["color"][1] / mx, l["color"][2] / mx, 1.0))
         lc.set_editor_property("attenuation_radius", l["radius"] * 100.0)
-        lc.set_editor_property("use_inverse_squared_falloff", False); lc.set_editor_property("light_falloff_exponent", 1.0)
+        # level-lights: useInverseSquaredFalloff lights are physical 1/d^2 in game (P0.w 1/400, colour x400, FUN_14224ecf0)
+        inv = bool(l.get("useInverseSquaredFalloff", False))
+        lc.set_editor_property("use_inverse_squared_falloff", inv)
+        if not inv: lc.set_editor_property("light_falloff_exponent", 1.0)
         # SM2 window sat(1-(d/r)^4)^2 is PROVEN (particles PS 214); UE non-inverse-square falloff is (1-(d/r)^2)^n
         # (Engine DynamicLightingCommon.ush RadialAttenuation), which cannot express it. n = 1 is the best fit
         # (max error 0.13 vs 0.59 for the previous n = 4): APPROXIMATION.

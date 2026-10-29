@@ -68,7 +68,11 @@ public sealed class EmitterState(EmitterDef def, int index)
 public readonly record struct LightSample(LightDef Def, Vector3 Position, Vector3 Color, float Radius, float Intensity)
 {
   /// <summary>mtl1-36: light relative to the particle ambient (<see cref="CaptureLightUnits.Relative"/>).</summary>
-  public Vector3 Relative(float averageLuminance) => CaptureLightUnits.Relative(Color, Intensity, Def.Adaptive, averageLuminance);
+  public Vector3 Relative(float averageLuminance) => CaptureLightUnits.Relative(Color, Intensity, Def.Adaptive, averageLuminance, Def.ColorScale);
+  /// <summary>level-lights: CB P0.w (softened inverse square) of this light.</summary>
+  public float Soft => Def.InverseSquareSoft;
+  /// <summary>level-lights: window * P0.w / (d^2 + P0.w) (or the isConstAtten sphere) at <paramref name="distance"/>.</summary>
+  public float Falloff(float distance) => CaptureLightUnits.SurfaceAttenuation(distance, MathF.Max(0.01f, Radius), Soft);
 }
 
 /// <summary>

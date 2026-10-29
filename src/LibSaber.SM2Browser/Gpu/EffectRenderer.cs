@@ -303,6 +303,7 @@ internal sealed unsafe class EffectRenderer : IDisposable
         var l = lights[i];
         _gl.Uniform4(_gl.GetUniformLocation(_ground, $"uLightPos[{i}]"), l.Position.X, l.Position.Y, l.Position.Z, Math.Max(0.01f, l.Radius));
         var gc = GroundLight(l, layer.Exposure); _gl.Uniform3(_gl.GetUniformLocation(_ground, $"uLightColor[{i}]"), gc.X, gc.Y, gc.Z);
+        _gl.Uniform1(_gl.GetUniformLocation(_ground, $"uLightSoft[{i}]"), MathF.Min(l.Soft, 1e30f));
       }
 
       _gl.Enable(EnableCap.DepthTest);
@@ -575,6 +576,7 @@ internal sealed unsafe class EffectRenderer : IDisposable
       var l = lights[i];
       _gl.Uniform4(_gl.GetUniformLocation(_mesh, $"uLightPos[{i}]"), l.Position.X, l.Position.Y, l.Position.Z, Math.Max(0.01f, l.Radius));
       var mc = MeshLight(l, layer.Exposure); _gl.Uniform3(_gl.GetUniformLocation(_mesh, $"uLightColor[{i}]"), mc.X, mc.Y, mc.Z);
+      _gl.Uniform1(_gl.GetUniformLocation(_mesh, $"uLightSoft[{i}]"), MathF.Min(l.Soft, 1e30f));
     }
 
     var model = _gl.GetUniformLocation(_mesh, "uModel");
@@ -932,6 +934,7 @@ internal sealed unsafe class EffectRenderer : IDisposable
     uniform int uLightCount;
     uniform vec4 uLightPos[8];
     uniform vec3 uLightColor[8];
+    uniform float uLightSoft[8]; // level-lights: CB P0.w (FUN_14224f010), > 2e5 = isConstAtten sphere
     out vec4 outColor;
     vec3 toGamma(vec3 c) { return mix(c * 12.92, 1.055 * pow(c, vec3(1.0 / 2.4)) - 0.055, step(0.0031308, c)); }
     void main()
@@ -949,8 +952,9 @@ internal sealed unsafe class EffectRenderer : IDisposable
         vec3 d = uLightPos[i].xyz - vWorld;
         float r = uLightPos[i].w;
         float q = dot(d, d) / (r * r);
-        float fall = clamp(1.0 - q * q, 0.0, 1.0); // s4462/s29889: sat(1 - d^4/r^4)^2 * P0.w/(d^2+P0.w), P0.w = 1 for sfx lights (rea-batch 2)
-        light += uLightColor[i] * fall * fall / (dot(d, d) + 1.0) * max(dot(n, normalize(d)), 0.0);
+        float s = uLightSoft[i];
+        float fall = s > 200000.0 ? step(q, 1.0) : clamp(1.0 - q * q, 0.0, 1.0); // s4462/s29889: sat(1 - d^4/r^4)^2 * P0.w/(d^2+P0.w)
+        light += uLightColor[i] * fall * fall * (s > 200000.0 ? 1.0 : s / (dot(d, d) + s)) * max(dot(n, normalize(d)), 0.0);
       }
       // emissive glow only for sfx (translucent) materials; lit combine_material shaders (blood splash) stay surface-lit
       vec3 hdr = base * light + base * uEmissive * (uTranslucent == 1 ? 25.0 : 0.0);
@@ -1045,6 +1049,7 @@ internal sealed unsafe class EffectRenderer : IDisposable
       var l = lights[i];
       _gl.Uniform4(_gl.GetUniformLocation(_cover, $"uLightPos[{i}]"), l.Position.X, l.Position.Y, l.Position.Z, Math.Max(0.01f, l.Radius));
       var cc = CoverLight(l, exposure); _gl.Uniform3(_gl.GetUniformLocation(_cover, $"uLightColor[{i}]"), cc.X, cc.Y, cc.Z);
+      _gl.Uniform1(_gl.GetUniformLocation(_cover, $"uLightSoft[{i}]"), MathF.Min(l.Soft, 1e30f));
     }
 
     _gl.Enable(EnableCap.DepthTest);
@@ -1087,6 +1092,7 @@ internal sealed unsafe class EffectRenderer : IDisposable
     uniform int uLightCount;
     uniform vec4 uLightPos[8];
     uniform vec3 uLightColor[8];
+    uniform float uLightSoft[8]; // level-lights: CB P0.w (FUN_14224f010), > 2e5 = isConstAtten sphere
     out vec4 outColor;
     vec3 toGamma(vec3 c) { return mix(c * 12.92, 1.055 * pow(c, vec3(1.0 / 2.4)) - 0.055, step(0.0031308, c)); }
     void main()
@@ -1106,8 +1112,9 @@ internal sealed unsafe class EffectRenderer : IDisposable
       {
         vec3 d = uLightPos[i].xyz - vWorld;
         float q = dot(d, d) / (uLightPos[i].w * uLightPos[i].w);
-        float f = clamp(1.0 - q * q, 0.0, 1.0);
-        col += albedo * uLightColor[i] * f * f / (dot(d, d) + 1.0) * max(0.0, dot(n, normalize(d)));
+        float s = uLightSoft[i];
+        float f = s > 200000.0 ? step(q, 1.0) : clamp(1.0 - q * q, 0.0, 1.0);
+        col += albedo * uLightColor[i] * f * f * (s > 200000.0 ? 1.0 : s / (dot(d, d) + s)) * max(0.0, dot(n, normalize(d)));
       }
       outColor = vec4(toGamma(vec3(1.0) - exp(-col * 1.6)), 1.0);
     }
@@ -1133,6 +1140,7 @@ internal sealed unsafe class EffectRenderer : IDisposable
     uniform int uLightCount;
     uniform vec4 uLightPos[8];
     uniform vec3 uLightColor[8];
+    uniform float uLightSoft[8]; // level-lights: CB P0.w (FUN_14224f010), > 2e5 = isConstAtten sphere
     out vec4 outColor;
     float grid(vec2 p, float step, float width)
     {
@@ -1154,8 +1162,9 @@ internal sealed unsafe class EffectRenderer : IDisposable
         vec3 d = uLightPos[i].xyz - vWorld;
         float r = uLightPos[i].w;
         float q = dot(d, d) / (r * r);
-        float f = clamp(1.0 - q * q, 0.0, 1.0);
-        light += uLightColor[i] * f * f / (dot(d, d) + 1.0) * max(0.0, normalize(d).y);
+        float s = uLightSoft[i];
+        float f = s > 200000.0 ? step(q, 1.0) : clamp(1.0 - q * q, 0.0, 1.0);
+        light += uLightColor[i] * f * f * (s > 200000.0 ? 1.0 : s / (dot(d, d) + s)) * max(0.0, normalize(d).y);
       }
       vec3 hdr = base * light;
       float fade = clamp(1.0 - length(vWorld.xz - uEye.xz) / 60.0, 0.0, 1.0);
