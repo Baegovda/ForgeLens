@@ -198,11 +198,21 @@ internal static class ClipPose
     return world;
   }
 
+  /// <summary>propanim: <paramref name="overlay" />'s tracks written over the current locals (no reset, no root motion).</summary>
+  public static void ApplyOverlay(IReadOnlyList<Bone> bones, AnimationClip overlay, float time, Matrix4x4[] local) =>
+    ApplyTracks(bones, overlay, time, local);
+
   private static void ApplyRaw(IReadOnlyList<Bone> bones, AnimationClip clip, float time, Matrix4x4[] local)
   {
     for (var i = 0; i < bones.Count; i++)
       local[i] = bones[i].Local;
 
+    ApplyTracks(bones, clip, time, local);
+    ApplyRoot(bones, clip, time, local);
+  }
+
+  private static void ApplyTracks(IReadOnlyList<Bone> bones, AnimationClip clip, float time, Matrix4x4[] local)
+  {
     var binding = ClipBinding.Resolve(bones, clip);
     for (var t = 0; t < clip.Tracks.Count; t++)
     {
@@ -225,7 +235,10 @@ internal static class ClipPose
         scale = Matrix4x4.Decompose(bind, out var bindScale, out _, out _) ? bindScale : Vector3.One;
       local[index] = Matrix4x4.CreateScale(scale) * Matrix4x4.CreateFromQuaternion(rotation) * Matrix4x4.CreateTranslation(translation);
     }
+  }
 
+  private static void ApplyRoot(IReadOnlyList<Bone> bones, AnimationClip clip, float time, Matrix4x4[] local)
+  {
     if (!clip.RootMotion || (clip.RootTranslation.Count == 0 && !clip.HasRootRotation))
       return;
 

@@ -41,6 +41,9 @@ Options:
                           path (animation/primaris/assault/*_run_*). @list.txt reads tokens
                           from a file, one per line. Clips with the additive slot (0xF3/0xF7)
                           end in __ADD.
+                          seq:NAME[,NAME..] or seq:all exports the template's own embedded
+                          sequences (weapons/props: SHOOT_1, RELOAD_FULL, chain_anim, ..) on its
+                          own skeleton as {model}__{NAME}; visibility keys become scale 0.
   --anim-only             Write the clip files only: no bind mesh, materials, or textures.
                           Use with a skeleton that is already in the Unreal project.
   --anim-only-manny       "Anim Only (Manny)": anim-only FBX on the UE5 Mannequin. Writes {model}__{clip}_Manny.fbx with SK_Mannequin

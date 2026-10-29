@@ -87,10 +87,10 @@ public static partial class MeshPreview
       return target.Resolve(width, height, ss);
     }
 
-    var clipActive = mesh.Bones.Count > 0 && mesh.Clip is { HasCurves: true };
+    var clipActive = mesh.Bones.Count > 0 && mesh.Animated;
     Matrix4x4[]? worlds = clipActive || showSkeleton ? BoneWorlds(mesh, timeSeconds) : null;
     var rebase = Matrix4x4.Identity;
-    if (clipActive && settings?.InPlace == true)
+    if (clipActive && settings?.InPlace == true && mesh.Clip is { HasCurves: true })
     {
       rebase = InPlaceRebase(mesh);
       for (var i = 0; i < worlds!.Length; i++)
@@ -1194,6 +1194,10 @@ public static partial class MeshPreview
       for (var i = 0; i < mesh.Bones.Count; i++)
         local[i] = mesh.Bones[i].Local;
     }
+
+    // propanim: a held prop's own sequences over the character clip (explicit bone indices).
+    if (mesh.Overlay is { HasCurves: true } overlay)
+      ClipPose.ApplyOverlay(mesh.Bones, overlay, overlay.Duration > 0 && time > overlay.Duration ? time % overlay.Duration : time, local);
 
     var pending = new bool[local.Length];
     Array.Fill(pending, true);

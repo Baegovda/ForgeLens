@@ -1,3 +1,4 @@
+using LibSaber.SM2.Assets.Animation;
 using System.Numerics;
 using LibSaber.IO;
 using LibSaber.SM2.Assets.Catalog;
@@ -69,6 +70,7 @@ public static class TemplateMeshReader
       var reader = new NativeReader(stream, Endianness.LittleEndian);
       template = Serializer<animTPL>.Deserialize(reader);
       ReadSkeleton(mesh, template, notes);
+      ReadTrack(mesh, template, notes);
       if (template?.GeometryGraph is { } graph)
         ReadGraph(mesh, graph, template, reader, () => FindGeometryPayload(catalog, store, fileIndex, description), name => ResolveTexture(catalog, fileIndex, name) >= 0, notes);
     }
@@ -120,10 +122,26 @@ public static class TemplateMeshReader
     var reader = new NativeReader(stream, Endianness.LittleEndian);
     var template = Serializer<animTPL>.Deserialize(reader);
     ReadSkeleton(mesh, template, notes);
+    ReadTrack(mesh, template, notes);
     if (template?.GeometryGraph is { } graph)
       ReadGraph(mesh, graph, template, reader, () => tplData, null, notes);
     mesh.Message = string.Join(" ", notes.Where(note => note.Length > 0));
     return mesh;
+  }
+
+  /// <summary>propanim: the embedded track (<c>trackAnim</c>) as <see cref="ExportedMesh.TplAnim" />.</summary>
+  private static void ReadTrack(ExportedMesh mesh, animTPL? template, List<string> notes)
+  {
+    try
+    {
+      mesh.TplAnim = TplAnimation.From(template?.trackAnim);
+      if (mesh.TplAnim is { } anim && (anim.Sequences.Count > 0 || anim.Objects.Count > 0))
+        notes.Add($"{anim.Sequences.Count} embedded sequence(s) on {anim.Objects.Count} animated object(s).");
+    }
+    catch (Exception ex)
+    {
+      notes.Add("The embedded track did not decode (" + ex.Message + ").");
+    }
   }
 
   private static void ReadSkeleton(ExportedMesh mesh, animTPL? template, List<string> notes)

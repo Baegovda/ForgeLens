@@ -9,7 +9,11 @@
 - ETNA block 245 = event tracks (data); `SaniReader.ReadEvents` reads only events (fast scan, mtl1-49).
 - Clip naming `<action>_<bundle>.sani`; `nameBundle` on the character class (data, mtl1-49).
 
-**Code:** `A/Animation/*` (SaniReader, EtnaCurves, AnimEvents, ClipResolver, CharacterAnimations), `A/Meshes/ClipPose.cs`, `ClipBinding.cs`.
+**tpl-embedded prop animation (propanim, DATA-PROVEN, no exe address — REA was down):**
+- `animTPL.trackAnim` (`animTRACK`: seqList / objAnimList per animNmb / objMapList / rootAnim); spline key `[frame, v0..]` stride 1+Unk_02; quats w-first conjugated; rootAnim identity; visibility 0..1 (scale 0 < 0.5 HEURISTIC).
+- Play rules: class `anim.layerList` (MainMultiStitch masks), blueprint `BlueprintAnimationLibraryStartanim/Stopanim`, firearm FSM + `shootAnimation`. Code: `A/Animation/TplAnimation.cs`, `PropAnimStates.cs`, `A/Effects/AnimEventVfxMap.cs` (EventAnim).
+
+**Code:** `A/Animation/*` (SaniReader, TplAnimation, PropAnimStates, EtnaCurves, AnimEvents, ClipResolver, CharacterAnimations), `A/Meshes/ClipPose.cs`, `ClipBinding.cs`.
 
 Long-form: RE_NOTES "Animation", HANDOFF sani gaps, Animation finishing.
 

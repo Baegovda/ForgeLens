@@ -46,6 +46,18 @@ public sealed record EventStop(string Source, IReadOnlyList<string> Names, bool 
 ///   Names may be keys of a class <c>sfx.list</c> (<c>muzzle = { __type = "fx_bolter_muzzle_client" }</c>);
 ///   <see cref="AddClassSfxList"/> registers those so <see cref="Resolve"/> returns the .sfx name.
 /// </summary>
+/// <summary>
+///   propanim: a blueprint <c>BlueprintAnimationLibraryStartanim</c>/<c>Stopanim</c> (the prop's own embedded sequence
+///   <see cref="Anim" />) and what starts it: a morpheme event name, or <c>@NodeType.Pin</c> for a graph root such as
+///   <c>@BlueprintNodeOnChangeHolding.OnHoldInArms</c>. <see cref="Playback" /> is <c>typePlayback.def</c> (e.g. <c>cycle</c>,
+///   <c>clamp</c>; empty = default).
+/// </summary>
+public sealed record EventAnim(string Trigger, string Anim, string Playback, bool Stop, bool AtEnd, string Source)
+{
+  public bool IsEvent => !Trigger.StartsWith('@');
+  public bool Loops => Playback.Equals("cycle", StringComparison.OrdinalIgnoreCase) || Playback.Equals("loop", StringComparison.OrdinalIgnoreCase);
+}
+
 public sealed class AnimEventVfxMap
 {
   private static readonly HashSet<string> Starters = new(StringComparer.Ordinal)
@@ -68,6 +80,9 @@ public sealed class AnimEventVfxMap
   private static readonly HashSet<string> EndPins = new(StringComparer.Ordinal) { "OnDeactivate", "OnExit" };
 
   public IReadOnlyDictionary<string, List<EventVfx>> Events => _map;
+  private readonly List<EventAnim> _anims = [];
+  /// <summary>propanim: every Startanim/Stopanim with its trigger, all blueprints (filter by <see cref="EventAnim.Source" />).</summary>
+  public IReadOnlyList<EventAnim> Anims => _anims;
   private readonly HashSet<string> _sources = new(StringComparer.OrdinalIgnoreCase);
   public bool HasSource(string source) => _sources.Contains(source);
   public int Files { get; private set; }
@@ -94,12 +109,17 @@ public sealed class AnimEventVfxMap
     foreach (var file in Directory.EnumerateFiles(root, "*.sso", SearchOption.AllDirectories))
     {
       var text = File.ReadAllText(file);
-      if (!text.Contains("MorphemeEvent", StringComparison.Ordinal) && !text.Contains("MorphemeDurationEvent", StringComparison.Ordinal)) continue;
+      if (!Relevant(text)) continue;
       map.AddBlueprint(Path.GetFileNameWithoutExtension(file), text);
     }
 
     return map;
   }
+
+  /// <summary>Blueprint text worth parsing: morpheme event hooks, or prop animation starts (propanim).</summary>
+  public static bool Relevant(string text) =>
+    text.Contains("MorphemeEvent", StringComparison.Ordinal) || text.Contains("MorphemeDurationEvent", StringComparison.Ordinal)
+    || text.Contains("BlueprintAnimationLibraryStartanim", StringComparison.Ordinal);
 
   public void AddBlueprint(string source, string text)
   {
@@ -132,6 +152,8 @@ public sealed class AnimEventVfxMap
           l.Add(value);
         }
     }
+
+    AddAnims(source, nodes);
 
     foreach (var (_, node) in nodes)
     {
@@ -199,6 +221,73 @@ public sealed class AnimEventVfxMap
     var l1 = Loc("locator1", "locator1Ref");
     var l2 = Loc("locator2", "locator2Ref");
     return l1 is null || l2 is null ? null : new TrailEdge(l1, Off("locator1Offset", "locator1OffsetRef"), l2, Off("locator2Offset", "locator2OffsetRef"));
+  }
+
+  /// <summary>
+  ///   propanim: for each Startanim/Stopanim node, walk the exec links (pins whose target is not a <c>/cb</c> data pipe)
+  ///   backwards, a few hops, to a morpheme event node or a graph root (a node nothing executes). Each one reached is a
+  ///   trigger; a duration event's OnDeactivate/OnExit pin fires at the event's end. DATA (the graph as cooked).
+  /// </summary>
+  private void AddAnims(string source, JsonObject nodes)
+  {
+    List<(string Name, JsonObject Node)>? animNodes = null;
+    foreach (var (name, node) in nodes)
+      if (node is JsonObject n && n.Str("__type") is "BlueprintAnimationLibraryStartanim" or "BlueprintAnimationLibraryStopanim")
+        (animNodes ??= []).Add((name, n));
+    if (animNodes is null) return;
+
+    var incoming = new Dictionary<string, List<(string From, string Pin)>>(StringComparer.Ordinal);
+    foreach (var (name, node) in nodes)
+    {
+      if (node is not JsonObject n) continue;
+      foreach (var (pin, target) in Pins(n))
+      {
+        if (target.EndsWith("/cb", StringComparison.Ordinal)) continue;
+        var to = target[..target.IndexOf('/')];
+        if (!incoming.TryGetValue(to, out var l)) incoming[to] = l = [];
+        l.Add((name, pin));
+      }
+    }
+
+    foreach (var (animName, anim) in animNodes)
+    {
+      if (anim.Obj("animLink")?.Str("def") is not { Length: > 0 } link) continue;
+      var stop = anim.Str("__type") == "BlueprintAnimationLibraryStopanim";
+      var playback = anim.Obj("typePlayback")?.Str("def") ?? "";
+      var seen = new HashSet<string>(StringComparer.Ordinal) { animName };
+      var queue = new Queue<(string Node, int Depth)>();
+      queue.Enqueue((animName, 0));
+      while (queue.Count > 0)
+      {
+        var (cur, depth) = queue.Dequeue();
+        if (!incoming.TryGetValue(cur, out var froms)) continue;
+        foreach (var (from, pin) in froms)
+        {
+          if (nodes[from] is not JsonObject src) continue;
+          var ev = src.Obj("mrEvent")?.Str("name") ?? src.Obj("mrDurationEvent")?.Str("name");
+          if (ev is { Length: > 0 })
+          {
+            AddAnim(new EventAnim(ev, link, playback, stop, src.ContainsKey("mrDurationEvent") && EndPins.Contains(pin), source));
+            continue;
+          }
+
+          if (!incoming.ContainsKey(from))
+          {
+            var type = src.Str("__type") ?? from;
+            AddAnim(new EventAnim("@" + type + "." + pin, link, playback, stop, false, source));
+            continue;
+          }
+
+          if (depth < 8 && seen.Add(from))
+            queue.Enqueue((from, depth + 1));
+        }
+      }
+    }
+  }
+
+  private void AddAnim(EventAnim a)
+  {
+    if (!_anims.Contains(a)) _anims.Add(a);
   }
 
   /// <summary>Effect names a starter/stopper node names: <c>*sfx*</c>/<c>*vfx*</c> param defaults plus string pipes into it.</summary>

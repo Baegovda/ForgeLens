@@ -228,6 +228,15 @@ public sealed class ExportedMesh
   public List<ClothSimShell> ClothSims { get; } = new();
   public MaterialDocument? Material { get; set; }
   public AnimationClip? Clip { get; set; }
+  /// <summary>propanim: the template's embedded track (sequence list, <see cref="TplAnimation.ToClip" />), when it has one.</summary>
+  public TplAnimation? TplAnim { get; set; }
+  /// <summary>
+  ///   propanim: a second clip applied over <see cref="Clip" /> (tracks with explicit bone indices), e.g. a held weapon's own
+  ///   sequences in the context view. Sampled at the same time, wrapped by its own duration.
+  /// </summary>
+  public AnimationClip? Overlay { get; set; }
+  /// <summary>Something animates the bones: <see cref="Clip" /> or <see cref="Overlay" /> has curves.</summary>
+  public bool Animated => Clip is { HasCurves: true } || Overlay is { HasCurves: true };
   /// <summary>Cloth and jiggle setup from the character class (<c>prop_cloth_sim</c>, <c>prop_phys_jiggle</c>).</summary>
   public LibSaber.SM2.Assets.Physics.PhysicsSetup? Physics { get; set; }
   public string Message { get; set; } = "";
@@ -243,7 +252,7 @@ public sealed class ExportedMesh
   /// <summary>Copy with the same vertex data and shared bone, part and level objects (lists are new).</summary>
   public ExportedMesh ShallowCopy()
   {
-    var copy = new ExportedMesh { Name = Name, Material = Material, Clip = Clip, Physics = Physics, Message = Message };
+    var copy = new ExportedMesh { Name = Name, Material = Material, Clip = Clip, Physics = Physics, Message = Message, TplAnim = TplAnim, Overlay = Overlay };
     copy.Positions.AddRange(Positions);
     copy.Normals.AddRange(Normals);
     copy.Uvs.AddRange(Uvs);

@@ -83,6 +83,15 @@ public partial class MainWindow
       _suppressAnim = false;
       ApplyClipToMesh(clip);
     }
+    else if (mesh.TplAnim is { Sequences.Count: > 0 } tplAnim)
+    {
+      // propanim QA: the embedded sequences (SM2_PROP_COND picks one, else Auto).
+      _animAll = PropSequenceRows(tplAnim);
+      ApplyAnimFilter(keepSelection: false);
+      SetupPropConditions();
+      if (_propConds.FirstOrDefault(c => c.Name.Equals(_propCond, StringComparison.OrdinalIgnoreCase)) is { } cond)
+        await PlayPropStandaloneAsync(cond, autoPlay: Environment.GetEnvironmentVariable("SM2_HOST_PLAY") == "1");
+    }
 
     FillHostVfxSockets();
     HostVfxName.Text = Environment.GetEnvironmentVariable("SM2_HOST_OPEN") ?? "";
@@ -165,7 +174,7 @@ public partial class MainWindow
         catch { continue; }
         if (!SslText.LooksText(bytes)) continue;
         var text = Encoding.UTF8.GetString(bytes);
-        if (text.Contains("MorphemeEvent", StringComparison.Ordinal) || text.Contains("MorphemeDurationEvent", StringComparison.Ordinal))
+        if (AnimEventVfxMap.Relevant(text)) // morpheme hooks, and (propanim) prop Startanim graphs
           map.AddBlueprint(Path.GetFileNameWithoutExtension(path), text);
       }
 

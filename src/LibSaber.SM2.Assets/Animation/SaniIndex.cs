@@ -67,6 +67,19 @@ public static class SaniIndex
       .ToList();
   }
 
+  /// <summary>
+  ///   propanim: clips stored under the model's own folder (<c>tpl/x.tpl/animations/*.sani</c>), whatever their track names
+  ///   (level props often have unnamed tracks, which <see cref="Compatible" /> cannot count; they bind by animNmb rank).
+  /// </summary>
+  public static List<Header> InFolder(IReadOnlyList<Header> headers, string modelPath)
+  {
+    var dir = System.IO.Path.GetDirectoryName(modelPath.Replace('\\', '/'))?.Replace('\\', '/');
+    if (string.IsNullOrEmpty(dir)) return [];
+    var prefix = dir.TrimEnd('/') + "/";
+    return headers.Where(h => h.Path.Replace('\\', '/').StartsWith(prefix, StringComparison.OrdinalIgnoreCase))
+      .OrderBy(h => h.Path, StringComparer.OrdinalIgnoreCase).ToList();
+  }
+
   public static List<Header> Match(IReadOnlyList<Header> headers, string token)
   {
     var needle = token.Replace('\\', '/').Trim();

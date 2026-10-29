@@ -45,7 +45,10 @@ public class animOBJ_ANIMSerializer : SM2SerializerBase<List<animOBJ_ANIM>>
       return;
 
     foreach (var anim in animList)
+    {
       anim.iniTranslation = reader.ReadVector3();
+      anim.HasIniTranslation = true;
+    }
   }
 
   private void ReadPTranslationProperty(NativeReader reader, List<animOBJ_ANIM> animList, ISerializationContext context)
@@ -68,7 +71,10 @@ public class animOBJ_ANIMSerializer : SM2SerializerBase<List<animOBJ_ANIM>>
       return;
 
     foreach (var anim in animList)
+    {
       anim.iniRotation = reader.ReadVector4();
+      anim.HasIniRotation = true;
+    }
   }
 
   private void ReadPRotationProperty(NativeReader reader, List<animOBJ_ANIM> animList, ISerializationContext context)
@@ -91,7 +97,10 @@ public class animOBJ_ANIMSerializer : SM2SerializerBase<List<animOBJ_ANIM>>
       return;
 
     foreach (var anim in animList)
+    {
       anim.iniScale = reader.ReadVector3();
+      anim.HasIniScale = true;
+    }
   }
 
   private void ReadPScaleProperty(NativeReader reader, List<animOBJ_ANIM> animList, ISerializationContext context)
@@ -114,7 +123,10 @@ public class animOBJ_ANIMSerializer : SM2SerializerBase<List<animOBJ_ANIM>>
       return;
 
     foreach (var anim in animList)
+    {
       anim.iniVisibility = reader.ReadFloat32();
+      anim.HasIniVisibility = true;
+    }
   }
 
   private void ReadPVisibilityProperty(NativeReader reader, List<animOBJ_ANIM> animList, ISerializationContext context)

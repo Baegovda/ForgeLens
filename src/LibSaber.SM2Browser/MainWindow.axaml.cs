@@ -77,6 +77,7 @@ public partial class MainWindow : Window
     InitializeComponent();
     InitHostVfx();
     InitContext();
+    InitPropAnim();
     RecentList.ItemsSource = _recent.Items;
     InitLayoutMemory();
     ShowAllBox.IsChecked = _settings.ShowAllFiles;
@@ -1228,16 +1229,28 @@ public partial class MainWindow : Window
         });
       }
 
+      // propanim: clips in the model's own folder (tpl/x.tpl/animations), even with unnamed tracks (animNmb binding).
+      var listed = rows.Select(r => r.Index).ToHashSet();
+      foreach (var header in SaniIndex.InFolder(_clipHeaders, modelPath))
+        if (listed.Add(header.Index))
+          rows.Add(new AnimChoice
+          {
+            Label = $"★ {Path.GetFileName(header.Path)}  ({header.Duration:0.00}s, model folder)", Index = header.Index, Path = header.Path,
+            Rank = ClipRank.Main, SameModel = true,
+          });
+
       // ★ this character's gameplay set, ☆ its cinematic clips, then the rest (clips named after it first), each by path.
       rows.Sort((a, b) =>
         a.Rank != b.Rank ? a.Rank.CompareTo(b.Rank)
         : a.SameModel != b.SameModel ? (a.SameModel ? -1 : 1)
         : string.Compare(a.Path, b.Path, StringComparison.OrdinalIgnoreCase));
+      rows.InsertRange(0, PropSequenceRows(physicsMesh.TplAnim));
       return (rows, owner);
     });
     if (generation != _animGeneration || _mesh is null)
       return;
     _animAll = choices;
+    SetupPropConditions();
     ApplyAnimFilter(keepSelection: false);
     if (physicsMesh.Physics is { IsEmpty: false } physics)
     {
@@ -1268,6 +1281,14 @@ public partial class MainWindow : Window
     PlayButton.Content = "Play";
     var play = _playOnLoad;
     _playOnLoad = false;
+    if (choice.Seq is { } seq)
+    {
+      _propCond = seq.Name;
+      SyncConditionBoxes();
+      await PlayPropStandaloneAsync(new PropCondition(seq.Name, PropAnimStates.Label(seq.Name), seq), play);
+      return;
+    }
+
     if (choice.Index < 0)
     {
       ResetClip();
@@ -1900,5 +1921,7 @@ public sealed class AnimChoice
   public string Path { get; init; } = "";
   public bool SameModel { get; init; }
   public ClipRank Rank { get; init; } = ClipRank.Other;
+  /// <summary>propanim: an embedded tpl sequence row (Index -2).</summary>
+  public TplSequence? Seq { get; init; }
   public override string ToString() => Label;
 }

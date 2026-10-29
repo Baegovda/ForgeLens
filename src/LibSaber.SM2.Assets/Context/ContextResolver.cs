@@ -175,6 +175,19 @@ public sealed class ContextResolver
     return keys.ContainsKey(effectOrKey) || keys.Values.Contains(effectOrKey, StringComparer.OrdinalIgnoreCase);
   }
 
+  /// <summary>propanim: any class whose template stem is <paramref name="tplStem"/> (weapons first, client side first).</summary>
+  public List<string> ClassesForTpl(string tplStem)
+  {
+    var stem = Stem(tplStem);
+    return _index.Classes.Values
+      .Where(c => Stem(_index.TplOf(c.Name) ?? "").Equals(stem, StringComparison.OrdinalIgnoreCase))
+      .Select(c => c.Name)
+      .OrderBy(n => _index.IsWeapon(n) ? 0 : 1)
+      .ThenBy(n => n.EndsWith("_authority", StringComparison.OrdinalIgnoreCase))
+      .ThenBy(n => n.Length)
+      .ToList();
+  }
+
   /// <summary>Character classes whose template stem is <paramref name="tplStem"/> (players / npcs, client side first).</summary>
   public List<string> CharactersForTpl(string tplStem)
   {

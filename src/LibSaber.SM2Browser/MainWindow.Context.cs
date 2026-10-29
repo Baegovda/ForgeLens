@@ -428,6 +428,11 @@ public partial class MainWindow
       _hostVfxSocketsFor = null;
     }
 
+    // propanim: the held weapon's own sequences (Auto = follow the character's action, or the picked condition).
+    var propText = await ApplyPropOverlayAsync(mesh, baseMesh, showProps ? weapon : null, clip, generation);
+    if (generation != _ctxGeneration) return;
+    if (propText.Length > 0) notes.Add(propText);
+
     // Effects: owned blueprints (+ inline ones), sfx.list resolution, weapon socket scope, Shoot -> muzzle.
     var cueText = "";
     if (await EnsureHostVfxAsync() is { } vfx)

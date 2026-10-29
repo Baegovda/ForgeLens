@@ -202,6 +202,21 @@ public sealed class ContextIndex
     return null;
   }
 
+  /// <summary>
+  ///   propanim: the class's <c>anim.layerList</c> (nearest class in the chain that has one): which embedded sequences
+  ///   play on which object subtrees (<c>MainMultiStitch</c> AnimList + RootObjectNameList). DATA.
+  /// </summary>
+  public IReadOnlyList<LibSaber.SM2.Assets.Animation.PropAnimLayer> AnimLayersOf(string name)
+  {
+    foreach (var c in Chain(name))
+      if (Detail(c.Name).AnimLayers is { Count: > 0 } layers)
+        return layers;
+    return [];
+  }
+
+  /// <summary>propanim: <c>shootAnimation</c> set on the class or an ancestor (firearm animation property), else null.</summary>
+  public string? ShootAnimationOf(string name) => Chain(name).Select(c => Detail(c.Name).ShootAnimation).FirstOrDefault(s => s is { Length: > 0 });
+
   /// <summary>Blueprint names the class (and ancestors) run: cooked <c>linksDesc</c> .sso plus inline <c>prop_blueprints</c> (as <c>cls:Class/Name</c>).</summary>
   public HashSet<string> BlueprintsOf(string name)
   {
@@ -267,6 +282,10 @@ public sealed class ClassDetail
   public Dictionary<string, string> DropSlots { get; } = new(StringComparer.OrdinalIgnoreCase);
   public string? EquipCategory { get; set; }
   public List<(string Name, JsonObject Root)> InlineBlueprints { get; } = [];
+  /// <summary>propanim: <c>anim.layerList</c> entries.</summary>
+  public List<LibSaber.SM2.Assets.Animation.PropAnimLayer> AnimLayers { get; } = [];
+  /// <summary>propanim: a <c>shootAnimation</c> string in a property (firearm animation controller override).</summary>
+  public string? ShootAnimation { get; set; }
 
   public static ClassDetail From(JsonObject root)
   {
@@ -314,10 +333,41 @@ public sealed class ClassDetail
         if (e.Obj("mrEvent")?.Str("name") is { Length: > 0 } ev && e.Str("slot") is { Length: > 0 } slot)
           d.DropSlots[ev] = slot;
     d.EquipCategory = props.Obj("prop_equipment")?.Str("loadoutItemCategoryUid");
+    if (props.Obj("anim")?.Obj("layerList") is { } layerList)
+      foreach (var (layerName, layer) in layerList)
+        if (layer is JsonObject lo)
+          d.AnimLayers.Add(new LibSaber.SM2.Assets.Animation.PropAnimLayer(layerName, lo.Str("type") ?? "",
+            ArrayStrings(lo["AnimList"]), ArrayStrings(lo["RootObjectNameList"])));
+    foreach (var (_, value) in props)
+      if (value is JsonObject prop && FindString(prop, "shootAnimation", 3) is { Length: > 0 } shoot)
+      {
+        d.ShootAnimation = shoot;
+        break;
+      }
+
     if (props.Obj("prop_blueprints")?.Obj("blueprints") is { } bps)
       foreach (var (name, bp) in bps)
         if (bp is JsonObject o && o.Obj("nodes") is not null)
           d.InlineBlueprints.Add((name, o));
     return d;
+  }
+
+  private static List<string> ArrayStrings(JsonNode? node)
+  {
+    var list = new List<string>();
+    if (node is JsonArray a)
+      foreach (var v in a)
+        if (v is JsonValue jv && jv.TryGetValue<string>(out var s) && s.Length > 0) list.Add(s);
+    return list;
+  }
+
+  private static string? FindString(JsonObject obj, string key, int depth)
+  {
+    if (obj.Str(key) is { Length: > 0 } s) return s;
+    if (depth <= 0) return null;
+    foreach (var (_, v) in obj)
+      if (v is JsonObject child && FindString(child, key, depth - 1) is { } found)
+        return found;
+    return null;
   }
 }

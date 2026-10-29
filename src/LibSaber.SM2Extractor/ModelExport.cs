@@ -149,6 +149,38 @@ public static class ModelExport
     TextWriter stderr,
     bool quiet)
   {
+    // propanim: seq:NAME / seq:all = the template's own embedded sequences.
+    var specs = animation.Split(';', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+    var seqSpecs = specs.Where(s => s.StartsWith("seq:", StringComparison.OrdinalIgnoreCase)).ToList();
+    if (seqSpecs.Count > 0)
+    {
+      var mesh = TemplateMeshReader.Load(catalog, store, modelIndex);
+      var model = Path.GetFileNameWithoutExtension(catalog.GetFile(modelIndex).Path);
+      if (mesh.TplAnim is not { Sequences.Count: > 0 } tplAnim)
+      {
+        stderr.WriteLine(catalog.GetFile(modelIndex).Path + ": the template has no embedded animation sequences.");
+        return false;
+      }
+
+      foreach (var spec in seqSpecs)
+      {
+        var missing = new List<string>();
+        foreach (var clip in PropAnimStates.SequenceClips(tplAnim, spec, model, missing))
+        {
+          clips.Add(clip);
+          if (!quiet)
+            stdout.WriteLine($"Animation {clip.Name} (tpl sequence)  {clip.Tracks.Count} tracks  {clip.Duration:0.###}s  {clip.SampleRate:0.###} fps");
+        }
+
+        foreach (var name in missing)
+          stderr.WriteLine($"No sequence '{name}' in {model} (has: {string.Join(", ", tplAnim.Sequences.Select(s => s.Name))}).");
+      }
+
+      animation = string.Join(";", specs.Except(seqSpecs));
+      if (animation.Length == 0)
+        return clips.Count > 0;
+    }
+
     var chosen = ClipResolver.Choose(catalog, store, modelIndex, animation, out var error);
     if (chosen.Count == 0)
     {

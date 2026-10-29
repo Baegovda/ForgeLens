@@ -26,6 +26,8 @@ internal static class Program
       return Bench.VfxUeExport.Rules(args);
     if (args.Length > 0 && args[0] == "--fxparts")
       return Bench.FxPartsBench.Run(args);
+    if (args.Length > 0 && args[0] == "--propbench")
+      return Bench.PropAnimBench.Run(args);
     if (args.Length > 0 && args[0] == "--glbench")
       return Bench.GpuBench.Run(args);
     return BuildAvaloniaApp().StartWithClassicDesktopLifetime(args);

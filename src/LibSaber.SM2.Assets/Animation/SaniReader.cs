@@ -49,26 +49,33 @@ public static class SaniReader
         }
       }
 
-      if (track.objAnimList is { Count: > 0 })
+      // propanim: the same decoder as a template's embedded track ([frame, values] keys, w-first conjugated
+      // rotations; DATA-PROVEN), replacing the old guess (values only, xyzw, frames spread over the clip).
+      if (TplAnimation.From(track) is { Objects.Count: > 0 } decoded)
       {
-        for (var i = 0; i < track.objAnimList.Count; i++)
+        var fps = decoded.Sequences.FirstOrDefault(s => s.Seconds > 0)?.Fps ?? TplAnimation.DefaultFps;
+        var whole = decoded.Timeline(clip.Name, fps);
+        clip.Duration = Math.Max(clip.Duration, whole.Duration);
+        for (var i = 0; i < whole.Tracks.Count; i++)
         {
-          var bone = track.objMapList is not null && i < track.objMapList.Count ? track.objMapList[i] : i;
-          var anim = track.objAnimList[i];
-          var boneTrack = new BoneTrack { Bone = bone, BoneName = "bone" + bone };
-          var duration = clip.Duration > 0 ? clip.Duration : 1f;
-          AddVectors(boneTrack.Translation, anim.pTranslation, anim.iniTranslation, duration, clip);
-          AddQuats(boneTrack.Rotation, anim.pRotation, anim.iniRotation, duration, clip);
-          AddVectors(boneTrack.Scale, anim.pScale, anim.iniScale, duration, clip);
+          var boneTrack = whole.Tracks[i];
+          if (track.objMapList is not null && i < track.objMapList.Count)
+          {
+            boneTrack.Bone = track.objMapList[i];
+            boneTrack.BoneName = "bone" + boneTrack.Bone;
+          }
+
           if (boneTrack.Translation.Count + boneTrack.Rotation.Count + boneTrack.Scale.Count > 0)
             clip.Tracks.Add(boneTrack);
         }
+
+        clip.Notes.AddRange(decoded.Notes);
       }
 
       if (clip.Sequences.Count == 0 && clip.Tracks.Count == 0)
         clip.Notes.Add("animTRACK parsed, but it had no sequences or curves.");
       else
-        clip.Notes.Add("Spline keys are copied with a best-effort layout (xyz or txyz). Retail .sani packing is unverified, and the library's spline accessors are still stubs.");
+        clip.Notes.Add("animTRACK keys decoded as [frame, values] (DATA-PROVEN on the tpl-embedded tracks; loose animTRACK .sani are rare). Without objMapList, tracks bind by animNmb rank.");
     }
     catch (Exception ex)
     {
@@ -334,76 +341,6 @@ public static class SaniReader
     }
 
     return letters >= 3;
-  }
-
-  private static void AddVectors(List<VectorKey> keys, m3dSPL? spline, Vector3 initial, float duration, AnimationClip clip)
-  {
-    var raw = spline?.RawData;
-    var data = raw?.Data;
-    var count = (int)(raw?.Count ?? 0);
-    if (data is null || count <= 0)
-    {
-      if (initial != Vector3.Zero)
-        keys.Add(new VectorKey { Time = 0, Value = initial });
-      return;
-    }
-
-    if (data.Length == count * 3)
-    {
-      for (var i = 0; i < count; i++)
-      {
-        keys.Add(new VectorKey
-        {
-          Time = count == 1 ? 0 : duration * i / (count - 1),
-          Value = new Vector3(data[i * 3], data[i * 3 + 1], data[i * 3 + 2]),
-        });
-      }
-
-      return;
-    }
-
-    if (data.Length == count * 4)
-    {
-      for (var i = 0; i < count; i++)
-      {
-        keys.Add(new VectorKey
-        {
-          Time = data[i * 4],
-          Value = new Vector3(data[i * 4 + 1], data[i * 4 + 2], data[i * 4 + 3]),
-        });
-      }
-
-      return;
-    }
-
-    clip.Notes.Add($"A spline had {count} keys and {data.Length} floats, which is not 3 or 4 floats per key, so those keys were left raw.");
-    if (initial != Vector3.Zero)
-      keys.Add(new VectorKey { Time = 0, Value = initial });
-  }
-
-  private static void AddQuats(List<QuatKey> keys, m3dSPL? spline, Vector4 initial, float duration, AnimationClip clip)
-  {
-    var raw = spline?.RawData;
-    var data = raw?.Data;
-    var count = (int)(raw?.Count ?? 0);
-    if (data is not null && count > 0 && data.Length == count * 4)
-    {
-      for (var i = 0; i < count; i++)
-      {
-        keys.Add(new QuatKey
-        {
-          Time = count == 1 ? 0 : duration * i / (count - 1),
-          Value = Quaternion.Normalize(new Quaternion(data[i * 4], data[i * 4 + 1], data[i * 4 + 2], data[i * 4 + 3])),
-        });
-      }
-
-      return;
-    }
-
-    if (initial != Vector4.Zero)
-      keys.Add(new QuatKey { Time = 0, Value = Quaternion.Normalize(new Quaternion(initial.X, initial.Y, initial.Z, initial.W)) });
-    else if (data is { Length: > 0 })
-      clip.Notes.Add("A rotation spline was not 4 floats per key, so it was not sampled.");
   }
 
 }

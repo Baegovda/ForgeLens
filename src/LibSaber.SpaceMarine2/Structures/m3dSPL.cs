@@ -47,6 +47,28 @@ public abstract class m3dSPL
   /// </summary>
   public SplineData RawData => _data;
 
+  /// <summary>
+  ///   Values per key (<c>Unk_02</c>; T/S 3, R 4, visibility 1). DATA-PROVEN on 14,149 retail tpls (propanim):
+  ///   every embedded track spline stores keys as <c>[frame, v0..v(n-1)]</c>, stride <c>1 + Unk_02</c>
+  ///   (<c>Unk_03 == Unk_02</c>, <c>CompressedDataSize == 0</c>), frames integer and increasing.
+  /// </summary>
+  public int Dimension => _data.Unk_02;
+
+  /// <summary>Floats per key: the frame plus <see cref="Dimension" /> values.</summary>
+  public int Stride => 1 + _data.Unk_02;
+
+  /// <summary>True when <see cref="SplineData.Data" /> splits into whole <c>[frame, values]</c> keys.</summary>
+  public bool HasFrameKeys => _data.Unk_02 > 0 && _data.Data is { Length: > 0 } d && d.Length % Stride == 0;
+
+  /// <summary>Number of <c>[frame, values]</c> keys (0 when the layout does not fit).</summary>
+  public int KeyCount => HasFrameKeys ? _data.Data.Length / Stride : 0;
+
+  /// <summary>Frame of key <paramref name="index" />.</summary>
+  public float KeyFrame(int index) => _data.Data[index * Stride];
+
+  /// <summary>Component <paramref name="component" /> of key <paramref name="index" />.</summary>
+  public float KeyValue(int index, int component) => _data.Data[index * Stride + 1 + component];
+
   #endregion
 
   #region Constructor

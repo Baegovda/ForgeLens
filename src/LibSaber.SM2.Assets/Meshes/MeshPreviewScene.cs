@@ -117,7 +117,7 @@ public static partial class MeshPreview
     var honorVisibility = partFilter < 0 && lod <= 0;
     var slices = CollectSlices(mesh, lod, partFilter, honorVisibility);
     var physics = settings?.Physics == true ? PhysicsFor(mesh) : null;
-    var clipActive = mesh.Bones.Count > 0 && (mesh.Clip is { HasCurves: true } || physics is not null);
+    var clipActive = mesh.Bones.Count > 0 && (mesh.Animated || physics is not null);
     Matrix4x4[]? worlds = clipActive || showSkeleton ? BoneWorlds(mesh, timeSeconds) : null;
     var rebase = Matrix4x4.Identity;
     if (clipActive && settings?.InPlace == true && mesh.Clip is { HasCurves: true })

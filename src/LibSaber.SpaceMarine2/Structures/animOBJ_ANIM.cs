@@ -14,4 +14,10 @@ public class animOBJ_ANIM
   public float iniVisibility { get; set; }
   public m3dSPL pVisibility { get; set; }
 
+  // propanim: the ini* properties are optional per track (sentinel byte 0 = not stored); a default value is not "zero".
+  public bool HasIniTranslation { get; set; }
+  public bool HasIniRotation { get; set; }
+  public bool HasIniScale { get; set; }
+  public bool HasIniVisibility { get; set; }
+
 }
