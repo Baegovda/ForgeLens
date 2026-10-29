@@ -50,7 +50,7 @@ public partial class MainWindow
     KitbashResetButton.Content = npc ? "Template default" : "Preset parts";
     ToolTip.SetTip(KitbashResetButton, npc ? "Most likely variant per layer (highest probability; the first on a tie)" : "Back to the regions of the chosen preset");
     ToolTip.SetTip(KitbashRandomButton, npc
-      ? "One variant per layer, drawn with the template's probabilities (a variant without one weighs 1.0, the sslbin default; HEURISTIC)"
+      ? "One variant per layer, drawn with the template's probabilities (a variant without one weighs the sslbin probability default; weights / sum is HEURISTIC)"
       : "One random part per slot from the listed options");
     KitbashIntro.Text = npc
       ? "Enemy / NPC parts from ssl/inst_constructor/inst_constructor_templates.sso (body layers → mesh templates) and .cls custom presets."
@@ -254,7 +254,7 @@ public partial class MainWindow
     {
       v.Key + "  (" + v.Link + ")",
       "Objects: " + (v.IsEmpty ? "none (empty)" : string.Join(", ", v.Mesh!.Objects)),
-      v.Probability is { } p ? $"probability {p:0.###} → {o.Chance:P0} of this layer" : $"no probability (weight 1.0, sslbin default, HEURISTIC) → {o.Chance:P0}",
+      v.Probability is { } p ? $"probability {p:0.###} → {o.Chance:P0} of this layer" : $"no probability (weight {v.Weight:0.###}, sslbin field default) → {o.Chance:P0}",
     };
     if (o.Missing)
       lines.Add("⚠ None of these objects is in the loaded tpl.");

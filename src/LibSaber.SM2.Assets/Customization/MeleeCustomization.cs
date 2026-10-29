@@ -28,14 +28,16 @@ public sealed class MeleeCustomization
   public const string FactoryPath = "ssl/melee/weapon_actors/melee_actor_factory.sso";
   public const string PowerFistActor = "power_fist_fake";
   /// <summary>mtl1-47: powerFistIds + visibilityUnchangableMeshes ("Meshes (of hand), which visibility can't be changed by this system").</summary>
-  public const string PowerFistPropPath = "ssl/body/customization/prop_power_fist_customizer_base.prop";
+  public const string PowerFistPropPath = PowerFistHandRule.PropPath;
   /// <summary>
-  ///   HEURISTIC: the hand region is the RIGHT_GAUNTLET body section. prop_power_fist_customizer_base has handRegion /
-  ///   SetRightHandVisibility / FilterRightHandMeshes and keeps torso_r_gauntlet (a right gauntlet object); the CharacterBodySection
-  ///   constant in its bytecode is not decoded.
+  ///   datapars: the power fist hand rule read from the compiled scripts (<see cref="PowerFistHandRule"/>: section =
+  ///   the CharacterBodySection int SetRightHandVisibility passes to GetMeshesByBodySection, keep = visibilityUnchangableMeshes,
+  ///   fists = powerFistIds). <see cref="PowerFistHandRule.Fallback"/> (HEURISTIC, the mtl1-47 RIGHT_GAUNTLET reading) until
+  ///   <see cref="Load"/> finds the scripts.
   /// </summary>
-  public const string HandSection = "RIGHT_GAUNTLET";
-  public List<string> HandKeep { get; } = new() { "torso_r_gauntlet", "upper_arm_librarium_T", "upper_arm_librarium_G" };
+  public PowerFistHandRule HandRule { get; set; } = PowerFistHandRule.Fallback("scripts not read (FromText)");
+  public string HandSection => HandRule.Section;
+  public IReadOnlyList<string> HandKeep => HandRule.Keep;
   private static readonly Regex NameTpl = new("nameTpl\\s*=\\s*\"([^\"]+)\"", RegexOptions.CultureInvariant);
 
   public Dictionary<string, List<MeleeSkin>> Skins { get; } = new(StringComparer.OrdinalIgnoreCase);
@@ -152,6 +154,8 @@ public sealed class MeleeCustomization
       return $"powerfist={fist} is not a {PowerFistActor} skin in {SkinsPath}.";
     request.HideHandSection = HandSection;
     request.HandKeep.UnionWith(HandKeep);
+    request.HandRuleEvidence = HandRule.Evidence;
+    request.FistIds.UnionWith(HandRule.FistIds);
     foreach (var obj in PowerFistObjects(skin))
     {
       if (obj.StartsWith("ch_", StringComparison.OrdinalIgnoreCase) && template.StartsWith("cc_sm_", StringComparison.OrdinalIgnoreCase))
@@ -169,22 +173,7 @@ public sealed class MeleeCustomization
       return null;
     string? factory = catalog.TryGetByPath(FactoryPath, out var f) ? Encoding.UTF8.GetString(store.Read(f)) : null;
     var c = FromText(Encoding.UTF8.GetString(store.Read(s)), Encoding.UTF8.GetString(store.Read(p)), factory);
-    if (catalog.TryGetByPath(PowerFistPropPath, out var fp))
-    {
-      try
-      {
-        var keep = SslText.Strings(SslText.Parse(Encoding.UTF8.GetString(store.Read(fp))).GetValueOrDefault("visibilityUnchangableMeshes")).Where(n => n.Length > 0).ToList();
-        if (keep.Count > 0)
-        {
-          c.HandKeep.Clear();
-          c.HandKeep.AddRange(keep);
-        }
-      }
-      catch
-      {
-        // keep the built-in list (same as the 2026 retail .prop)
-      }
-    }
+    c.HandRule = PowerFistHandRule.Load(catalog, store);
 
     c.ResolveTpls(cls =>
     {

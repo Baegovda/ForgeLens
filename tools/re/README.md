@@ -1,3 +1,6 @@
+# SSLB scripts (datapars)
+- `sslb.py <file.sslbin> [x]`: classes / members / constants (x = also disassemble every method); `pb.py <file>`: raw protobuf dump. Layout: docs/SYMBOL_DB/scripting.md.
+
 # Light exe RE (no Ghidra auto-analysis) — mtl1-39
 - `xref.py <exe> <out.json> --str S | --va 0xHEX ...`: .pdata function bounds + capstone RIP-relative refs.
 - `callers.py <exe> 0xTARGET...`: direct call/jmp callers (also via one E9 ILT thunk, e.g. Convert.exe).

@@ -41,6 +41,13 @@ public sealed class VariantRequest
   ///   FilterRightHandMeshes); its meshes are hidden except <see cref="HandKeep"/> (visibilityUnchangableMeshes).
   /// </summary>
   public string? HideHandSection { get; set; }
+  /// <summary>datapars: where the hand rule came from (<see cref="PowerFistHandRule.Evidence"/>; PROVEN sslbin or HEURISTIC fallback).</summary>
+  public string? HandRuleEvidence { get; set; }
+  /// <summary>
+  ///   datapars: prop_power_fist_customizer_base <c>powerFistIds</c>; Init / HideFist hide all of them (HideAllFists). Objects whose
+  ///   name starts with "powerfist" are hidden too when this is empty (mtl1-47 name rule, HEURISTIC fallback).
+  /// </summary>
+  public HashSet<string> FistIds { get; } = new(StringComparer.OrdinalIgnoreCase);
   public HashSet<string> HandKeep { get; } = new(StringComparer.OrdinalIgnoreCase);
   /// <summary>Power fist objects; the hand is hidden only when one of them exists in the tpl (else the arm would end bare).</summary>
   public HashSet<string> HandFist { get; } = new(StringComparer.OrdinalIgnoreCase);
@@ -501,7 +508,8 @@ public static class ArmorVariant
           AddSubtree(name, keep);
         hand.ExceptWith(keep);
         hidden.UnionWith(hand);
-        result.Notes.Add($"power fist hides the {handSection}={handUid} hand ({string.Join(", ", handNames)}); kept {string.Join(", ", request.HandKeep)}.");
+        result.Notes.Add($"power fist hides the {handSection}={handUid} hand ({string.Join(", ", handNames)}); kept {string.Join(", ", request.HandKeep)}."
+          + (request.HandRuleEvidence is { } ev ? " Rule: " + ev : ""));
       }
       else
       {
@@ -511,7 +519,7 @@ public static class ArmorVariant
 
     foreach (var (name, _) in byName)
     {
-      if (name.StartsWith("powerfist", StringComparison.OrdinalIgnoreCase))
+      if (request.FistIds.Contains(name) || (request.FistIds.Count == 0 && name.StartsWith("powerfist", StringComparison.OrdinalIgnoreCase)))
         AddSubtree(name, hidden);
     }
 

@@ -440,6 +440,8 @@ public static class AssetExporter
     if (!CustomizationLibrary.IsConstructorTemplate(template))
       return ApplyWeaponVariant(catalog, store, template, mesh, settings, report);
     var request = VariantRequest.Parse(settings.Variant);
+    if (MeleeLibrary(catalog, store) is { } meleeLib)
+      request.FistIds.UnionWith(meleeLib.HandRule.FistIds); // datapars: HideAllFists hides powerFistIds on every constructor
     if (request.PowerFist is not null && MeleeLibrary(catalog, store)?.AddPowerFist(request, template) is { } fistNote)
       report.Messages.Add(template + ": " + fistNote);
     if (request.All)

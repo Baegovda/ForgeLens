@@ -544,6 +544,8 @@ public partial class MainWindow
     else
     {
       var request = VariantRequest.Parse(spec);
+      if (_melee is not null)
+        request.FistIds.UnionWith(_melee.HandRule.FistIds); // datapars: HideAllFists (powerFistIds)
       var fistNote = _melee?.AddPowerFist(request, _kitTemplate ?? mesh.Name);
       var result = ArmorVariant.Apply(mesh, _kit.Library, team, _kitClass.Name, request);
       if (fistNote is not null)

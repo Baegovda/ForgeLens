@@ -22,12 +22,15 @@ public sealed class NpcVariant
   public double? Probability { get; init; }
   /// <summary>
   ///   Weight for Randomize: <see cref="Probability"/>, else <see cref="InstConstructorLibrary.DefaultProbability"/>.
-  ///   HEURISTIC: the default 1.0 is the only float default in inst_constructor_mesh_template_variant_release.sslbin
-  ///   (offset 0x26F, field after <c>probability</c>); the game draws with GetElementIndexByDistribution /
-  ///   CreateProbabilityDistributionArray (names in inst_constructor_template_link_variants_release.sslbin), whose
-  ///   normalisation we assume (weights / sum).
+  ///   datapars: the default is PROVEN from the field-default table of class InstConstructorMeshTemplateVariant
+  ///   (inst_constructor_mesh_template_variant_release.sslbin: class field 10 { slot 5 = probability, float 1.0 }), read at
+  ///   load by <see cref="InstConstructorLibrary.ApplyScriptDefaults"/>. The draw (InstConstructorBodyLayerTemplate.
+  ///   CreateDistributionCache / GenerateRandomMeshTemplate -> native CreateProbabilityDistributionArray /
+  ///   GetElementIndexByDistribution) is native code: weights / sum stays HEURISTIC.
   /// </summary>
-  public double Weight => Probability ?? InstConstructorLibrary.DefaultProbability;
+  public double Weight => Probability ?? DefaultWeight;
+  /// <summary>The declared <c>probability</c> field default (<see cref="InstConstructorLibrary.ApplyScriptDefaults"/>).</summary>
+  public double DefaultWeight { get; set; } = InstConstructorLibrary.DefaultProbability;
   public string Key => Mesh?.Key ?? Link;
   public bool IsEmpty => Mesh is null || Mesh.IsEmpty;
   public override string ToString() => Key;
@@ -80,7 +83,38 @@ public sealed class InstConstructorLibrary
   public const string TemplatesPath = "ssl/inst_constructor/inst_constructor_templates.sso";
   public const string MeshTemplatesPath = "ssl/inst_constructor/inst_constructor_mesh_templates.ssolib";
   public const string LinkPrefix = "InstConstructorMeshTemplates";
+  /// <summary>Built-in probability default (the sslbin value; <see cref="ApplyScriptDefaults"/> replaces it when the script is read).</summary>
   public const double DefaultProbability = 1.0;
+  public const string MeshTemplateVariantScriptPath = "ssl/geom_customizer/inst_constructor/inst_constructor_mesh_template_variant_release.sslbin";
+  /// <summary>Where the probability default came from (PROVEN sslbin or HEURISTIC built-in).</summary>
+  public string ProbabilityDefaultEvidence { get; private set; } = "HEURISTIC built-in 1.0 (sslbin not read)";
+
+  /// <summary>
+  ///   datapars: reads the declared <c>probability</c> default of InstConstructorMeshTemplateVariant from its compiled script and
+  ///   applies it to every variant without a probability. Keeps the built-in 1.0 (HEURISTIC) when the script is missing or odd.
+  /// </summary>
+  public void ApplyScriptDefaults(byte[]? meshTemplateVariantSslbin)
+  {
+    double? value = null;
+    try
+    {
+      if (meshTemplateVariantSslbin is not null && Scripting.Sslb.IsSslb(meshTemplateVariantSslbin))
+      {
+        var sslb = Scripting.Sslb.Parse(meshTemplateVariantSslbin);
+        if (sslb.Class("InstConstructorMeshTemplateVariant") is { } cls && sslb.FieldDefault(cls, "probability") is { } d)
+          value = Convert.ToDouble(d, System.Globalization.CultureInfo.InvariantCulture);
+      }
+    }
+    catch (InvalidDataException)
+    {
+    }
+
+    if (value is not { } v)
+      return;
+    ProbabilityDefaultEvidence = $"PROVEN {MeshTemplateVariantScriptPath} InstConstructorMeshTemplateVariant.probability default {v:0.###}";
+    foreach (var variant in Templates.SelectMany(t => t.Layers).SelectMany(l => l.Variants))
+      variant.DefaultWeight = v;
+  }
   public const string EmptyKey = "EMPTY";
 
   public List<NpcTemplate> Templates { get; } = new();
@@ -366,28 +400,25 @@ public sealed class InstConstructorLibrary
   }
 
   /// <summary>
-  ///   Layers that are off by the requiredLayer / disabledByLayer rules for these picks (a layer counts as filled when its pick
-  ///   names a non-empty mesh template and the layer itself is active). HEURISTIC reading of the two field names; the sslbin
-  ///   logic is not decoded.
+  ///   Layers that are off by the requiredLayer / disabledByLayer rules for these picks. datapars: PROVEN from
+  ///   InstConstructorTemplate.GenerateRandomPreset (ssl/geom_customizer/inst_constructor/inst_constructor_template_release.sslbin):
+  ///   after every layer picked (meshTemplates[name] = layer.GenerateRandomMeshTemplate, null picks not stored), ONE pass over
+  ///   bodyLayers removes a layer's pick when GetRequiredLayer() != "" and meshTemplates[required] is null or its geomObjNames
+  ///   is empty, otherwise when GetDisabledByLayer() != "" and meshTemplates[disabledBy] is non-null with geomObjNames non-empty.
+  ///   Removals are seen by later layers only (single pass, no fixed point). HEURISTIC: the bodyLayers dict iterates in .sso
+  ///   file order (native DictIterator order is not decoded).
   /// </summary>
   public HashSet<string> DisabledLayers(NpcTemplate t, IReadOnlyDictionary<string, string?> picks)
   {
     var off = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
     bool Filled(string layer) => !off.Contains(layer) && picks.GetValueOrDefault(layer) is { } key && MeshTemplates.GetValueOrDefault(key) is { IsEmpty: false };
-    for (var pass = 0; pass < 4; pass++)
+    foreach (var layer in t.Layers)
     {
-      var changed = false;
-      foreach (var layer in t.Layers)
-      {
-        if (off.Contains(layer.Name))
-          continue;
-        var disabled = (layer.RequiredLayer is { } req && !Filled(req)) || (layer.DisabledByLayer is { } by && Filled(by));
-        if (disabled)
-          changed |= off.Add(layer.Name);
-      }
-
-      if (!changed)
-        break;
+      var disabled = layer.RequiredLayer is { Length: > 0 } req
+        ? !Filled(req) || (layer.DisabledByLayer is { Length: > 0 } by1 && Filled(by1))
+        : layer.DisabledByLayer is { Length: > 0 } by && Filled(by);
+      if (disabled)
+        off.Add(layer.Name);
     }
 
     return off;
@@ -418,6 +449,7 @@ public sealed class InstConstructorLibrary
       if (!catalog.TryGetByPath(TemplatesPath, out var t) || !catalog.TryGetByPath(MeshTemplatesPath, out var m))
         return null;
       var lib = FromText(Encoding.UTF8.GetString(store.Read(t)), Encoding.UTF8.GetString(store.Read(m)));
+      lib.ApplyScriptDefaults(catalog.TryGetByPath(MeshTemplateVariantScriptPath, out var sv) ? store.Read(sv) : null);
       var query = catalog.Query(null, ".cls", AssetFilter.All);
       foreach (var index in query.Indices ?? Enumerable.Range(query.First, query.Count).ToArray())
       {

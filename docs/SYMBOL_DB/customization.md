@@ -7,10 +7,11 @@
 - Default look = PREDEFINED_PRESET_1 (data). Team/class from `customizable_character_dummy_*.cls` (data).
 - ApplyMaterialSuffix chain — see materials.md (PROVEN).
 - Firearm uid rule (mtl1-49, data): explicit `uid=` > skin override actor (mgs/ first) > own actor > prefix owner.
-- Power fist hand: RIGHT_GAUNTLET region minus visibilityUnchangableMeshes (section constant HEURISTIC).
+- Power fist hand (datapars, PROVEN from script bytecode): `PropPowerFistCustomizerBase.SetRightHandVisibility` hides `GetMeshesByBodySection(6)` (CharacterBodySection 6 = RIGHT_GAUNTLET) minus `visibilityUnchangableMeshes`; `HideAllFists` hides `powerFistIds` (geom native slot 167). Read at load by `A/Customization/PowerFistHandRule.cs` (HEURISTIC built-in fallback when the scripts are missing). Subtree hiding and engineer (no fist objects) keep-hand stay HEURISTIC.
+- NPC inst_constructor (datapars, PROVEN from bytecode): `InstConstructorTemplate.GenerateRandomPreset` applies requiredLayer / disabledByLayer in ONE pass over bodyLayers (filled = pick present with non-empty geomObjNames); variant `probability` default 1.0 is the declared field default (class field 10). Dict iteration order and the native distribution draw stay HEURISTIC.
 - Held weapon from `prop_inventory_client` + hold locators `prop_model_weapon_holds` (data, mtl1-49; see scripting.md).
 
-**Code:** `A/Customization/*` (ArmorVariant, WeaponVariant, SkinMaterial, Kitbash, ColourSchemes), `A/Context/*`.
+**Code:** `A/Scripting/Sslb.cs` (sslbin reader), `A/Customization/*` (PowerFistHandRule, ArmorVariant, WeaponVariant, SkinMaterial, Kitbash, ColourSchemes), `A/Context/*`.
 
 Long-form: RE_NOTES "Customization", HANDOFF ui-44/45, mtl1-46..49.
 

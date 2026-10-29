@@ -265,7 +265,9 @@ public static class WeaponVariant
 {
   /// <summary>
   ///   Hide every tpl object a firearm region lists except the regions of the selected skin.
-  ///   HEURISTIC: region <c>main</c> (body_geom/back) stays shown (equipment defaultRegion is not in the data we decode);
+  ///   HEURISTIC: region <c>main</c> (body_geom/back) stays shown. datapars: PropGeomCustomizerEquipment.Init (sslbin) is HideAll, then
+  ///   initialBehaviour 0 ShowActiveRegions / 1 ShowDefault(defaultRegion); it never names <c>main</c>, and the firearm skin scripts
+  ///   (weapons/creator/customization/firearm_skin_release.sslbin) are not decoded yet;
   ///   objects no region mentions keep their visibility.
   /// </summary>
   public static VariantResult Apply(ExportedMesh mesh, WeaponCustomization lib, string uid, VariantRequest request)
