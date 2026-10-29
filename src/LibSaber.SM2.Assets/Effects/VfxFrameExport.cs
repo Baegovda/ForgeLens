@@ -127,7 +127,7 @@ public static class VfxFrameExport
   /// <summary>
   ///   mtl1-35: effect lights (<c>sfx_light</c>, <see cref="EffectInstance"/> Lights()) at the frame time.
   ///   mtl1-36: <c>color</c> is in capture-calibrated relative units (<see cref="CaptureLightUnits.Relative"/>: capture HDR /
-  ///   avgLum, i.e. 1 = the particle ambient), <c>captureHdr</c> the CB_COMMON_LIGHTNG value at that avgLum; attenuation
+  ///   avgLum, i.e. 1 = the particle ambient), <c>captureHdr</c> the CB_COMMON_LIGHTNG value at that avgLum (adaptive lights x clamp(avgLum, 0.05, 50), PROVEN R37); attenuation
   ///   sat(1 - d^4/r^4)^2, radius in metres.
   /// </summary>
   public static JsonArray Lights(IEnumerable<LightSample> lights, float averageLuminance = 1f)

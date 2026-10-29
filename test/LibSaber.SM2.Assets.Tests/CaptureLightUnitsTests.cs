@@ -53,6 +53,31 @@ public class CaptureLightUnitsTests
     Assert.Equal(0.5f, CaptureLightUnits.SrgbToLinear(CaptureLightUnits.SrgbToLinear(1f) * 0f + 0.7354f), 2e-3f);
   }
 
+  [Theory]
+  [InlineData(0.001f, 0.05f)]
+  [InlineData(0.05f, 0.05f)]
+  [InlineData(4f, 4f)]
+  [InlineData(50f, 50f)]
+  [InlineData(1000f, 50f)]
+  public void AdaptiveFactorIsClampedAverageLuminance(float avgLum, float factor)
+  {
+    // R37 PROVEN: FUN_141e90cb0 = clamp(avgLum, 0.05, 50) fed to packer FUN_14224ecf0 for adaptive lights.
+    Assert.Equal(factor, CaptureLightUnits.AdaptiveFactor(true, avgLum), 1e-6f);
+    Assert.Equal(8f * factor, CaptureLightUnits.Capture(Vector3.One, 8f, true, avgLum).X, 1e-3f);
+    Assert.Equal(8f * factor / avgLum, CaptureLightUnits.Relative(Vector3.One, 8f, true, avgLum).X, 8f * factor / avgLum * 1e-5f);
+  }
+
+  [Theory]
+  [InlineData(0.001f)]
+  [InlineData(4f)]
+  [InlineData(1000f)]
+  public void NonAdaptiveFactorIsOne(float avgLum)
+  {
+    Assert.Equal(1f, CaptureLightUnits.AdaptiveFactor(false, avgLum));
+    Assert.Equal(8f, CaptureLightUnits.Capture(Vector3.One, 8f, false, avgLum).X, 1e-4f);
+    Assert.Equal(8f / avgLum, CaptureLightUnits.Relative(Vector3.One, 8f, false, avgLum).X, 8f / avgLum * 1e-5f);
+  }
+
   [Fact]
   public void ExportedLightColorIsRelative()
   {

@@ -335,8 +335,12 @@ public static class CaptureTonemapGlsl
 ///   Capture match: fx_plasma_exterminator_shot_venting (r 24 exact, colour (94,120,152) sRGB-decoded ratio within 1.3%):
 ///   CB colour 274.0 / 269.0 vs srgbToLinear(152/255) * 200 (Intensity at t=0) * avgLum 4.150 = 260.5 (-5% / -3%);
 ///   fx_plasma_charging_side (r 2 exact, ratio within 1.5%): 1145 = lin * 569 * avgLum, 569 inside its 150..4448 spline.
-///   So capture HDR = srgbToLinear(ColorCtrl) * Intensity * (isAdaptiveIntensity ? avgLum : 1). The adaptive scale is
-///   inferred from one light at one avgLum (HEURISTIC for the factor itself; non-adaptive lights were not in a capture).
+///   So capture HDR = srgbToLinear(ColorCtrl) * Intensity * (isAdaptiveIntensity ? clamp(avgLum, 0.05, 50) : 1).
+///   rea-batch 7 (R37) PROVEN: packer FUN_14224ecf0 multiplies P1.rgb by adaptScale when light+0x6d bit0 is set; the
+///   per-viewport light CB fill FUN_141ee9e80 (3 sites) passes adaptScale = FUN_141e90cb0 (GetAvgLumClamped(vp) =
+///   clamp(avgLum[vp] @DAT_144f9d06c, 0.05, 50), = COMMON_HDR_AVERAGE_LUMINANCE_CLAMPED); the LIGHTS_BUFFER builder
+///   FUN_141de8140 passes 1.0. Non-adaptive lights get factor 1. Still HEURISTIC: <see cref="DefaultAdaptive"/> and the
+///   bench exposure 1/250 (which decides the bench avgLum).
 ///   With exposure = key / avgLum an adaptive light's exposed value is lin * I * key, independent of scene brightness.
 /// </summary>
 public static class CaptureLightUnits
@@ -370,11 +374,18 @@ public static class CaptureLightUnits
 
   /// <summary>Capture HDR colour (CB_COMMON_LIGHTNG PARAMS[4i+1].rgb) for an authored colour/intensity.</summary>
   public static System.Numerics.Vector3 Capture(System.Numerics.Vector3 srgb, float intensity, bool adaptive, float averageLuminance, float colorScale = 1f)
-    => Linear(srgb) * intensity * colorScale * (adaptive ? averageLuminance : 1f);
+    => Linear(srgb) * intensity * colorScale * AdaptiveFactor(adaptive, averageLuminance);
+
+  /// <summary>Adaptive-luminance clamp of FUN_141e90cb0 (PROVEN 0.05 / 50, DAT_143c843d4 / DAT_143557190).</summary>
+  public const float AdaptiveMin = 0.05f, AdaptiveMax = 50f;
+
+  /// <summary>FUN_14224ecf0 adaptScale: clamp(avgLum, 0.05, 50) for adaptive lights (FUN_141e90cb0), 1 otherwise. PROVEN.</summary>
+  public static float AdaptiveFactor(bool adaptive, float averageLuminance)
+    => adaptive ? Math.Clamp(averageLuminance, AdaptiveMin, AdaptiveMax) : 1f;
 
   /// <summary>Light relative to the particle ambient (capture HDR / avgLum): what the bench and UE export use.</summary>
   public static System.Numerics.Vector3 Relative(System.Numerics.Vector3 srgb, float intensity, bool adaptive, float averageLuminance, float colorScale = 1f)
-    => Linear(srgb) * intensity * colorScale * (adaptive ? 1f : 1f / MathF.Max(averageLuminance, 1e-6f));
+    => Linear(srgb) * intensity * colorScale * (AdaptiveFactor(adaptive, averageLuminance) / MathF.Max(averageLuminance, 1e-6f));
 
   /// <summary>s4462 distance window: sat(1 - d^4 / r^4)^2 (the inverse-square factor is <see cref="InverseSquare"/>).</summary>
   public static float Attenuation(float distance, float radius)

@@ -68,3 +68,4 @@
 ## rea-batch 7 (2026-10-29 23:45 – 10-30 KST, PC REA daemon, rea-agents 6.8.0)
 - Notes/raw box /workspace/rea/b7/ (trail_points.md, raw/). Upload FUN_14184c8d0, update FUN_141909810 → FUN_141847640 → baker FUN_141ab9b60, spawn FUN_1418bd8d0 (all PROVEN); slot {7,2} INFERRED.
 - Code: branch trail-fade (worktree /workspace/LibSaber-trail-fade), patch /workspace/patches/trail-fade/. Fade default ON, age-sampled gradient.
+- Item 2 adaptive light (R37): notes /workspace/rea/b7/adaptive_light.md; code branch adaptive-light (worktree /workspace/LibSaber-adaptive-light), patch /workspace/patches/adaptive-light/. AdaptiveFactor = clamp(avgLum,0.05,50) PROVEN; DefaultAdaptive + bench 1/250 HEURISTIC.

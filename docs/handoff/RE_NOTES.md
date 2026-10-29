@@ -255,7 +255,7 @@ All addresses are virtual addresses in `sm2_retail.exe` (retail Steam build, 81 
 ## rea-batch 3 (2026-10-29 KST, headless Ghidra + RenderDoc raw re-dump)
 - **Render light from desc (PROVEN, FUN_141384090, desc base +0x78):** R = light+0x18.
   - R+0x54 = attenCurveParam (desc 0x94).
-  - R+0x6d bits: 0 isAdaptiveIntensity (0xa5), 1 useInverseSquaredFalloff (0x91), 2 isConstAtten (0x98), 3 desc 0x205, 4 isNoSpecular (0xa9).
+  - R+0x6d bits: 0 isAdaptiveIntensity (0xa5; adaptScale source PROVEN rea-batch 7/R37: FUN_141ee9e80 passes FUN_141e90cb0 = clamp(avgLum[vp], 0.05, 50), FUN_141de8140 LIGHTS_BUFFER passes 1.0), 1 useInverseSquaredFalloff (0x91), 2 isConstAtten (0x98), 3 desc 0x205, 4 isNoSpecular (0xa9).
   - R+0x1fc coefIndirect (0x9c). R+0x68 = clamped fogAmount (0xa0).
   - R+0x60 / +0x64: spotAngle (min-clamped DAT_1436385ec) / inner (0..DAT_14355c0f0), spot only.
   - R+0x6c type (point 0, spot 1, directional 2). R+0x20b enableSM (0xa4). R+0x20c = 3 when isStatic (0xa6). isHiddenReflCube (0xaa) → light+0x69. R+0xd4 = desc 0xe0 (defaulted when < 0).
@@ -300,3 +300,9 @@ All addresses are virtual addresses in `sm2_retail.exe` (retail Steam build, 81 
 - **Spawn (PROVEN):** FUN_1418bd8d0 (vtbl+0x170) pt+0x14 = p5 ? ARGB(p5+0x40..0x4c) : 0xFFFFFFFF, pt+0x1c = p4 ? p4[2] : 255; FUN_1418bbd20 / FUN_141909810 pass NULL → white, 255. Non-null p5 caller not traced.
 - Supersedes the rea-batch 6 note that no ribbon RGB is computed on the CPU (that was FUN_141847c30 on another path).
 - **Implemented:** `EffectTrails.cs` `TrailDef.BakePointColor` / `AlphaInherited`; `SM2_VFX_TRAIL_FADE` default ON (=0 opt-out). colorIntensity × curve stays as before (GPU EMISSIVE, rea-batch 2). Not verified: owner+0x144 value (code uses 1), curve+0x400 (code maps age 0..1 over the whole gradient), age normalisation by timeLifeSeg (INFERRED), blendType enum for trail visuals assumed blend 0 / add 1 / blend_add 2 as for particles (INFERRED). Raw: box /workspace/rea/b7/.
+
+## rea-batch 7 item 2 (2026-10-30 KST, PC REA daemon): adaptive light multiplier → code (R37)
+- **adaptScale (PROVEN):** packer FUN_14224ecf0(out, light, adaptScale, shadowIdx): P1.rgb *= adaptScale iff light+0x6d bit0 (isAdaptiveIntensity), all light types. FUN_141e90cb0 = GetAvgLumClamped(vp) = clamp(*(float*)(DAT_144f9cee0 + vp*0x198 + 0x18c) = DAT_144f9d06c, 0.05, 50) = COMMON_HDR_AVERAGE_LUMINANCE_CLAMPED (same DAT FUN_141e90d00 writes to CB_COMMON +0x160/+0x164).
+- Callers: FUN_141ee9e80 per-viewport light CB fill (0x141eea048/331/517: first 16, main list, extras at +0x841a0) all pass clamp(avgLum); FUN_141de8140 "LIGHTS_BUFFER" builder (0x141de826c) passes 1.0 (consumer not traced, INFERRED non-viewport).
+- **Code:** `CaptureLightUnits.AdaptiveFactor` = adaptive ? clamp(avgLum, 0.05, 50) : 1; Capture() = lin·I·factor, Relative() = Capture()/avgLum. Capture scenes unchanged (avgLum 4.15/4.82 in range); only bench/`SM2_VFX_EXPOSURE` cases with avgLum outside [0.05, 50] change.
+- Still HEURISTIC: `DefaultAdaptive = true` (desc deserializer default not traced), bench exposure 1/250. Other FUN_141e90cb0 users (0x14184cd7f, 0x14184d3fd, 0x14189f70a, 0x141906bee, 0x141ef822c) not inspected.

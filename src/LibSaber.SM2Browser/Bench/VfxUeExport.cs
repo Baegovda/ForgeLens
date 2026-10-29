@@ -126,7 +126,7 @@ internal static class VfxUeExport
       frame["pixels"] = size;
       frame["lights"] = VfxFrameExport.Lights(lights, hdr.AverageLuminance);
       frame["scene"] = hdr.Json();
-      frame["lightUnits"] = "mtl1-36 CaptureLightUnits: color = srgbToLinear(ColorCtrl) * Intensity * (adaptive ? 1 : 1/avgLum), relative to the particle ambient (= capture avgLum); att = sat(1-(d/r)^4)^2 (s4462). Ground/cover: grey * (1 + albedo/pi * sum(color * att * max(0, n.l))), albedo 0.18 HEURISTIC.";
+      frame["lightUnits"] = "mtl1-36 CaptureLightUnits: color = srgbToLinear(ColorCtrl) * Intensity * (adaptive ? clamp(avgLum,0.05,50) : 1) / avgLum (adaptive factor PROVEN FUN_141e90cb0, R37), relative to the particle ambient (= capture avgLum); att = sat(1-(d/r)^4)^2 (s4462). Ground/cover: grey * (1 + albedo/pi * sum(color * att * max(0, n.l))), albedo 0.18 HEURISTIC.";
       frame["groundY"] = 0f;
       frame["grading"] = new System.Text.Json.Nodes.JsonObject
       {
