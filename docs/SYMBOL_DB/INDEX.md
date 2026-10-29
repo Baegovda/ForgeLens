@@ -6,6 +6,7 @@ One place to look up what is already reverse-engineered, so new work starts from
 1. `grep -i <word or address> docs/SYMBOL_DB/index.tsv` (columns: symbol | address | domain | purpose | status | doc | dump | strings).
 2. Open the domain file below for the overview (entry points, data links, code that implements it, open questions).
 3. Unknown function but asset-related? `grep <address or string> docs/SYMBOL_DB/rea_string_xrefs.tsv` (REA string-xref inventory, below).
+   Ranked leads for unmapped asset functions (HEURISTIC score, per domain): [PRIORITY_UNMAPPED.md](PRIORITY_UNMAPPED.md) (`python3 tools/symbol_db/priority_unmapped.py`).
 4. Only if both have nothing: run new RE with **REA first** (the persistent `rea mcp` daemon, `tools/re/rea_call.py`; WORKFLOW.md "REA"), plain Ghidra headless only as a fallback. Write the result into RE_NOTES / HANDOFF with a status word, and regenerate the map:
    `python3 tools/symbol_db/build_symbol_db.py` (repo root; default dump dirs `/workspace/rea`, `/workspace/mtl_fix/m48` on the box).
 
