@@ -1,0 +1,59 @@
+cls	wpnType	shootTip	barrelOverrides	muzzleSfx	aimHoldClips
+arifle_bolt_rifle_combimelta_client.cls	1.51	shootTip	melta=tip_gl		tacticus_wpn151_aim_hold_intercessor.sani;tacticus_wpn151_aim_hold_melta_intercessor.sani
+arifle_bolt_rifle_combimelta_tac_reserve_client.cls	1.51	shootTip	melta=tip_gl		tacticus_wpn151_aim_hold_intercessor.sani;tacticus_wpn151_aim_hold_melta_intercessor.sani
+arifle_heavy_bolt_rifle_heroic_01_client.cls	1.52	(inherited)			
+brifle_stalker_bolt_rifle_deathwatch_01_client.cls	1.1	(inherited)			tacticus_wpn110_aim_hold_intercessor.sani
+hwpn_heavy_meltagun_salamander_01_client.cls	2.3	(inherited)			tacticus_wpn230_aim_hold_intercessor.sani
+shotgun_meltagun_heroic_05_client.cls	1.4	(inherited)		muzzle	tacticus_wpn140_aim_hold_intercessor.sani
+smg_bolt_carbine_heroic_05_a_client.cls	1.2	shootTip	pyre=flame_area		tacticus_wpn120_aim_hold_intercessor.sani
+arifle_auto_bolt_rifle_client.cls	1.01	(inherited)			tacticus_wpn101_aim_hold_intercessor.sani
+arifle_bolt_rifle_client.cls	1	(inherited)			tacticus_wpn10_aim_hold_intercessor.sani
+arifle_bolt_rifle_tac_reserve_client.cls	1	(inherited)			tacticus_wpn10_aim_hold_intercessor.sani
+arifle_death_watch_bolt_rifle_client.cls	1.03	(inherited)			tacticus_wpn103_aim_hold_intercessor.sani
+arifle_heavy_bolt_rifle_client.cls	1.02	(inherited)			tacticus_wpn102_aim_hold_intercessor.sani
+aux_grenade_launcher_client.cls	1.5	(inherited)			
+aux_grenade_launcher_tac_reserve_client.cls	1.5	(inherited)			
+aux_melta_bolter_client.cls	1.5	(inherited)			
+brifle_bolt_sniper_rifle_client.cls	1.13	(inherited)			tacticus_wpn113_aim_hold_intercessor.sani
+brifle_instigator_bolt_carbine_client.cls	1.12	(inherited)			tacticus_wpn112_aim_hold_intercessor.sani
+brifle_marksman_bolt_carbine_client.cls	1.11	(inherited)			tacticus_wpn111_aim_hold_intercessor.sani
+brifle_stalker_bolt_rifle_client.cls	1.1	(inherited)			tacticus_wpn110_aim_hold_intercessor.sani
+hgun_absolver_bolt_pistol_client.cls	0	(inherited)			tacticus_wpn000_aim_hold_intercessor.sani
+hgun_assault_bolter_client.cls	0.3	(inherited)			
+hgun_bolt_carbine_client.cls	0.1	(inherited)			
+hgun_bolt_pistol_client.cls	0.1	(inherited)			
+hgun_bolt_pistol_gun_strike_hidden_client.cls	0.1	(inherited)			
+hgun_death_watch_bolt_pistol_client.cls	0.1	(inherited)			
+hgun_heavy_bolt_pistol_client.cls	0	(inherited)			tacticus_wpn000_aim_hold_intercessor.sani
+hgun_inferno_pistol_client.cls	0.5	(inherited)			
+hgun_plasma_pistol_client.cls	0.2	(inherited)			tacticus_wpn020_aim_hold_intercessor.sani
+hgun_volkite_pistol_client.cls	0.4	(inherited)			
+humanwpn_cultist_autogun_client.cls	3	(inherited)			
+humanwpn_cultist_sniper_lasgun_client.cls	2	(inherited)			tacticus_wpn200_aim_hold_intercessor.sani
+hwpn_grav_cannon_client.cls	2	(inherited)			tacticus_wpn200_aim_hold_intercessor.sani
+hwpn_heavy_bolter_client.cls	2	(inherited)			tacticus_wpn200_aim_hold_intercessor.sani
+hwpn_heavy_flamer_client.cls	2.2	(inherited)			tacticus_wpn220_aim_hold_intercessor.sani
+hwpn_heavy_meltagun_client.cls	2.3	(inherited)			tacticus_wpn230_aim_hold_intercessor.sani
+hwpn_las_fusil_client.cls	1.6	(inherited)			tacticus_wpn160_aim_hold_intercessor.sani
+hwpn_plasma_incinerator_client.cls	2.1	(inherited)			tacticus_wpn210_aim_hold_intercessor.sani
+hwpn_pyrecannon_client.cls	2.21	(inherited)			
+hwpn_pyroblaster_client.cls	1.25	(inherited)			tacticus_wpn125_aim_hold_intercessor.sani
+inferno_combi_bolter_client.cls	0	(inherited)			tacticus_wpn000_aim_hold_intercessor.sani
+mounted_forge_bolter_client.cls	1.02	(inherited)			tacticus_wpn102_aim_hold_intercessor.sani
+mounted_plasma_client.cls	1.02	(inherited)			tacticus_wpn102_aim_hold_intercessor.sani
+mounted_sniper_client.cls	1.02	(inherited)			tacticus_wpn102_aim_hold_intercessor.sani
+pwpn_plasma_exterminator_client.cls	1.3	(inherited)			tacticus_wpn130_aim_hold_intercessor.sani
+rubric_bolter_client.cls	0	(inherited)			tacticus_wpn000_aim_hold_intercessor.sani
+shotgun_meltagun_client.cls	1.4	(inherited)			tacticus_wpn140_aim_hold_intercessor.sani
+siege_heavy_bolter_client.cls	2	(inherited)			tacticus_wpn200_aim_hold_intercessor.sani
+siege_heavy_bolt_pistol_client.cls	0	(inherited)			tacticus_wpn000_aim_hold_intercessor.sani
+siege_las_fusil_client.cls	1.6	(inherited)			tacticus_wpn160_aim_hold_intercessor.sani
+siege_plasma_pistol_client.cls	0.2	(inherited)			tacticus_wpn020_aim_hold_intercessor.sani
+smg_bolt_carbine_client.cls	1.2	(inherited)			tacticus_wpn120_aim_hold_intercessor.sani
+smg_occulus_bolt_carbine_client.cls	1.21	(inherited)			tacticus_wpn121_aim_hold_intercessor.sani
+wpn_tarantula_client.cls		shootTipRight		muzzle_r	
+wpn_barbed_strangler_client.cls	3	(inherited)		muzzle_full	
+wpn_devourer_client.cls	1	(inherited)		muzzle_full	tacticus_wpn10_aim_hold_intercessor.sani
+wpn_venom_canon_client.cls	2	(inherited)		muzzle_full	tacticus_wpn200_aim_hold_intercessor.sani
+arifle_auto_bolt_rifle_chaos_client.cls	1.04	(inherited)			
+shotgun_meltagun_chaos_client.cls	1.41	(inherited)			
