@@ -160,6 +160,14 @@ public sealed class ContextResolver
     return name => keys.TryGetValue(name, out var e) ? e : map?.Resolve(name) ?? name;
   }
 
+  /// <summary>
+  ///   mtl1-53: sfx.list entry for a blueprint name, weapon chain first then character (same order as <see cref="Resolver"/>).
+  ///   The entry is a prototype override of its <c>__type</c> effect (wpn_melee_chainsword: trail_mele_01_yellow =
+  ///   trail_melee_01_yellow with timeLifeSeg 0.15, colorIntensity 5 x 0.4), merged like sfx_group list entries (INFERRED).
+  /// </summary>
+  public Func<string, System.Text.Json.Nodes.JsonObject?> Overrides(string? character, string? weapon)
+    => key => (weapon is null ? null : _index.SfxEntry(weapon, key)) ?? (character is null ? null : _index.SfxEntry(character, key));
+
   /// <summary>Is the effect started by the weapon's chain (so it goes on the weapon's sockets)?</summary>
   public bool WeaponOwns(string weapon, string effectOrKey)
   {

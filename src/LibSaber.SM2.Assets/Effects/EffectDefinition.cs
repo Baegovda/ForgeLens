@@ -274,6 +274,13 @@ public sealed class EffectDefinition
   public List<LightDef> Lights { get; } = [];
   public List<TrailDef> Trails { get; } = [];
   /// <summary>
+  ///   mtl1-53: <c>sfx_trail_triangle</c> nodes (weapon swing trails). Registered as a subclass of <c>sfx_trail_base</c>
+  ///   next to sfx_trail in FUN_141848c40 (string @0x14363c4d0, class SfxTrailTriangle @0x143648c80), so they share the
+  ///   trail desc (visuals / trailParams / optimization). They have no single parent: the blueprint starter names the two
+  ///   locators they sweep (<see cref="TrailEdge"/>), so only context playback draws them (<see cref="TriangleTrails"/>).
+  /// </summary>
+  public List<TrailDef> SweptTrails { get; } = [];
+  /// <summary>
   ///   mtl1-42: trail names referenced by an emitter's <c>trails.partATTACHED_TRAIL.name</c> (204 sfx files). These ribbons
   ///   follow the emitter's particles in game, not the effect root (fx_mgs_zoanthrop_lightnings: trail_sorcerer_smoke_* on
   ///   CPU_EMITTER particles). INFERRED from the data (key name), the exe binding was not traced.
@@ -283,7 +290,7 @@ public sealed class EffectDefinition
   public IEnumerable<TrailDef> RootTrails => Trails.Where(t => !ParticleAttachedTrails.Contains(t.Name));
   /// <summary>Every drawable render state: sprite emitters and trail ribbons.</summary>
   public IEnumerable<EmitterDef> Drawables => Emitters.Where(e => e.IsSprite).Concat(Trails.Select(t => t.Render));
-  public IEnumerable<string?> Textures => Emitters.Select(e => e.Texture).Concat(Emitters.Select(e => e.AlphaMask)).Concat(Trails.Select(t => t.Render.Texture));
+  public IEnumerable<string?> Textures => Emitters.Select(e => e.Texture).Concat(Emitters.Select(e => e.AlphaMask)).Concat(Trails.Select(t => t.Render.Texture)).Concat(SweptTrails.Select(t => t.Render.Texture));
   /// <summary>Nodes kept out of the simulation (trails, mesh particles, ...): path and type.</summary>
   public List<(string Path, string Type)> Unsupported { get; } = [];
   /// <summary>
@@ -411,6 +418,9 @@ public sealed class EffectDefinition
       }
       case "sfx_trail":
         def.Trails.Add(TrailDef.Parse(node, path, world, nameParent, scale * node.Float("scale", 1f)));
+        break;
+      case "sfx_trail_triangle":
+        def.SweptTrails.Add(TrailDef.Parse(node, path, world, nameParent, scale * node.Float("scale", 1f)));
         break;
       default:
         def.Unsupported.Add((path, type.Length > 0 ? type : "?"));

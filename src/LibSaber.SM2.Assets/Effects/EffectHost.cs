@@ -50,6 +50,13 @@ public sealed class EffectHost
 
   public Func<string, float, Matrix4x4?> Socket => (name, _) => World(name);
 
+  /// <summary>mtl1-53: <see cref="World"/> on other bone worlds (a past pose), trying <paramref name="scope"/>_name first.</summary>
+  public Matrix4x4? WorldIn(Matrix4x4[] worlds, string name, string? scope = null)
+  {
+    var i = scope is { Length: > 0 } && name.Length > 0 && IndexOf(scope + "_" + name) is var s and >= 0 ? s : IndexOf(name);
+    return i >= 0 && i < worlds.Length ? Rigid(worlds[i]) : null;
+  }
+
   /// <summary>Whether any emitter, light or trail of the effect binds to a socket the host has.</summary>
   public bool Binds(EffectDefinition def)
     => def.Emitters.Any(e => IndexOf(e.NameParent) >= 0) || def.Lights.Any(l => IndexOf(l.NameParent) >= 0) || def.Trails.Any(t => IndexOf(t.NameParent) >= 0);
@@ -94,9 +101,13 @@ public sealed class AnimEventEffects
   /// <param name="resolve">sfx.list key → effect for the clip's owner (character + held weapon chains); default <see cref="AnimEventVfxMap.Resolve"/>.</param>
   /// <param name="scope">Socket scope for a cue (effect, source) → (bone prefix, root bone), e.g. a held weapon's effects.</param>
   /// <param name="trackCues">Cues not from blueprints: every event on a track named <see cref="Context.TrackCue.Track"/> starts the effect (HEURISTIC, e.g. Shoot → muzzle).</param>
+  /// <param name="buildKeyed">mtl1-53: (blueprint name, effect) → the effect with the owner's <c>sfx.list</c> entry merged on top
+  ///   (prototype inheritance, as sfx_group list entries), or null; used for swept (triangle) trails.</param>
   public AnimEventEffects(AnimationClip clip, AnimEventVfxMap map, Func<string, EffectDefinition?> build, EffectHost host, Func<EventVfx, bool>? include = null,
-    Func<string, string>? resolve = null, Func<string, string, (string Prefix, string Root)?>? scope = null, IReadOnlyList<Context.TrackCue>? trackCues = null)
+    Func<string, string>? resolve = null, Func<string, string, (string Prefix, string Root)?>? scope = null, IReadOnlyList<Context.TrackCue>? trackCues = null,
+    Func<string, string, EffectDefinition?>? buildKeyed = null)
   {
+    var swept = new List<SweptTrailCue>();
     resolve ??= map.Resolve;
     var cues = new List<Cue>();
     var unmapped = new SortedSet<string>(StringComparer.Ordinal);
@@ -131,6 +142,16 @@ public sealed class AnimEventEffects
             var inst = host.Attach(def, locator, (ulong)(cues.Count * 7919), sc?.Prefix);
             inst.StopTime = stopAt - time;
             _instances.Add((cue, inst));
+            if (def.SweptTrails.Count > 0)
+            {
+              if (hit.Edge is not { } edge) { unmapped.Add($"{tag}->{name} (triangle trail, starter has no locator1/2)"); continue; }
+              var keyed = buildKeyed?.Invoke(hit.Effect, name) ?? def;
+              foreach (var td in keyed.SweptTrails.Count > 0 ? keyed.SweptTrails : def.SweptTrails)
+              {
+                var end = Math.Min(stopAt, td.TimeLife > 0 ? time + td.TimeLife : float.PositiveInfinity);
+                swept.Add(new SweptTrailCue(tag, name, hit.Source, td, edge, sc?.Prefix, time, Math.Min(end, length)));
+              }
+            }
           }
         }
 
@@ -149,9 +170,25 @@ public sealed class AnimEventEffects
           }
         }
 
+    // A later start of the same trail on the same edge restarts it (BlueprintNodeVfxTriangleRestart; HEURISTIC for Startsfxtrailtriangle).
+    for (var i = 0; i < swept.Count; i++)
+    {
+      var c = swept[i];
+      var next = swept.Where(o => o.Start > c.Start + 1e-4f && o.Def.Path == c.Def.Path && o.Edge == c.Edge && o.Scope == c.Scope)
+        .Select(o => o.Start).DefaultIfEmpty(float.PositiveInfinity).Min();
+      if (next < c.End) swept[i] = c with { End = next };
+    }
+
+    Swept = swept;
     Cues = cues;
     Unmapped = unmapped.ToList();
   }
+
+  /// <summary>mtl1-53: weapon swing trails (<c>sfx_trail_triangle</c>) with their emission windows.</summary>
+  public IReadOnlyList<SweptTrailCue> Swept { get; }
+
+  /// <summary>Swept trails visible at clip time <paramref name="t"/>.</summary>
+  public IEnumerable<SweptTrailCue> SweptAt(float t) => Swept.Where(c => SweptTrails.Alive(c, t));
 
   public int Count => _instances.Count;
   /// <summary>Stop cues on this clip (after the blueprint filter).</summary>

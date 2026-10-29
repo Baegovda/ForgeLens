@@ -4,8 +4,10 @@ using System.Text.Json.Nodes;
 namespace LibSaber.SM2.Assets.Effects;
 
 /// <summary>Cross-section of a trail ribbon (<c>trailParams.typeParams</c> union: local__billboard @0x1436459f0,
-/// local__tape @0x1436459c0, local__cross @0x1436459d0, local__star @0x1436459e0, cylinder).</summary>
-public enum TrailShape { Billboard, Tape, Cylinder, Cross, Star }
+/// local__tape @0x1436459c0, local__cross @0x1436459d0, local__star @0x1436459e0, cylinder).
+/// mtl1-53: <c>local__triangle</c> @0x143646c18 is union member 6 in the typeParams reader FUN_1418296f0, which reads
+/// only <c>triangle.name</c> for it (billboard/tape blocks next to it in the data are stale and unread, PROVEN).</summary>
+public enum TrailShape { Billboard, Tape, Cylinder, Cross, Star, Triangle }
 
 /// <summary>
 ///   <c>sfx_trail</c> (node type string @0x14363c280): a ribbon left behind by its parent (projectile, bone, socket).
@@ -29,6 +31,10 @@ public sealed class TrailDef
   public bool Vertical { get; init; }
   public int Subdivs { get; init; } = 1;
   public float MaxTrailLength { get; init; }
+  /// <summary>Node <c>timeLife</c> (s, 0 = none). mtl1-53: a swept trail emits until its stop event or this, whichever is first (HEURISTIC).</summary>
+  public float TimeLife { get; init; }
+  /// <summary><c>trailParams.angleMin</c> (deg). Read for completeness; the swept trail samples on a fixed clock instead (HEURISTIC).</summary>
+  public float AngleMin { get; init; }
   public float MaxSegLength { get; init; } = 0.5f;
   public float TimeLifeSeg { get; init; } = 0.5f;
   public Curve1 Width { get; init; } = new([0f, 0.1f]);
@@ -66,7 +72,14 @@ public sealed class TrailDef
     var transform = texture.Obj("tcIn")?.Obj("transform");
     var intensity = SslRead.Scalar(visuals.Get("colorIntensity"), 1f);
     var mult = visuals.Float("colorIntensityMultiplier", 1f);
-    var blend = visuals.Str("blendType") switch { "add" => EffectBlend.Add, "blend_add" => EffectBlend.BlendAdd, _ => EffectBlend.Blend };
+    var triangle = node.Str("__type") == "sfx_trail_triangle";
+    // mtl1-53: a swept trail without blendType draws additive, the sfx material default (mtl1-50: mtl_template_sfx.td ->
+    // sfx_sdr_preset_default.sd). Every retail sfx_trail_triangle sets blendType, so this only covers edits. sfx_trail keeps blend.
+    var blend = visuals.Str("blendType") switch
+    {
+      "add" => EffectBlend.Add, "blend_add" => EffectBlend.BlendAdd, "blend" => EffectBlend.Blend,
+      _ => triangle ? EffectBlend.Add : EffectBlend.Blend,
+    };
     var name = path.Split('/')[^1];
     var render = new EmitterDef
     {
@@ -90,10 +103,12 @@ public sealed class TrailDef
       NameParent = node.Str("nameParent") is { Length: > 0 } np ? np : nameParent,
       Transform = world,
       Scale = scale,
-      Shape = kind switch { "tape" => TrailShape.Tape, "cylinder" => TrailShape.Cylinder, "cross" => TrailShape.Cross, "star" => TrailShape.Star, _ => TrailShape.Billboard },
+      Shape = triangle ? TrailShape.Triangle : kind switch { "tape" => TrailShape.Tape, "cylinder" => TrailShape.Cylinder, "cross" => TrailShape.Cross, "star" => TrailShape.Star, _ => TrailShape.Billboard },
       Vertical = body.Str("topology") == "vertical",
       Subdivs = Math.Max(1, (int)body.Float("segSubdivs", 1f)),
       MaxTrailLength = tp.Float("maxTrailLength", 0f),
+      TimeLife = node.Float("timeLife", 0f),
+      AngleMin = tp.Float("angleMin", 0f),
       MaxSegLength = Math.Max(0.01f, tp.Float("maxSegLength", 0.5f)),
       TimeLifeSeg = Math.Max(0.005f, tp.Float("timeLifeSeg", 0.5f)),
       Width = width.Length >= 2 ? new Curve1(width) : new Curve1([0f, 0.1f]),

@@ -13,7 +13,9 @@
 
 **Code:** `src/LibSaber.SM2.Assets/Effects/*` (EffectLibrary, EffectDefinition, EffectSimulation, EffectSprites, EffectTrails, EffectMeshParticles, AnimEventVfxMap, EffectHost, VfxBlendRules), browser `Gpu/EffectRenderer.cs`, `Effects/HostVfx.cs`.
 
-**Open:** trail runtime builder, genOnFly runtime, `additionalContrast` shader path details, VAT splash vertex layout, ratioDependency/ratioXY, the Shoot-track consumer in the exe.
+- trail53: `sfx_trail_triangle` @0x14363c4d0 (SfxTrailTriangle @0x143648c80) registered by FUN_141848c40 (subclass of sfx_trail_base), type compare FUN_141a6e410, typeParams `local__triangle` @0x143646c18 = type 6 in FUN_1418296f0 (only `triangle.name`), trailParams fields FUN_141839b50, TRAIL_TRIANGLE define @0x143803c88 (FUN_1424e32c0). Weapon starters BlueprintSfxLibraryStartsfxtrailtriangle / BlueprintNodeVfxTriangleRestart (locator1/2 + offsets).
+
+**Open:** trail runtime builder (sfx_trail and sfx_trail_triangle), genOnFly runtime, `additionalContrast` shader path details, VAT splash vertex layout, ratioDependency/ratioXY, the Shoot-track consumer in the exe.
 
 Long-form: RE_NOTES.md "VFX", HANDOFF vfx3 parts 1-4, vfx4-1, mtl1-34..41, mtl1-44.
 

@@ -194,6 +194,14 @@ public sealed class ContextIndex
     return keys;
   }
 
+  /// <summary>mtl1-53: the raw <c>sfx.list</c> entry for <paramref name="key"/> on the class chain (nearest wins), or null.</summary>
+  public System.Text.Json.Nodes.JsonObject? SfxEntry(string name, string key)
+  {
+    foreach (var c in Chain(name))
+      if (Detail(c.Name).SfxEntries.TryGetValue(key, out var e)) return e;
+    return null;
+  }
+
   /// <summary>Blueprint names the class (and ancestors) run: cooked <c>linksDesc</c> .sso plus inline <c>prop_blueprints</c> (as <c>cls:Class/Name</c>).</summary>
   public HashSet<string> BlueprintsOf(string name)
   {
@@ -245,6 +253,8 @@ public sealed class ClassDetail
   public static readonly ClassDetail Empty = new();
   /// <summary>sfx.list key → effect name (<c>__type</c>, else the key).</summary>
   public Dictionary<string, string> Sfx { get; } = new(StringComparer.OrdinalIgnoreCase);
+  /// <summary>mtl1-53: the <c>sfx.list</c> entries themselves (overrides such as <c>trailParams.timeLifeSeg</c>, <c>visuals.colorIntensity</c>).</summary>
+  public Dictionary<string, JsonObject> SfxEntries { get; } = new(StringComparer.OrdinalIgnoreCase);
   /// <summary><c>prop_inventory*.localCreatedActorsDescs.*.type.__type</c>: weapon classes the character creates.</summary>
   public List<string> WeaponTypes { get; } = [];
   /// <summary>Weapon uids: <c>inventoryUids</c>, <c>prop_weapon_dummy_user.weaponUid.*WeaponUid</c>, inventory desc keys.</summary>
@@ -264,7 +274,10 @@ public sealed class ClassDetail
     var props = root.Obj("properties") ?? root;
     if (props.Obj("sfx")?.Obj("list") is { } list)
       foreach (var (key, value) in list)
+      {
         d.Sfx[key] = value.Str("__type") is { Length: > 0 } t ? t : key;
+        if (value is JsonObject entry) d.SfxEntries[key] = entry;
+      }
     foreach (var (key, value) in props)
     {
       if (value is not JsonObject prop) continue;

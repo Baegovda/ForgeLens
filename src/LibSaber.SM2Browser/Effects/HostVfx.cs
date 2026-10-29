@@ -25,6 +25,10 @@ internal sealed class HostVfx
   private bool _eventsOn;
   private int _frames;
   private static readonly bool Debug = Environment.GetEnvironmentVariable("SM2_HOST_DEBUG") == "1";
+  private SweptPoseCache? _poses;
+  private bool _posesInPlace;
+  /// <summary>mtl1-53: weapon swing trails (sfx_trail_triangle) in context playback; <c>SM2_SWING_TRAILS=0</c> hides them.</summary>
+  public static bool SweptOn { get; set; } = Environment.GetEnvironmentVariable("SM2_SWING_TRAILS") != "0";
 
   public required EffectLibrary Library { get; init; }
   public required PartAliases Aliases { get; init; }
@@ -49,7 +53,7 @@ internal sealed class HostVfx
       if (Library.Resolve(name) is { } tree)
       {
         def = EffectDefinition.Build(name, tree);
-        if (def.Emitters.Count == 0 && def.Lights.Count == 0 && def.Trails.Count == 0) def = null;
+        if (def.Emitters.Count == 0 && def.Lights.Count == 0 && def.Trails.Count == 0 && def.SweptTrails.Count == 0) def = null;
         else
         {
           Textures.Prefetch(def.Textures);
@@ -58,6 +62,26 @@ internal sealed class HostVfx
       }
 
       return _defs[name] = def;
+    }
+  }
+
+  /// <summary>
+  ///   mtl1-53: <paramref name="effect"/> with the owner's sfx.list entry for <paramref name="key"/> merged on top
+  ///   (<see cref="HostVfxContext.Overrides"/>), or null without an entry.
+  /// </summary>
+  public EffectDefinition? BuildKeyed(string key, string effect)
+  {
+    if (Context?.Overrides?.Invoke(key) is not { } entry) return null;
+    var id = $"{effect}#{key}#{entry.ToJsonString().GetHashCode()}";
+    lock (_defs)
+    {
+      if (_defs.TryGetValue(id, out var cached)) return cached;
+      var node = (System.Text.Json.Nodes.JsonObject)entry.DeepClone();
+      node["__type"] = effect;
+      var def = EffectDefinition.Build(effect, Library.ResolveNode(node));
+      if (def.Emitters.Count == 0 && def.Lights.Count == 0 && def.Trails.Count == 0 && def.SweptTrails.Count == 0) def = null;
+      else Textures.Prefetch(def.Textures);
+      return _defs[id] = def;
     }
   }
 
@@ -70,6 +94,7 @@ internal sealed class HostVfx
       _bind = null;
       _events = null;
       _eventsFor = null;
+      _poses = null;
       _single = _single is null ? null : _host.Attach(_single.Definition, _attach);
     }
 
@@ -117,13 +142,56 @@ internal sealed class HostVfx
     var ctx = filters.Length == 0 ? Context : null;
     _events = new AnimEventEffects(clip, Map, Build, _host!,
       filters.Length > 0 ? h => filters.Any(f => h.Source.Contains(f, StringComparison.OrdinalIgnoreCase)) : ctx?.Include,
-      ctx?.Resolve, ctx?.Scope, ctx?.TrackCues);
+      ctx?.Resolve, ctx?.Scope, ctx?.TrackCues, ctx is null ? null : BuildKeyed);
+    _poses = null;
     var tags = clip.EventTracks.Sum(t => t.Events.Count);
     return Status = tags == 0
       ? $"{clip.Name}: no morpheme events"
-      : $"{clip.Name}: {tags} events, {_events.Cues.Count} effect cues, {_events.StopCount} stops ({string.Join(", ", _events.Cues.Select(c => $"{c.Event}@{c.Time:0.00}s->{c.Effect}").Take(6))})"
+      : $"{clip.Name}: {tags} events, {_events.Cues.Count} effect cues, {_events.StopCount} stops"
+        + (_events.Swept.Count > 0 ? $", {_events.Swept.Count} swing trails ({string.Join(", ", _events.Swept.Take(4).Select(c => $"{c.Def.Name}@{c.Start:0.00}-{c.End:0.00}s"))})" : "")
+        + $"  ({string.Join(", ", _events.Cues.Select(c => $"{c.Event}@{c.Time:0.00}s->{c.Effect}").Take(6))})"
         + (_events.Unmapped.Count > 0 ? $"; no blueprint link: {string.Join(", ", _events.Unmapped.Take(8))}" : "")
         + $" [{Map.Files} blueprints]";
+  }
+
+  /// <summary>
+  ///   mtl1-53: ribbons of the swing trails alive at <paramref name="clipTime"/>. Past cross-sections need past poses: the
+  ///   clip is re-posed on the <see cref="SweptTrails.SampleRate"/> grid (cached) in the same space the scene draws, i.e.
+  ///   with the In-place rebase / root-motion removal when the scene has it; the head uses the drawn pose itself.
+  /// </summary>
+  private IEnumerable<SpriteBatch> SweptBatches(ExportedMesh mesh, EffectHost host, PreviewScene scene, float clipTime)
+  {
+    if (scene.BoneWorlds is not { } now || mesh.Clip is not { HasCurves: true }) yield break;
+    var alive = _events!.SweptAt(clipTime).ToList();
+    if (alive.Count == 0) yield break;
+    if (_poses is null)
+    {
+      // Which space does the scene draw in? Compare the drawn pose with a raw and an in-place pose at the same time.
+      var raw = MeshPreview.BoneWorlds(mesh, clipTime);
+      var inPlace = InPlace(mesh, (Matrix4x4[])raw.Clone());
+      var probe = Math.Max(0, host.IndexOf(alive[0].Edge.Locator1));
+      float Err(Matrix4x4[] w) => probe < w.Length && probe < now.Length ? Vector3.Distance(w[probe].Translation, now[probe].Translation) : 0f;
+      _posesInPlace = Err(inPlace) < Err(raw);
+      var useInPlace = _posesInPlace;
+      _poses = new SweptPoseCache(t => useInPlace ? InPlace(mesh, MeshPreview.BoneWorlds(mesh, t)) : MeshPreview.BoneWorlds(mesh, t));
+    }
+
+    _poses.Trim(clipTime - 1f, clipTime + 0.05f);
+    foreach (var cue in alive)
+    {
+      var batch = SweptTrails.Build(cue, clipTime,
+        s => MathF.Abs(s - clipTime) < 1e-4f ? SweptTrails.Edge(host, now, cue.Edge, cue.Scope) : _poses.Edge(host, cue.Edge, cue.Scope, s),
+        scene.Eye);
+      if (batch is not null) yield return batch;
+    }
+  }
+
+  private static Matrix4x4[] InPlace(ExportedMesh mesh, Matrix4x4[] worlds)
+  {
+    var rebase = MeshPreview.InPlaceRebase(mesh);
+    for (var i = 0; i < worlds.Length; i++) worlds[i] *= rebase;
+    MeshPreview.RemoveRootMotion(mesh, worlds, rebase);
+    return worlds;
   }
 
   /// <summary>GL thread: pose the host from the scene and build the overlay layer.</summary>
@@ -145,8 +213,10 @@ internal sealed class HostVfx
 
       if (_eventsOn && _events is not null)
         instances.AddRange(_events.At(clipTime));
-      if (instances.Count == 0) return null;
       var batches = new List<SpriteBatch>();
+      if (_eventsOn && _events is { Swept.Count: > 0 } && SweptOn)
+        batches.AddRange(SweptBatches(mesh, host, scene, clipTime));
+      if (instances.Count == 0 && batches.Count == 0) return null;
       var meshes = new List<MeshBatch>();
       var lights = new List<LightSample>();
       foreach (var inst in instances)
@@ -168,4 +238,8 @@ internal sealed record HostVfxContext(
   Func<EventVfx, bool>? Include,
   Func<string, string>? Resolve,
   Func<string, string, (string Prefix, string Root)?>? Scope,
-  IReadOnlyList<LibSaber.SM2.Assets.Context.TrackCue>? TrackCues);
+  IReadOnlyList<LibSaber.SM2.Assets.Context.TrackCue>? TrackCues)
+{
+  /// <summary>mtl1-53: blueprint name → the owner's sfx.list entry (prototype override), see <see cref="LibSaber.SM2.Assets.Context.ContextResolver.Overrides"/>.</summary>
+  public Func<string, System.Text.Json.Nodes.JsonObject?>? Overrides { get; init; }
+}

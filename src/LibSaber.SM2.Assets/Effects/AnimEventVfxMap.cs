@@ -1,10 +1,22 @@
+using System.Numerics;
 using System.Text.Json.Nodes;
 
 namespace LibSaber.SM2.Assets.Effects;
 
 /// <summary>One effect a morpheme event starts, with where the link was found.</summary>
 /// <param name="AtEnd">Reached from a duration event's <c>OnDeactivate</c>/<c>OnExit</c>: fires at the event's end.</param>
-public sealed record EventVfx(string Effect, string Source, string Locator = "", bool AtEnd = false);
+/// <param name="Edge">mtl1-53: a two-locator (weapon swing) trail starter, null for every other starter.</param>
+public sealed record EventVfx(string Effect, string Source, string Locator = "", bool AtEnd = false, TrailEdge? Edge = null);
+
+/// <summary>
+///   mtl1-53: the two points a <c>sfx_trail_triangle</c> sweeps, as the starter node names them (PROVEN from data):
+///   <c>BlueprintSfxLibraryStartsfxtrailtriangle</c> has <c>locator1</c>/<c>locator1Offset</c>/<c>locator2</c>/<c>locator2Offset</c>
+///   (chainsword: <c>sfx_trail3</c> / <c>sfx_trail2</c>, offsets 0); <c>BlueprintNodeVfxTriangleRestart</c> has
+///   <c>locator1Ref</c>/<c>locator1OffsetRef</c>/<c>locator2Ref</c>/<c>locator2OffsetRef</c> (marine_shared:
+///   <c>floorplace</c> z -0.5 / <c>tip</c> z 0.2). Offsets are <c>Vector3d</c> (missing members are 0), taken in the
+///   locator's frame (HEURISTIC: the runtime that applies them was not traced).
+/// </summary>
+public sealed record TrailEdge(string Locator1, Vector3 Offset1, string Locator2, Vector3 Offset2);
 
 /// <summary>
 ///   An event that stops effects: <c>BlueprintNodeVfxStop</c> / <c>BlueprintSfxLibraryStopsfx</c> (one name),
@@ -48,6 +60,10 @@ public sealed class AnimEventVfxMap
   private static readonly HashSet<string> Stoppers = new(StringComparer.Ordinal)
   {
     "BlueprintNodeVfxStop", "BlueprintSfxLibraryStopsfx", "BlueprintNodeStopPackOfVfx", "BlueprintNodeStopAllSfx",
+  };
+  private static readonly HashSet<string> TriangleStarters = new(StringComparer.Ordinal)
+  {
+    "BlueprintNodeVfxTriangleRestart", "BlueprintSfxLibraryStartsfxtrailtriangle",
   };
   private static readonly HashSet<string> EndPins = new(StringComparer.Ordinal) { "OnDeactivate", "OnExit" };
 
@@ -148,8 +164,11 @@ public sealed class AnimEventVfxMap
         if (Starters.Contains(targetType))
         {
           var locator = target.Obj("locator1Ref")?.Str("def") ?? target.Obj("locatorRef")?.Str("def") ?? "";
+          var edge = TriangleStarters.Contains(targetType) ? Edge(target) : null;
+          // mtl1-53: a triangle trail has no single attach locator (it sweeps locator1 -> locator2), so the instance root stays the scope root.
+          if (edge is not null) locator = "";
           foreach (var effect in Names(target, name, pipes))
-            Add(evName, new EventVfx(effect, source, locator, atEnd));
+            Add(evName, new EventVfx(effect, source, locator, atEnd, edge));
         }
         else if (Stoppers.Contains(targetType))
         {
@@ -165,6 +184,21 @@ public sealed class AnimEventVfxMap
             queue.Enqueue((l[..l.IndexOf('/')], depth + 1, atEnd));
       }
     }
+  }
+
+  /// <summary>mtl1-53: locator1/2 (+ offsets) of a triangle trail starter (both param spellings), null without both locators.</summary>
+  public static TrailEdge? Edge(JsonObject node)
+  {
+    string? Loc(string a, string b) => node.Obj(a)?.Str("def") is { Length: > 0 } s ? s : node.Obj(b)?.Str("def") is { Length: > 0 } t ? t : null;
+    Vector3 Off(string a, string b)
+    {
+      var d = (node.Obj(a) ?? node.Obj(b))?.Obj("def");
+      return d is null ? Vector3.Zero : new Vector3(d.Float("x", 0f), d.Float("y", 0f), d.Float("z", 0f));
+    }
+
+    var l1 = Loc("locator1", "locator1Ref");
+    var l2 = Loc("locator2", "locator2Ref");
+    return l1 is null || l2 is null ? null : new TrailEdge(l1, Off("locator1Offset", "locator1OffsetRef"), l2, Off("locator2Offset", "locator2OffsetRef"));
   }
 
   /// <summary>Effect names a starter/stopper node names: <c>*sfx*</c>/<c>*vfx*</c> param defaults plus string pipes into it.</summary>

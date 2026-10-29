@@ -70,6 +70,9 @@ public sealed class EffectLibrary(IEffectSource source)
   /// <summary>Fully expanded tree for <paramref name="name"/> (inheritance applied, group entries instanced).</summary>
   public JsonObject? Resolve(string name) => Raw(name) is { } raw ? Expand(raw, 0, [name]) : null;
 
+  /// <summary>mtl1-53: an override node (a class <c>sfx.list</c> entry: <c>__type</c> = effect file plus replaced fields), expanded.</summary>
+  public JsonObject ResolveNode(JsonObject node) => Expand(node, 0, []);
+
   private JsonObject Expand(JsonObject node, int depth, HashSet<string> chain)
   {
     var result = node;

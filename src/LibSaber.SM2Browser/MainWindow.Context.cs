@@ -459,7 +459,10 @@ public partial class MainWindow
         CtxSlotBox.SelectedIndex = slot is null ? -1 : slots.IndexOf(slot);
         _suppressCtx = false;
         if (shoots && slot is not null) cues.Add(slot);
-        vfx.Context = new HostVfxContext(h => ContextResolver.OwnedSource(owned, h.Source), resolve, scope, cues);
+        vfx.Context = new HostVfxContext(h => ContextResolver.OwnedSource(owned, h.Source), resolve, scope, cues)
+        {
+          Overrides = resolver.Overrides(plan.characters[0], weapon?.Class),
+        };
         vfx.Map = map;
         HostVfxFilter.Text = "";
         var status = await Task.Run(() => vfx.SetEvents(mesh, mesh.Clip is not null));
