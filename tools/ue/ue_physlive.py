@@ -33,7 +33,7 @@ else:
     for c in pj.get("cloths", []):
         md = c.get("maxDistanceMeters", [])
         hb += [h["bone"] for i, h in enumerate(c.get("helperBones", [])) if not (i < len(md) and md[i] == 0)]
-    hb += [j.get("bone") for j in pj.get("jiggles", pj.get("jiggleBones", [])) if isinstance(j, dict) and j.get("bone")]
+    hb += [j.get("Name") or j.get("bone") for j in pj.get("jiggles", pj.get("jiggleBones", [])) if isinstance(j, dict) and (j.get("Name") or j.get("bone"))]  # phys52: sidecar key is "Name"
     co, cf = on.skeletal_mesh_component, off.skeletal_mesh_component
     if mode == "play":
         import os; fd = r"K:/Unreal Projects/UE_VFX_57/Content/SM2_Work/Tests/%s/%s/Anims" % (SET, name); f = sorted(x for x in os.listdir(fd) if x.endswith(".uasset"))[0][:-7]; anim = unreal.load_asset("/Game/SM2_Work/Tests/%s/%s/Anims/%s" % (SET, name, f))

@@ -50,6 +50,15 @@ public:
   static int32 SetSimGravity(UPhysicsAsset* PA, bool bEnable);
 
   /**
+   * phys52 migration for assets made before phys52: every body of PA (and of each RigidBody node's override PA in ABP)
+   * gets CollisionTraceFlag=UseSimpleAsComplex and PhysType_Simulated -> Default; every RigidBody node in ABP gets
+   * bUseDefaultAsSimulated, then ABP is compiled. Stops the component's world-scene double simulation and the PIE
+   * "ComplexAsSimple collision" warnings. Edits in place: the caller backs the assets up first and saves.
+   */
+  UFUNCTION(BlueprintCallable, Category = "SM2|Physics")
+  static int32 FixWorldPhysics(UPhysicsAsset* PA, UAnimBlueprint* ABP, FString& Report);
+
+  /**
    * mtl1-9 Chaos Cloth option: for every cloth in {model}.physics.json, finds the LOD0 section that is the game _SIM mesh
    * (positions match simPositionsUeCm), builds a Clothing Asset from it (section disabled, as the editor's
    * "Create Clothing Data from Section"), paints MaxDistance from maxDistanceMeters (0 = pinned), sets the ChaosClothConfig

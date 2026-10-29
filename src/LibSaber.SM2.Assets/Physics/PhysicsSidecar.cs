@@ -37,10 +37,26 @@ public static class PhysicsSidecar
       var d = j.OffsetDistance;
       var dir = j.OffsetDirection.LengthSquared() > 1e-12f ? Vector3.Normalize(j.OffsetDirection) : Vector3.UnitZ;
       float Deg(float c) => MathF.Atan(c) * 180f / MathF.PI;
+      // phys52: RigidBody (PhysicsAsset) mapping used by SM2PhysicsSetup. Rest direction = offset direction moved onto the
+      // clamp box point nearest the target (the spring's equilibrium when the box excludes the target, e.g. Hip_plate x in
+      // [-0.4,-0.35]) DERIVED; swing = widest angle from it to a box corner (clamped 0.5..60 deg, clamp HEURISTIC).
+      Vector3 Box(Vector3 u) => dir + u; // in offsetDistance units, bone-local source frame
+      var rest = Box(Vector3.Clamp(Vector3.Zero, j.ConstraintMin, j.ConstraintMax));
+      rest = rest.LengthSquared() > 1e-12f ? Vector3.Normalize(rest) : dir;
+      var swing = 0f;
+      for (var c = 0; c < 8; c++)
+      {
+        var corner = Box(new Vector3((c & 1) != 0 ? j.ConstraintMax.X : j.ConstraintMin.X, (c & 2) != 0 ? j.ConstraintMax.Y : j.ConstraintMin.Y, (c & 4) != 0 ? j.ConstraintMax.Z : j.ConstraintMin.Z));
+        if (corner.LengthSquared() > 1e-12f)
+          swing = MathF.Max(swing, MathF.Acos(Math.Clamp(Vector3.Dot(rest, Vector3.Normalize(corner)), -1f, 1f)) * 180f / MathF.PI);
+      }
+      var gDown = -j.Gravity * invMass; // m/s^2, gravity is added on world Y (negative = down)
+      var locked = d <= 0;
       return new
       {
         j.Group,
         j.Name,
+        bone = j.Name, // phys52: the plugin reads "Name" and falls back to "bone"
         found = bone >= 0,
         parent = bone >= 0 ? BoneName(bones[bone].Parent) : "",
         source = new
@@ -58,6 +74,20 @@ public static class PhysicsSidecar
         },
         ue = new
         {
+          rigidBody = new
+          {
+            note = "phys52 SM2PhysicsSetup mapping (DERIVED unless noted): simulated body on the jiggle bone, joint at the bone origin, twist locked (the engine only re-aims the offset axis); SLERP drive in acceleration mode toward restDirUe with stiffness k/m [1/s^2] and damping = game damping [1/s] (exp(-damping dt) velocity decay); gravity as a point mass at comDistanceCm so 980/comDistanceCm equals the game's (gravity/mass)/offsetDistance. locked: offsetDistance 0 (no rotation in the game). Mass per chain depth and the 0.5..60 deg clamp are HEURISTIC.",
+            space = "boneLocal",
+            offsetDirUe = V(AxisConvert.Direction(dir, false)),
+            restDirUe = V(AxisConvert.Direction(rest, false)),
+            swingDeg = Math.Clamp(swing, 0.5f, 60f),
+            locked,
+            driveStiffness = j.Stiffness * invMass,
+            driveDamping = j.Damping,
+            gravityEnabled = gDown > 0 && d > 0,
+            comDistanceCm = gDown > 0 && d > 0 ? Math.Clamp(980f * d / gDown, 2f, 300f) : Math.Clamp(d * 100f, 2f, 50f),
+            sourceMassKg = j.Mass,
+          },
           animDynamics = new
           {
             boundBone = j.Name,
@@ -146,6 +176,49 @@ public static class PhysicsSidecar
       };
     }).ToList();
 
+    // phys52: prop_motion_damper_controller -> per-joint angular spring-damper (SM2PhysicsSetup second RigidBody node).
+    int Child(int b) { for (var i = 0; i < bones.Count; i++) if (bones[i].Parent == b) return i; return -1; }
+    bool IsAncestor(int a, int b) { for (var i = b; i >= 0; i = bones[i].Parent) if (i == a) return true; return false; }
+    var springDampers = setup.SpringDampers.Select((sd, di) => new
+    {
+      index = di,
+      sd.TimeScale,
+      windFlutter = sd.WindFlutter is not null,
+      joints = sd.Joints.Select((jt, ji) =>
+      {
+        var b = ClothInstance.FindBone(bones, jt.Name);
+        var next = ji + 1 < sd.Joints.Count ? ClothInstance.FindBone(bones, sd.Joints[ji + 1].Name) : -1;
+        var seg = b >= 0 && next >= 0 && IsAncestor(b, next) ? next : b >= 0 ? Child(b) : -1;
+        var m = jt.Mass > 0 ? jt.Mass : 1f;
+        var w0 = MathF.Sqrt(MathF.Max(jt.Stiffness, 0) / m) * sd.TimeScale;
+        return new
+        {
+          jt.Name,
+          found = b >= 0,
+          parent = b >= 0 ? BoneName(bones[b].Parent) : "",
+          segmentTo = seg >= 0 ? BoneName(seg) : "",
+          source = new { jt.Stiffness, jt.DampingRation, jt.Mass, jt.JointAngle, jt.Gravity, jt.IsParent, jt.IsInvertedLook, defaulted = jt.Defaulted },
+          ue = new
+          {
+            omegaRadPerSec = w0,
+            driveStiffness = w0 * w0,
+            driveDamping = 2f * jt.DampingRation * w0,
+            coneDeg = Math.Clamp(jt.JointAngle, 1f, 175f),
+            gravityScale = jt.Gravity,
+            massKg = m,
+          },
+        };
+      }).ToList(),
+      constrains = sd.Constrains.Select(k => new
+      {
+        k.UpLocatorName, k.DownLocatorName, k.HasExternalLocators, k.ResolvedFrom,
+        upBone = k.UpBone, upOffsetCm = Ue(k.UpOffset), downBone = k.DownBone, downOffsetCm = Ue(k.DownOffset),
+        upFound = ClothInstance.FindBone(bones, k.UpBone) >= 0,
+        downFound = ClothInstance.FindBone(bones, k.DownBone) >= 0,
+        radiusCm = k.Radius * 100f,
+      }).ToList(),
+    }).ToList();
+
     return JsonSerializer.Serialize(new
     {
       setup.SourceClass,
@@ -157,6 +230,9 @@ public static class PhysicsSidecar
       baked = baked.Select(kv => new { clip = kv.Key, kv.Value.Frames, rate = PhysicsBake.Rate, kv.Value.JiggleBones, kv.Value.ClothBones, kv.Value.MaxJiggleDegrees, kv.Value.MaxClusterFitError, kv.Value.MeanStepMs }),
       jiggles,
       cloths,
+      springDamperSource = setup.SpringDamperSource,
+      springDamperNote = "phys52 prop_motion_damper_controller. Model (HEURISTIC, exe step not reversed): every joint is an angular spring-damper on its bone (pivot = bone origin, body = segment to segmentTo), omega0 = sqrt(stiffness/mass) * timeScale, drive stiffness omega0^2, damping 2*dampingRation*omega0 (acceleration mode), swing cone = jointAngle, gravity on when gravity > 0 (node gravity 980*max(gravity) cm/s^2). constrains = kinematic capsule up->down locator (radius) the joint bodies collide with. isParent / isInvertedLook / hasExternalLocators / windFlutter are recorded, not simulated. Not baked into clips.",
+      springDampers,
     }, Options);
   }
 }

@@ -65,6 +65,15 @@ public static class CdtObjectResolver
         }
     }
 
+    // phys52: spring-damper constrains name locators too (upLocatorName / downLocatorName); same link_tpl_obj rule.
+    foreach (var k in setup.SpringDampers.SelectMany(d => d.Constrains).Where(seen.Add))
+    {
+      var from = new List<string>();
+      if (Map(k.UpLocatorName, Vector3.Zero, out var p1, out var o1, out _)) { from.Add("Up=" + k.UpLocatorName); k.UpBone = p1; k.UpOffset = o1; resolved++; }
+      if (Map(k.DownLocatorName, Vector3.Zero, out var p2, out var o2, out _)) { from.Add("Down=" + k.DownLocatorName); k.DownBone = p2; k.DownOffset = o2; resolved++; }
+      if (from.Count > 0) k.ResolvedFrom = string.Join(" ", from);
+    }
+
     foreach (var n in notes)
       setup.Notes.Add("mtl1-37 CDT bone resolved via tpl_markup (link_tpl_obj): " + n);
     return resolved;

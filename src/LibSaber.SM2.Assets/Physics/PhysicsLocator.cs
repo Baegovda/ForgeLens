@@ -44,24 +44,87 @@ public static class PhysicsLocator
       .ThenBy(p => p.Length)
       .ThenBy(p => p, StringComparer.Ordinal)
       .ToList();
+    PhysicsSetup? setup = null;
+    string? from = null;
     foreach (var candidate in candidates)
     {
-      var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-      for (var path = candidate; path is not null && seen.Add(path); path = source.ParentOf(path) is { } parent ? source.PathOf(parent) : null)
+      foreach (var path in Chain(source, candidate))
       {
         var text = source.Read(path);
         if (text is null || !PhysicsParser.Declares(text))
           continue;
-        var setup = PhysicsParser.Parse(text, path);
-        if (setup.IsEmpty)
-          continue;
+        var parsed = PhysicsParser.Parse(text, path);
+        if (parsed.Cloths.Count == 0 && parsed.Jiggles.Count == 0)
+          continue; // phys52: a damper-only class does not stop the cloth/jiggle search (dampers are merged below)
         if (!string.Equals(path, candidate, StringComparison.OrdinalIgnoreCase))
-          setup.Notes.Add($"inherited from {path} (via {candidate})");
-        return setup;
+          parsed.Notes.Add($"inherited from {path} (via {candidate})");
+        setup = parsed;
+        from = candidate;
+        break;
+      }
+      if (setup is not null)
+        break;
+    }
+
+    // phys52: prop_motion_damper_controller is often declared only on the authority (server) class (Titus: the client class
+    // has cloth + jiggles, pc_marine_pve_story_titus_authority.cls has the box damper). Look in the chosen class chain, then
+    // its *_authority counterpart (+ chain), then every other candidate in score order.
+    if (setup is null || setup.SpringDampers.Count == 0)
+    {
+      var order = new List<string>();
+      var first = from ?? candidates.FirstOrDefault();
+      if (first is not null)
+      {
+        order.Add(first);
+        if (Counterpart(source, first) is { } auth)
+          order.Add(auth);
+      }
+      order.AddRange(candidates);
+      var visited = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+      foreach (var candidate in order)
+      {
+        string? hit = null;
+        foreach (var path in Chain(source, candidate))
+        {
+          if (!visited.Add(path))
+            continue;
+          var text = source.Read(path);
+          if (text is null || !PhysicsParser.DeclaresDamper(text))
+            continue;
+          var parsed = PhysicsParser.Parse(text, path);
+          if (parsed.SpringDampers.Count == 0)
+            continue;
+          setup ??= new PhysicsSetup { SourceClass = path };
+          setup.SpringDampers.AddRange(parsed.SpringDampers);
+          setup.SpringDamperSource = path;
+          if (!string.Equals(path, setup.SourceClass, StringComparison.OrdinalIgnoreCase))
+            setup.Notes.Add($"phys52: prop_motion_damper_controller ({parsed.SpringDampers.Count} springDampers) read from {path}; {Path.GetFileName(setup.SourceClass)} has none");
+          hit = path;
+          break;
+        }
+        if (hit is not null)
+          break;
       }
     }
 
-    return null;
+    return setup is { IsEmpty: false } ? setup : null;
+  }
+
+  /// <summary>The class itself, then its <c>__type</c> parents.</summary>
+  private static IEnumerable<string> Chain(IClassSource source, string start)
+  {
+    var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+    for (var path = start; path is not null && seen.Add(path); path = source.ParentOf(path) is { } parent ? source.PathOf(parent) : null)
+      yield return path;
+  }
+
+  /// <summary>phys52: <c>x_client.cls</c> -> <c>x_authority.cls</c> (by class name), or null.</summary>
+  public static string? Counterpart(IClassSource source, string path)
+  {
+    var name = Path.GetFileNameWithoutExtension(path);
+    if (!name.EndsWith("_client", StringComparison.OrdinalIgnoreCase))
+      return null;
+    return source.PathOf(name[..^"_client".Length] + "_authority");
   }
 
   public static PhysicsSetup? Find(GameCatalog catalog, ArchiveStore store, string modelPath)

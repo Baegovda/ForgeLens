@@ -132,3 +132,12 @@ Long-form: RE_NOTES "Physics", HANDOFF secondary physics, mtl1-8..13, mtl1-30..3
 | FUN_1410a2fa0 | 0x1410a2fa0 | DECOMPILED | decompiled (227 B), purpose not documented (domain from its dump file) | /workspace/rea/m43_cdt5.c |
 | FUN_14183d5e0 | 0x14183d5e0 | DECOMPILED | strings: maxLength / drawToCollision / pivot / camera / collisionSource / fpsViewCorrection | /workspace/rea/vfxk_3.c |
 | FUN_141845c00 | 0x141845c00 | DECOMPILED | strings: flowDensity / flowSpeed / showCollision / cdtRadiusMultiplier / clipSpeedAfterCollision / cdtDelay | /workspace/rea/vfxk_3.c |
+
+## phys52: prop_motion_damper_controller
+
+| symbol | address | status | purpose | source |
+|---|---|---|---|---|
+| strings springDampers / timeScale / windFlutter / joints / stiffness / dampingRation / jointAngle / constrains / upLocatorName / downLocatorName / radius | 0x143634e30–0x143634ec0 | STRING | field names of the motion damper controller (`dampingRation` is the game's spelling) | exe strings |
+| serializer xrefs | 0x141475c10, 0x141475db0, 0x1414760c0, 0x141476260, 0x1415e1210 | XREF | functions referencing those strings (serializer registration); defaults and the solver step NOT recovered → parser defaults HEURISTIC | REA string xrefs |
+| data | 168 `.cls` (96 client, 61 authority) | PROVEN | Titus: only `pc_marine_pve_story_titus{,_assault}_authority.cls` carry it | `PhysicsParser.ReadMotionDamper`, `PhysicsLocator.Counterpart` |
+

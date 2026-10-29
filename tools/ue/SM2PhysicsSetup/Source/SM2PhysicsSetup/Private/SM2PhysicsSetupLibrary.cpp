@@ -64,6 +64,25 @@ TArray<FTransform> RefComponentSpace(const FReferenceSkeleton& Ref)
   return Out;
 }
 
+constexpr EPhysicsType SM2SimType = PhysType_Default;
+inline bool IsSM2Sim(const USkeletalBodySetup* B) { return B && B->PhysicsType != PhysType_Kinematic; }
+
+// Every body: simple collision as complex; PhysType_Simulated -> Default (see AddBody). Returns the number changed.
+int32 NormalizeBodies(UPhysicsAsset* PA)
+{
+  int32 N = 0;
+  if (!PA) return 0;
+  for (USkeletalBodySetup* B : PA->SkeletalBodySetups)
+  {
+    if (!B) continue;
+    bool bChanged = false;
+    if (B->CollisionTraceFlag != CTF_UseSimpleAsComplex) { B->CollisionTraceFlag = CTF_UseSimpleAsComplex; bChanged = true; }
+    if (B->PhysicsType == PhysType_Simulated) { B->PhysicsType = SM2SimType; bChanged = true; }
+    N += bChanged ? 1 : 0;
+  }
+  return N;
+}
+
 USkeletalBodySetup* AddBody(UPhysicsAsset* PA, FName Bone, float Radius, bool bKinematic)
 {
   const int32 Existing = PA->FindBodyIndex(Bone);
@@ -71,7 +90,14 @@ USkeletalBodySetup* AddBody(UPhysicsAsset* PA, FName Bone, float Radius, bool bK
     return PA->SkeletalBodySetups[Existing];
   USkeletalBodySetup* Body = NewObject<USkeletalBodySetup>(PA, NAME_None, RF_Transactional);
   Body->BoneName = Bone;
-  Body->PhysicsType = bKinematic ? PhysType_Kinematic : PhysType_Simulated;
+  // phys52: simulated bodies are PhysType_Default + the RigidBody node's bUseDefaultAsSimulated. A PhysType_Simulated body is
+  // ALSO simulated by the skeletal mesh component in the world scene whenever the component's collision has physics
+  // (GetSimulatingAndBlendWeight in BodyInstance.cpp: blend weight 1), so it was simulated twice and the world ragdoll was
+  // blended over the AnimNode result; with the project's DefaultShapeComplexity=CTF_UseComplexAsSimple every such body also
+  // logged "Trying to simulate physics on ... but it has ComplexAsSimple collision" in PIE. Default follows the component's
+  // SimulatePhysics (off), so only the AnimNode simulates them.
+  Body->PhysicsType = bKinematic ? PhysType_Kinematic : SM2SimType;
+  Body->CollisionTraceFlag = CTF_UseSimpleAsComplex; // primitives only; never inherit the project's ComplexAsSimple default
   Body->CollisionReponse = EBodyCollisionResponse::BodyCollision_Disabled; // helpers overlap; collide with nothing
   FKSphereElem Sphere(Radius);
   Body->AggGeom.SphereElems.Add(Sphere);
@@ -101,6 +127,49 @@ void AddConstraint(UPhysicsAsset* PA, FName Child, FName Anchor, const FTransfor
   CI.SetDisableCollision(true);
   C->SetDefaultProfile(CI);
   PA->ConstraintSetup.Add(C);
+}
+
+// phys52 helpers
+double JNum(const TSharedPtr<FJsonObject>& O, const TCHAR* F, double Default)
+{
+  double V = Default;
+  return O.IsValid() && O->TryGetNumberField(F, V) ? V : Default;
+}
+
+bool JBool(const TSharedPtr<FJsonObject>& O, const TCHAR* F, bool Default)
+{
+  bool V = Default;
+  return O.IsValid() && O->TryGetBoolField(F, V) ? V : Default;
+}
+
+FVector JDir(const TSharedPtr<FJsonObject>& O, const TCHAR* F, const FVector& Default)
+{
+  const TArray<TSharedPtr<FJsonValue>>* A = nullptr;
+  if (!O.IsValid() || !O->TryGetArrayField(F, A) || A->Num() < 3)
+    return Default;
+  const FVector V((*A)[0]->AsNumber(), (*A)[1]->AsNumber(), (*A)[2]->AsNumber());
+  return V.IsNearlyZero() ? Default : V;
+}
+
+// phys52: SLERP angular drive in acceleration mode (stiffness [1/s^2], damping [1/s]), twist locked, symmetric swing cone.
+void SetSpringJoint(FConstraintInstance& CI, float SwingDeg, bool bLocked, float Stiffness, float Damping)
+{
+  CI.SetLinearXMotion(LCM_Locked);
+  CI.SetLinearYMotion(LCM_Locked);
+  CI.SetLinearZMotion(LCM_Locked);
+  const EAngularConstraintMotion Swing = bLocked ? ACM_Locked : ACM_Limited;
+  CI.SetAngularSwing1Limit(Swing, SwingDeg);
+  CI.SetAngularSwing2Limit(Swing, SwingDeg);
+  CI.SetAngularTwistLimit(ACM_Locked, 0.0f);
+  CI.SetDisableCollision(true);
+  if (Stiffness > 0.0f || Damping > 0.0f)
+  {
+    CI.SetAngularDriveMode(EAngularDriveMode::SLERP);
+    CI.SetOrientationDriveSLERP(Stiffness > 0.0f);
+    CI.SetAngularVelocityDriveSLERP(Damping > 0.0f);
+    CI.SetAngularDriveParams(Stiffness, Damping, 0.0f);
+    CI.SetAngularDriveAccelerationMode(true);
+  }
 }
 
 UEdGraphPin* PosePin(UEdGraphNode* Node, EEdGraphPinDirection Dir)
@@ -265,33 +334,296 @@ bool USM2PhysicsSetupLibrary::SetupFromJsonEx(USkeletalMesh* Mesh, const FString
     }
   }
 
-  // Jiggle bones (prop_phys_jiggle): simulated sphere ball-jointed to the skeleton parent (HEURISTIC limits).
-  const TArray<TSharedPtr<FJsonValue>>* Jiggles = nullptr;
-  if (Root->TryGetArrayField(TEXT("jiggles"), Jiggles))
-    for (const TSharedPtr<FJsonValue>& JV : *Jiggles)
-    {
-      FString BoneName;
-      if (!JV->AsObject()->TryGetStringField(TEXT("bone"), BoneName))
-        continue;
-      const int32 BI = Ref.FindBoneIndex(FName(BoneName));
-      const int32 ParentIdx = BI == INDEX_NONE ? INDEX_NONE : Ref.GetParentIndex(BI);
-      if (ParentIdx == INDEX_NONE)
+  // Jiggle bones (prop_phys_jiggle). phys52: the sidecar key is "Name" (C# member name); older plugin builds read "bone" and
+  // silently skipped every jiggle (Titus: 0 of 34 bodies). "Name" first, "bone" as fallback; skipped ones are counted + logged.
+  // Two passes: (1) every jiggle bone gets a SIMULATED body (a body that already exists as a kinematic cloth anchor, e.g.
+  // Belt_jiggle / Shin_L_jiggle, is switched to simulated: the jiggle data wins), (2) kinematic parent only when the parent has
+  // no body, then the joint. Joint at the jiggle bone origin (the engine re-aims the bone's offset axis at the spring point).
+  // Mapping in ue.rigidBody (DERIVED, see PhysicsSidecar.cs); old sidecars without it get 15 deg / no drive (HEURISTIC).
+  int32 JigSim = 0, JigMissing = 0, JigConverted = 0;
+  TArray<FString> JigSkipped;
+  {
+    struct FJig { FName Bone; int32 BI; int32 ParIdx; TSharedPtr<FJsonObject> RB; double SourceMass; };
+    TArray<FJig> Jigs;
+    const TArray<TSharedPtr<FJsonValue>>* Jiggles = nullptr;
+    if (Root->TryGetArrayField(TEXT("jiggles"), Jiggles))
+      for (const TSharedPtr<FJsonValue>& JV : *Jiggles)
       {
-        ++Missing;
+        const TSharedPtr<FJsonObject> J = JV->AsObject();
+        FString BoneName;
+        if (!J.IsValid() || (!J->TryGetStringField(TEXT("Name"), BoneName) && !J->TryGetStringField(TEXT("bone"), BoneName)) || BoneName.IsEmpty())
+        {
+          ++Missing; ++JigMissing;
+          JigSkipped.Add(TEXT("<no Name/bone>"));
+          continue;
+        }
+        const int32 BI = Ref.FindBoneIndex(FName(BoneName));
+        const int32 ParentIdx = BI == INDEX_NONE ? INDEX_NONE : Ref.GetParentIndex(BI);
+        if (ParentIdx == INDEX_NONE)
+        {
+          ++Missing; ++JigMissing;
+          JigSkipped.Add(BoneName + (BI == INDEX_NONE ? TEXT(" (bone not in skeleton)") : TEXT(" (root bone)")));
+          continue;
+        }
+        const TSharedPtr<FJsonObject>* Ue = nullptr;
+        const TSharedPtr<FJsonObject>* RBp = nullptr;
+        TSharedPtr<FJsonObject> RBo;
+        if (J->TryGetObjectField(TEXT("ue"), Ue) && (*Ue)->TryGetObjectField(TEXT("rigidBody"), RBp))
+          RBo = *RBp;
+        const TSharedPtr<FJsonObject>* Src = nullptr;
+        const double SourceMass = J->TryGetObjectField(TEXT("source"), Src) ? JNum(*Src, TEXT("Mass"), 1.0) : 1.0;
+        Jigs.Add({ FName(BoneName), BI, ParentIdx, RBo, SourceMass });
+      }
+    TSet<FName> JigSet;
+    for (const FJig& J : Jigs)
+      JigSet.Add(J.Bone);
+    // Chain depth (parent is a jiggle). The engine evaluates parent before child one-way; a RigidBody chain is two-way, so
+    // deeper bodies get lighter (x0.25 per level) to keep children from yanking parents (HEURISTIC).
+    auto DepthOf = [&](int32 BI)
+    {
+      int32 D = 0;
+      for (int32 P = Ref.GetParentIndex(BI); P != INDEX_NONE && JigSet.Contains(Ref.GetBoneName(P)) && D < 16; P = Ref.GetParentIndex(P))
+        ++D;
+      return D;
+    };
+    // Pass 1: simulated bodies.
+    for (const FJig& J : Jigs)
+    {
+      const bool bHad = PA->FindBodyIndex(J.Bone) != INDEX_NONE;
+      USkeletalBodySetup* Body = AddBody(PA, J.Bone, 1.0f, false);
+      if (bHad && !IsSM2Sim(Body))
+      {
+        Body->PhysicsType = SM2SimType;
+        ++JigConverted;
+        UE_LOG(LogTemp, Display, TEXT("SM2PhysicsSetup: jiggle %s had a kinematic (cloth anchor) body; now simulated"), *J.Bone.ToString());
+      }
+      const FVector OffsetDir = JDir(J.RB, TEXT("offsetDirUe"), FVector::ZAxisVector).GetSafeNormal();
+      const float ComCm = (float)JNum(J.RB, TEXT("comDistanceCm"), 2.0);
+      Body->AggGeom.SphereElems.Reset();
+      FKSphereElem Sphere(1.0f);
+      Sphere.Center = OffsetDir * ComCm; // point mass at the spring point (gravity lever, DERIVED)
+      Body->AggGeom.SphereElems.Add(Sphere);
+      Body->CollisionReponse = EBodyCollisionResponse::BodyCollision_Disabled;
+      Body->DefaultInstance.SetMassOverride(FMath::Pow(0.25f, (float)DepthOf(J.BI)), true);
+      Body->DefaultInstance.LinearDamping = 0.0f;  // damping is the drive's (game exp(-damping dt) decay)
+      Body->DefaultInstance.AngularDamping = J.RB.IsValid() ? 0.0f : 2.0f;
+      Body->DefaultInstance.SetEnableGravity(J.RB.IsValid() ? JBool(J.RB, TEXT("gravityEnabled"), false) : true);
+    }
+    // Pass 2: anchors + joints.
+    for (const FJig& J : Jigs)
+    {
+      const FName Parent = Ref.GetBoneName(J.ParIdx);
+      if (PA->FindBodyIndex(Parent) == INDEX_NONE)
+      {
+        AddBody(PA, Parent, 1.0f, true);
+        ++Kin;
+      }
+      bool bDup = false;
+      for (const UPhysicsConstraintTemplate* C : PA->ConstraintSetup)
+        bDup |= C && C->DefaultInstance.ConstraintBone1 == J.Bone;
+      if (bDup)
+      {
+        JigSkipped.Add(J.Bone.ToString() + TEXT(" (already constrained, joint kept)"));
+        ++JigSim;
         continue;
       }
-      const FName Parent = Ref.GetBoneName(ParentIdx);
-      AddBody(PA, Parent, 1.0f, true);
-      AddBody(PA, FName(BoneName), 2.0f, false);
-      AddConstraint(PA, FName(BoneName), Parent, CS[BI], CS[ParentIdx], 15.0f);
-      ++Sim;
+      if (!J.RB.IsValid())
+      {
+        AddConstraint(PA, J.Bone, Parent, CS[J.BI], CS[J.ParIdx], 15.0f); // old sidecar: previous behaviour
+        ++JigSim;
+        continue;
+      }
+      const FVector OffsetDir = JDir(J.RB, TEXT("offsetDirUe"), FVector::ZAxisVector).GetSafeNormal();
+      const FVector RestDir = JDir(J.RB, TEXT("restDirUe"), OffsetDir).GetSafeNormal();
+      UPhysicsConstraintTemplate* C = NewObject<UPhysicsConstraintTemplate>(PA, NAME_None, RF_Transactional);
+      FConstraintInstance& CI = C->DefaultInstance;
+      CI.JointName = J.Bone;
+      CI.ConstraintBone1 = J.Bone;
+      CI.ConstraintBone2 = Parent;
+      const FTransform F1(FRotationMatrix::MakeFromX(OffsetDir).ToQuat(), FVector::ZeroVector);
+      const FTransform Desired = FTransform(FQuat::FindBetweenNormals(OffsetDir, RestDir)) * CS[J.BI];
+      CI.SetRefFrame(EConstraintFrame::Frame1, F1);
+      CI.SetRefFrame(EConstraintFrame::Frame2, (F1 * Desired).GetRelativeTransform(CS[J.ParIdx]));
+      SetSpringJoint(CI, (float)JNum(J.RB, TEXT("swingDeg"), 15.0), JBool(J.RB, TEXT("locked"), false),
+        (float)JNum(J.RB, TEXT("driveStiffness"), 0.0), (float)JNum(J.RB, TEXT("driveDamping"), 0.0));
+      C->SetDefaultProfile(CI);
+      PA->ConstraintSetup.Add(C);
+      ++JigSim;
     }
+    Sim += JigSim;
+    for (const FString& S : JigSkipped)
+      UE_LOG(LogTemp, Warning, TEXT("SM2PhysicsSetup: jiggle skipped/note: %s"), *S);
+  }
 
+  NormalizeBodies(PA);
   PA->UpdateBodySetupIndexMap();
   PA->UpdateBoundsBodiesArray();
   PA->RefreshPhysicsAssetChange();
   FAssetRegistryModule::AssetCreated(PA);
   PA->MarkPackageDirty();
+
+  // phys52: prop_motion_damper_controller -> PA_{mesh}_SM2Damper for a SECOND RigidBody node (HEURISTIC model, see the
+  // sidecar's springDamperNote): each joint is an angular spring-damper on its bone (pivot = bone origin, capsule body to
+  // segmentTo, mass = joint mass), SLERP acceleration drive (omega0^2, 2*zeta*omega0), cone = jointAngle, twist locked; its
+  // skeleton parent is kinematic unless it is a joint too. constrains = kinematic capsule (up -> down locator, radius) that
+  // only the joint bodies collide with; shrunk so no rest-pose joint body starts inside it. A joint that already has a
+  // simulated body in the main PA is skipped (no double simulation).
+  UPhysicsAsset* DPA = nullptr;
+  int32 DamperBodies = 0, DamperSkipped = 0, DamperCaps = 0;
+  float DamperGravity = 0.0f;
+  TArray<FString> DamperLog;
+  {
+    const TArray<TSharedPtr<FJsonValue>>* Dampers = nullptr;
+    if (Root->TryGetArrayField(TEXT("springDampers"), Dampers) && Dampers->Num() > 0)
+    {
+      const FString DName = FreeName(Folder, TEXT("PA_") + Mesh->GetName() + TEXT("_SM2Damper"));
+      DPA = NewObject<UPhysicsAsset>(CreatePackage(*(Folder / DName)), *DName, RF_Public | RF_Standalone | RF_Transactional);
+      DPA->SetPreviewMesh(Mesh);
+      const float BodyR = 3.0f; // cm, HEURISTIC (collision radius of a joint segment)
+      TArray<FName> JointBodies;
+      struct FSeg { FVector A, B; };
+      TArray<FSeg> RestSegs;
+      for (const TSharedPtr<FJsonValue>& DV : *Dampers)
+      {
+        const TSharedPtr<FJsonObject> D = DV->AsObject();
+        if (!D.IsValid())
+          continue;
+        for (const TSharedPtr<FJsonValue>& JV : D->GetArrayField(TEXT("joints")))
+        {
+          const TSharedPtr<FJsonObject> J = JV->AsObject();
+          FString N, SegTo;
+          J->TryGetStringField(TEXT("Name"), N);
+          J->TryGetStringField(TEXT("segmentTo"), SegTo);
+          const int32 BI = Ref.FindBoneIndex(FName(N));
+          const int32 ParIdx = BI == INDEX_NONE ? INDEX_NONE : Ref.GetParentIndex(BI);
+          const int32 SI = SegTo.IsEmpty() ? INDEX_NONE : Ref.FindBoneIndex(FName(SegTo));
+          if (ParIdx == INDEX_NONE || SI == INDEX_NONE)
+          {
+            ++DamperSkipped;
+            DamperLog.Add(N + (BI == INDEX_NONE ? TEXT(": bone not in skeleton") : ParIdx == INDEX_NONE ? TEXT(": root bone") : TEXT(": leaf joint (no child bone, its rotation moves nothing)")));
+            continue;
+          }
+          const int32 MainIdx = PA->FindBodyIndex(FName(N));
+          if (MainIdx != INDEX_NONE && IsSM2Sim(PA->SkeletalBodySetups[MainIdx]))
+          {
+            ++DamperSkipped;
+            DamperLog.Add(N + TEXT(": already simulated in the main PA (jiggle/cloth)"));
+            continue;
+          }
+          const TSharedPtr<FJsonObject>* UeP = nullptr;
+          TSharedPtr<FJsonObject> Ue;
+          if (J->TryGetObjectField(TEXT("ue"), UeP))
+            Ue = *UeP;
+          const FVector SegLocal = CS[SI].GetLocation() - CS[BI].GetLocation();
+          const FVector SegDirLocal = CS[BI].InverseTransformVectorNoScale(SegLocal).GetSafeNormal();
+          const float SegLen = FMath::Max(SegLocal.Size(), 1.0f);
+          // Body (reuse = kinematic parent made earlier for another joint -> make it simulated).
+          USkeletalBodySetup* Body = AddBody(DPA, FName(N), 1.0f, false);
+          Body->PhysicsType = SM2SimType;
+          Body->AggGeom.SphereElems.Reset();
+          FKSphylElem Cap(BodyR, FMath::Max(SegLen - 2.0f * BodyR, 0.1f));
+          Cap.Center = SegDirLocal * SegLen * 0.5f;
+          Cap.Rotation = FRotationMatrix::MakeFromZ(SegDirLocal).Rotator();
+          Body->AggGeom.SphylElems.Add(Cap);
+          Body->CollisionReponse = EBodyCollisionResponse::BodyCollision_Enabled;
+          Body->DefaultInstance.SetMassOverride((float)JNum(Ue, TEXT("massKg"), 1.0), true);
+          Body->DefaultInstance.LinearDamping = 0.0f;
+          Body->DefaultInstance.AngularDamping = 0.0f;
+          const float G = (float)JNum(Ue, TEXT("gravityScale"), 0.0);
+          Body->DefaultInstance.SetEnableGravity(G > 0.0f);
+          DamperGravity = FMath::Max(DamperGravity, G);
+          JointBodies.AddUnique(FName(N));
+          RestSegs.Add({ CS[BI].GetLocation(), CS[SI].GetLocation() });
+          const FName Parent = Ref.GetBoneName(ParIdx);
+          if (DPA->FindBodyIndex(Parent) == INDEX_NONE)
+            AddBody(DPA, Parent, 1.0f, true); // kinematic hanger; becomes simulated if it is a joint reached later
+          UPhysicsConstraintTemplate* C = NewObject<UPhysicsConstraintTemplate>(DPA, NAME_None, RF_Transactional);
+          FConstraintInstance& CI = C->DefaultInstance;
+          CI.JointName = FName(N);
+          CI.ConstraintBone1 = FName(N);
+          CI.ConstraintBone2 = Parent;
+          const FTransform F1(FRotationMatrix::MakeFromX(SegDirLocal).ToQuat(), FVector::ZeroVector);
+          CI.SetRefFrame(EConstraintFrame::Frame1, F1);
+          CI.SetRefFrame(EConstraintFrame::Frame2, (F1 * CS[BI]).GetRelativeTransform(CS[ParIdx]));
+          SetSpringJoint(CI, (float)JNum(Ue, TEXT("coneDeg"), 30.0), false, (float)JNum(Ue, TEXT("driveStiffness"), 0.0), (float)JNum(Ue, TEXT("driveDamping"), 0.0));
+          C->SetDefaultProfile(CI);
+          DPA->ConstraintSetup.Add(C);
+          ++DamperBodies;
+          DamperLog.Add(FString::Printf(TEXT("%s: body to %s (%.1f cm), parent %s, cone %.0f, drive %.1f/%.1f, mass %.2f, gravity %.2f"), *N, *SegTo, SegLen, *Parent.ToString(),
+            JNum(Ue, TEXT("coneDeg"), 30.0), JNum(Ue, TEXT("driveStiffness"), 0.0), JNum(Ue, TEXT("driveDamping"), 0.0), JNum(Ue, TEXT("massKg"), 1.0), G));
+        }
+        // Capsule limits.
+        const TArray<TSharedPtr<FJsonValue>>* Cons = nullptr;
+        if (D->TryGetArrayField(TEXT("constrains"), Cons))
+          for (const TSharedPtr<FJsonValue>& KV : *Cons)
+          {
+            const TSharedPtr<FJsonObject> K = KV->AsObject();
+            FString UpB, DnB;
+            K->TryGetStringField(TEXT("upBone"), UpB);
+            K->TryGetStringField(TEXT("downBone"), DnB);
+            const int32 UI = Ref.FindBoneIndex(FName(UpB)), DI = Ref.FindBoneIndex(FName(DnB));
+            if (UI == INDEX_NONE || DI == INDEX_NONE)
+            {
+              DamperLog.Add(FString::Printf(TEXT("constraint %s-%s skipped: locator bone not in skeleton%s"), *UpB, *DnB, JBool(K, TEXT("HasExternalLocators"), false) ? TEXT(" (hasExternalLocators)") : TEXT("")));
+              continue;
+            }
+            const FVector UpW = CS[UI].TransformPosition(JDir(K, TEXT("upOffsetCm"), FVector::ZeroVector));
+            const FVector DnW = CS[DI].TransformPosition(JDir(K, TEXT("downOffsetCm"), FVector::ZeroVector));
+            float R = (float)JNum(K, TEXT("radiusCm"), 0.0);
+            // Shrink off the rest pose: distance between the capsule axis and each joint segment (sampled).
+            float Clear = BIG_NUMBER;
+            for (const FSeg& Sg : RestSegs)
+              for (int32 T = 0; T <= 8; ++T)
+              {
+                const FVector P = FMath::Lerp(Sg.A, Sg.B, T / 8.0f);
+                Clear = FMath::Min(Clear, (float)FMath::PointDistToSegment(P, UpW, DnW));
+              }
+            const float RMax = Clear - BodyR - 0.5f;
+            if (R > RMax)
+            {
+              DamperLog.Add(FString::Printf(TEXT("constraint %s-%s radius %.1f -> %.1f cm (rest pose clearance %.1f, HEURISTIC shrink)"), *UpB, *DnB, R, FMath::Max(RMax, 0.5f), Clear));
+              R = FMath::Max(RMax, 0.5f);
+            }
+            const FName CapBone = Ref.GetBoneName(UI);
+            const bool bNew = DPA->FindBodyIndex(CapBone) == INDEX_NONE;
+            USkeletalBodySetup* CB = AddBody(DPA, CapBone, 1.0f, true);
+            if (bNew)
+              CB->AggGeom.SphereElems.Reset();
+            const FVector A = CS[UI].InverseTransformPosition(UpW), B = CS[UI].InverseTransformPosition(DnW);
+            const FVector Axis = (B - A).GetSafeNormal();
+            FKSphylElem KC(R, FMath::Max((B - A).Size(), 0.1f));
+            KC.Center = (A + B) * 0.5f;
+            KC.Rotation = FRotationMatrix::MakeFromZ(Axis.IsNearlyZero() ? FVector::ZAxisVector : Axis).Rotator();
+            CB->AggGeom.SphylElems.Add(KC);
+            CB->CollisionReponse = EBodyCollisionResponse::BodyCollision_Enabled;
+            ++DamperCaps;
+            DamperLog.Add(FString::Printf(TEXT("constraint capsule on %s: %s -> %s, r %.1f cm, len %.1f cm"), *CapBone.ToString(), *UpB, *DnB, R, (B - A).Size()));
+          }
+      }
+      DPA->UpdateBodySetupIndexMap();
+      // Collision: only joint bodies vs capsule bodies (joint-joint and anything-kinematic-hanger pairs off).
+      for (int32 I = 0; I < DPA->SkeletalBodySetups.Num(); ++I)
+        for (int32 K = I + 1; K < DPA->SkeletalBodySetups.Num(); ++K)
+        {
+          const bool bJI = JointBodies.Contains(DPA->SkeletalBodySetups[I]->BoneName), bJK = JointBodies.Contains(DPA->SkeletalBodySetups[K]->BoneName);
+          const bool bCI = DPA->SkeletalBodySetups[I]->AggGeom.SphylElems.Num() > 0 && !bJI, bCK = DPA->SkeletalBodySetups[K]->AggGeom.SphylElems.Num() > 0 && !bJK;
+          if (!((bJI && bCK) || (bJK && bCI)))
+            DPA->DisableCollision(I, K);
+        }
+      for (USkeletalBodySetup* B : DPA->SkeletalBodySetups)
+        if (!JointBodies.Contains(B->BoneName) && B->AggGeom.SphylElems.Num() == 0)
+          B->CollisionReponse = EBodyCollisionResponse::BodyCollision_Disabled;
+      NormalizeBodies(DPA);
+      DPA->UpdateBoundsBodiesArray();
+      DPA->RefreshPhysicsAssetChange();
+      FAssetRegistryModule::AssetCreated(DPA);
+      DPA->MarkPackageDirty();
+      for (const FString& S : DamperLog)
+        UE_LOG(LogTemp, Display, TEXT("SM2PhysicsSetup damper: %s"), *S);
+      if (DamperBodies == 0)
+        DamperLog.Add(TEXT("no damper body created; second RigidBody node not added"));
+    }
+  }
 
   // Post-process AnimBP: InputPose -> LocalToComponent -> RigidBody -> ComponentToLocal -> Output.
   const FString ABPName = FreeName(Folder, TEXT("ABP_") + Mesh->GetName() + TEXT("_SM2Phys"));
@@ -325,6 +657,7 @@ bool USM2PhysicsSetupLibrary::SetupFromJsonEx(USkeletalMesh* Mesh, const FString
   auto* RB = NewGraphNode<UAnimGraphNode_RigidBody>(Graph, -400);
   auto* C2L = NewGraphNode<UAnimGraphNode_ComponentToLocalSpace>(Graph, -150);
   RB->Node.OverridePhysicsAsset = PA;
+  RB->Node.bUseDefaultAsSimulated = true; // phys52: bodies are PhysType_Default (see AddBody)
   // mtl1-8: simulate in the CENTRE (pelvis) bone space; that bone's world motion is fed back clamped through SimSpaceSettings.
   // Root-motion clips move the bones, not the actor. In WorldSpace a 13 m/s dash left the cloth metres behind (sorcerer_exalted).
   // The limits are HEURISTIC: a run (~4.5 m/s) passes unclamped, and a dash/teleport is capped.
@@ -346,12 +679,39 @@ bool USM2PhysicsSetupLibrary::SetupFromJsonEx(USkeletalMesh* Mesh, const FString
   RB->Node.SimSpaceSettings.MaxAngularVelocity = 10.0f;      // rad/s
   RB->Node.SimSpaceSettings.MaxAngularAcceleration = 100.0f; // rad/s^2
   RB->Node.bEnableWorldGeometry = false;
-  const bool bLinked = PosePin(In, EGPD_Output) && PosePin(L2C, EGPD_Input) && PosePin(RB, EGPD_Input) && PosePin(C2L, EGPD_Input) && PosePin(Out, EGPD_Input);
+  // phys52: second RigidBody node for the motion dampers. Base-bone space on the skeleton root: root motion / clip loop
+  // jumps are removed, the pelvis/belt motion relative to the root drives the swing (HEURISTIC). Gravity 980 * max joint
+  // gravity (one value per node; joints with gravity 0 have it off) HEURISTIC.
+  UAnimGraphNode_RigidBody* RB2 = nullptr;
+  if (DPA && DamperBodies > 0)
+  {
+    C2L->NodePosX = 100;
+    RB2 = NewGraphNode<UAnimGraphNode_RigidBody>(Graph, -150);
+    RB2->NodePosY = 200;
+    RB2->NodeComment = TEXT("SM2 motion damper (phys52)");
+    RB2->Node.OverridePhysicsAsset = DPA;
+    RB2->Node.bUseDefaultAsSimulated = true;
+    RB2->Node.SimulationSpace = ESimulationSpace::BaseBoneSpace;
+    RB2->Node.BaseBoneRef.BoneName = Ref.GetBoneName(0);
+    RB2->Node.SimSpaceSettings.WorldAlpha = 0.0f;
+    RB2->Node.SimSpaceSettings.DampingAlpha = 0.0f;
+    RB2->Node.bEnableWorldGeometry = false;
+    RB2->Node.bOverrideWorldGravity = true;
+    RB2->Node.OverrideWorldGravity = FVector(0.0, 0.0, -980.0 * DamperGravity);
+  }
+  const bool bLinked = PosePin(In, EGPD_Output) && PosePin(L2C, EGPD_Input) && PosePin(RB, EGPD_Input) && PosePin(C2L, EGPD_Input) && PosePin(Out, EGPD_Input)
+    && (!RB2 || PosePin(RB2, EGPD_Input));
   if (bLinked)
   {
     PosePin(In, EGPD_Output)->MakeLinkTo(PosePin(L2C, EGPD_Input));
     PosePin(L2C, EGPD_Output)->MakeLinkTo(PosePin(RB, EGPD_Input));
-    PosePin(RB, EGPD_Output)->MakeLinkTo(PosePin(C2L, EGPD_Input));
+    if (RB2)
+    {
+      PosePin(RB, EGPD_Output)->MakeLinkTo(PosePin(RB2, EGPD_Input));
+      PosePin(RB2, EGPD_Output)->MakeLinkTo(PosePin(C2L, EGPD_Input));
+    }
+    else
+      PosePin(RB, EGPD_Output)->MakeLinkTo(PosePin(C2L, EGPD_Input));
     PosePin(C2L, EGPD_Output)->MakeLinkTo(PosePin(Out, EGPD_Input));
   }
   FKismetEditorUtilities::CompileBlueprint(ABP);
@@ -362,9 +722,13 @@ bool USM2PhysicsSetupLibrary::SetupFromJsonEx(USkeletalMesh* Mesh, const FString
   Mesh->SetPostProcessAnimBlueprint(TSubclassOf<UAnimInstance>(Cast<UClass>(ABP->GeneratedClass)));
   Mesh->MarkPackageDirty();
 
-  Report = FString::Printf(TEXT("PA=%s ABP=%s simulated=%d kinematic=%d constraints=%d missingBones=%d linked=%d compiled=%d"),
+  Report = FString::Printf(TEXT("PA=%s ABP=%s simulated=%d kinematic=%d constraints=%d missingBones=%d linked=%d compiled=%d jiggles=%d jiggleMissing=%d jiggleFromKinematic=%d damperPA=%s damperBodies=%d damperSkipped=%d damperCapsules=%d damperGravity=%.2f"),
     *PA->GetPathName(), *ABP->GetPathName(), Sim, Kin, PA->ConstraintSetup.Num(), Missing, bLinked ? 1 : 0,
-    ABP->Status != BS_Error ? 1 : 0);
+    ABP->Status != BS_Error ? 1 : 0, JigSim, JigMissing, JigConverted, DPA ? *DPA->GetPathName() : TEXT("none"), DamperBodies, DamperSkipped, DamperCaps, DamperGravity);
+  if (JigSkipped.Num() > 0)
+    Report += TEXT(" jiggleSkipped=[") + FString::Join(JigSkipped, TEXT("; ")) + TEXT("]");
+  if (DamperLog.Num() > 0)
+    Report += TEXT(" damperLog=[") + FString::Join(DamperLog, TEXT("; ")) + TEXT("]");
   return bLinked && ABP->Status != BS_Error;
 }
 
@@ -378,7 +742,8 @@ UAnimGraphNode_RigidBody* FindRigidBodyNode(UAnimBlueprint* ABP)
     if (G)
       for (UEdGraphNode* N : G->Nodes)
         if (UAnimGraphNode_RigidBody* RB = Cast<UAnimGraphNode_RigidBody>(N))
-          return RB;
+          if (!RB->NodeComment.StartsWith(TEXT("SM2 motion damper"))) // phys52: TuneRigidBody edits the main node only
+            return RB;
   return nullptr;
 }
 
@@ -399,6 +764,7 @@ USkeletalBodySetup* CollBody(UPhysicsAsset* PA, FName Bone)
   USkeletalBodySetup* Body = NewObject<USkeletalBodySetup>(PA, NAME_None, RF_Transactional);
   Body->BoneName = Bone;
   Body->PhysicsType = PhysType_Kinematic;
+  Body->CollisionTraceFlag = CTF_UseSimpleAsComplex;
   PA->SkeletalBodySetups.Add(Body);
   PA->UpdateBodySetupIndexMap();
   return Body;
@@ -1371,6 +1737,36 @@ int32 USM2PhysicsSetupLibrary::SetSimGravity(UPhysicsAsset* PA, bool bEnable)
     }
   PA->MarkPackageDirty();
   return N;
+}
+
+int32 USM2PhysicsSetupLibrary::FixWorldPhysics(UPhysicsAsset* PA, UAnimBlueprint* ABP, FString& Report)
+{
+  TArray<UPhysicsAsset*> PAs;
+  if (PA) PAs.AddUnique(PA);
+  TArray<UAnimGraphNode_RigidBody*> Nodes;
+  if (ABP)
+    for (UEdGraph* G : ABP->FunctionGraphs)
+      if (G)
+        for (UEdGraphNode* N : G->Nodes)
+          if (UAnimGraphNode_RigidBody* RB = Cast<UAnimGraphNode_RigidBody>(N))
+          {
+            Nodes.Add(RB);
+            if (RB->Node.OverridePhysicsAsset) PAs.AddUnique(RB->Node.OverridePhysicsAsset.Get());
+          }
+  int32 Bodies = 0;
+  for (UPhysicsAsset* P : PAs)
+  {
+    P->Modify();
+    for (USkeletalBodySetup* B : P->SkeletalBodySetups) if (B) B->Modify();
+    const int32 N = NormalizeBodies(P);
+    Bodies += N;
+    if (N) { P->RefreshPhysicsAssetChange(); P->MarkPackageDirty(); }
+  }
+  for (UAnimGraphNode_RigidBody* RB : Nodes) { RB->Modify(); RB->Node.bUseDefaultAsSimulated = true; }
+  if (ABP && Nodes.Num()) { FKismetEditorUtilities::CompileBlueprint(ABP); ABP->MarkPackageDirty(); }
+  Report = FString::Printf(TEXT("physicsAssets=%d bodiesChanged=%d rigidBodyNodes=%d compiled=%d"), PAs.Num(), Bodies, Nodes.Num(),
+    ABP ? (ABP->Status != BS_Error ? 1 : 0) : -1);
+  return Bodies;
 }
 
 int32 USM2PhysicsSetupLibrary::MeasureClothPenetration(USkeletalMeshComponent* Comp, float ThresholdCm, FString& Report, UPhysicsAsset* OverrideCollision)

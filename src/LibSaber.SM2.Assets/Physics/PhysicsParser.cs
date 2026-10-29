@@ -20,12 +20,70 @@ public static class PhysicsParser
       ReadCloth(cloth, setup);
     if (Child(root, "prop_phys_jiggle") is JsonObject jiggle)
       ReadJiggle(jiggle, setup);
+    if (Child(root, "prop_motion_damper_controller") is JsonObject damper)
+      ReadMotionDamper(damper, setup, source);
     return setup;
   }
 
-  /// <summary>True when the text declares either physics property (cheap pre-filter, no parse).</summary>
+  /// <summary>True when the text declares any physics property (cheap pre-filter, no parse).</summary>
   public static bool Declares(string clsText)
-    => clsText.Contains("prop_cloth_sim", StringComparison.Ordinal) || clsText.Contains("prop_phys_jiggle", StringComparison.Ordinal);
+    => clsText.Contains("prop_cloth_sim", StringComparison.Ordinal) || clsText.Contains("prop_phys_jiggle", StringComparison.Ordinal)
+       || DeclaresDamper(clsText);
+
+  /// <summary>phys52: the text declares <c>prop_motion_damper_controller</c>.</summary>
+  public static bool DeclaresDamper(string clsText) => clsText.Contains("prop_motion_damper_controller", StringComparison.Ordinal);
+
+  /// <summary>
+  ///   phys52: <c>prop_motion_damper_controller { springDampers [ { timeScale, windFlutter?, joints [ { name, stiffness,
+  ///   dampingRation, mass, jointAngle, gravity, isParent?, isInvertedLook? } ], constrains [ { upLocatorName,
+  ///   downLocatorName, radius, hasExternalLocators? } ] } ] }</c>. Survey of the 168 retail cls files that use it (96 client,
+  ///   61 authority): 1-6 joints per damper, root first.
+  /// </summary>
+  private static void ReadMotionDamper(JsonObject prop, PhysicsSetup setup, string source)
+  {
+    foreach (var item in Items(Child(prop, "springDampers")))
+    {
+      var d = new SpringDamper { TimeScale = Num(item, "timeScale", 1) };
+      if (Child(item, "windFlutter") is { } wind)
+        d.WindFlutter = wind.ToJsonString();
+      foreach (var j in Items(Child(item, "joints")))
+      {
+        var joint = new SpringDamperJoint { Name = Str(j, "name") };
+        float Field(string key, float fallback)
+        {
+          if (Child(j, key) is null) joint.Defaulted.Add(key);
+          return Num(j, key, fallback);
+        }
+        joint.Stiffness = Field("stiffness", 0);
+        joint.DampingRation = Field("dampingRation", 1);
+        joint.Mass = Field("mass", 1);
+        joint.JointAngle = Field("jointAngle", 30);
+        joint.Gravity = Field("gravity", 0);
+        if (Child(j, "isParent") is not null) joint.IsParent = Bool(j, "isParent", false);
+        if (Child(j, "isInvertedLook") is not null) joint.IsInvertedLook = Bool(j, "isInvertedLook", false);
+        if (joint.Name.Length > 0)
+          d.Joints.Add(joint);
+      }
+      foreach (var c in Items(Child(item, "constrains")))
+      {
+        var k = new SpringDamperConstraint
+        {
+          UpLocatorName = Str(c, "upLocatorName"),
+          DownLocatorName = Str(c, "downLocatorName"),
+          Radius = Num(c, "radius", 0),
+        };
+        if (Child(c, "hasExternalLocators") is not null) k.HasExternalLocators = Bool(c, "hasExternalLocators", false);
+        k.UpBone = k.UpLocatorName;
+        k.DownBone = k.DownLocatorName;
+        if (k.UpLocatorName.Length > 0)
+          d.Constrains.Add(k);
+      }
+      if (d.Joints.Count > 0)
+        setup.SpringDampers.Add(d);
+    }
+    if (setup.SpringDampers.Count > 0)
+      setup.SpringDamperSource = source;
+  }
 
   private static void ReadCloth(JsonObject prop, PhysicsSetup setup)
   {

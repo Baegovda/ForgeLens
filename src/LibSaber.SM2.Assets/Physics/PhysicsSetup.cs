@@ -222,6 +222,58 @@ public sealed class PhysicsSetup
   public string SourceClass { get; set; } = "";
   public List<ClothEntry> Cloths { get; } = new();
   public List<JiggleSettings> Jiggles { get; } = new();
+  /// <summary>phys52: <c>prop_motion_damper_controller.springDampers</c> (may come from the authority class, see <see cref="PhysicsLocator"/>).</summary>
+  public List<SpringDamper> SpringDampers { get; } = new();
+  /// <summary>Class the spring dampers were read from (empty when none).</summary>
+  public string SpringDamperSource { get; set; } = "";
   public List<string> Notes { get; } = new();
-  public bool IsEmpty => Cloths.Count == 0 && Jiggles.Count == 0;
+  public bool IsEmpty => Cloths.Count == 0 && Jiggles.Count == 0 && SpringDampers.Count == 0;
+}
+
+/// <summary>
+///   phys52: one joint of a <c>prop_motion_damper_controller</c> spring damper. Field strings are the exe's
+///   (0x143634e30..0x143634ec0: SpringDamper, dampingRation, isParent, jointAngle, isInvertedLook; serializer xrefs
+///   0x141475c10 / 0x141475db0 / 0x1414760c0 / 0x141476260). Exe defaults were not recovered: an absent mass is 1, an absent
+///   jointAngle 30, gravity 0, stiffness 0, dampingRation 1 (HEURISTIC; recorded in <see cref="Defaulted"/>).
+/// </summary>
+public sealed class SpringDamperJoint
+{
+  public string Name { get; set; } = "";
+  public float Stiffness { get; set; }
+  /// <summary>Authored as <c>dampingRation</c> (sic): read as a damping ratio (HEURISTIC, from the name).</summary>
+  public float DampingRation { get; set; } = 1f;
+  public float Mass { get; set; } = 1f;
+  /// <summary>Degrees.</summary>
+  public float JointAngle { get; set; } = 30f;
+  public float Gravity { get; set; }
+  public bool? IsParent { get; set; }
+  public bool? IsInvertedLook { get; set; }
+  /// <summary>Fields the class left out (their HEURISTIC defaults were used).</summary>
+  public List<string> Defaulted { get; } = new();
+}
+
+/// <summary>phys52: a <c>constrains</c> item: a capsule between two locators that the damper joints must stay outside of.</summary>
+public sealed class SpringDamperConstraint
+{
+  public string UpLocatorName { get; set; } = "";
+  public string DownLocatorName { get; set; } = "";
+  /// <summary>Meters.</summary>
+  public float Radius { get; set; }
+  public bool? HasExternalLocators { get; set; }
+  /// <summary>Skeleton bone + bone-local offset (source meters) of each locator; same as the name when it is a bone (set by <see cref="CdtObjectResolver"/>).</summary>
+  public string UpBone { get; set; } = "";
+  public System.Numerics.Vector3 UpOffset { get; set; }
+  public string DownBone { get; set; } = "";
+  public System.Numerics.Vector3 DownOffset { get; set; }
+  public string ResolvedFrom { get; set; } = "";
+}
+
+/// <summary>phys52: one <c>springDampers</c> item (a joint chain, root first).</summary>
+public sealed class SpringDamper
+{
+  public float TimeScale { get; set; } = 1f;
+  /// <summary>Raw <c>windFlutter</c> block when present (4 retail uses); not simulated.</summary>
+  public string? WindFlutter { get; set; }
+  public List<SpringDamperJoint> Joints { get; } = new();
+  public List<SpringDamperConstraint> Constrains { get; } = new();
 }
