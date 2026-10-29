@@ -5,7 +5,7 @@ import os, re, subprocess, sys
 ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 REPO = ["tools/re/README.md", "tools/re/rea_call.py", "tools/re/recall.py", "tools/re/re_cache_build.py", "tools/re/exe_check.py",
         "tools/re/ghidra_serve/GhidraServe.java", "tools/re/ghidra_serve/gs.py", "tools/re/ghidra_serve/gs.ps1",
-        "tools/re/pc/start_rea.ps1", "tools/re/pc/mem_watch.ps1", "tools/re/box/refresh_origin.sh",
+        "tools/re/pc/start_rea.ps1", "tools/re/pc/mem_watch.ps1", "tools/re/pc/disk_watch.ps1", "tools/re/pc/patch_watch.ps1", "tools/re/pc/install_tasks.ps1", "tools/re/pc/backup.ps1", "tools/re/rea_version.py", "tools/re/box/push_lock.sh", "tools/re/nmb_verify.py", "docs/handoff/CONCERNS.md", "tools/re/box/refresh_origin.sh",
         "docs/handoff/RE_CACHE/INDEX.tsv", "docs/handoff/UNVERIFIED.md", "docs/handoff/VISUAL_CHECKS.md", "docs/handoff/BACKUPS.md",
         "docs/BOT_TRANSFER.md", "HANDOFF.md", "docs/SYMBOL_DB/index.tsv"]
 PC = [r"%USERPROFILE%\Desktop\SM2_Work\Tools\re_env\work\sm2_retail.exe", r"%USERPROFILE%\Desktop\SM2_Work\Tools\re_env\ghidra_12.1.4_PUBLIC",
@@ -20,6 +20,9 @@ def main(a):
     if "--pc" in a:
         for p in PC:
             if not os.path.exists(os.path.expandvars(p)): bad.append(f"missing PC path {p}")
+        sys.path.insert(0, os.path.dirname(os.path.abspath(__file__))); import rea_version
+        v = rea_version.installed()
+        if v != rea_version.PIN: bad.append(f"REA version guard: installed {v} != pinned {rea_version.PIN}")
     for doc in ["tools/re/README.md", "docs/BOT_TRANSFER.md", "docs/handoff/WORKFLOW.md", "tools/re/rea_call.py"]:
         f = os.path.join(ROOT, doc)
         if not os.path.exists(f): continue

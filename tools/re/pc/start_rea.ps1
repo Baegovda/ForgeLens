@@ -2,7 +2,9 @@
 # Copy to / run from re_env\work (rea_daemon.py + rea_call.py live there). Skips start if a daemon is already running.
 # Usage: powershell -File start_rea.ps1      (first ready ~11 min on the PC; REA deletes its temp project on exit)
 $W = "$env:USERPROFILE\Desktop\SM2_Work\Tools\re_env\work"; Set-Location $W
+python "$PSScriptRoot\..\rea_version.py"; if ($LASTEXITCODE) { throw "REA version guard failed (pinned 6.8.0)" }
 $run = Get-CimInstance Win32_Process | ? { $_.CommandLine -like "*rea_daemon.py*" }
+if ($run) { "REA daemon already running (pid $($run.ProcessId -join ',')): no-op"; exit 0 }   # idempotent (Task Scheduler logon)
 if (-not $run) {
   New-Item -ItemType Directory -Force "$W\rea_q" | Out-Null; Remove-Item "$W\rea_daemon.ready" -ErrorAction SilentlyContinue
   Start-Process python -ArgumentList "-u rea_daemon.py" -WorkingDirectory $W -WindowStyle Hidden -RedirectStandardOutput "$W\rea_daemon.log" -RedirectStandardError "$W\rea_daemon.err.log"

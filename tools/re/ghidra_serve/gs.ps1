@@ -18,6 +18,7 @@ switch ($cmd) {
    "import started pid $($p.Id); log $S\import.log"
  }
  'start' {
+   if ((Test-Path "$S\serve.json") -and ((python "$Scr\gs.py" ping 2>$null) -match '"ok"')) { "GhidraServe already running: no-op"; return }   # idempotent
    Remove-Item "$S\serve.json" -ErrorAction SilentlyContinue
    $t0 = Get-Date
    $p = Start-Process -FilePath $G -ArgumentList "`"$P`" sm2 -process sm2_retail.exe -readOnly -noanalysis -scriptPath `"$Scr`" -postScript GhidraServe.java `"$S`"" -RedirectStandardOutput "$S\serve.log" -RedirectStandardError "$S\serve.err" -WindowStyle Hidden -PassThru

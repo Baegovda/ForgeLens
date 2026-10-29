@@ -65,10 +65,10 @@ public static class PlayerFireClips
       if (group is { } g) return new PlayerFireClip(A(g), B(g), "INFERRED", $"Expression_2: wpn_type {w} → sht{g}");
       // Tails differ between the aim and the blind program.
       string aim, blind, ev = "INFERRED", why;
-      if (Eq(w, 1.4)) { aim = A(5); blind = B(5); why = "1.4 → 3 (aim sht5; blind child is a SubtractiveBlend over sht5, INFERRED)"; }
+      if (Eq(w, 1.4)) { aim = A(5); blind = B(5); ev = "HEURISTIC"; why = "1.4 → 3 (aim sht5; blind child is a SubtractiveBlend, not indexed, assumed sht5; nmb_verify R40)"; }
       else if (Eq(w, 1.41)) { aim = A(1); blind = B(5); ev = "HEURISTIC"; why = "1.41: blind → 3 (sht5 SubtractiveBlend); aim unassigned (default 0 assumed)"; }
       else if (Eq(w, 1.25)) { aim = A(15); blind = B(15); why = "1.25 → 4"; }
-      else if (Eq(w, 1.51)) { aim = auxVision ? "tacticus_sht16_shoot_aim_melta" : A(16); blind = B(16); why = "1.51 → 5 (aim: isInAuxVision picks the melta clip)"; }
+      else if (Eq(w, 1.51)) { aim = auxVision ? "tacticus_sht16_shoot_aim_melta" : A(16); blind = B(16); ev = "HEURISTIC"; why = "1.51 → 5 (aim: Switch_2 input SimpleTypeConvert not indexed, assumed isInAuxVision → melta clip; nmb_verify R40)"; }
       else if (Eq(w, 1.7)) { aim = A(15); blind = B(16); ev = "HEURISTIC"; why = "1.7: aim → 4 behind an undecoded isInAuxVision test; blind else-branch → 5"; }
       else if (Eq(w, 1.5)) { aim = A(2); blind = B(16); ev = "HEURISTIC"; why = "1.5: aim → 1 behind an undecoded isInAuxVision test; blind else-branch → 5"; }
       else { aim = A(1); blind = B(16); ev = "HEURISTIC"; why = $"wpn_type {w}: blind else-branch → 5 (sht16, INFERRED); aim unassigned (default 0 → sht1 assumed)"; }

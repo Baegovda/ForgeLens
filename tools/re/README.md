@@ -25,4 +25,23 @@ Needs pefile + capstone (box: /tmp/cs/bin/python), JAVA_HOME=jdk25, GHIDRA_HEADL
 | `docs_check.py` | documented paths/arg names still valid | `python3 tools/re/docs_check.py [--pc]` |
 | `pc/mem_watch.ps1` | log when PC free RAM < 20 GB (log only) | `powershell -File mem_watch.ps1` |
 | `box/refresh_origin.sh` | refresh box origin ref from PC bundle after a push | see script header |
+| `box/push_lock.sh` | one push at a time (mkdir lock, stale 1 h) — acquire before format-patch, release after refresh_origin | `push_lock.sh acquire <agent>` / `release <agent>` / `status` |
+| `nmb_verify.py` (R40) | fire-clip table (PlayerFireClips.cs port) vs primaris.nmb per weapon × plasma × aux; lists assumptions, re-labels rows, exit 1 on MISMATCH | `python3 tools/re/nmb_verify.py primaris.nmb --all-states --out docs/handoff/FIRE_CLIP_VERIFY.tsv` |
+| `rea_version.py` (R41) | REA guard: installed rea-agents must be 6.8.0 (called by start_rea.ps1, docs_check --pc) | `python tools/re/rea_version.py` |
+| `pc/disk_watch.ps1`, `pc/patch_watch.ps1`, `pc/mem_watch.ps1 -Once` (R41) | silent watchers → one line per tag in `SM2_Work\alerts.txt` (empty = OK), history `re_env\alerts.log`. Scheduled by `pc/install_tasks.ps1` (mem/disk every 10 min, patch daily 09:00). **Cost no tokens**: they only write alerts.txt; the bot reads it when it looks | `type %USERPROFILE%\Desktop\SM2_Work\alerts.txt` |
+| `pc/backup.ps1` (R41) | copy big artefacts to `K:\SM2_Backup` + sha256 manifest; `verify`; `record` = manifest only (proj_sm2 while served). Never deletes | `backup.ps1 copy` · `backup.ps1 verify` · `backup.ps1 record proj_sm2 <path>` |
+REA daemon and GhidraServe are **manual starts** (owner 10/30: no logon auto-start): `start_rea.ps1`, `gs.ps1 start`; both are no-ops when already running.
+
+## gs.py batch recipe (R40)
+One query per line (`#` comment), short form or JSON:
+```
+sum 0x141909810          # summary (sum ADDR [code lines])
+dec 0x141ab9b60 30       # decompile, max lines
+xrefs 0x14224ecf0        # [limit]
+str ho_shoot             # regex [limit]
+at 0x141909900           # function_at
+funcs 0x141909000 0x141910000 20
+```
+`gs.py batch q.txt` (or `-` = stdin) → one compact block per query `## n tool args`; `--json` = raw. Round-trip time on stderr.
+Measured PC 2026-10-30 01:2x KST, 20 mixed queries (8 sum, 3 dec 30, 3 xrefs, 3 str, 2 at, 1 funcs): 198–229 ms server round trip, 246–292 ms wall (3 runs); same 20 as separate calls 1,123 ms; compact output 11.4 k chars vs 15.3 k JSON.
 Measured 2026-10-30 KST (PC): `gs.ps1 import` 21 min (full analysis, saved 1.22 GB); `gs.ps1 start` ready in 8–10 s (56,190 strings indexed); decompile 42–54 ms server-side, ~110 ms per gs.py call; string search 6 ms; batch of 3 in ~63 ms; RAM ~1 GB idle. Known gap: `summary` signature shows Ghidra's listing prototype (often `undefined f(void)`); use `-c N` for the decompiled signature.

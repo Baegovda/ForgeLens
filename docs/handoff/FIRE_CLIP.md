@@ -44,10 +44,10 @@ Code: `PlayerFireClips` (src/LibSaber.SM2.Assets/Animation/PlayerFireClips.cs), 
 | 1.1, 1.13, 1.6 | stalker, bolt sniper, las fusil | sht2 | sht2 | INFERRED |
 | 1.3 | plasma exterminator | sht1 (charged: sht2) | same | INFERRED |
 | 1.12 | instigator | sht3 | sht3 | INFERRED |
-| 1.4 | melta shotgun | sht5 | SubtractiveBlend(sht5) | INFERRED |
+| 1.4 | melta shotgun | sht5 | SubtractiveBlend(sht5) | HEURISTIC (R40: SubtractiveBlend not indexed, child assumed sht5) |
 | 1.41 | melta shotgun (chaos) | sht1 | sht5 | aim HEURISTIC |
 | 1.25 | pyroblaster | sht15 | sht15 | INFERRED |
-| 1.51 | combi melta | sht16 (aux: sht16_melta) | sht16 | INFERRED |
+| 1.51 | combi melta | sht16 (aux: sht16_melta) | sht16 | HEURISTIC (R40: Switch_2 input SimpleTypeConvert not indexed; isInAuxVision assumed) |
 | 1.5 | aux GL / aux melta | sht2? | sht16 | HEURISTIC (undecoded op c4 on isInAuxVision) |
 | 1.7 | smg heroic_05_a (authority only) | sht15? | sht16 | HEURISTIC (undecoded ops 95/98) |
 | 2 | heavy bolter, grav cannon | sht1? | sht9 | blind INFERRED; aim HEURISTIC (no heavy branch) |
@@ -62,3 +62,10 @@ Code: `PlayerFireClips` (src/LibSaber.SM2.Assets/Animation/PlayerFireClips.cs), 
 - The ssl code that copies wpnType → wpn_type.
 - Heavies in aim: there is probably no minizoom state for them. Check which state heavies use when aiming.
 - In game, no visual check of the result has been done.
+
+## Verification (R40, `tools/re/nmb_verify.py`)
+`nmb_verify.py primaris.nmb --all-states` → `FIRE_CLIP_VERIFY.tsv` (31 weapons × plasma × aux = 124 rows; weapon list `fire_clip_weapons.tsv`).
+- Table vs network: 0 mismatches; 60 rows INFERRED (no assumption), 64 HEURISTIC. Two rows were relabelled INFERRED → HEURISTIC (1.4, 1.51), code + tests updated.
+- Assumptions it lists: unassigned Expression OUT → 0; undecoded ops 95/98/c4 (1.5, 1.7: first outcome taken); heavies (≥2) floor into the rifle aim branch; SubtractiveBlend / SimpleTypeConvert records not indexed.
+- Variant states (wham, shield, asWas, shoot_state_1) diverge for the else-branch weapons (blind gives sht1 instead of sht16, pistols 0.3/0.4 differ). Which variant the game picks is not known.
+- Lead for heavy aim (not followed): states `LOCO|heavy_bolter_turret|shoot|shoot_anim` (sht11/sht12 aim clips) and `anim|heavy_flammer_shoot`.

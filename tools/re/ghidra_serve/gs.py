@@ -4,11 +4,14 @@ Usage:
   gs.py <tool> '<json args>'              one query  (same names as rea_call.py where practical:
                                           procedure_pseudo_code/decompile, xrefs, search_strings, function_at,
                                           list_functions, summary, ping, shutdown)
-  gs.py batch <file.jsonl | ->            many queries in one round trip: one {"tool":..,"arguments":..} per line
+  gs.py batch <file | -> [--json]         many queries in ONE round trip, compact combined output. One query per line:
+                                          JSON {"tool":..,"arguments":..}  or short form:
+                                            sum 0xA [N]   dec 0xA [maxlines]   xrefs 0xA [limit]   at 0xA
+                                            str REGEX [limit]   funcs 0xSTART 0xEND [limit]     (# = comment)
   gs.py sum 0xADDR [0xADDR...] [-c N]     compact summary per function (signature, calls, strings, globals,
                                           constants; -c N adds first N pseudo-code lines)
 State file: $GS_STATE/serve.json (default: dir of this script/../../.. not used; set GS_STATE)."""
-import json, os, socket, sys
+import json, os, socket, sys, time
 
 def state_dir():
     d = os.environ.get("GS_STATE")
@@ -37,6 +40,32 @@ def fmt_summary(r):
     if r.get("code"): L.append("  code:\n    " + r["code"].replace("\r", "").rstrip().replace("\n", "\n    "))
     return "\n".join(L)
 
+SHORT = {"sum": ("summary", "address", "pseudo_lines"), "dec": ("decompile", "address", "max_lines"),
+         "xrefs": ("xrefs", "address", "limit"), "at": ("function_at", "address", None),
+         "str": ("search_strings", "pattern", "limit")}
+
+def parse_q(line):
+    line = line.strip()
+    if line.startswith("{"): q = json.loads(line); q.setdefault("arguments", {}); return q
+    w = line.split()
+    if w[0] == "funcs":
+        args = {"start": w[1], "end": w[2]}
+        if len(w) > 3: args["limit"] = int(w[3])
+        return {"tool": "list_functions", "arguments": args}
+    tool, k1, k2 = SHORT[w[0]]
+    args = {k1: w[1]}
+    if k2 and len(w) > 2: args[k2] = int(w[2])
+    return {"tool": tool, "arguments": args}
+
+def fmt_any(tool, r):
+    if "error" in r: return f"ERROR {r['error']}"
+    if tool == "summary": return fmt_summary(r)
+    if "code" in r: return f"// {r['name']} @{r['entry']}\n" + r["code"].replace("\r", "").rstrip()
+    if "xrefs" in r: return f"count={r['count']}\n" + "\n".join(f"  {x['from']} {x['type']} {x.get('function','')}" for x in r["xrefs"])
+    if "strings" in r: return "\n".join(f"  {x['address']} {x['value'][:160]}" for x in r["strings"]) or "  (none)"
+    if "functions" in r: return "\n".join("  " + x for x in r["functions"])
+    return json.dumps(r, ensure_ascii=False)
+
 def main(a):
     if not a: sys.exit(__doc__)
     if a[0] == "sum":
@@ -50,8 +79,11 @@ def main(a):
         return
     if a[0] == "batch":
         f = sys.stdin if a[1] == "-" else open(a[1])
-        qs = [json.loads(l) for l in f if l.strip()]
-        print(json.dumps(send({"batch": qs}), indent=1, ensure_ascii=False))
+        qs = [parse_q(l) for l in f if l.strip() and not l.lstrip().startswith("#")]
+        t0 = time.time(); res = send({"batch": qs})["batch"]; dt = (time.time() - t0) * 1000
+        if "--json" in a: print(json.dumps(res, indent=1, ensure_ascii=False))
+        else: print("\n".join(f"## {k+1} {q['tool']} {json.dumps(q['arguments'])}\n" + fmt_any(q["tool"], r) for k, (q, r) in enumerate(zip(qs, res))))
+        print(f"# {len(qs)} queries, {dt:.0f} ms round trip", file=sys.stderr)
         return
     tool = a[0]; args = json.loads(a[1]) if len(a) > 1 else {}
     r = send({"tool": tool, "arguments": args})

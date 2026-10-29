@@ -11,9 +11,9 @@ public class PlayerFireClipsTests
   [InlineData(1.03, "tacticus_sht1_shoot_aim", "tacticus_sht1_shoot_blind", "INFERRED")]
   [InlineData(1.1, "tacticus_sht2_shoot_aim", "tacticus_sht2_shoot_blind", "INFERRED")]      // stalker
   [InlineData(1.12, "tacticus_sht3_shoot_aim", "tacticus_sht3_shoot_blind", "INFERRED")]     // instigator
-  [InlineData(1.4, "tacticus_sht5_shoot_aim", "tacticus_sht5_shoot_blind", "INFERRED")]      // melta shotgun
+  [InlineData(1.4, "tacticus_sht5_shoot_aim", "tacticus_sht5_shoot_blind", "HEURISTIC")]     // melta shotgun (SubtractiveBlend unindexed, R40)
   [InlineData(1.25, "tacticus_sht15_shoot_aim", "tacticus_sht15_shoot_blind", "INFERRED")]   // pyroblaster
-  [InlineData(1.51, "tacticus_sht16_shoot_aim", "tacticus_sht16_shoot_blind", "INFERRED")]   // combi melta
+  [InlineData(1.51, "tacticus_sht16_shoot_aim", "tacticus_sht16_shoot_blind", "HEURISTIC")]  // combi melta (SimpleTypeConvert unindexed, R40)
   [InlineData(1.6, "tacticus_sht2_shoot_aim", "tacticus_sht2_shoot_blind", "INFERRED")]      // las fusil
   [InlineData(0.1, "tacticus_sht6_shoot_aim", "tacticus_sht6_shoot_blind", "INFERRED")]      // bolt pistol
   [InlineData(0.0, "tacticus_sht7_shoot_aim", "tacticus_sht7_shoot_blind", "INFERRED")]      // heavy bolt pistol
