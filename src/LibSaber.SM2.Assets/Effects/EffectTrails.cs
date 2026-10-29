@@ -19,6 +19,18 @@ public enum TrailShape { Billboard, Tape, Cylinder, Cross, Star, Triangle }
 ///   <c>maxSegLength</c> metres, points die after <c>timeLifeSeg</c>, length clipped to <c>maxTrailLength</c>) and
 ///   width/colour sampled along the ribbon (0 = head, 1 = tail) follow the field names and corpus values.
 /// </summary>
+/// <summary>
+///   fix54: texture usage from the name. In the retail td set (18,690 <c>.td</c>) a name ending in <c>_nm</c> has
+///   <c>usage = "MNM"</c> ("Normalmap(rgb)") in 3,619 of 3,619 files and no other usage has that suffix (PROVEN, data), so the
+///   suffix stands for the td usage without reading the td.
+/// </summary>
+public static class SfxTextureUsage
+{
+  /// <summary>Whether <paramref name="nameTex"/> is a normal map (td usage MNM).</summary>
+  public static bool IsNormalMap(string? nameTex)
+    => nameTex is { Length: > 3 } n && n.TrimEnd().EndsWith("_nm", StringComparison.OrdinalIgnoreCase);
+}
+
 public sealed class TrailDef
 {
   public required string Name { get; init; }
@@ -93,7 +105,12 @@ public sealed class TrailDef
       AlphaIntensity = visuals.Float("alphaMult", 1f),
       SoftDepth = visuals.Float("softDepth", 0f),
       Lighting = visuals.Get("lighting") is JsonObject lo ? (lo.Bool("isEnabled", false) ? "Lit" : "None") : visuals.Str("lighting") ?? "None",
-      Target = visuals.Bool("isDistortion", false) ? DrawTarget.Distortion : DrawTarget.Color,
+      // fix54 (HEURISTIC rule, data INFERRED): a trail whose visuals texture is a normal map (td usage MNM) is a distortion /
+      // refraction ribbon, never colour. Of the 48 retail trail nodes with an MNM texture, 46 set isDistortion; the other two
+      // (trail_melee_dark, trail_sword_melee_warrior_03) are clones of their weapon's distortion trail (same nm texture, sdr,
+      // width, spline) with isDistortion False, and drawn as colour they made a dark fan the owner does not see in game.
+      Target = visuals.Bool("isDistortion", false) || SfxTextureUsage.IsNormalMap(texture.Str("nameTex") ?? node.Str("nameTex"))
+        ? DrawTarget.Distortion : DrawTarget.Color,
     };
     var width = SslRead.Floats(tp.Get("width"));
     return new TrailDef

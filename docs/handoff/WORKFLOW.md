@@ -1,5 +1,10 @@
 # WORKFLOW — how the work is done
 
+## 0. Evidence first (standing rule R32, 2026-10-29)
+- Base every rule on evidence, in this order: game data (survey the retail files, count matches and exceptions), the exe (REA, or the headless Ghidra DecompAt fallback when REA is OOM), RenderDoc captures (`/workspace/rdc`).
+- Use HEURISTIC only as a last resort, after that search failed. Label it HEURISTIC in code and docs, say what was searched, and add the open question to HANDOFF "REA 일괄 처리 목록".
+- Every conclusion carries PROVEN / INFERRED / HEURISTIC (R12).
+
 ## 1. Where things run
 | Kind of work | Runs on | How |
 |---|---|---|

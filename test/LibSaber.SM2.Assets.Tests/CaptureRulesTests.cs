@@ -10,6 +10,9 @@ public class CaptureRulesTests
   {
     Assert.Equal(new VfxBlendState(true, "One", "InvSrcAlpha", "One", "InvSrcAlpha"), VfxBlendRules.For(VfxDrawKind.CpuParticle));
     Assert.Equal(new VfxBlendState(true, "SrcAlpha", "InvSrcAlpha", "Zero", "One"), VfxBlendRules.For(VfxDrawKind.Trail));
+    Assert.Equal(new VfxBlendState(true, "One", "One", "Zero", "One"), VfxBlendRules.ForTrail(EffectBlend.Add));
+    Assert.Equal(VfxBlendRules.For(VfxDrawKind.Trail), VfxBlendRules.ForTrail(EffectBlend.Blend));
+    Assert.Equal(VfxBlendRules.For(VfxDrawKind.Trail), VfxBlendRules.ForTrail(EffectBlend.BlendAdd));
     Assert.False(VfxBlendRules.For(VfxDrawKind.Spark).Enabled);
     Assert.Equal(new VfxBlendState(true, "One", "One", "Zero", "One"), VfxBlendRules.For(VfxDrawKind.SfxMesh));
   }

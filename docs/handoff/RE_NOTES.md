@@ -230,3 +230,10 @@ All addresses are virtual addresses in `sm2_retail.exe` (retail Steam build, 81 
 - Rotation: w-first, conjugated (`Quaternion(-x,-y,-z,w)`), DATA-PROVEN vs MatrixModel 2,642/2,830 and MatrixLT 1,617/1,627. The old xyzw reading in SaniReader's legacy path was wrong.
 - `rootAnim` identity on all 877 tracks; visibility 0..1 (11.5 % fractional = fades) — preview shows scale 0 below 0.5 (HEURISTIC).
 - Which sequence plays: class `anim.layerList` (MainMultiStitch AnimList/RootObjectNameList = object subtrees), blueprint `BlueprintAnimationLibraryStartanim/Stopanim` (animLink, typePlayback) reached from morpheme events / root pins, firearm FSM Idle ⇄ Shoot ⇄ Reload + `shootAnimation`. DATA. Not traced in the exe (open: the runtime layer mixer).
+
+## fix54 trail blend + normal-map trails (2026-10-29 KST, capture + data; REA not run, memory)
+- PROVEN (RenderDoc plasma 101917, draws.json + cbuffers.json): CB_PASS_TRAIL draws eid 4898/4905 (4 idx × 20 inst, PSO 131096) SrcAlpha/InvSrcAlpha alpha Zero/One; eid 4914 (24 idx, PSO 1866476) One/One alpha Zero/One. All bind CB_ANIM_TRAILS, CB_TRAIL_CHUNK_OFFSET, PS_REG_TRAIL_EMISSIVE, TRAIL_COLOR_FADEOFF. smoke/hellbrute/armory only have SrcAlpha/InvSrcAlpha trail draws.
+- INFERRED: blendType add → One/One, blend/blend_add → SrcAlpha/InvSrcAlpha (same split as FUN_142451840, mtl1-44). Not traced: the trail PSO key builder, and which sfx each captured draw belongs to.
+- PROVEN (data): td `_nm` suffix ⇔ usage MNM (3,619/3,619, 0 exceptions in 18,690). 139 trail nodes in 2,381 .sfx: isDistortion×MNM = (F, non) 72, (T, MNM) 46, (T, non) 19, (F, MNM) 2. The two (F, MNM): trail_melee_dark (clone of trail_melee_distortion_01) and warrior/trail_sword_melee_warrior_03 (clone of trail_sword_melee_warrior_distortion_01). Survey: box `/workspace/mtl_fix/trail/fix54/survey.py`, `survey_rows.json`.
+- INFERRED: those two are distortion trails with the flag left off. HEURISTIC (last resort, R32): not drawing them in colour. REA batch item 3 should find whether the exe routes an MNM-textured trail to the distortion buffer or draws it as colour.
+

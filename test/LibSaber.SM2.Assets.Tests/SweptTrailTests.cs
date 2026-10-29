@@ -106,6 +106,43 @@ public class SweptTrailTests
     Assert.Contains("gradient_02", def.Textures);
   }
 
+  [Theory]
+  [InlineData("trail_mgs_distort_nm", true)]
+  [InlineData("ALGA_DISTORT_02_NM", true)]
+  [InlineData("gradient_02", false)]
+  [InlineData("nm_gradient", false)]
+  [InlineData(null, false)]
+  public void NormalMapTextureName(string? name, bool expected) => Assert.Equal(expected, SfxTextureUsage.IsNormalMap(name));
+
+  [Theory]
+  [InlineData("sfx_trail_triangle")]
+  [InlineData("sfx_trail")]
+  public void NormalMapTrailIsNotColour(string type)
+  {
+    // fix54: trail_melee_dark shape — isDistortion False, blend, a normal-map texture (td usage MNM) → distortion, not colour.
+    var text = Yellow.Replace("\"gradient_02\"", "\"trail_mgs_distort_nm\"").Replace("\"add\"", "\"blend\"").Replace("\"sfx_trail_triangle\"", $"\"{type}\"");
+    var lib = new EffectLibrary(new MemoryEffectSource(new Dictionary<string, string> { ["dark"] = text }));
+    var def = EffectDefinition.Build("dark", lib.Resolve("dark")!);
+    var trail = Assert.Single(type == "sfx_trail" ? def.Trails : def.SweptTrails);
+    Assert.Equal(DrawTarget.Distortion, trail.Render.Target);
+    var cue = new SweptTrailCue("hit", "dark", "bp", trail, new TrailEdge("a", Vector3.Zero, "b", Vector3.Zero), null, 0f, 1f);
+    Assert.Null(SweptTrails.Build(cue, 0.5f, s => (new Vector3(s, 0, 0), new Vector3(s, 1, 0)), new Vector3(0, 0, 5)));
+    // The colour texture keeps the colour pass.
+    var yellow = Assert.Single(EffectDefinition.Build("trail_melee_01_yellow", Library().Resolve("trail_melee_01_yellow")!).SweptTrails);
+    Assert.Equal(DrawTarget.Color, yellow.Render.Target);
+    Assert.NotNull(SweptTrails.Build(cue with { Def = yellow }, 0.5f, s => (new Vector3(s, 0, 0), new Vector3(s, 1, 0)), new Vector3(0, 0, 5)));
+  }
+
+  [Fact]
+  public void RetailDarkTrailIsDistortion()
+  {
+    const string sfx = "/workspace/vfx3_raw/sfx";
+    if (!Directory.Exists(sfx)) return;
+    var lib = new EffectLibrary(new DirectoryEffectSource(sfx));
+    foreach (var (name, target) in new[] { ("trail_melee_dark", DrawTarget.Distortion), ("trail_melee_distortion_01", DrawTarget.Distortion), ("trail_melee_01_yellow", DrawTarget.Color) })
+      Assert.All(EffectDefinition.Build(name, lib.Resolve(name)!).SweptTrails, t => Assert.Equal(target, t.Render.Target));
+  }
+
   [Fact]
   public void ClassSfxListOverridesTrail()
   {

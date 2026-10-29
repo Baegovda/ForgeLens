@@ -43,6 +43,7 @@
 | R29 | 10/27 | UE 목표는 Sequencer 시네마틱 렌더 → 천은 Chaos Cloth, 본 파츠는 본 물리 선호(실시간 성능보다 품질) | Offline cinematic quality — 오프라인 렌더 품질 우선 | standing | mtl1-10 Chaos Cloth 옵션 (9e99c31) |
 | R30 | 10/28 | SM2 안티치트는 밴 위험 없음(멀티만 꺼짐) → 인게임 캡처/모드 작업 자체는 허용 (단, R13이 우선) | Risk acceptance (EAC) — 위험 수용 | standing | HANDOFF vfx3r/vfx3s |
 | R31 | 10/29 | 내 요청은 인수인계 문서에 꼼꼼히 기록(업계 용어·뜻·상태 포함), 계속 최신으로 | Requirements traceability ledger — 요구사항 추적 대장 | standing (done: 이 섹션, `docs: user request ledger`) | 이 섹션 |
+| R32 | 10/29 | HEURISTIC은 되도록 쓰지 말고, 모든 규칙은 먼저 게임 데이터/exe 근거로 정해요. 근거 찾기가 실패했을 때만 마지막 수단으로 HEURISTIC을 쓰고, 그때는 분명하게 표시해요 | Evidence-first rule derivation — 근거 우선 규칙 도출(데이터·exe·캡처 → 마지막에만 추정) | standing (fix54부터) | `docs/handoff/WORKFLOW.md` §0, 이 대장 "REA 일괄 처리 목록" |
 
 ## B. 기능 요청 (Feature requests)
 
@@ -105,6 +106,7 @@
 | F55 | 10/29 | 트레일 fx 뷰어 표현(무기 휘두를 때 궤적, 맥락 재생에서 이벤트 구간만, Effects 토글 따름, 트레일 데이터 있는 근접무기 전부) | Ribbon trail (swept weapon trail) — 리본 트레일 | done (trail53, 이 커밋; HANDOFF "Update trail53"); 리본 생성 규칙 HEURISTIC, UE export 범위 밖, Niagara 안 씀 | `Effects/SweptTrails.cs`, `AnimEventVfxMap.cs` (TrailEdge), `EffectHost.cs`, `Effects/HostVfx.cs` |
 | F56 | 10/29 | 프롭/무기 자체 애니메이션: tpl 내장 시퀀스 디코더(2,811개, 가시성·루트 포함), 프롭 단독 재생(tpl별 시퀀스 목록), 캐릭터 동작(사격/재장전/근접/충전, 체인소드 톱니)과 맥락 동기화, tpl 폴더 .sani 56개 클립 목록 포함, UE 내보내기 | Rigid prop animation (embedded node animation) — 메시 노드(오브젝트) 단위 키프레임 애니 | done (propanim, 이 커밋; HANDOFF "Update propanim"): 키 레이아웃 DATA-PROVEN(REA 다운), 가시성→scale 0·트리거 분기·장전 클립 판정 HEURISTIC | `Animation/TplAnimation.cs`, `PropAnimStates.cs`, `AnimEventVfxMap.cs` (EventAnim), Browser `MainWindow.PropAnim.cs`, Extractor `--anim seq:` |
 | F57 | 10/29 | (F56 조정) 맥락 뷰에 "Prop anim / 프롭 애님" 토글(기본 ON, 저장) + 재생 조건 드롭다운: "Auto(캐릭터 동작 따라감)" 기본 + 게임 데이터의 무기 상태(IDLE, SHOOT_1/2/3, SHOOT_AUX, RELOAD_START/END/FULL, anim1–4, chain_anim 1–4단, 충전 on/off …), 데이터 이름 + 짧은 한글 라벨, 단독/맥락 뷰 모두 | Playback condition override — 재생 조건 강제 선택 | done (propanim): `PropAnim`/`PropCondition` 설정 저장, env `SM2_PROP_ANIM`/`SM2_PROP_COND` | `MainWindow.PropAnim.cs`, `MainWindow.axaml` (`CtxPropAnimToggle`, `CtxPropCondBox`, `PropCondBox`) |
+| F58 | 10/29 | 인게임 체인소드 휘두르기 트레일은 저런 어두운 부채꼴이 아니에요 → 일반 규칙으로 수정(노멀맵 텍스처·distortion 트레일은 색으로 안 그림), 노란 additive 궤적이 밝은 호로 보이는지 확인 | Blend-state fix (additive trail) + distortion-trail culling — 트레일 블렌드 상태 교정, 굴절 트레일 색 패스 제외 | done (fix54, 이 커밋; HANDOFF "Update fix54"): 어두운 부채꼴의 주원인은 노란 트레일(add)이 straight-alpha로 그려져 회색 꼬리가 배경을 어둡게 한 것(캡처 PROVEN 상태 + selector INFERRED), trail_melee_dark(노멀맵) 제외는 INFERRED/HEURISTIC 표시. 실제 게임 화면 비교는 아직이에요 | `Effects/CaptureRules.cs` (`VfxBlendRules.ForTrail`), `Gpu/EffectRenderer.cs`, `Effects/EffectTrails.cs` (`SfxTextureUsage`), `Effects/HostVfx.cs` |
 
 ## C. 미래 (Future, 로드맵 밖)
 
@@ -114,7 +116,7 @@
 | X02 | 10/28 | SM2 끝나면 다음은 Path of Exile 읽기 | Multi-game support (PoE) — 다른 게임 포맷 지원 | future | ROADMAP (추가 예정) |
 | X03 | 10/27–28 | 그 다음 Unreal Engine 게임 읽기(.pak/IoStore) | UE game extraction — 언리얼 게임 에셋 추출 | future | ROADMAP "Possible future development" |
 
-합계: 상시 규칙 31 · 기능 요청 53 · 미래 3 = **87건** (2026-10-29 기준).
+합계: 상시 규칙 32 · 기능 요청 58 · 미래 3 = **93건** (2026-10-29 기준; fix54에서 실제 행 수로 다시 셌어요).
 
 ---
 
@@ -2314,3 +2316,37 @@ Owner request (ledger F56 + steering F57, approval "ㄱㄱ"): decode the animati
 - **Strips (PC `Scripts\mtl_fix\propanim\after\`, box `/workspace/mtl_fix/prop_anims/after/`):** bolter `SHOOT_1`, `RELOAD_FULL` (magazine drops), `SHOOT_AUX`, auto reload clip `tacticus_wpn10_reload` (IDLE + RELOAD_FULL), auto firing clip `tacticus_wpn1_blind_shooting_run` (SHOOT_1 looped; `bolter_fire12`, 12 frames — 8 frames alias onto the 0.133 s loop); chainsword `chain_anim`, `chain_anim4`, `anim1`, auto `light_slash_1` (chain_anim loop on hold + anim1 at 0.181 s from `hit1_start_anim`). Box UI shot `ui/loose_chainsword_cond.png` (condition box, loose model without tpl_data).
 - **Deploy:** `Bin\ForgeLens_latest\ForgeLens.exe` sha256 479D9200…1E4A (origin mtl1-53 + propanim), 12:12 KST; previous exe (E91EDF1E…5079, combined trail53) → `.bak10`.
 - **Open / HEURISTIC:** visibility fade; blueprint branch choice for holding; reload clip detection by name; the shot = Shoot-track rule; no REA confirmation of the key layout (data only).
+
+## REA 일괄 처리 목록 (2026-10-29 KST, R32)
+
+REA(또는 headless Ghidra 대체 경로)로 한 번에 몰아서 확인할 항목이에요. 메모리가 빠듯해서 하나씩 하지 말고, 데몬을 한 번 띄울 때 묶어서 처리해요. 결과는 항목마다 PROVEN / INFERRED / HEURISTIC으로 표시해요.
+
+**REA 항목**
+1. attenCurveParam 라이트 감쇠(falloff) — 셰이더 공식은 PROVEN, CPU 소비자(attenCurveParam 읽는 곳)를 아직 못 찾았어요.
+2. UseSpecMap — 쓰는 곳(writer)을 못 찾았어요.
+3. 트레일 리본 빌더(locator 쌍 → 세그먼트, maxSegLength/angleMin/scaleRange/displacement) + 어두운 트레일 렌더링(노멀맵 텍스처를 쓰는데 isDistortion = False인 trail_melee_dark가 실제로 어느 패스에 그려지는지, 트레일 blendType → PSO 매핑).
+4. 스프링 댐퍼 기본값 / 해골 상자 흔들림 진폭(prop_motion_damper_controller 런타임 기본값과 적분).
+5. 컬러 스킴이 어둡게 나오는 원인.
+6. 남은 컬러 블렌드 모드 / 패턴 / 렌즈.
+7. 프롭 애님 키 형식 확인 + 플레이어 사격 타이밍 + 재장전 판정(지금은 클립 이름 HEURISTIC).
+
+**REA 아닌 항목(데이터/도구 작업)**
+1. 좌/우 견갑·건틀릿·그리브 오버라이드.
+2. 총구 화염 오프셋 + 데이터 기준 조준(aim-up).
+3. 임포터에서 .td의 텍스처가 아닌 파라미터 처리.
+4. 컬러 스킴을 UE 머티리얼에 연결.
+5. 다른 캐릭터 물리 다시 돌리기.
+
+## Update fix54 (2026-10-29 KST): chainsword swing trail — additive trail blend + distortion/normal-map trails out of the colour pass
+
+Owner report (ledger F58, "인게임은 저런 어두운 트레일이 아닌데"): the chainsword swing trail in the game is not the dark fan Forge Lens showed (trail53). Fix with a generic rule; evidence first (R32).
+
+- **What the fan was (measured on the trail53 build, cc_intercessor + wpn_melee_chainsword, light_slash_1 t = 0.42 s):** a capture with `SM2_SWING_TRAILS=0` has no fan, so it is a swing trail. Skipping trail_melee_dark alone changed at most 6/765 per pixel (box `diff_t042.png`), so most of the fan is **trail_mele_01_yellow** (blendType `add`): its gradient goes bright yellow (A 207) → grey 55,55,55 (A 44) at n 0.19 → 0 at 0.68, and the viewer drew every trail with straight alpha (SrcAlpha/InvSrcAlpha, mtl1-28). With straight alpha the long grey tail pulls the background down (fan pixel 21,18,17 vs background 28,24,22) → a dark smoke fan instead of a bright additive arc.
+- **Blend rule (PROVEN state, INFERRED mapping):** the RenderDoc plasma capture (101917, box `/workspace/rdc/plasma/nightly`) has three CB_PASS_TRAIL draws (CB_ANIM_TRAILS + CB_TRAIL_CHUNK_OFFSET bound): eid 4898/4905 SrcAlpha/InvSrcAlpha and **eid 4914 One/One (alpha Zero/One)** → trails do use an additive state (PROVEN). Mapping blendType `add` → One/One and `blend`/`blend_add` → SrcAlpha/InvSrcAlpha follows the PROVEN sfx selector FUN_142451840 (mtl1-44) and blend_add = blend (mtl1-38): INFERRED (the retail trail behind each captured draw was not identified). Code: `VfxBlendRules.ForTrail`, `EffectRenderer.ApplyKindState(kind, blend)`, trail shader branch writes `c*alpha, 0` for add. Applies to every trail (sfx_trail and sfx_trail_triangle), no per-weapon code.
+- **Normal-map trails (PROVEN data, INFERRED meaning, HEURISTIC rendering):** `.td` name ending `_nm` ⇔ `usage = "MNM"` (Normalmap(rgb)) in 3,619/3,619 of 18,690 retail td (PROVEN, data). Of 139 retail trail nodes in 2,381 .sfx, 48 use an MNM texture and 46 of those set `isDistortion` (PROVEN count); the other two (trail_melee_dark, trail_sword_melee_warrior_03) are field-for-field clones of their weapon's distortion trail with colour/intensity/isDistortion/isAutoStart changed (PROVEN diff) → INFERRED distortion trails with the flag left off. `SfxTextureUsage.IsNormalMap` + `TrailDef.Parse`: isDistortion **or** MNM texture → `DrawTarget.Distortion`, which the colour pass skips (no trail refraction pass in the viewer, like root distortion trails). The exe path for an MNM texture on a non-distortion trail was not traced (REA batch item 3) → the skip itself is the remaining HEURISTIC. Sprite emitters with MNM textures are unchanged.
+- **Status line:** swing trails on the Distortion target are listed with "(distortion, not drawn)".
+- **Result (after, same frames):** the dark fan is gone; pixels darker than the background in the viewport drop 67,603 → 8,987 at t 0.42 (15,739 → 8,867 at 0.30, 11,848 → 8,518 at 0.60; the rest is the model).
+- **Yellow arc check: too faint.** No bright yellow arc is visible at 0.30/0.42/0.60; the yellow-pixel count is unchanged (≈ 1,900 / 2,050 / 1,385, the gold armour trim). colorIntensity 5 × 0.4 = 2 and the bright gradient key lasts only n < 0.19 (≈ 29 ms of the 0.15 s segment life), so the bright band is a few pixels behind the blade; the grey tail now adds a faint lift instead of darkening. Open (REA batch item 3): PS_REG_TRAIL_EMISSIVE [5,4,1,0] / TRAIL_COLOR_FADEOFF and the HDR exposure the game applies to trails are not emulated, which may be why the in-game arc is brighter.
+- **Screenshots:** box `/workspace/mtl_fix/trail/fix54/` (`before_t030/042/060.png`, `after_t030/042/060.png`, crops `crop_*`, `strip_before_after.png`, `diff_t0*.png`, `probe_noswing_t042.png`); PC `Captures\mtl_fix\trail54\`. In-game comparison still to do.
+- **Tests:** `SweptTrailTests` (`NormalMapTextureName`, `NormalMapTrailIsNotColour`, `RetailDarkTrailIsDistortion`), `CaptureRulesTests` (ForTrail).
+

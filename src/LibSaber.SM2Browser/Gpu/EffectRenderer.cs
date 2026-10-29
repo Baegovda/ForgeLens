@@ -408,11 +408,13 @@ internal sealed unsafe class EffectRenderer : IDisposable
 
       var kind = VfxDrawKinds.Enabled ? ResolveKind(batch) : VfxDrawKind.CpuParticle;
       _gl.Uniform1(kindLoc, kind switch { VfxDrawKind.Trail => 1, VfxDrawKind.Spark => 2, _ => 0 });
-      ApplyKindState(kind);
+      ApplyKindState(kind, batch.Emitter.Blend);
       if (kind == VfxDrawKind.Trail) TrailBatches++;
       if (kind == VfxDrawKind.Spark) SparkBatches++;
       // mtl1-41: with the REA blend the "add" mode is flag 0x20 (FUN_1417e1e50: add && (!default || screenSpace || !alphaKill)).
       _gl.Uniform1(modeLoc, rea ? ((EffectBlendRea.Flags(batch.Emitter) & 0x20u) != 0 ? 1 : 0) : (int)batch.Emitter.Blend);
+      // fix54: trail add/blend from blendType (VfxBlendRules.ForTrail), the shader's uKind 1 branch reads uMode.
+      if (kind == VfxDrawKind.Trail) _gl.Uniform1(modeLoc, batch.Emitter.Blend == EffectBlend.Add ? 1 : 0);
       _gl.Uniform1(tintLoc, batch.Emitter.TextureTint);
       // additionalContrast / contrastColorKey (shared[1]); PROVEN PS 281 boost, default on (mtl1-38).
       var key = batch.Emitter.ContrastColorKey / 255f;
@@ -447,14 +449,18 @@ internal sealed unsafe class EffectRenderer : IDisposable
   ///   (CB_PASS_TRAIL), shader writes straight colour. Sparks: blending off, depth written, alpha-tested in the shader.
   ///   CPU particles keep the per-emitter state set just before this call.
   /// </summary>
-  private void ApplyKindState(VfxDrawKind kind)
+  private void ApplyKindState(VfxDrawKind kind, EffectBlend blend)
   {
     switch (kind)
     {
       case VfxDrawKind.Trail:
         _gl.Enable(EnableCap.Blend);
         _gl.DepthMask(false);
-        _gl.BlendFuncSeparate(BlendingFactor.SrcAlpha, BlendingFactor.OneMinusSrcAlpha, BlendingFactor.Zero, BlendingFactor.One);
+        // fix54: add trails One/One (alpha Zero/One), others straight alpha; capture + selector evidence in VfxBlendRules.ForTrail.
+        if (blend == EffectBlend.Add)
+          _gl.BlendFuncSeparate(BlendingFactor.One, BlendingFactor.One, BlendingFactor.Zero, BlendingFactor.One);
+        else
+          _gl.BlendFuncSeparate(BlendingFactor.SrcAlpha, BlendingFactor.OneMinusSrcAlpha, BlendingFactor.Zero, BlendingFactor.One);
         break;
       case VfxDrawKind.Spark:
         _gl.Disable(EnableCap.Blend);
@@ -769,7 +775,8 @@ internal sealed unsafe class EffectRenderer : IDisposable
       float alpha = clamp(vColor.a, 0.0, 1.0) * a;
       // mtl1-28 capture blend per kind: trail = straight colour for SrcAlpha/InvSrcAlpha (CB_PASS_TRAIL);
       // spark = blending off (smoke 88302 eid 2086): alpha test on texture coverage, vertex alpha scales brightness (HEURISTIC).
-      if (uKind == 1) { outColor = vec4(c, alpha); return; }
+      // fix54: an add trail (uMode 1, One/One) writes the alpha-weighted colour and no alpha (= SrcAlpha/One on rgb).
+      if (uKind == 1) { outColor = uMode == 1 ? vec4(c * alpha, 0.0) : vec4(c, alpha); return; }
       if (uKind == 2)
       {
         if (a < 0.5) discard;

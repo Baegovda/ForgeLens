@@ -39,6 +39,19 @@ public static class VfxBlendRules
     VfxDrawKind.SfxMesh => new(true, "One", "One", "Zero", "One"),
     _ => throw new ArgumentOutOfRangeException(nameof(kind))
   };
+
+  /// <summary>
+  ///   fix54: trail blend state per <c>visuals.blendType</c>. PROVEN (capture): CB_PASS_TRAIL draws use two states, plasma
+  ///   101917 eid 4898/4905 SrcAlpha/InvSrcAlpha and eid 4914 One/One (alpha Zero/One), all three with CB_ANIM_TRAILS +
+  ///   CB_TRAIL_CHUNK_OFFSET bound (box /workspace/rdc/plasma/nightly draws.json / cbuffers.json). INFERRED: add -> One/One and
+  ///   blend / blend_add -> SrcAlpha/InvSrcAlpha, the same split as the PROVEN sfx selector FUN_142451840 (mtl1-44: add ->
+  ///   SFX_BLEND_ADD_NO_ALPHA, blend -> SFX_ALPHA_BLEND; blend_add has no flag = blend, mtl1-38); which retail trail each
+  ///   captured draw came from was not identified. Before fix54 every trail used the straight-alpha state, so additive trails
+  ///   (trail_melee_01_yellow's grey tail, colour 55,55,55 at alpha 44) darkened the frame like a smoke fan.
+  /// </summary>
+  public static VfxBlendState ForTrail(EffectBlend blend) => blend == EffectBlend.Add
+    ? new(true, "One", "One", "Zero", "One")
+    : For(VfxDrawKind.Trail);
 }
 
 /// <summary>
