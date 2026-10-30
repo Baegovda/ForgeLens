@@ -1,7 +1,7 @@
 # SM2 live-physics verify: twin actors (post-process ABP on/off), manual ticks, helper-bone deviation per step.
 import sys, json, math, unreal
 mode, name = sys.argv[1], sys.argv[2]; SET = sys.argv[3] if len(sys.argv) > 3 else "mtl_phys"
-W = r"C:/Users/Revaptor_FX/Desktop/SM2_Work"; folder = "/Game/SM2_Work/Tests/%s/%s" % (SET, name)
+W = r"C:/Users/Revaptor_FX/Desktop/SM2_Work"; folder = "/Game/ForgeLens/SM2/Tests/%s/%s" % (SET, name)
 pj = json.load(open(W + "/Exports/%s/%s/tpl/%s.tpl/%s.physics.json" % (SET, name, name, name), encoding="utf-8-sig"))
 helpers = []
 for c in pj.get("cloths", []):

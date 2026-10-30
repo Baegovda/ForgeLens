@@ -1,5 +1,5 @@
-# .sani gap verification in the unified layout: mesh -> /Game/SM2_Work/{Characters|Props}/<name>,
-# "after" clip -> /Game/SM2_Work/Animations/<name>, "before" clip -> /Game/SM2_Work/Tests/sani_before/<name>;
+# .sani gap verification in the unified layout: mesh -> /Game/ForgeLens/SM2/{Characters|Props}/<name>,
+# "after" clip -> /Game/ForgeLens/SM2/Animations/<name>, "before" clip -> /Game/ForgeLens/SM2/Tests/sani_before/<name>;
 # then report per-anim length, frames and bone poses (world space) at a few times.
 # usage: ue_sani_fix.py import <name> <clip> [after_tag] [before_tag]   |   ue_sani_fix.py check <name> <bone,bone,...>
 # Exports are read from Desktop/SM2_Work/Exports/sani_fix_<tag>/<name>/tpl/<name>.tpl/ (tags default to after / before).
@@ -104,7 +104,7 @@ def sm2_anim_import(fbx, skeleton, dest, yaw="auto", root_motion=True):
 # --- end sm2_anim_import ---
 mode, name = sys.argv[1], sys.argv[2]
 base = r"C:/Users/Revaptor_FX/Desktop/SM2_Work/Exports/sani_fix_{}/" + name + "/tpl/" + name + ".tpl/"
-W = "/Game/SM2_Work/"
+W = "/Game/ForgeLens/SM2/"
 folder = W + ("Characters/" if name.startswith("cc_") else "Props/") + name
 anim_dirs = {"after": W + "Animations/" + name, "before": W + "Tests/sani_before/" + name}
 tags = {"after": sys.argv[4] if len(sys.argv) > 4 else "after", "before": sys.argv[5] if len(sys.argv) > 5 else "before"}

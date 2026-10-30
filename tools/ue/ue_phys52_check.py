@@ -1,7 +1,7 @@
 # phys52_check.py: read-only check of the Titus phys52 assets (mesh PA/ABP, jiggle bodies, body types / trace flags).
 import json, unreal
 from collections import Counter
-W = r"C:/Users/Revaptor_FX/Desktop/SM2_Work"; name = "cc_titus_assault"; folder = "/Game/SM2_Work/Tests/chars_phys/" + name
+W = r"C:/Users/Revaptor_FX/Desktop/SM2_Work"; name = "cc_titus_assault"; folder = "/Game/ForgeLens/SM2/Tests/chars_phys/" + name
 pj = W + "/Exports/chars_phys52/%s/tpl/%s.tpl/%s.physics.json" % (name, name, name)
 lib = unreal.SM2PhysicsSetupLibrary; mesh = unreal.load_asset(folder + "/" + name)
 pa = mesh.get_editor_property("physics_asset"); abpc = mesh.get_editor_property("post_process_anim_blueprint")

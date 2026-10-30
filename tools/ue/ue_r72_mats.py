@@ -10,12 +10,12 @@
 #   scene[,ev]                 Tests/r72_mats/Map_Mats: grey floor, lights, manual exposure, 4 actors + 1 capture each
 #   cap,<dir>,<tag>            <dir>/<tag>_<actor>.png
 import sys, math, os, runpy, unreal
-W = "C:/Users/Revaptor_FX/Desktop/SM2_Work"; F = "/Game/SM2_Work/Tests/r72_mats"; C = "/Game/SM2_Work/Characters/"
+W = "C:/Users/Revaptor_FX/Desktop/SM2_Work"; F = "/Game/ForgeLens/SM2/Tests/r72_mats"; C = "/Game/ForgeLens/SM2/Characters/"
 EAL = unreal.EditorAssetLibrary
-MESHES = {"vortex": C + "cc_vortex_beast/cc_vortex_beast", "vortex_cloth": "/Game/SM2_Work/Tests/r67_phys/cc_vortex_beast_cloth",
-          "sorcerer": C + "cc_sorcerer_exalted/cc_sorcerer_exalted", "sorcerer_ref": "/Game/SM2_Work/Tests/r67_cloth/cc_sorcerer_exalted_ref"}
-TESTS = {"cc_vortex_beast": ["/Game/SM2_Work/Tests/r67_phys/cc_vortex_beast_cloth"],
-         "cc_sorcerer_exalted": ["/Game/SM2_Work/Tests/r67_cloth/cc_sorcerer_exalted_" + s for s in ("ref", "b0", "r13", "r13b0", "skin0")]}
+MESHES = {"vortex": C + "cc_vortex_beast/cc_vortex_beast", "vortex_cloth": "/Game/ForgeLens/SM2/Tests/r67_phys/cc_vortex_beast_cloth",
+          "sorcerer": C + "cc_sorcerer_exalted/cc_sorcerer_exalted", "sorcerer_ref": "/Game/ForgeLens/SM2/Tests/r67_cloth/cc_sorcerer_exalted_ref"}
+TESTS = {"cc_vortex_beast": ["/Game/ForgeLens/SM2/Tests/r67_phys/cc_vortex_beast_cloth"],
+         "cc_sorcerer_exalted": ["/Game/ForgeLens/SM2/Tests/r67_cloth/cc_sorcerer_exalted_" + s for s in ("ref", "b0", "r13", "r13b0", "skin0")]}
 def les(): return unreal.get_editor_subsystem(unreal.LevelEditorSubsystem)
 def eas(): return unreal.get_editor_subsystem(unreal.EditorActorSubsystem)
 def world():

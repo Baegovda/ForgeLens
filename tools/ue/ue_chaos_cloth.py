@@ -1,11 +1,11 @@
 # Chaos Cloth option (mtl1-9): <asset> [set=chars_cloth]
-# Duplicates /Game/SM2_Work/Tests/<set>/<asset>/<asset> to <asset>_ChaosCloth (never touches the original), turns every cloth
+# Duplicates /Game/ForgeLens/SM2/Tests/<set>/<asset>/<asset> to <asset>_ChaosCloth (never touches the original), turns every cloth
 # whose game _SIM section is found into a Chaos Clothing Asset (CreateChaosCloth: MaxDistance from maxDistanceMeters,
 # 0 = pinned), then rebuilds the bone-based PA/ABP for the rest (SetupFromJsonEx skip list: tentacles etc. stay RigidBody).
 # The bone method (ue_bulk default) stays the default; this is opt-in.
 import sys, json, unreal
 name = sys.argv[1]; SET = sys.argv[2] if len(sys.argv) > 2 else "chars_cloth"
-W = r"C:/Users/Revaptor_FX/Desktop/SM2_Work"; folder = "/Game/SM2_Work/Tests/%s/%s" % (SET, name)
+W = r"C:/Users/Revaptor_FX/Desktop/SM2_Work"; folder = "/Game/ForgeLens/SM2/Tests/%s/%s" % (SET, name)
 pj = W + "/Exports/%s/%s/tpl/%s.tpl/%s.physics.json" % (SET, name, name, name)
 EAL = unreal.EditorAssetLibrary; lib = unreal.SM2PhysicsSetupLibrary
 src = folder + "/" + name; dst = folder + "/" + name + "_ChaosCloth"

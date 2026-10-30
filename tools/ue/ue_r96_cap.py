@@ -33,7 +33,7 @@ if OV:
             if v == "flat": mid.set_texture_parameter_value(k, unreal.load_asset("/Engine/EngineMaterials/FlatNormal"))
             else: mid.set_scalar_parameter_value(k, float(v))
 b = mesh.get_bounds(); h = b.box_extent.z * 2; w = max(b.box_extent.x, b.box_extent.y); c = L + b.origin
-grey = unreal.load_asset("/Game/SM2_Work/Tests/r72_mats/M_r72_grey")
+grey = unreal.load_asset("/Game/ForgeLens/SM2/Tests/r72_mats/M_r72_grey")
 fl = tagit(E.spawn_actor_from_object(unreal.load_asset("/Engine/BasicShapes/Plane"), L + unreal.Vector(0, 0, b.origin.z - b.box_extent.z)))
 fl.set_actor_scale3d(unreal.Vector(60, 60, 1)); fl.static_mesh_component.set_material(0, grey)
 wl = tagit(E.spawn_actor_from_object(unreal.load_asset("/Engine/BasicShapes/Plane"), L + unreal.Vector(0, -w * 3, b.origin.z), unreal.Rotator(roll=90, pitch=0, yaw=0)))

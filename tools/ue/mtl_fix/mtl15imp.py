@@ -1,7 +1,7 @@
-# mtl1-15m: import an mtl15 re-export (BC5 spec R fix) into /Game/SM2_Work/Tests/mtl15/<asset> and build its materials.
+# mtl1-15m: import an mtl15 re-export (BC5 spec R fix) into /Game/ForgeLens/SM2/Tests/mtl15/<asset> and build its materials.
 import sys, runpy, unreal
 name = sys.argv[1]; exp = sys.argv[2] if len(sys.argv) > 2 else "mtl15"
-W = r"C:/Users/Revaptor_FX/Desktop/SM2_Work"; folder = "/Game/SM2_Work/Tests/%s/%s" % (exp, name)
+W = r"C:/Users/Revaptor_FX/Desktop/SM2_Work"; folder = "/Game/ForgeLens/SM2/Tests/%s/%s" % (exp, name)
 root = W + "/Exports/%s/%s/tpl/%s.tpl/" % (exp, name, name)
 t = unreal.AssetImportTask(); t.filename = root + name + ".fbx"; t.destination_path = folder
 t.automated = True; t.replace_existing = True; t.save = False

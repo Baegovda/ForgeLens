@@ -37,7 +37,7 @@ if mode in ("pose", "capture"):
     if mode == "pose":
         builtins._sm2_posed = a; print("posed"); raise SystemExit
     comp = a.skeletal_mesh_component
-    hidden = unreal.load_asset("/Game/SM2_Work/Materials/M_Hide")
+    hidden = unreal.load_asset("/Game/ForgeLens/SM2/Materials/M_Hide")
     nh = 0
     for i, slot in enumerate(m.materials):
         if hidden and any(k in str(slot.material_slot_name).lower() for k in HIDE):

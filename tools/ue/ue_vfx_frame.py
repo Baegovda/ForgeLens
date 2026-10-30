@@ -15,7 +15,7 @@ Input: *.vfxframe.json + textures/*.png written by ForgeLens --vfxue / --vfxue-r
 No Niagara, no per-effect names: one ProceduralMeshComponent per batch, sort priority = batch order (far -> near).
 
 usage (via uerun.ps1):
-  import <frame dir> [dest=/Game/SM2_Work/VfxUe] [fresh]   textures + masters + one MI per unique parameter set
+  import <frame dir> [dest=/Game/ForgeLens/SM2/VfxUe] [fresh]   textures + masters + one MI per unique parameter set
   render <frame json> [dest] [res=1024] [backdrop_exposed=-1] [exposure_scale=1] [ground_exposed=-1] [lut=1]
   export <out png>                                          write the capture, destroy SM2Cap actors
 """
@@ -30,7 +30,7 @@ S = importlib.reload(S)  # mtl1-36: the editor keeps modules loaded between ueru
 EAL = unreal.EditorAssetLibrary
 MEL = unreal.MaterialEditingLibrary
 AT = unreal.AssetToolsHelpers.get_asset_tools()
-DEST = "/Game/SM2_Work/VfxUe"
+DEST = "/Game/ForgeLens/SM2/VfxUe"
 TAG = "SM2Cap"
 BASE = unreal.Vector(300000, -300000, 50000)
 STRIDE = 13  # pos3 uv2 rgb3 a clip softDepth mu mv
@@ -302,7 +302,7 @@ def ue(p, o=None):  # SM2 metres (x, y, z) -> UE cm (x, z, y)
 mode = sys.argv[1]
 if mode == "import":
     src = sys.argv[2]; dest = sys.argv[3] if len(sys.argv) > 3 else DEST
-    assert dest.startswith("/Game/SM2_Work/") and not dest.startswith("/Game/SM2_Work/Original"), dest
+    assert dest.startswith("/Game/ForgeLens/SM2/") and not dest.startswith("/Game/SM2_Work/Original"), dest
     if len(sys.argv) > 4 and sys.argv[4] == "fresh" and EAL.does_directory_exist(dest):
         n = 1
         while EAL.does_directory_exist(f"{dest}_bak{n}"): n += 1

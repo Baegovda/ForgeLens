@@ -1,7 +1,7 @@
 # mtl1-22 texture reimport after redecode-bc5: texreimp.py scan <unix cutoff> | run
 # scan: Texture2D under /Game/SM2_Work (not Original/, not Work, not *_bakN) whose import source file was rewritten after
 #       the cutoff -> %USERPROFILE%\texreimp_list.json. run: reimports the remaining list items for up to 200 s; items outside
-#       /Game/SM2_Work/Tests/ (user area) are first duplicated to the next free <name>_bakN. Texture settings (sRGB,
+#       /Game/ForgeLens/SM2/Tests/ (user area) are first duplicated to the next free <name>_bakN. Texture settings (sRGB,
 #       compression, LOD group, ...) are restored after the import. Prints TXR REMAIN n.
 import sys, os, json, time, unreal
 EAL = unreal.EditorAssetLibrary; AR = unreal.AssetRegistryHelpers.get_asset_registry()
@@ -24,7 +24,7 @@ if sys.argv[1] == "scan":
         if pkg.startswith("/Game/SM2_Work/Original/") or "_bak" in pkg: continue
         s = src_of(ad, pkg)
         if s and os.path.exists(s) and os.path.getmtime(s) >= cut: out.append([pkg, s])
-    json.dump(out, open(L, "w")); print("TXR scanned", n, "matched", len(out), "user", sum(1 for p, _ in out if not p.startswith("/Game/SM2_Work/Tests/")))
+    json.dump(out, open(L, "w")); print("TXR scanned", n, "matched", len(out), "user", sum(1 for p, _ in out if not p.startswith("/Game/ForgeLens/SM2/Tests/")))
     raise SystemExit
 items = json.load(open(L)); done = set(json.load(open(D))) if os.path.exists(D) else set()
 KEEP = ["srgb", "compression_settings", "lod_group", "flip_green_channel", "mip_gen_settings", "address_x", "address_y", "virtual_texture_streaming", "never_stream"]
@@ -38,7 +38,7 @@ for pkg, s in items:
     for k in KEEP:
         try: st[k] = a.get_editor_property(k)
         except Exception: pass
-    if not pkg.startswith("/Game/SM2_Work/Tests/"):
+    if not pkg.startswith("/Game/ForgeLens/SM2/Tests/"):
         i = 1
         while EAL.does_asset_exist("%s_bak%d" % (pkg, i)): i += 1
         if EAL.duplicate_asset(pkg, "%s_bak%d" % (pkg, i)): bak += 1; EAL.save_asset("%s_bak%d" % (pkg, i), only_if_is_dirty=False)

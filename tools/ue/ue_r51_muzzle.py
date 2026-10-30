@@ -1,6 +1,6 @@
 # ue_r51_muzzle.py (R51): UE side of the muzzle position. Opt-in (nothing changes unless run).
 # Usage: uerun.ps1 <this> <weapon_tpl>[,socket][,<fbx_dir>]
-#   Imports Exports/r51/<w>/tpl/<w>.tpl/<w>.fbx as a skeletal mesh into a NEW /Game/SM2_Work/Tests/r51/<w> (refuses if it
+#   Imports Exports/r51/<w>/tpl/<w>.tpl/<w>.fbx as a skeletal mesh into a NEW /Game/ForgeLens/SM2/Tests/r51/<w> (refuses if it
 #   exists), reports the shoot-tip node (prop_firearm_shoot_tip locator; MUZZLE_AIM.tsv; default "shootTip") as a bone and
 #   its ref-pose location (component query; may print 0 for an unregistered component - use the glb node world instead).
 #   Undo: the test folder (owner).
@@ -8,7 +8,7 @@ import sys, time, unreal
 toks = [t for a in sys.argv[1:] if not a.startswith("-") for t in a.split(",") if t]
 w = toks[0] if toks else "wpn_bolt_rifle_01"; socket = "socket" in toks; tip = next((t[4:] for t in toks if t.startswith("tip=")), "shootTip")
 W = r"C:/Users/Revaptor_FX/Desktop/SM2_Work"; fbx = W + "/Exports/r51/%s/tpl/%s.tpl/%s.fbx" % (w, w, w)
-EAL = unreal.EditorAssetLibrary; folder = "/Game/SM2_Work/Tests/r51/" + w
+EAL = unreal.EditorAssetLibrary; folder = "/Game/ForgeLens/SM2/Tests/r51/" + w
 if not (EAL.does_directory_exist(folder) and EAL.list_assets(folder, True, False)):
     t0 = time.time()
     t = unreal.AssetImportTask(); t.filename = fbx; t.destination_path = folder; t.automated = True; t.save = True

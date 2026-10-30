@@ -1,9 +1,9 @@
 # Step 3 A/B helper: duplicates each step3 instance that has UseSecondSpec/UseAnisoSpec on into
-# /Game/SM2_Work/Tests/step3_ab_off/<asset>/<MI>_off with all three switches off (originals untouched).
+# /Game/ForgeLens/SM2/Tests/step3_ab_off/<asset>/<MI>_off with all three switches off (originals untouched).
 import unreal, sys
 asset = sys.argv[1]
-mesh = unreal.load_asset(f"/Game/SM2_Work/Characters/{asset}/{asset}")
-dst = f"/Game/SM2_Work/Tests/step3_ab_off/{asset}"
+mesh = unreal.load_asset(f"/Game/ForgeLens/SM2/Characters/{asset}/{asset}")
+dst = f"/Game/ForgeLens/SM2/Tests/step3_ab_off/{asset}"
 mel = unreal.MaterialEditingLibrary; eal = unreal.EditorAssetLibrary
 n = 0
 for s in mesh.materials:

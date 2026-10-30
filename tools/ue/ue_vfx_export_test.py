@@ -1,7 +1,7 @@
 # vfx4-2: Unreal export TEST for the compared VFX (no Niagara). Imports only the textures + meshes those effects use
 # (grenade part_mg_frag_grenade_expl, bolter muzzle/trail/smoke, finisher blood) and builds simple preview materials.
 # Usage (each mode a separate uerun.ps1 call):
-#   import <export_root> [dest]   textures/meshes from the SM2Extractor exports -> dest (default /Game/SM2_Work/VfxExport)
+#   import <export_root> [dest]   textures/meshes from the SM2Extractor exports -> dest (default /Game/ForgeLens/SM2/VfxExport)
 #   capture <dest>                spawns an SM2Cap-tagged board (one plane per texture material + both meshes) far away
 #   export <out_dir>              writes the render target PNG and removes the SM2Cap actors
 # Never deletes assets: an existing dest folder is renamed to <dest>_bakN first. /Game/SM2_Work/Original is not touched.
@@ -48,8 +48,8 @@ def master(dest, name, additive):
     return m
 
 if mode == "import":
-    root = sys.argv[2]; dest = sys.argv[3] if len(sys.argv) > 3 else "/Game/SM2_Work/VfxExport"
-    assert dest.startswith("/Game/SM2_Work/") and not dest.startswith("/Game/SM2_Work/Original"), dest
+    root = sys.argv[2]; dest = sys.argv[3] if len(sys.argv) > 3 else "/Game/ForgeLens/SM2/VfxExport"
+    assert dest.startswith("/Game/ForgeLens/SM2/") and not dest.startswith("/Game/SM2_Work/Original"), dest
     if EAL.does_directory_exist(dest):
         n = 1
         while EAL.does_directory_exist(f"{dest}_bak{n}"): n += 1

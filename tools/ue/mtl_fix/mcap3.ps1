@@ -1,4 +1,4 @@
-$d="$env:USERPROFILE\Desktop\SM2_Work\Scripts\mtl_fix"; $b="/Game/SM2_Work/Anims_Mannequin/cc_titus_assault__tacticus_"
+$d="$env:USERPROFILE\Desktop\SM2_Work\Scripts\mtl_fix"; $b="/Game/ForgeLens/SM2/Anims_Mannequin/cc_titus_assault__tacticus_"
 function M($a){ & "$d\ue.ps1" "$d\mcap3.py" $a 2>&1 | sls "MCAP|Error" | %{$_.Line} }
 M @("prep"); M @("start"); Start-Sleep 5; try {
 $clips=@(@("run","run_fwd_sound_intercessor_Manny","0,0.23,0.47,0.7"),@("idle","wpn0_blind_idle_intercessor_Manny","0,1.6"),@("attack","attack_melee_axe_light_1_intercessor_Manny","0,0.7,1.35,2.0"))

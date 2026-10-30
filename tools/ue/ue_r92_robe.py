@@ -1,7 +1,7 @@
 # ue_r92_robe.py (R92): sorcerer robe colour check in Tests/r72_mats/Map_Mats, no asset changes.
 # uerun.ps1 <this> set,<ev>,<yaw>   then (separate call, so the scene updates)   cap,<dir>,<name>   ; reset
 import sys, unreal
-F = "/Game/SM2_Work/Tests/r72_mats"
+F = "/Game/ForgeLens/SM2/Tests/r72_mats"
 les = unreal.get_editor_subsystem(unreal.LevelEditorSubsystem); E = unreal.get_editor_subsystem(unreal.EditorActorSubsystem)
 a = [t for x in sys.argv[1:] for t in x.split(",") if t]
 w = unreal.EditorLevelLibrary.get_editor_world()

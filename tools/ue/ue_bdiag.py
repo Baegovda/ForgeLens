@@ -1,7 +1,7 @@
 # bdiag.py <asset> <set> [grav 0|1]: which PA the ABP uses, DescribeBody for the first verify helpers; optional gravity toggle (saved).
 import sys, json, unreal
 name, SET = sys.argv[1], sys.argv[2]; G = sys.argv[3] if len(sys.argv) > 3 else ""
-W = r"C:/Users/Revaptor_FX/Desktop/SM2_Work"; folder = "/Game/SM2_Work/Tests/%s/%s" % (SET, name)
+W = r"C:/Users/Revaptor_FX/Desktop/SM2_Work"; folder = "/Game/ForgeLens/SM2/Tests/%s/%s" % (SET, name)
 pj = json.load(open(W + "/Exports/%s/%s/tpl/%s.tpl/%s.physics.json" % (SET, name, name, name), encoding="utf-8-sig"))
 hs = []
 for c in pj.get("cloths", []):

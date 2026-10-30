@@ -1,5 +1,5 @@
 # ue_r53_cloth.py (R53): verify the installed SM2PhysicsSetup cloth path (CreateChaosCloth) on one character.
-# Imports Exports/chars_cloth/<n> FBX into a NEW folder /Game/SM2_Work/Tests/r53_cloth/<n> (refuses if it exists; nothing
+# Imports Exports/chars_cloth/<n> FBX into a NEW folder /Game/ForgeLens/SM2/Tests/r53_cloth/<n> (refuses if it exists; nothing
 # renamed or deleted), runs create_chaos_cloth with the export's physics.json, prints the plugin report, saves.
 # Usage: uerun.ps1 <this> cc_sorcerer_exalted
 import sys, json, time, unreal
@@ -7,7 +7,7 @@ args = [t for a in sys.argv[1:] if not a.startswith("-") for t in a.split(",") i
 n = args[0] if args else "cc_sorcerer_exalted"
 W = r"C:/Users/Revaptor_FX/Desktop/SM2_Work"; base = W + "/Exports/chars_cloth/%s/tpl/%s.tpl/%s" % (n, n, n)
 EAL = unreal.EditorAssetLibrary; lib = unreal.SM2PhysicsSetupLibrary
-folder = "/Game/SM2_Work/Tests/r53_cloth/" + n
+folder = "/Game/ForgeLens/SM2/Tests/r53_cloth/" + n
 if EAL.does_directory_exist(folder) and EAL.list_assets(folder, True, False):
     raise SystemExit("R53 folder exists, refusing: " + folder)
 t0 = time.time()

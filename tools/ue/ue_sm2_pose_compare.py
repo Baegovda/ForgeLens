@@ -4,7 +4,7 @@
 # SETS / BASE below are the mtl1-44 test imports; edit them for other assets. The legacy pose/cap/export modes are kept for reference (they do not animate).
 import sys, builtins, unreal
 eas = unreal.get_editor_subsystem(unreal.EditorActorSubsystem); w = unreal.get_editor_subsystem(unreal.UnrealEditorSubsystem).get_editor_world()
-SETS = {"old": "/Game/SM2_Work/Tests/mtl44/old/cc_calgar/", "new": "/Game/SM2_Work/Tests/mtl44/new/cc_calgar/"}
+SETS = {"old": "/Game/ForgeLens/SM2/Tests/mtl44/old/cc_calgar/", "new": "/Game/ForgeLens/SM2/Tests/mtl44/new/cc_calgar/"}
 BASE = {"old": unreal.Vector(300000, 310000, 50000), "new": unreal.Vector(310000, 310000, 50000)}
 TAG = unreal.Name("SM2Cap44")
 def tagged(): return [x for x in eas.get_all_level_actors() if x.actor_has_tag(TAG)]

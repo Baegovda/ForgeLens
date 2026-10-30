@@ -7,10 +7,10 @@ mode, name, SET = sys.argv[1], sys.argv[2], sys.argv[3]
 W = r"C:/Users/Revaptor_FX/Desktop/SM2_Work"; TAG = "C28"
 les = unreal.get_editor_subsystem(unreal.LevelEditorSubsystem); ues = unreal.get_editor_subsystem(unreal.UnrealEditorSubsystem)
 eas = unreal.get_editor_subsystem(unreal.EditorActorSubsystem)
-base = unreal.load_asset("/Game/SM2_Work/Tests/%s/%s/%s" % (SET, name, name))
-diag = unreal.load_asset("/Game/SM2_Work/Tests/diag_unsaved/%s_diag" % name)
+base = unreal.load_asset("/Game/ForgeLens/SM2/Tests/%s/%s/%s" % (SET, name, name))
+diag = unreal.load_asset("/Game/ForgeLens/SM2/Tests/diag_unsaved/%s_diag" % name)
 if diag is None:  # mtl1-32: no diag duplicate -> check the SAVED <name>_ChaosCloth
-    diag = unreal.load_asset("/Game/SM2_Work/Tests/%s/%s/%s_ChaosCloth" % (SET, name, name))
+    diag = unreal.load_asset("/Game/ForgeLens/SM2/Tests/%s/%s/%s_ChaosCloth" % (SET, name, name))
 O = unreal.Vector(0, 60000, 0)
 def acts(world):
     return unreal.GameplayStatics.get_all_actors_with_tag(world, TAG)

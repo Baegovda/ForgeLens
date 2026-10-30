@@ -4,7 +4,7 @@
 # uerun.ps1 <this> scene | set,<ev> | cap,<dir>,<tag>   (cap in a separate call after set)
 import sys, math, unreal
 F = "/Game/ForgeLens/SM2/Tests/r92_floor"; EAL = unreal.EditorAssetLibrary
-C = "/Game/SM2_Work/Characters/"; T2 = "/Game/ForgeLens/SM2/Tests/chars_cloth2/"
+C = "/Game/ForgeLens/SM2/Characters/"; T2 = "/Game/ForgeLens/SM2/Tests/chars_cloth2/"
 CH = {"vortex": C + "cc_vortex_beast/cc_vortex_beast", "sorcerer": C + "cc_sorcerer_exalted/cc_sorcerer_exalted", "calgar": C + "cc_calgar/cc_calgar",
       "hormagaunt": C + "cc_swarm_hormagaunt/cc_swarm_hormagaunt", "titus": C + "cc_titus_assault/cc_titus_assault",
       "chaplain": T2 + "cc_chaplain/cc_chaplain", "commissar": T2 + "cc_commissar/cc_commissar", "tech_priest": T2 + "cc_tech_priest/cc_tech_priest"}
@@ -20,7 +20,7 @@ def scene(ev=8.0):  # R95c: chapel-style lights (R95b variant c: key 800 / rim 2
     if EAL.does_asset_exist(mp): les.load_level(mp); [E.destroy_actor(x) for x in E.get_all_level_actors()]
     else: les.new_level(mp)
     fl = E.spawn_actor_from_object(unreal.load_asset("/Engine/BasicShapes/Plane"), unreal.Vector(0, 0, 0))
-    fl.set_actor_scale3d(unreal.Vector(400, 400, 1)); fl.static_mesh_component.set_material(0, unreal.load_asset("/Game/SM2_Work/Tests/r72_mats/M_r72_grey"))
+    fl.set_actor_scale3d(unreal.Vector(400, 400, 1)); fl.static_mesh_component.set_material(0, unreal.load_asset("/Game/ForgeLens/SM2/Tests/r72_mats/M_r72_grey"))
     d = E.spawn_actor_from_class(unreal.DirectionalLight, unreal.Vector(0, 0, 800), unreal.Rotator(roll=0, pitch=-45, yaw=60)); d.light_component.set_intensity(0.0)
     s = E.spawn_actor_from_class(unreal.SkyLight, unreal.Vector(0, 0, 500)); s.light_component.set_intensity(0.05)
     s.light_component.set_editor_property("source_type", unreal.SkyLightSourceType.SLS_SPECIFIED_CUBEMAP)

@@ -4,8 +4,8 @@
 import unreal, sys, json, math, os
 mode = sys.argv[1]
 W = r"C:/Users/Revaptor_FX/Desktop/SM2_Work"; OUT = W + "/Captures/phys52"
-MESH = "/Game/SM2_Work/Tests/chars_phys/cc_titus_assault/cc_titus_assault"
-ANIM = "/Game/SM2_Work/Sequences/TitusWalkFire/Anims/cc_titus_assault__tacticus_wpn1_walk_fwd_intercessor"
+MESH = "/Game/ForgeLens/SM2/Tests/chars_phys/cc_titus_assault/cc_titus_assault"
+ANIM = "/Game/ForgeLens/SM2/Sequences/TitusWalkFire/Anims/cc_titus_assault__tacticus_wpn1_walk_fwd_intercessor"
 BONES = ["CENTRE", "Belt_jiggle", "box_jiggle_01", "box_jiggle_02", "box_jiggle_end"]
 eas = unreal.get_editor_subsystem(unreal.EditorActorSubsystem)
 les = unreal.get_editor_subsystem(unreal.LevelEditorSubsystem); ues = unreal.get_editor_subsystem(unreal.UnrealEditorSubsystem)

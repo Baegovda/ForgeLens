@@ -3,7 +3,7 @@
 # two actors of the SAME cloth mesh: R63_on (cloth simulating) and R63_off (cloth disabled = skinned pose) for an A/B.
 # One SceneCapture per actor (close 3/4 back view on cloak/skirt/tabard), viewport-independent.
 # Modes (uerun.ps1 <this> <mode>[,args]):
-#   prep                duplicate /Game/SM2_Work/Characters/cc_sorcerer_exalted (materials kept) into Tests/r63_cloth and run
+#   prep                duplicate /Game/ForgeLens/SM2/Characters/cc_sorcerer_exalted (materials kept) into Tests/r63_cloth and run
 #                       create_chaos_cloth with the chars_cloth physics.json (falls back to the R53 FBX import if 0 cloths)
 #   scene[,ev]          new scratch map + lights + floor + actors + captures (+ unbound PPV, manual exposure bias ev)
 #   anim,<asset>        looping clip on both actors
@@ -14,7 +14,7 @@
 #   tune,<k=v;k=v>      set_cloth_config_props on the r63 mesh
 import sys, os, math, json, unreal
 W = r"C:/Users/Revaptor_FX/Desktop/SM2_Work"; N = "cc_sorcerer_exalted"
-SRC = "/Game/SM2_Work/Characters/%s/%s" % (N, N); FOLD = "/Game/SM2_Work/Tests/r63_cloth"; MESH = FOLD + "/" + N + "_cloth"
+SRC = "/Game/ForgeLens/SM2/Characters/%s/%s" % (N, N); FOLD = "/Game/ForgeLens/SM2/Tests/r63_cloth"; MESH = FOLD + "/" + N + "_cloth"
 MAP = FOLD + "/Map_Cloth"; PJ = W + "/Exports/chars_cloth/%s/tpl/%s.tpl/%s.physics.json" % (N, N, N)
 EAL = unreal.EditorAssetLibrary; L = unreal.SM2PhysicsSetupLibrary
 def les(): return unreal.get_editor_subsystem(unreal.LevelEditorSubsystem)

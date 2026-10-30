@@ -1,4 +1,4 @@
-# Animation survey (read-mostly). Everything goes to /Game/SM2_Work/Tests/anim_survey/<asset>/.
+# Animation survey (read-mostly). Everything goes to /Game/ForgeLens/SM2/Tests/anim_survey/<asset>/.
 # usage (ue_python argv):
 #   import <export dir>/tpl/<asset>.tpl <asset> [mesh|noyaw|yaw180|noroot|sub=<Name>|root=<Name>]
 #        mesh import only when missing (Interchange) into <root or asset>/; anims via sm2_anim_import (auto yaw, root motion on)
@@ -104,7 +104,7 @@ def sm2_anim_import(fbx, skeleton, dest, yaw="auto", root_motion=True):
         raise RuntimeError("SPLITSKEL %d clip(s) not on %s: %s (run ue_fix_split_skeletons.py)" % (len(split), skeleton.get_path_name(), "; ".join("%s uses %s" % b for b in split)))
     return paths, y
 # --- end sm2_anim_import ---
-W = "/Game/SM2_Work/Tests/anim_survey/"
+W = "/Game/ForgeLens/SM2/Tests/anim_survey/"
 mode = sys.argv[1]
 X = unreal.AnimPoseExtensions
 SP = unreal.AnimPoseSpaces
@@ -253,7 +253,7 @@ elif mode == "pose":
 elif mode == "capture":
     out, name = sys.argv[2], sys.argv[3]
     m, acts = builtins._sm2_sheet
-    hidden = unreal.load_asset("/Game/SM2_Work/Materials/M_Hide")
+    hidden = unreal.load_asset("/Game/ForgeLens/SM2/Materials/M_Hide")
     boxes = []
     for a in acts:
         c = a.skeletal_mesh_component

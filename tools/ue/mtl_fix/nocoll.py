@@ -3,7 +3,7 @@
 import sys, unreal
 name = sys.argv[1]; SET = sys.argv[2] if len(sys.argv) > 2 else "chars_cloth"
 EAL = unreal.EditorAssetLibrary; lib = unreal.SM2PhysicsSetupLibrary
-src = "/Game/SM2_Work/Tests/%s/%s/%s_ChaosCloth" % (SET, name, name); dst = src + "_NoColl"
+src = "/Game/ForgeLens/SM2/Tests/%s/%s/%s_ChaosCloth" % (SET, name, name); dst = src + "_NoColl"
 if EAL.does_asset_exist(dst):
     n = 1
     while EAL.does_asset_exist(dst + "_bak%d" % n): n += 1

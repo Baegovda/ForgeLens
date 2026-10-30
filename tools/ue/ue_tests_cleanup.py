@@ -1,11 +1,11 @@
-# Dry run (default) or delete scratch folders under /Game/SM2_Work/Tests. Never touches anything outside Tests.
+# Dry run (default) or delete scratch folders under /Game/ForgeLens/SM2/Tests. Never touches anything outside Tests.
 import sys, unreal
 spec = sys.argv[1]  # "dry:a,b,c" or "delete:a,b,c" (one arg; uerun -File passes one argv)
 mode, _, flist = spec.partition(":")
 folders = flist.split(",")
 ar = unreal.AssetRegistryHelpers.get_asset_registry()
 eal = unreal.EditorAssetLibrary
-root = "/Game/SM2_Work/Tests/"
+root = "/Game/ForgeLens/SM2/Tests/"
 targets = [root + f for f in folders if f and ".." not in f and not f.startswith("/")]
 dele = tuple(t + "/" for t in targets)
 opts = unreal.AssetRegistryDependencyOptions(include_soft_package_references=True, include_hard_package_references=True, include_searchable_names=False, include_soft_management_references=False, include_hard_management_references=False)

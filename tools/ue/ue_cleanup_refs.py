@@ -14,7 +14,7 @@ for d in dirs:
         import re
         assets += [a.rsplit(".", 1)[0] for a in EAL.list_assets("/Game/SM2_Work", True, False) if re.search(r"_bak\d+$", a.rsplit(".", 1)[0])]
         continue
-    if d.startswith(PROT) or "Lightning_01" in d or not d.startswith("/Game/SM2_Work/"): print("R57REFUSE", d); continue
+    if d.startswith(PROT) or "Lightning_01" in d or not d.startswith("/Game/ForgeLens/SM2/"): print("R57REFUSE", d); continue
     assets += [a.rsplit(".", 1)[0] for a in EAL.list_assets(d, True, False)]
 pkgs = set(assets)
 refs = {a: [str(r) for r in EAL.find_package_referencers_for_asset(a, False)] for a in pkgs}

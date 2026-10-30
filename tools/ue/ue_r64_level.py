@@ -1,11 +1,11 @@
-# R64: readable lighting + captures for the R54 scratch level map (only /Game/SM2_Work/Tests/r54_level).
+# R64: readable lighting + captures for the R54 scratch level map (only /Game/ForgeLens/SM2/Tests/r54_level).
 # Modes: stats | light | capture <out_dir> | export
 import unreal, sys, builtins, collections
 MAP = "/Game/SM2_Work/Tests/r54_level/L_hub_battle_barge"
 eas = unreal.get_editor_subsystem(unreal.EditorActorSubsystem)
 ues = unreal.get_editor_subsystem(unreal.UnrealEditorSubsystem)
 world = ues.get_editor_world()
-assert "/Game/SM2_Work/Tests/r54_level/" in world.get_path_name(), world.get_path_name()
+assert "/Game/ForgeLens/SM2/Tests/r54_level/" in world.get_path_name(), world.get_path_name()
 mode = sys.argv[1]
 acts = [a for a in eas.get_all_level_actors() if a.actor_has_tag("R54")]
 def q(v, f): v = sorted(v); return v[int((len(v) - 1) * f)]

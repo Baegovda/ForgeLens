@@ -1,14 +1,14 @@
 # ue_r90_cloth.py (R90): generic cloth check over several characters with fast clips (death/run/melee) for the plugin before/after A/B.
 # Modes: prep,<subj>,<tag> | scene,<subj>,<tag>,<clipkey> | cap,<dir>,<name> | measure,<name> | sim | stop | open,<map>
 import sys, os, math, json, unreal
-W = "C:/Users/Revaptor_FX/Desktop/SM2_Work"; F = "/Game/SM2_Work/Tests/r90_cloth"
+W = "C:/Users/Revaptor_FX/Desktop/SM2_Work"; F = "/Game/ForgeLens/SM2/Tests/r90_cloth"
 EAL = unreal.EditorAssetLibrary; L = unreal.SM2PhysicsSetupLibrary
-A = "/Game/SM2_Work/Animations/"
+A = "/Game/ForgeLens/SM2/Animations/"
 SUB = {
  "sorcerer": ("cc_sorcerer_exalted", {"death": A+"cc_sorcerer_exalted/Bulk/cc_sorcerer_exalted__lesser_sorcerer_death_from_idle_sorcerer_exalted"}),
  "titus": ("cc_titus_assault", {"run": A+"cc_titus_assault/yaw180/cc_titus_assault__tacticus_unarmed_run_fwd_intercessor",
                                 "melee": A+"cc_titus_assault/yaw180/cc_titus_assault__npc_assault_attack_melee_thunder_hammer_light_1_intercessor"}),
- "calgar": ("cc_calgar", {"run": "/Game/SM2_Work/Tests/r67_phys/anims/cc_calgar__calgar_run_fwd_calgar"}),
+ "calgar": ("cc_calgar", {"run": "/Game/ForgeLens/SM2/Tests/r67_phys/anims/cc_calgar__calgar_run_fwd_calgar"}),
  "tech_priest": ("cc_tech_priest", {"death": "/Game/ForgeLens/SM2/Tests/chars_cloth2/cc_tech_priest/Anims/cc_tech_priest__tech_priest_hordemode_death_tech_priest", "walk": "/Game/ForgeLens/SM2/Tests/chars_cloth2/cc_tech_priest/Anims/cc_tech_priest__tech_priest_censer_walk_loop_tech_priest"}),
  "chaplain": ("cc_chaplain", {"turn": "/Game/ForgeLens/SM2/Tests/chars_cloth2/cc_chaplain/Anims/cc_chaplain__chaplain_turn_180_lwd_chaplain"}),
  "commissar": ("cc_commissar", {"death": "/Game/ForgeLens/SM2/Tests/chars_cloth2/cc_commissar/Anims/cc_commissar__death_1_commissar", "run": "/Game/ForgeLens/SM2/Tests/chars_cloth2/cc_commissar/Anims/cc_commissar__trooper_run_start_fwd_v01_commissar", "melee": "/Game/ForgeLens/SM2/Tests/chars_cloth2/cc_commissar/Anims/cc_commissar__trooper_death_melee_front_v01_commissar"}),
@@ -32,7 +32,7 @@ def mesh_path(subj, tag): return "%s/%s_%s" % (F, SUB[subj][0], tag)
 def prep(subj, tag):
     n = SUB[subj][0]; mp = mesh_path(subj, tag)
     if EAL.does_asset_exist(mp): EAL.delete_asset(mp)
-    src = "/Game/SM2_Work/Characters/%s/%s" % (n, n)
+    src = "/Game/ForgeLens/SM2/Characters/%s/%s" % (n, n)
     if not EAL.does_asset_exist(src): src = "/Game/ForgeLens/SM2/Tests/chars_cloth2/%s/%s" % (n, n)  # R91 imports under /Game/ForgeLens/SM2
     m = EAL.duplicate_asset(src, mp)
     r = L.create_chaos_cloth(m, pj(n)); conv, rep = (r if isinstance(r, tuple) else ([], ""))[-2:]

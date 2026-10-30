@@ -1,6 +1,6 @@
-# R80 (t172u/R75): game sky + env lighting for the hub_battle_barge UE copy (/Game/SM2_Work/Tests/r54_level). Run in the editor via uerun.ps1.
+# R80 (t172u/R75): game sky + env lighting for the hub_battle_barge UE copy (/Game/ForgeLens/SM2/Tests/r54_level). Run in the editor via uerun.ps1.
 #   state                      -> print sky/fog/sun/skylight/atmosphere actors and settings
-#   import <hdr>               -> import the decoded long-lat HDR (bc6hdr, BC6H UF16 -> RGBE) as TextureCube /Game/SM2_Work/Tests/r54_level/Sky/T_buttle_barge_sky_1
+#   import <hdr>               -> import the decoded long-lat HDR (bc6hdr, BC6H UF16 -> RGBE) as TextureCube /Game/ForgeLens/SM2/Tests/r54_level/Sky/T_buttle_barge_sky_1
 #   apply [skyInt] [fogScale]  -> SkyLight = specified cubemap (angle -44.33, game intensity 8 * skyInt), SkyAtmosphere hidden,
 #                                 fog = game hbbm_fog_v2 colour (40,50,83)/255, sun colour (255,236,196), R78 PPV exposure; tags R78Env
 #   revert                     -> undo apply (R64 DaylightAmbientCubemap skylight, atmosphere visible, R66 fog)
@@ -9,7 +9,7 @@
 import sys, unreal
 eas = unreal.get_editor_subsystem(unreal.EditorActorSubsystem)
 mode = sys.argv[1] if len(sys.argv) > 1 else "state"
-CUBE = "/Game/SM2_Work/Tests/r54_level/Sky/T_buttle_barge_sky_1"
+CUBE = "/Game/ForgeLens/SM2/Tests/r54_level/Sky/T_buttle_barge_sky_1"
 def acts(cls): return [a for a in eas.get_all_level_actors() if isinstance(a, cls)]
 if mode == "state":
     print("R78 level", unreal.EditorLevelLibrary.get_editor_world().get_name())

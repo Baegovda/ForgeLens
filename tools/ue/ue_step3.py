@@ -1,8 +1,8 @@
-# Step 3 import: FBX into /Game/SM2_Work/Characters/<name> (Props/<name> when <name> is not cc_*), then the exported import_sm2_materials.py, then a switch report.
+# Step 3 import: FBX into /Game/ForgeLens/SM2/Characters/<name> (Props/<name> when <name> is not cc_*), then the exported import_sm2_materials.py, then a switch report.
 import sys, runpy, json, unreal
 name = sys.argv[1]
 root = r"C:/Users/Revaptor_FX/Desktop/SM2_Work/Exports/step3_" + name + "/tpl/" + name + ".tpl/"
-folder = "/Game/SM2_Work/" + ("Characters/" if name.startswith("cc_") else "Props/") + name
+folder = "/Game/ForgeLens/SM2/" + ("Characters/" if name.startswith("cc_") else "Props/") + name
 if sys.argv[2] == "import":
     t = unreal.AssetImportTask(); t.filename = root + name + ".fbx"; t.destination_path = folder
     t.automated = True; t.replace_existing = True; t.save = True

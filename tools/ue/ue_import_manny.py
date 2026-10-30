@@ -1,12 +1,12 @@
 # Import mannequin-ready anim FBX ({model}__{clip}_Manny.fbx from `export --anim-mannequin <json>`) onto SK_Mannequin.
-# usage: sys.argv = ['x', <fbx | folder>, [dest=/Game/SM2_Work/Anims_Mannequin], [skeleton=SK_Mannequin path], [yaw=0]]
+# usage: sys.argv = ['x', <fbx | folder>, [dest=/Game/ForgeLens/SM2/Anims_Mannequin], [skeleton=SK_Mannequin path], [yaw=0]]
 # Yaw 0: the clip is already in SK_Mannequin's frame (root identity, +Y front). The SM2 "auto" rule would give 180 here and
 # turn the clip around. Re-imports reuse the yaw stored in the existing asset's import data, so it is reset first.
 # No IK Retargeter: the FBX already has SK_Mannequin bone names, hierarchy and ref pose. Existing assets are kept as
 # <name>_bakN before reimport.
 import sys, os, unreal
 SKEL = "/Game/Characters/Mannequins/Meshes/SK_Mannequin"
-DEST = "/Game/SM2_Work/Anims_Mannequin"
+DEST = "/Game/ForgeLens/SM2/Anims_Mannequin"
 def manny_files(p):
     if isinstance(p, (list, tuple)): return list(p)
     if os.path.isdir(p):

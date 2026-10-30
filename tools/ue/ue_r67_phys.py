@@ -1,16 +1,16 @@
 # ue_r67_phys.py (R67): readable ON/OFF physics checks for calgar (jiggle bodies, run clip) and vortex (tentacle Chaos cloth).
-# Map per subject /Game/SM2_Work/Tests/r67_phys/Map_<subj>: grey floor, dir + sky + 2 point + spot, manual exposure,
+# Map per subject /Game/ForgeLens/SM2/Tests/r67_phys/Map_<subj>: grey floor, dir + sky + 2 point + spot, manual exposure,
 # actor <subj>_on (physics) and <subj>_off (calgar: post-process ABP off; vortex: cloth off), one SceneCapture each.
 # Modes: prep_vortex | scene,<subj> | cap,<subj>,<dir>,<tag> | sim | stop | osc,<sec>,<amp> | measure,<subj>,<tag> | open,<map>
 import sys, math, json, re, unreal
-W = "C:/Users/Revaptor_FX/Desktop/SM2_Work"; F = "/Game/SM2_Work/Tests/r67_phys"
+W = "C:/Users/Revaptor_FX/Desktop/SM2_Work"; F = "/Game/ForgeLens/SM2/Tests/r67_phys"
 EAL = unreal.EditorAssetLibrary; L = unreal.SM2PhysicsSetupLibrary
-VSRC = "/Game/SM2_Work/Characters/cc_vortex_beast/cc_vortex_beast"; VMESH = F + "/cc_vortex_beast_cloth"
+VSRC = "/Game/ForgeLens/SM2/Characters/cc_vortex_beast/cc_vortex_beast"; VMESH = F + "/cc_vortex_beast_cloth"
 VPJ = W + "/Exports/chars_phys52/cc_vortex_beast/tpl/cc_vortex_beast.tpl/cc_vortex_beast.physics.json"
 CLIP = F + "/anims/cc_calgar__calgar_run_fwd_calgar"
-SUB = {"calgar": dict(mesh="/Game/SM2_Work/Characters/cc_calgar/cc_calgar", clip=CLIP, off="ppabp",
+SUB = {"calgar": dict(mesh="/Game/ForgeLens/SM2/Characters/cc_calgar_work/cc_calgar", clip=CLIP, off="ppabp",
                       bones=["order_jinggle_01", "tassel_01_jiggle_01", "tassel_02_jiggle_02", "BACKup"]),
-       "vortex": dict(mesh=VMESH, clip="/Game/SM2_Work/Animations/cc_vortex_beast/cc_vortex_beast__vortex_beast_attack_melee_180_rwd_vortex_beast", off="cloth", bones=[])}
+       "vortex": dict(mesh=VMESH, clip="/Game/ForgeLens/SM2/Animations/cc_vortex_beast/cc_vortex_beast__vortex_beast_attack_melee_180_rwd_vortex_beast", off="cloth", bones=[])}
 def les(): return unreal.get_editor_subsystem(unreal.LevelEditorSubsystem)
 def eas(): return unreal.get_editor_subsystem(unreal.EditorActorSubsystem)
 def world():

@@ -1,11 +1,11 @@
-# Bulk validation (step 4): import one bulk export into /Game/SM2_Work/Tests/bulk/<asset> and check it.
+# Bulk validation (step 4): import one bulk export into /Game/ForgeLens/SM2/Tests/bulk/<asset> and check it.
 # usage: ue_bulk.py import <asset>   (mesh + exported import_sm2_materials.py + {asset}__*.fbx clips, then check)
 #        ue_bulk.py check <asset>    (checks only)
 # Export root: Desktop/SM2_Work/Exports/bulk/<asset>/tpl/<asset>.tpl/. Writes Exports/bulk/<asset>.ue.json and prints BULKJSON.
 # "Anim Only (Manny)" exports ({asset}__{clip}_Manny.fbx, already on SK_Mannequin's skeleton) are imported onto
-# /Game/Characters/Mannequins/Meshes/SK_Mannequin into /Game/SM2_Work/Anims_Mannequin (ue_import_manny.py, yaw 0, _bakN
+# /Game/Characters/Mannequins/Meshes/SK_Mannequin into /Game/ForgeLens/SM2/Anims_Mannequin (ue_import_manny.py, yaw 0, _bakN
 # backups) and kept out of the SM2 clip import; an export with only _Manny files stops there.
-# A re-import first DUPLICATES an existing /Game/SM2_Work/Tests/<set>/<asset> to <asset>_bakN, then reimports in place (never deletes).
+# A re-import first DUPLICATES an existing /Game/ForgeLens/SM2/Tests/<set>/<asset> to <asset>_bakN, then reimports in place (never deletes).
 import sys, os, re, json, math, time, runpy, unreal
 
 # --- sm2_skel_rule (R43): mesh imports reuse the one existing {mesh}_Skeleton; same-name collisions fail loudly ---
@@ -24,7 +24,7 @@ def sm2_mesh_skeleton(folder, mesh_name, root="/Game"):
 # --- end sm2_skel_rule ---
 mode, name = sys.argv[1], sys.argv[2]
 SET = sys.argv[3] if len(sys.argv) > 3 else "bulk"
-CHAOS = "chaoscloth" in [a.lower() for a in sys.argv[4:]]  # opt-in: also build <asset>_ChaosCloth (bone method stays the default)  # optional set name: Exports/<set>/<asset> -> /Game/SM2_Work/Tests/<set>/<asset>
+CHAOS = "chaoscloth" in [a.lower() for a in sys.argv[4:]]  # opt-in: also build <asset>_ChaosCloth (bone method stays the default)  # optional set name: Exports/<set>/<asset> -> /Game/ForgeLens/SM2/Tests/<set>/<asset>
 W = r"C:/Users/Revaptor_FX/Desktop/SM2_Work"
 root = W + "/Exports/" + SET + "/" + name + "/tpl/" + name + ".tpl/"
 def _fl_root():  # R84 (t200u): /Game/ForgeLens/SM2 by default; env FORGELENS_UE_ROOT=legacy -> /Game/SM2_Work

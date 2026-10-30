@@ -5,3 +5,14 @@
 - Vortex orb: emissive 9 only brightens spike tips; the in-game glowing orb is NOT mesh emissive (likely VFX/particles) -> not fixed by materials.
 - Hormagaunt live MIs reparented to M_SM2_r96 (ue_r96_apply.py; undo = reparent to M_SM2).
 - NOTE: existing /Game/SM2_Work characters not yet re-imported with R97 importer (scalars apply on next import).
+
+## R97b/R97d 2026-10-31 04:06 KST
+- Migration /Game/SM2_Work -> /Game/ForgeLens/SM2 (owner t260u), tools/ue/ue_r97_migrate.py, editor -unattended:
+  * Backups: K:\SM2_Backups\{SM2_Work,ForgeLens}_premigrate_20261031 (9.0 GB + 3.3 GB).
+  * Attempt 1 (03:24-03:29) crashed (the 'Continue with rename?' prompt for maps + Message Log window -> D3D11 CreateSwapChain 80070005). Rolled back byte-exact from the backups (3593 new files removed, 2194 restored, robocopy /L diff = 0).
+  * Attempt 2: 4586 assets moved (maps excluded), 0 failed batches. SM2_Work/Characters/cc_calgar -> ForgeLens/SM2/Characters/cc_calgar_work (name clash with the existing FL cc_calgar). 24 referencers re-saved; 1417 redirectors kept (1411 now unreferenced), NOT deleted yet.
+  * Stayed in /Game/SM2_Work: Original (protected) and 7 maps (PhysTestMap, r54 L_hub_battle_barge, r63 Map_Cloth, r67 Map_calgar/Map_vortex, r72 Map_Mats, r90 Map_r90).
+  * Verified (ue_r97_verify.py): 6 FL character meshes load with skeleton and all MIs resolve. Physics assets on calgar(both)/sorcerer/vortex; hormagaunt/titus have none (as before).
+  * 68 tool scripts repointed to /Game/ForgeLens/SM2 (maps + Original kept). SM2PhysicsSetup plugin has no SM2_Work path (nothing to change). Importer default already /Game/ForgeLens/SM2 (fl_roots.py / UnrealDirect.cs).
+- Map_Floor blowout (t263u): the cause was 24 R95c point lights (key 800 / green rim 2500 / fill 150) + PPV manual bias 8, not R97 emissive (Vortex MIs EmissiveStrength 0/1). Now: 0 point lights, 1 warm directional 3 lux + DaylightAmbient sky 3, PPV and captures manual bias -5 (ue_r97_floor.py 3 3 -5). Captures Shots\r97_floor\s3_*.png: no clipped pixels. Vortex centre mean 35,39,48 vs game crop 95,100,103 (the game orb/body glow is VFX, see R97h).
+- R97h Vortex orb: game data proves it is VFX: blueprint_vfx_vortex_beast.sso starts 'fx_vortex_beast_back_idle' (CPU emitters, emissiveIntensity overrides). Exported to Exports\r97\vortex_vfx\export (niagara.json + 6 textures). Not yet built in UE.

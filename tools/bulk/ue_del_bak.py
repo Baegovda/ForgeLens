@@ -1,6 +1,6 @@
-# Delete only /Game/SM2_Work/Tests/bulk/*_bakN folders (bulk-validation backups).
+# Delete only /Game/ForgeLens/SM2/Tests/bulk/*_bakN folders (bulk-validation backups).
 import unreal, re
-root = "/Game/SM2_Work/Tests/bulk"
+root = "/Game/ForgeLens/SM2/Tests/bulk"
 eal = unreal.EditorAssetLibrary
 subs = unreal.AssetRegistryHelpers.get_asset_registry().get_sub_paths(root, False)
 done = []

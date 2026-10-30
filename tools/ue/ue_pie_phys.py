@@ -1,6 +1,6 @@
 # ue_pie_phys.py (R60): Simulate-in-editor physics check on a scratch map (never Lightning_01 / protected maps).
 # Steps (one uerun call each, screenshots between them with ew_shot.ps1):
-#   setup[,map]        new scratch map (default /Game/SM2_Work/Tests/r60_pie/Map_PhysCheck): floor, light, one actor per mesh in a row; saves map
+#   setup[,map]        new scratch map (default /Game/ForgeLens/SM2/Tests/r60_pie/Map_PhysCheck): floor, light, one actor per mesh in a row; saves map
 #   anims              give each test actor a looping clip (ANIMS; actors without one keep the ref pose); saves map
 #   addcap[,x,y,z,pitch,yaw]  add a SceneCapture2D 'R60cap' (+ render target under the map folder) to the scratch map; saves
 #   cap,<png path>     capture the sim world through R60cap and write a PNG (viewport-independent screenshot)
@@ -14,13 +14,13 @@
 #   stop               end Simulate/PIE
 # Verdict (HEURISTIC thresholds): NaN or max>150cm -> EXPLODE; after settle max>40cm -> NO_SETTLE; moved but max<0.05cm -> NO_MOTION; else OK.
 import sys, json, os, math, unreal
-MESHES = {"calgar": "/Game/SM2_Work/Characters/cc_calgar/cc_calgar",
-          "sorcerer": "/Game/SM2_Work/Characters/cc_sorcerer_exalted/cc_sorcerer_exalted",
-          "vortex": "/Game/SM2_Work/Characters/cc_vortex_beast/cc_vortex_beast",
-          "sorc_cloth": "/Game/SM2_Work/Tests/r53_cloth/cc_sorcerer_exalted/cc_sorcerer_exalted"}
-ANIMS = {"calgar": "/Game/SM2_Work/Tests/r60_pie/anims/cc_calgar__tacticus_wpn1_run_fwd_intercessor",
-         "sorcerer": "/Game/SM2_Work/Animations/cc_sorcerer_exalted/Bulk/cc_sorcerer_exalted__sorcerer_exa_vs_tacticus_grab_loop_sorcerer_exalted",
-         "vortex": "/Game/SM2_Work/Animations/cc_vortex_beast/cc_vortex_beast__vortex_beast_attack_melee_180_rwd_vortex_beast"}
+MESHES = {"calgar": "/Game/ForgeLens/SM2/Characters/cc_calgar_work/cc_calgar",
+          "sorcerer": "/Game/ForgeLens/SM2/Characters/cc_sorcerer_exalted/cc_sorcerer_exalted",
+          "vortex": "/Game/ForgeLens/SM2/Characters/cc_vortex_beast/cc_vortex_beast",
+          "sorc_cloth": "/Game/ForgeLens/SM2/Tests/r53_cloth/cc_sorcerer_exalted/cc_sorcerer_exalted"}
+ANIMS = {"calgar": "/Game/ForgeLens/SM2/Tests/r60_pie/anims/cc_calgar__tacticus_wpn1_run_fwd_intercessor",
+         "sorcerer": "/Game/ForgeLens/SM2/Animations/cc_sorcerer_exalted/Bulk/cc_sorcerer_exalted__sorcerer_exa_vs_tacticus_grab_loop_sorcerer_exalted",
+         "vortex": "/Game/ForgeLens/SM2/Animations/cc_vortex_beast/cc_vortex_beast__vortex_beast_attack_melee_180_rwd_vortex_beast"}
 PROTECTED = ("/Game/SM2_Work/Original", "/Game/Work", "Lightning_01")
 SAVED = unreal.Paths.project_saved_dir()
 
@@ -32,8 +32,8 @@ def actors():
     return [a for a in unreal.GameplayStatics.get_all_actors_of_class(world(), unreal.SkeletalMeshActor)
             if a.get_actor_label().startswith("R60_") or str(a.get_name()).startswith("R60_") or "R60_" in str(a.tags)]
 
-def setup(mp="/Game/SM2_Work/Tests/r60_pie/Map_PhysCheck"):
-    if any(p in mp for p in PROTECTED) or not mp.startswith("/Game/SM2_Work/Tests/"): raise SystemExit("R60 refuse map " + mp)
+def setup(mp="/Game/ForgeLens/SM2/Tests/r60_pie/Map_PhysCheck"):
+    if any(p in mp for p in PROTECTED) or not mp.startswith("/Game/ForgeLens/SM2/Tests/"): raise SystemExit("R60 refuse map " + mp)
     les().new_level(mp)
     eas = unreal.get_editor_subsystem(unreal.EditorActorSubsystem)
     fl = eas.spawn_actor_from_object(unreal.load_asset("/Engine/BasicShapes/Plane"), unreal.Vector(0, 0, 0))
@@ -171,8 +171,8 @@ if __name__ == "__main__":
         les().save_current_level()
     elif m == "addcap":
         v = [float(x) for x in a[1:6]] if len(a) >= 6 else [150, -1700, 450, -10, 90]
-        rt = unreal.AssetToolsHelpers.get_asset_tools().create_asset("RT_R60cap", "/Game/SM2_Work/Tests/r60_pie", unreal.TextureRenderTarget2D, unreal.TextureRenderTargetFactoryNew()) \
-            if not unreal.EditorAssetLibrary.does_asset_exist("/Game/SM2_Work/Tests/r60_pie/RT_R60cap") else unreal.load_asset("/Game/SM2_Work/Tests/r60_pie/RT_R60cap")
+        rt = unreal.AssetToolsHelpers.get_asset_tools().create_asset("RT_R60cap", "/Game/ForgeLens/SM2/Tests/r60_pie", unreal.TextureRenderTarget2D, unreal.TextureRenderTargetFactoryNew()) \
+            if not unreal.EditorAssetLibrary.does_asset_exist("/Game/ForgeLens/SM2/Tests/r60_pie/RT_R60cap") else unreal.load_asset("/Game/ForgeLens/SM2/Tests/r60_pie/RT_R60cap")
         rt.set_editor_property("size_x", 1600); rt.set_editor_property("size_y", 900)
         rt.set_editor_property("render_target_format", unreal.TextureRenderTargetFormat.RTF_RGBA8)
         unreal.EditorAssetLibrary.save_loaded_asset(rt)

@@ -1,10 +1,10 @@
 # mtl1-16 MRQ keyed-wind test scene: mrqwind.py build <mesh path> | info
-# build: new map /Game/SM2_Work/Tests/mrq16/L_wind16 (sky + sun, SkeletalMeshActor with the ChaosCloth mesh, CineCamera, a
+# build: new map /Game/ForgeLens/SM2/Tests/mrq16/L_wind16 (sky + sun, SkeletalMeshActor with the ChaosCloth mesh, CineCamera, a
 # WindDirectionalSource whose Speed/Strength are KEYED in LS_wind16: calm 0-40, ramp 40-60, strong 60-150 @30 fps), and an
 # MRQ primary config CFG_wind16 (PNG 960x540, engine warm-up 32). Restores the previously open map afterwards (not saved).
 # Render with mrqrender.ps1 (full object paths; a bare package path leaves {sequence_name} empty).
 import sys, unreal
-F = "/Game/SM2_Work/Tests/mrq16"; EAL = unreal.EditorAssetLibrary; AT = unreal.AssetToolsHelpers.get_asset_tools()
+F = "/Game/ForgeLens/SM2/Tests/mrq16"; EAL = unreal.EditorAssetLibrary; AT = unreal.AssetToolsHelpers.get_asset_tools()
 les = unreal.get_editor_subsystem(unreal.LevelEditorSubsystem); eas = unreal.get_editor_subsystem(unreal.EditorActorSubsystem)
 ues = unreal.get_editor_subsystem(unreal.UnrealEditorSubsystem)
 mode = sys.argv[1]

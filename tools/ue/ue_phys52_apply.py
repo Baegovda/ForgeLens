@@ -1,7 +1,7 @@
 # phys52_apply.py: re-run SetupFromJson on the Titus mesh with the phys52 sidecar (new PA/ABP/_SM2Damper, old kept). Saves only those + mesh.
 import sys, json, unreal
 W = r"C:/Users/Revaptor_FX/Desktop/SM2_Work"; name = "cc_titus_assault"
-folder = "/Game/SM2_Work/Tests/chars_phys/" + name
+folder = "/Game/ForgeLens/SM2/Tests/chars_phys/" + name
 pj = W + "/Exports/chars_phys52/%s/tpl/%s.tpl/%s.physics.json" % (name, name, name)
 lib = unreal.SM2PhysicsSetupLibrary; EAL = unreal.EditorAssetLibrary
 mesh = unreal.load_asset(folder + "/" + name)

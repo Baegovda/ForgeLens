@@ -1,4 +1,4 @@
-# R66: textured, full-coverage hub_battle_barge in the UE scratch map (only /Game/SM2_Work/Tests/r54_level).
+# R66: textured, full-coverage hub_battle_barge in the UE scratch map (only /Game/ForgeLens/SM2/Tests/r54_level).
 # Input = ForgeLens --levelbench <game> <level> <dir> 1 (R66): templates/*.obj with usemtl slots, textures/*.png,
 # materials_ue.tsv, instances_ue.tsv (local test outputs under Exports\level, never committed).
 # Modes (EngineWire via uerun.ps1, one call each; batch the big ones):
@@ -11,7 +11,7 @@
 #   sky <dir> [fog]             -> SkyAtmosphere + height fog (no black void), keeps R64 lights
 #   stats                       -> counts
 import unreal, sys, os, collections
-ROOT = "/Game/SM2_Work/Tests/r54_level"; TEX = ROOT + "/Textures"; MAT = ROOT + "/Materials"; MESH = ROOT + "/Meshes66"
+ROOT = "/Game/ForgeLens/SM2/Tests/r54_level"; TEX = ROOT + "/Textures"; MAT = ROOT + "/Materials"; MESH = ROOT + "/Meshes66"
 eal = unreal.EditorAssetLibrary; at = unreal.AssetToolsHelpers.get_asset_tools(); mel = unreal.MaterialEditingLibrary
 eas = unreal.get_editor_subsystem(unreal.EditorActorSubsystem)
 world = unreal.get_editor_subsystem(unreal.UnrealEditorSubsystem).get_editor_world()

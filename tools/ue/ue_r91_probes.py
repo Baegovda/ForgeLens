@@ -2,7 +2,7 @@
 import unreal, sys, os, collections
 eas = unreal.get_editor_subsystem(unreal.EditorActorSubsystem)
 world = unreal.get_editor_subsystem(unreal.UnrealEditorSubsystem).get_editor_world()
-assert "/Game/SM2_Work/Tests/r54_level/" in world.get_path_name(), world.get_path_name()
+assert "/Game/ForgeLens/SM2/Tests/r54_level/" in world.get_path_name(), world.get_path_name()
 for a in eas.get_all_level_actors():
     if a.actor_has_tag("R91Refl"): eas.destroy_actor(a)
 if sys.argv[1] == "add":

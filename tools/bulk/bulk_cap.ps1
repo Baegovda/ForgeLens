@@ -4,7 +4,7 @@ $S = "$env:USERPROFILE\Desktop\SM2_Work\Scripts"; $O = "$env:USERPROFILE\Desktop
 function U($py, $a) { $r = & "$S\uerun.ps1" "$S\$py" @($a) | Out-String; try { $j = ($r.Substring($r.IndexOf('{')) | ConvertFrom-Json); $j.output; if (-not $j.success) { "PYERR " + $j.result } } catch { $r } }
 $list = if ($Only) { $Only -split ',' } else { dir $O -Filter *.ue.json | % { $_.Name -replace '\.ue\.json$', '' } }
 foreach ($a in $list) {
-  $cap = U ue_cap_lit.py @("capture", "/Game/SM2_Work/Tests/bulk/$a/$a", "$C\$a", "bulk", "intensity=80") | Out-String
+  $cap = U ue_cap_lit.py @("capture", "/Game/ForgeLens/SM2/Tests/bulk/$a/$a", "$C\$a", "bulk", "intensity=80") | Out-String
   $e = U ue_cap_lit.py @("export") | Out-String
   "$a " + (($cap + $e) -split "`n" | ? { $_ -match "captured|exported|PYERR|Error" } | % { $_.Trim() }) -join ' '
 }

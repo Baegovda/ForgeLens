@@ -1,13 +1,13 @@
 # R54: build a UE scratch map from ForgeLens --levelbench output (templates/*.obj in UE axes/cm + instances_ue.tsv).
 # Modes (run through uerun.ps1 / EngineWire, or headless):
-#   import  <dir> <start> <count>  -> OBJ templates into /Game/SM2_Work/Tests/r54_level/Meshes (batched, saved)
+#   import  <dir> <start> <count>  -> OBJ templates into /Game/ForgeLens/SM2/Tests/r54_level/Meshes (batched, saved)
 #   place   <dir>                  -> new map /Game/SM2_Work/Tests/r54_level/L_hub_battle_barge, one StaticMeshActor per instance, saved
 #   capture <out_dir>              -> top + oblique SceneCapture2D into render targets; then "export" in a later call writes PNGs
 #   reset                          -> delete the r54 Meshes scratch folder (re-import)
 #   probe   <asset>                -> print bounds of one imported mesh (axis/scale check)
-# Only touches /Game/SM2_Work/Tests/r54_level. Never opens/saves Lightning_01, Original/*, /Game/Work/*.
+# Only touches /Game/ForgeLens/SM2/Tests/r54_level. Never opens/saves Lightning_01, Original/*, /Game/Work/*.
 import unreal, sys, os, builtins
-ROOT = "/Game/SM2_Work/Tests/r54_level"; MESH = ROOT + "/Meshes"; MAP = ROOT + "/L_hub_battle_barge"
+ROOT = "/Game/ForgeLens/SM2/Tests/r54_level"; MESH = ROOT + "/Meshes"; MAP = ROOT + "/L_hub_battle_barge"
 mode = sys.argv[1]
 def safe_name(t): return "SM_" + "".join(ch if ch.isalnum() or ch == "_" else "_" for ch in t)
 if mode == "import":
@@ -22,7 +22,7 @@ if mode == "import":
     if tasks: unreal.AssetToolsHelpers.get_asset_tools().import_asset_tasks(tasks)
     ok = sum(1 for f in files if unreal.EditorAssetLibrary.does_asset_exist(MESH + "/" + safe_name(f[:-4])))
     print("import", start, len(files), "present", ok)
-elif mode == "reset":  # scratch only: deletes /Game/SM2_Work/Tests/r54_level/Meshes (owner t110u: useless scratch may be deleted)
+elif mode == "reset":  # scratch only: deletes /Game/ForgeLens/SM2/Tests/r54_level/Meshes (owner t110u: useless scratch may be deleted)
     print("deleted", unreal.EditorAssetLibrary.delete_directory(MESH))
 elif mode == "list":
     for a in unreal.EditorAssetLibrary.list_assets(ROOT, True, False)[:int(sys.argv[2])]: print(a)

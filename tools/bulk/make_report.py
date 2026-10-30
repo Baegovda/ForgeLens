@@ -7,7 +7,7 @@ for a, m in man.items():
     e = exp.get(a, {}); log = open(f"{M}/{a}.log", encoding="utf-8", errors="replace").read() if os.path.exists(f"{M}/{a}.log") else ""
     u = json.load(open(f"{M}/{a}.ue.json", encoding="utf-8-sig")) if os.path.exists(f"{M}/{a}.ue.json") else None
     P = []; W = []; N = []
-    F = "/workspace/bulk/meta_fix"  # single-root fix build (UnrealRoot.HasSingleRoot): Exports/bulk_fix -> /Game/SM2_Work/Tests/bulk_fix
+    F = "/workspace/bulk/meta_fix"  # single-root fix build (UnrealRoot.HasSingleRoot): Exports/bulk_fix -> /Game/ForgeLens/SM2/Tests/bulk_fix
     if os.path.exists(f"{F}/{a}.ue.json"):
         u = json.load(open(f"{F}/{a}.ue.json", encoding="utf-8-sig")); log = open(f"{F}/{a}.log", encoding="utf-8", errors="replace").read()
         N.append("re-exported with the single-root fix (bulk_fix set), bone0 %s" % u.get("bone0"))

@@ -3,8 +3,8 @@
 #                                       -> duplicate Characters/cc_sorcerer_exalted to Tests/r67_cloth/cc_sorcerer_exalted_<tag> + create_chaos_cloth
 #   use,<tag>                           put that mesh on R63_on / R63_off in the open Map_Cloth (editor world, saved)
 import sys, json, unreal
-W = "C:/Users/Revaptor_FX/Desktop/SM2_Work"; N = "cc_sorcerer_exalted"; F = "/Game/SM2_Work/Tests/r67_cloth"
-PJ = W + "/Exports/chars_cloth/%s/tpl/%s.tpl/%s.physics.json" % (N, N, N); SRC = "/Game/SM2_Work/Characters/%s/%s" % (N, N)
+W = "C:/Users/Revaptor_FX/Desktop/SM2_Work"; N = "cc_sorcerer_exalted"; F = "/Game/ForgeLens/SM2/Tests/r67_cloth"
+PJ = W + "/Exports/chars_cloth/%s/tpl/%s.tpl/%s.physics.json" % (N, N, N); SRC = "/Game/ForgeLens/SM2/Characters/%s/%s" % (N, N)
 EAL = unreal.EditorAssetLibrary; L = unreal.SM2PhysicsSetupLibrary
 def build(tag, rs, bs, md=None):
     j = json.load(open(PJ, encoding="utf-8")); n = 0

@@ -1,7 +1,7 @@
 # Checks the anim_finish imports: root motion, CENTRE start/end (rebase), additive settings.
 import sys, unreal
 X = unreal.AnimPoseExtensions; WS = unreal.AnimPoseSpaces.WORLD; LS = unreal.AnimPoseSpaces.LOCAL
-root = sys.argv[1] if len(sys.argv) > 1 else "/Game/SM2_Work/Tests/anim_finish"
+root = sys.argv[1] if len(sys.argv) > 1 else "/Game/ForgeLens/SM2/Tests/anim_finish"
 opt = unreal.AnimPoseEvaluationOptions()
 for p in unreal.EditorAssetLibrary.list_assets(root, recursive=True):
     a = unreal.load_asset(p)

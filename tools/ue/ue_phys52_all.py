@@ -1,6 +1,6 @@
 # ue_phys52_all.py (R52): phys52 rules (jiggle Name key, motion damper, no ComplexAsSimple) on other characters.
 # Usage (EngineWire): uerun.ps1 <this> <name>[,<name>...] [probe]
-# Per character: mesh /Game/SM2_Work/Characters/<n>/<n>; sidecar Exports/chars_phys52/<n>/tpl/<n>.tpl/<n>.physics.json.
+# Per character: mesh /Game/ForgeLens/SM2/Characters/<n>/<n>; sidecar Exports/chars_phys52/<n>/tpl/<n>.tpl/<n>.physics.json.
 # Safety: PIE must be stopped; the mesh is first duplicated to <n>_bakN (next free N, never overwritten);
 # SetupFromJson creates new PA/ABP/_SM2Damper and keeps the old ones (nothing deleted). Undo: re-assign the old
 # PhysicsAsset / PostProcess ABP printed as BEFORE (or copy back from <n>_bakN).
@@ -19,7 +19,7 @@ except Exception as ex:
 lib = getattr(unreal, "SM2PhysicsSetupLibrary", None)
 print("R52 plugin", lib is not None)
 for n in names:
-    folder = "/Game/SM2_Work/Characters/" + n
+    folder = "/Game/ForgeLens/SM2/Characters/" + n
     pj = W + "/Exports/chars_phys52/%s/tpl/%s.tpl/%s.physics.json" % (n, n, n)
     mesh = unreal.load_asset(folder + "/" + n)
     if mesh is None or not os.path.exists(pj):

@@ -2,15 +2,15 @@
 # Duplicates the F46 template LS_TitusWalkFire into <dest>/LS_<name> (template untouched), then
 #  - swaps the generated pitchUp35 aim-pose section for the aim-hold clip named in docs/handoff/MUZZLE_AIM.tsv (column aimHoldClips),
 #  - re-attaches every MuzzleFlash binding to socket SM2_shootTip (flag tip -> SM2_tip) on the rifle (sockets via ew_socket.py).
-# Usage: uerun.ps1 ue_seq_fire.py <muzzle_aim.tsv>,<cls>[,shootTip|tip[,dest[,frame]]]   (dest default /Game/SM2_Work/Sequences/BoltRifleFire)
+# Usage: uerun.ps1 ue_seq_fire.py <muzzle_aim.tsv>,<cls>[,shootTip|tip[,dest[,frame]]]   (dest default /Game/ForgeLens/SM2/Sequences/BoltRifleFire)
 # Prints R59 lines; [frame] opens the sequence and parks the playhead there (for a screenshot).
 import sys
 try:
     import unreal
 except ImportError:  # unit tests (aim_clip only)
     unreal = None
-TEMPLATE = "/Game/SM2_Work/Sequences/TitusWalkFire/LS_TitusWalkFire"
-CLIPDIRS = ["/Game/SM2_Work/Sequences/TitusWalkFire/Anims"]
+TEMPLATE = "/Game/ForgeLens/SM2/Sequences/TitusWalkFire/LS_TitusWalkFire"
+CLIPDIRS = ["/Game/ForgeLens/SM2/Sequences/TitusWalkFire/Anims"]
 PREFIX = "cc_titus_assault__"
 
 def aim_clip(tsv, cls):
@@ -27,7 +27,7 @@ def find_anim(name):
         if unreal.EditorAssetLibrary.does_asset_exist(p): return unreal.load_asset(p)
     raise SystemExit("R59 clip not imported: " + name + " (export with SM2Extractor --anim and import under " + CLIPDIRS[0] + ")")
 
-def build(tsv, cls, which="shootTip", dest="/Game/SM2_Work/Sequences/BoltRifleFire", frame=None):
+def build(tsv, cls, which="shootTip", dest="/Game/ForgeLens/SM2/Sequences/BoltRifleFire", frame=None):
     sock = "SM2_" + which
     clip = aim_clip(tsv, cls); anim = find_anim(clip)
     name = "LS_" + cls.replace("_client.cls", "")
@@ -56,5 +56,5 @@ def build(tsv, cls, which="shootTip", dest="/Game/SM2_Work/Sequences/BoltRifleFi
 if __name__ == "__main__":
     a = sys.argv[1:]
     if len(a) == 1: a = a[0].split(",")  # uerun.ps1 passes one comma-joined arg
-    build(a[0], a[1], a[2] if len(a) > 2 else "shootTip", a[3] if len(a) > 3 else "/Game/SM2_Work/Sequences/BoltRifleFire",
+    build(a[0], a[1], a[2] if len(a) > 2 else "shootTip", a[3] if len(a) > 3 else "/Game/ForgeLens/SM2/Sequences/BoltRifleFire",
           a[4] if len(a) > 4 else None)

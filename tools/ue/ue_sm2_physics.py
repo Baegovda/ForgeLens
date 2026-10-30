@@ -1,6 +1,6 @@
 # Check / set up the SM2 secondary physics of an imported character in Unreal (UE 5.4+).
 # usage (UEMCP ue_python): sys.argv = ['x', <{model}.physics.json>, <skeletal mesh asset>,
-#                                      [dest=/Game/SM2_Work/Tests/physics], [verify|physasset|assign]]
+#                                      [dest=/Game/ForgeLens/SM2/Tests/physics], [verify|physasset|assign]]
 #
 # The exporter (SM2Extractor export / SM2Browser export, physics on by default) already BAKES the game's secondary
 # motion into the files, so nothing has to run in Unreal for it to play:
@@ -60,7 +60,7 @@ def assign(mesh, pa_path):
     ok = unreal.EditorAssetLibrary.save_loaded_asset(mesh, only_if_is_dirty=False)
     return "assigned %s (was %s)%s" % (pa_path, curn or "None", "" if ok else " SAVE FAILED")
 
-def run(json_path, mesh_path, dest="/Game/SM2_Work/Tests/physics", mode="verify"):
+def run(json_path, mesh_path, dest="/Game/ForgeLens/SM2/Tests/physics", mode="verify"):
     data = json.load(open(json_path, encoding="utf-8"))
     mesh = unreal.load_asset(mesh_path)
     if mesh is None:
@@ -111,5 +111,5 @@ def run(json_path, mesh_path, dest="/Game/SM2_Work/Tests/physics", mode="verify"
 if __name__ == "__main__" or True:
     a = sys.argv[1:]
     if len(a) >= 2:
-        ok = run(a[0], a[1], a[2] if len(a) > 2 else "/Game/SM2_Work/Tests/physics", a[3] if len(a) > 3 else "verify")
+        ok = run(a[0], a[1], a[2] if len(a) > 2 else "/Game/ForgeLens/SM2/Tests/physics", a[3] if len(a) > 3 else "verify")
         print("SM2PHYS %s" % ("OK" if ok else "CHECK"))

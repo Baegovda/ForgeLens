@@ -17,8 +17,8 @@
 # Import the FBX as a skeletal mesh first (default settings, materials and
 # textures on). The script then replaces those slot materials. The third
 # argument is the content folder. It defaults to /Game/SM2/<mesh name>.
-# (The LibSaber dev tools in tools/ue pass the folder explicitly: /Game/SM2_Work/Characters/<mesh>
-# for skeletal characters, /Game/SM2_Work/Props/<mesh> for props; see HANDOFF.md "UE layout".)
+# (The LibSaber dev tools in tools/ue pass the folder explicitly: /Game/ForgeLens/SM2/Characters/<mesh>
+# for skeletal characters, /Game/ForgeLens/SM2/Props/<mesh> for props; see HANDOFF.md "UE layout".)
 
 import json
 import os
@@ -557,7 +557,7 @@ def apply_td_scalars(instance, slot):
         unreal.MaterialEditingLibrary.set_material_instance_scalar_parameter_value(instance, "NormalScale", float(nm))
     ei = (slot.get("tdScalars") or {}).get("emissiveIntensity")
     if ei is not None and first_map(slot, "emissive") is not None:  # R97: glt.emissive.intensity -> EmissiveStrength (units HEURISTIC; vortex orb ring 9)
-        unreal.MaterialEditingLibrary.set_material_instance_scalar_parameter_value(instance, "EmissiveStrength", float(ei))
+        unreal.MaterialEditingLibrary.set_material_instance_scalar_parameter_value(instance, "EmissiveStrength", min(float(ei), 50.0))  # R97a: cap; game units unknown (exalted body_01_6 = 1500)
 
 
 def find_scheme(sidecar_path):

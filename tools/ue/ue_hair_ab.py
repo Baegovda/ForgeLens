@@ -1,10 +1,10 @@
 # Hair A/B helper (material finishing 2): duplicates the cc_calgar-style hair instances (slots with UseAnisoSpec on)
-# into /Game/SM2_Work/Tests/mat2_hair/<asset>/<mode>/<MI>_off with some lobes switched off (originals untouched),
+# into /Game/ForgeLens/SM2/Tests/mat2_hair/<asset>/<mode>/<MI>_off with some lobes switched off (originals untouched),
 # for ue_cap_lit.py off=<folder>. Modes: nosecond (UseSecondSpec off), noaniso (UseAnisoSpec/UseAnisoDirMap off), nospec (all three off).
 import unreal, sys
 asset, mode = sys.argv[1], sys.argv[2]
-mesh = unreal.load_asset(f"/Game/SM2_Work/Characters/{asset}/{asset}")
-dst = f"/Game/SM2_Work/Tests/mat2_hair/{asset}/{mode}"
+mesh = unreal.load_asset(f"/Game/ForgeLens/SM2/Characters/{asset}/{asset}")
+dst = f"/Game/ForgeLens/SM2/Tests/mat2_hair/{asset}/{mode}"
 mel = unreal.MaterialEditingLibrary; eal = unreal.EditorAssetLibrary
 offs = {"nosecond": ("UseSecondSpec",), "noaniso": ("UseAnisoSpec", "UseAnisoDirMap"), "nospec": ("UseSecondSpec", "UseAnisoSpec", "UseAnisoDirMap")}[mode]
 n = 0
