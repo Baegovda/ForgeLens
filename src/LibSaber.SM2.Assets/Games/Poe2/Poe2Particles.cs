@@ -250,6 +250,7 @@ public static class Poe2Particles
   ///   points over particle life (PROVEN layout, arc_02/impact_midup.pet). Units cm and cm/s (x0.01). colour = 7 hex AARRGGBB
   ///   (INFERRED byte order). velocity/acceleration graphs use their mean (SM2 sim has constant speed + gravity).
   /// </summary>
+  private static readonly float CpuFactor = float.TryParse(Environment.GetEnvironmentVariable("FL_POE2_FX_CPU"), System.Globalization.CultureInfo.InvariantCulture, out var cf) ? cf : 1f;
   private static void Cpu(Poe2Reader reader, Result res, string pet, JsonElement ce, int n, Matrix4x4 at)
   {
     var kv = new Dictionary<string, string[]>(StringComparer.Ordinal);
@@ -296,7 +297,7 @@ public static class Poe2Particles
       frameMode = FrameMode.AgeSpline;
       spline = new ScalarParam(new Curve1([0f, 0f, 1f, fx * fy - 0.01f]), Vector2.Zero);
     }
-    var blend = (kv.TryGetValue("blend_type", out var bt) ? bt.FirstOrDefault() : "") switch { "AdditiveBlend" => EffectBlend.Add, "AlphaBlend" => EffectBlend.Blend, _ => EffectBlend.BlendAdd };
+    var blend = (kv.TryGetValue("blend_type", out var bt) ? bt.FirstOrDefault() : "") switch { "AdditiveBlend" => EffectBlend.BlendAdd /* M2 E: the textures carry an alpha mask (fw, lightning_bolts_vert: white RGB, alpha 2-7%); pure Add drew white squares */, "AlphaBlend" => EffectBlend.Blend, _ => EffectBlend.BlendAdd };
     var infinite = One("is_infinite", 0) != 0;
     var name = $"{Path.GetFileNameWithoutExtension(pet)}_c{n}";
     var face = kv.TryGetValue("face_type", out var ft) ? ft.FirstOrDefault() ?? "" : "";
@@ -313,8 +314,8 @@ public static class Poe2Particles
       Size = new ScalarParam(Life7(G("scale"), Poe2Reader.Scale * Math.Max(0.01f, One("emit_scale", 1))), new Vector2(-1, 1) * One("scale_variance", 0) * Poe2Reader.Scale),
       Texture = tex, Blend = blend,
       Color = new ColorCurve(flatC.ToArray()),
-      // HEURISTIC: CPU emitters stack many full-bright additive layers (arc impact: 7); 0.35 keeps them out of clipping.
-      ColorIntensity = ScalarParam.Constant(Intensity * ti * 0.35f),
+      // HEURISTIC: CPU emitter intensity factor (env FL_POE2_FX_CPU, default 1). It was 0.35 while AdditiveBlend ignored the alpha masks (white squares).
+      ColorIntensity = ScalarParam.Constant(Intensity * ti * CpuFactor),
       FrameMode = frameMode, FrameSpline = spline,
       RandomFlip = One("random_flip_x", 0) != 0,
       RotationAngle = new Vector2(0, 360),
@@ -322,6 +323,13 @@ public static class Poe2Particles
       Gravity = new Vector3(0, (acc.Length > 0 ? acc.Average() : 0) * Poe2Reader.Scale, 0),
     });
     res.Notes.Add($"{name}: CPU {Str(ce, "emitter_type")} rate {rate:0.#} life {life:0.00}s v {speed:0.00}m/s size {G("scale").DefaultIfEmpty(0).Max() * Poe2Reader.Scale:0.00}m tex {tex ?? "-"} {blend} face {face}");
+  }
+
+  /// <summary>Columns of an "_Nx1_" lightning sheet (0 when the name has no such grid).</summary>
+  public static int StripColumns(string tex)
+  {
+    var m = System.Text.RegularExpressions.Regex.Match(Path.GetFileName(tex), @"_(\d+)x1_", System.Text.RegularExpressions.RegexOptions.IgnoreCase);
+    return m.Success ? int.Parse(m.Groups[1].Value) : 0;
   }
 
   private static void Trl(Poe2Reader reader, Result res, string trl, Matrix4x4 at)
@@ -337,6 +345,7 @@ public static class Poe2Particles
       var mat = S("material");
       var g = Graphs(reader, mat);
       var tex = TextureOf(g);
+      if (tex != null && StripColumns(tex) > 1 && g.Any(x => x.Graph.StartsWith("LIGHTNING_", StringComparison.Ordinal))) tex += "#strip";
       var width = TrlCurve(S("scale"));
       var name = $"{Path.GetFileNameWithoutExtension(trl)}_t{n}";
       var blend = g.Any(x => x.Graph is "ForceAlpha" or "ForceAlphaBlendNoGI") ? EffectBlend.Blend : EffectBlend.BlendAdd;
@@ -371,6 +380,13 @@ public static class Poe2Particles
           case "Vibrance_Albedo" or "Vibrance_Albedo_PreLight":
           if (ps.TryGetValue("- Hue", out var h) && Vec(h) is { } hv) tint *= hv;
           intensity *= Math.Max(0.1f, Val(ps, "- Intensity", 1)); break;
+        case "LIGHTNING_Main" when ps.TryGetValue("02. Lightning Color", out var lc) && Vec(lc) is { } lv:
+          {
+            // M2 E HEURISTIC: linear bolt colour (spark: 0.023/0.032/0.11) times a sparse 4x1 strip (mean texel ~4%): the hue is
+            // the colour normalised to max 1, and the strength is max*100 (the shader's decay power makes the core white-hot, not modelled).
+            var mx = Math.Max(1e-4f, Math.Max(lv.X, Math.Max(lv.Y, lv.Z)));
+            tint *= lv / mx; intensity *= mx * 100f; break;
+          }
         case "Channel_LookUpColor" when ps.TryGetValue("Color Look Up RGB", out var lu):
           {
             // HEURISTIC: luminance -> RGB ramp sampled at 0.7 (a bright texel) as a constant tint, max channel normalised to 1

@@ -94,3 +94,12 @@ handoff/poe2_m2/monsters6_sheet.png shows bind pose and the first clip at t=0.5 
 | ramgiant | 56 | 46 | 5160 | bind good; Wheel_attack_01 pose is crouched; plausible, not checked against the game |
 | lichboss | 115 | 42 | 50294 | renders almost black, same class as BellCrow (dark albedo plus missing SSS/spec/emissive shading), OPEN |
 
+
+### Step E.4: weak effects (handoff/poe2_m2/fx_sheets_e.png, fx_spark_e.png, fx_vfxbench_e.txt)
+
+- Arc impact overexposed: fixed. The CPU .pet AdditiveBlend now maps to SM2 BlendAdd. fw.dds and lightning_bolts_vert.dds are white RGB with an alpha mask (alpha mean 2-7%), and pure Add drew them as white squares. The 0.35 CPU damping is gone (FL_POE2_FX_CPU, default 1). The bolts and the ring now read clearly.
+- Spark invisible: fixed, but it is faint. The projectile is only the trail sparkLightning_xtra (lightningSpark.mat, LIGHTNING_Main). The 4x1 strip sheet now uses one column, rotated so the bolt runs along the trail (texture suffix #strip, from TRAIL_UVSelect Rotate UV 0.5). The colour is LIGHTNING_Main '02. Lightning Color' (0.023/0.032/0.11) normalised; strength is max*100 (HEURISTIC). The shader's decay power / white-hot core is not modelled.
+- Smoke flat tint: NOT fixed. It is still a constant tint from SIM_Smoke2 04.Albedo_RGB; the lit SIM normal/density shading is not modelled.
+- Stormblast explosion: the grey octagon in the first frames is also in the older step-D sheet, so it is not a regression. It is OPEN (probably a flash/glow card without a soft mask).
+- All six benches are deterministic. Firebolt, impact and wind spear are unchanged.
+

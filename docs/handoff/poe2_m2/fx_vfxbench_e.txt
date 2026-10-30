@@ -1,0 +1,98 @@
+vfxbench 2026-10-31 06:09:35: effects 0 aliases 0
+GL: ANGLE (NVIDIA, NVIDIA GeForce RTX 4090 (0x00002684) Direct3D11 vs_5_0 ps_5_0, D3D11-32.0.16.1088) | OpenGL ES 3.0.0 (ANGLE 2.1.22045 git hash: 4a177dd16290) | MSAA 8x | aniso 16x
+  poe2 greater_proj_e1_meshsprite: ConstantFlow rate 5 burst 0 life 0.20-0.20s r 0.00m v 0.00m/s size 0.5 tex Art/particles/FXLib/glow/glow_star_015_BC7.dds BlendAdd
+  poe2 greater_proj_e2: ConstantFlow rate 113.8 burst 0 life 1.50-3.00s r 0.00m v 0.00m/s size 1 tex Art/particles/FXLib/powdery/powder_sparkFB_01_BC7.dds BlendAdd
+  poe2 greater_proj_e3: ConstantFlow rate 30 burst 0 life 0.60-0.60s r 0.00m v 0.00m/s size 7 tex Art/particles/distortion/supercaustics_gradient_alpha_DXT5.dds BlendAdd (distortion, hidden)
+  poe2 greater_proj_e4: ConstantFlow rate 50 burst 0 life 0.20-0.30s r 0.02m v 0.00m/s size 5 tex Art/particles/ember/fire_bits_2X2_DXT5.dds#lum Add
+  poe2 greater_trail_t1: trail length 8.00m width 0.30m tex Art/particles/FXLib/tileables/noise_caustic_01_BC7.dds
+  poe2 greater_trail_t2: trail length 5.00m width 0.33m tex Art/particles/FXLib/tileables/tile_trail_013_BC7.dds
+Metadata/Effects/Spells/fire_fireball/ao/greater.ao: emitters 4 (sprite 4, mesh 0, other 0) lights 0 trails 2 covering 0 other 0 [] duration 6.00s capture 1.20s missing textures [] missing meshes []
+  t=0.075s particles 10 quads 16 meshes 0 batches 4 (trail 2 spark 0) lights 0 distortion 0 vatDraws(cum) 0
+  t=0.225s particles 35 quads 59 meshes 0 batches 5 (trail 2 spark 0) lights 0 distortion 0 vatDraws(cum) 0
+  t=0.375s particles 55 quads 97 meshes 0 batches 5 (trail 2 spark 0) lights 0 distortion 0 vatDraws(cum) 0
+  t=0.525s particles 72 quads 132 meshes 0 batches 5 (trail 2 spark 0) lights 0 distortion 0 vatDraws(cum) 0
+  t=0.675s particles 89 quads 147 meshes 0 batches 5 (trail 2 spark 0) lights 0 distortion 0 vatDraws(cum) 0
+  t=0.825s particles 105 quads 155 meshes 0 batches 5 (trail 2 spark 0) lights 0 distortion 0 vatDraws(cum) 0
+  t=0.975s particles 122 quads 173 meshes 0 batches 5 (trail 2 spark 0) lights 0 distortion 0 vatDraws(cum) 0
+  t=1.125s particles 140 quads 197 meshes 0 batches 5 (trail 2 spark 0) lights 0 distortion 0 vatDraws(cum) 0
+  peak particles 140; sim 0.006 ms/step (60 Hz); sprite build mean 1.44 ms; GPU draw+finish mean 15.81 ms max 119.83 ms; deterministic yes
+  poe2 greater_impact_e1: Explosion rate 0 burst 32 life 1.00-1.00s r 0.00m v 7.00m/s size 15 tex Art/particles/distortion/supercaustics_gradient_alpha_DXT5.dds BlendAdd (distortion, hidden)
+  poe2 greater_impact_e2_meshsprite: Explosion rate 0 burst 1 life 1.20-1.20s r 0.00m v 0.00m/s size 2.5 tex Art/particles/FXLib/glow/glow_star_015_BC7.dds Blend (face_lock Z / tileable mask, hidden)
+  poe2 greater_impact_e3: Explosion rate 0 burst 32 life 0.20-0.55s r 0.00m v 7.50m/s size 14.38 tex Art/particles/ember/fire_bits_2X2_DXT5.dds#lum Add
+  poe2 greater_impact_e4: Explosion rate 0 burst 1 life 0.12-0.12s r 0.00m v 0.00m/s size 60 tex Art/particles/FXLib/glow/glow_star_015_BC7.dds BlendAdd
+  poe2 greater_impact_e5: Explosion rate 0 burst 1 life 0.15-0.15s r 0.00m v 0.00m/s size 70 tex Art/particles/distortion/zoom_distort_2.dds BlendAdd (distortion, hidden)
+  poe2 greater_impact_e6: Explosion rate 0 burst 16 life 1.75-2.75s r 0.30m v 4.67m/s size 25 tex Art/particles/FXLib/smoke_SIM/SIM_billow_01_8X8_BC7.dds Blend
+  poe2 greater_impact_e7: Explosion rate 0 burst 1 life 0.35-0.35s r 0.00m v 0.00m/s size 40 tex Art/particles/FXLib/tileables/noise_caustic_01_BC7.dds#lum Add (face_lock Camera / tileable mask, hidden)
+  poe2 greater_impact_e8_meshsprite: Explosion rate 0 burst 1 life 0.20-0.20s r 0.00m v 0.00m/s size 2.11 tex Art/particles/FXLib/glow/glow_star_015_BC7.dds BlendAdd
+  poe2 greater_impact_e9: Explosion rate 0 burst 128 life 1.50-4.00s r 0.00m v 0.00m/s size 1 tex Art/particles/FXLib/powdery/powder_sparkFB_01_BC7.dds BlendAdd
+  poe2 greater_impact_e10: Explosion rate 0 burst 1 life 0.30-0.30s r 0.00m v 0.00m/s size 50 tex Art/particles/FXLib/tileables/noise_caustic_01_BC7.dds Blend (face_lock None / tileable mask, hidden)
+Metadata/Effects/Spells/fire_fireball/ao/impact_greater.ao: emitters 10 (sprite 10, mesh 0, other 0) lights 0 trails 0 covering 0 other 0 [] duration 4.00s capture 1.20s missing textures [] missing meshes []
+  t=0.075s particles 178 quads 178 meshes 0 batches 5 (trail 0 spark 0) lights 0 distortion 0 vatDraws(cum) 0
+  t=0.225s particles 176 quads 176 meshes 0 batches 3 (trail 0 spark 0) lights 0 distortion 0 vatDraws(cum) 0
+  t=0.375s particles 159 quads 159 meshes 0 batches 3 (trail 0 spark 0) lights 0 distortion 0 vatDraws(cum) 0
+  t=0.525s particles 147 quads 147 meshes 0 batches 3 (trail 0 spark 0) lights 0 distortion 0 vatDraws(cum) 0
+  t=0.675s particles 144 quads 144 meshes 0 batches 2 (trail 0 spark 0) lights 0 distortion 0 vatDraws(cum) 0
+  t=0.825s particles 144 quads 144 meshes 0 batches 2 (trail 0 spark 0) lights 0 distortion 0 vatDraws(cum) 0
+  t=0.975s particles 144 quads 144 meshes 0 batches 2 (trail 0 spark 0) lights 0 distortion 0 vatDraws(cum) 0
+  t=1.125s particles 144 quads 144 meshes 0 batches 2 (trail 0 spark 0) lights 0 distortion 0 vatDraws(cum) 0
+  peak particles 178; sim 0.006 ms/step (60 Hz); sprite build mean 0.14 ms; GPU draw+finish mean 1.99 ms max 10.72 ms; deterministic yes
+  poe2 sparkLightning_xtra_t1: trail length 2.78m width 1.00m tex Art/particles/FXLib/lightning/strike05_4x1_2048_BC7.dds#strip
+  poe2 sparkLightning_xtra_t2: trail length 0.00m width 0.05m tex Art/particles/FXLib/tileables/noise_crater_01_BC7.dds
+Metadata/Effects/Spells/lightning_spark/spark_projectile.ao: emitters 0 (sprite 0, mesh 0, other 0) lights 0 trails 2 covering 0 other 0 [] duration 2.00s capture 1.50s missing textures [] missing meshes []
+  t=0.094s particles 0 quads 5 meshes 0 batches 2 (trail 2 spark 0) lights 0 distortion 0 vatDraws(cum) 0
+  t=0.281s particles 0 quads 11 meshes 0 batches 2 (trail 2 spark 0) lights 0 distortion 0 vatDraws(cum) 0
+  t=0.469s particles 0 quads 11 meshes 0 batches 2 (trail 2 spark 0) lights 0 distortion 0 vatDraws(cum) 0
+  t=0.656s particles 0 quads 2 meshes 0 batches 1 (trail 1 spark 0) lights 0 distortion 0 vatDraws(cum) 0
+  t=0.844s particles 0 quads 8 meshes 0 batches 2 (trail 2 spark 0) lights 0 distortion 0 vatDraws(cum) 0
+  t=1.031s particles 0 quads 11 meshes 0 batches 2 (trail 2 spark 0) lights 0 distortion 0 vatDraws(cum) 0
+  t=1.219s particles 0 quads 11 meshes 0 batches 2 (trail 2 spark 0) lights 0 distortion 0 vatDraws(cum) 0
+  t=1.406s particles 0 quads 5 meshes 0 batches 1 (trail 1 spark 0) lights 0 distortion 0 vatDraws(cum) 0
+  peak particles 0; sim 0.001 ms/step (60 Hz); sprite build mean 0.05 ms; GPU draw+finish mean 0.89 ms max 3.25 ms; deterministic yes
+  poe2 impact_midup_c1: CPU PointEmitter rate 168.1 life 0.09s v 0.00m/s size 1.10m tex Art/particles/arc_02/flash_mid.dds BlendAdd face FaceCamera
+  poe2 impact_midup_c2: CPU PointEmitter rate 168.1 life 0.30s v 0.00m/s size 2.73m tex Art/particles/arc_02/light_gradient.dds BlendAdd face FaceCamera
+  poe2 impact_midup_c3: CPU PointEmitter rate 148.1 life 0.20s v 0.00m/s size 1.70m tex Art/particles/arc_02/light_ring_add.dds BlendAdd face FaceCamera
+  poe2 impact_midup_c4: CPU PointEmitter rate 490 life 0.55s v 0.98m/s size 0.04m tex Art/particles/arc_02/lightning_spark.dds BlendAdd face FaceCamera
+  poe2 impact_midup_c5: CPU PointEmitter rate 168.1 life 0.12s v 0.00m/s size 0.79m tex Art/particles/distortion/warp_cirlce_3d.dds Blend face FaceCamera
+  poe2 impact_midup_c6: CPU PointEmitter rate 302.5 life 0.10s v 0.00m/s size 1.98m tex Art/particles/arc_02/lightning_bolts_vert.dds BlendAdd face FaceCamera
+  poe2 impact_midup_c7: CPU PointEmitter rate 282.6 life 0.20s v 0.00m/s size 2.74m tex Art/particles/arc_02/fw.dds BlendAdd face FaceCamera
+Metadata/Effects/Spells/arc_02/arcimpact.ao: emitters 7 (sprite 7, mesh 0, other 0) lights 0 trails 0 covering 0 other 0 [] duration 0.62s capture 0.50s missing textures [] missing meshes []
+  t=0.031s particles 23 quads 18 meshes 0 batches 6 (trail 0 spark 0) lights 0 distortion 0 vatDraws(cum) 0
+  t=0.094s particles 23 quads 23 meshes 0 batches 6 (trail 0 spark 0) lights 0 distortion 0 vatDraws(cum) 0
+  t=0.156s particles 16 quads 16 meshes 0 batches 4 (trail 0 spark 0) lights 0 distortion 0 vatDraws(cum) 0
+  t=0.219s particles 12 quads 12 meshes 0 batches 4 (trail 0 spark 0) lights 0 distortion 0 vatDraws(cum) 0
+  t=0.281s particles 10 quads 10 meshes 0 batches 2 (trail 0 spark 0) lights 0 distortion 0 vatDraws(cum) 0
+  t=0.344s particles 8 quads 8 meshes 0 batches 1 (trail 0 spark 0) lights 0 distortion 0 vatDraws(cum) 0
+  t=0.406s particles 8 quads 8 meshes 0 batches 1 (trail 0 spark 0) lights 0 distortion 0 vatDraws(cum) 0
+  t=0.469s particles 8 quads 7 meshes 0 batches 1 (trail 0 spark 0) lights 0 distortion 0 vatDraws(cum) 0
+  peak particles 23; sim 0.002 ms/step (60 Hz); sprite build mean 0.14 ms; GPU draw+finish mean 1.27 ms max 4.01 ms; deterministic yes
+  poe2 storm_explosion_e1: Explosion rate 0 burst 1 life 0.10-0.10s r 0.00m v 0.00m/s size 25 tex Art/particles/FXLib/glow/glow_star_015_BC7.dds Blend
+  poe2 storm_explosion_e2_meshsprite: Explosion rate 0 burst 4 life 0.25-0.41s r 0.00m v 1.43m/s size 0.2 tex Art/particles/FXLib/lightning/strike05_4x1_1024_BC7.dds Add
+  poe2 storm_explosion_e3: Explosion rate 0 burst 1 life 0.35-0.35s r 0.00m v 0.00m/s size 30 tex - BlendAdd
+  poe2 storm_explosion_e4_meshsprite: Explosion rate 0 burst 1 life 0.35-0.35s r 0.00m v 0.00m/s size 1 tex Art/particles/distortion/turbulent_flow_BC7.dds BlendAdd (distortion, hidden)
+  poe2 storm_explosion_e5_meshsprite: Explosion rate 0 burst 1 life 0.15-0.15s r 0.00m v 0.00m/s size 2.27 tex Art/particles/FXLib/glow/glow_star_015_BC7.dds Add
+  poe2 storm_explosion_e6: Explosion rate 0 burst 16 life 1.50-3.00s r 0.00m v 0.00m/s size 1 tex Art/particles/FXLib/powdery/powder_sparkFB_01_BC7.dds BlendAdd
+  poe2 storm_explosion_e7_meshsprite: Explosion rate 0 burst 16 life 0.15-0.55s r 0.45m v 0.00m/s size 0.49 tex Art/particles/FXLib/lightning/strike02_4x1_1024_DXT5.dds Blend
+Metadata/Effects/Spells/crossbow_stormblast/explosion.ao: emitters 7 (sprite 7, mesh 0, other 0) lights 0 trails 0 covering 0 other 0 [] duration 3.00s capture 1.50s missing textures [] missing meshes []
+  t=0.094s particles 39 quads 39 meshes 0 batches 6 (trail 0 spark 0) lights 0 distortion 0 vatDraws(cum) 0
+  t=0.281s particles 36 quads 36 meshes 0 batches 4 (trail 0 spark 0) lights 0 distortion 0 vatDraws(cum) 0
+  t=0.469s particles 23 quads 23 meshes 0 batches 2 (trail 0 spark 0) lights 0 distortion 0 vatDraws(cum) 0
+  t=0.656s particles 16 quads 16 meshes 0 batches 1 (trail 0 spark 0) lights 0 distortion 0 vatDraws(cum) 0
+  t=0.844s particles 16 quads 16 meshes 0 batches 1 (trail 0 spark 0) lights 0 distortion 0 vatDraws(cum) 0
+  t=1.031s particles 16 quads 16 meshes 0 batches 1 (trail 0 spark 0) lights 0 distortion 0 vatDraws(cum) 0
+  t=1.219s particles 16 quads 16 meshes 0 batches 1 (trail 0 spark 0) lights 0 distortion 0 vatDraws(cum) 0
+  t=1.406s particles 16 quads 16 meshes 0 batches 1 (trail 0 spark 0) lights 0 distortion 0 vatDraws(cum) 0
+  peak particles 39; sim 0.002 ms/step (60 Hz); sprite build mean 0.06 ms; GPU draw+finish mean 1.39 ms max 6.75 ms; deterministic yes
+  poe2 projectile_wind_e1_meshsprite: ConstantFlow rate 10 burst 0 life 0.10-0.10s r 0.00m v 0.00m/s size 1 tex Art/particles/FXLib/glow/glow_star_015_BC7.dds Blend
+  poe2 projectile_wind_e2_meshsprite: ConstantFlow rate 2 burst 0 life 0.40-0.60s r 0.00m v 0.00m/s size 0 tex Art/particles/FXLib/glow/glow_star_015_BC7.dds Blend
+  poe2 wind_spear_trail_t1: trail length 10.00m width 0.05m tex Art/particles/FXLib/tileables/noise_cell_01.dds
+  poe2 wind_spear_trail_t2: trail length 10.00m width 0.05m tex Art/particles/FXLib/tileables/tile_wind_01_BC7.dds
+Metadata/Effects/Spells/spear_wind_spear/projectile.ao: emitters 2 (sprite 2, mesh 0, other 0) lights 0 trails 2 covering 0 other 0 [] duration 3.60s capture 1.20s missing textures [] missing meshes []
+  t=0.075s particles 0 quads 6 meshes 0 batches 2 (trail 2 spark 0) lights 0 distortion 0 vatDraws(cum) 0
+  t=0.225s particles 1 quads 25 meshes 0 batches 3 (trail 2 spark 0) lights 0 distortion 0 vatDraws(cum) 0
+  t=0.375s particles 1 quads 43 meshes 0 batches 3 (trail 2 spark 0) lights 0 distortion 0 vatDraws(cum) 0
+  t=0.525s particles 2 quads 60 meshes 0 batches 3 (trail 2 spark 0) lights 0 distortion 0 vatDraws(cum) 0
+  t=0.675s particles 2 quads 51 meshes 0 batches 3 (trail 2 spark 0) lights 0 distortion 0 vatDraws(cum) 0
+  t=0.825s particles 2 quads 62 meshes 0 batches 3 (trail 2 spark 0) lights 0 distortion 0 vatDraws(cum) 0
+  t=0.975s particles 2 quads 71 meshes 0 batches 3 (trail 2 spark 0) lights 0 distortion 0 vatDraws(cum) 0
+  t=1.125s particles 2 quads 81 meshes 0 batches 3 (trail 2 spark 0) lights 0 distortion 0 vatDraws(cum) 0
+  peak particles 2; sim 0.003 ms/step (60 Hz); sprite build mean 0.08 ms; GPU draw+finish mean 0.94 ms max 2.14 ms; deterministic yes
