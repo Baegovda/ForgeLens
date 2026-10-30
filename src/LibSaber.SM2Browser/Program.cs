@@ -45,21 +45,13 @@ internal static class Program
   }
 
   /// <summary>
-  ///   R94: caps the .NET thread pool (Parallel.For, Task.Run) at SM2_THREADS workers (default cores - 2, at least 2) so a
-  ///   model open or level build leaves cores for the game / editor. SM2_THREADS=0 = no cap. Native threads (GPU driver,
-  ///   ANGLE, audio) are not affected.
+  ///   R94 cap replaced in R95 by <see cref="PerfBudget"/>: Auto = every logical processor (settings window "Performance",
+  ///   SM2_THREADS overrides). Note: the R94 SetMaxThreads(cores - 2) call returned false (.NET rejects a max below the
+  ///   core count), so the R94 cap never applied.
   /// </summary>
-  internal static int ThreadCap { get; private set; }
+  internal static int ThreadCap => PerfBudget.Threads;
 
-  private static void ApplyThreadCap()
-  {
-    var cap = int.TryParse(Environment.GetEnvironmentVariable("SM2_THREADS"), out var t) ? t : Math.Max(2, Environment.ProcessorCount - 2);
-    if (cap <= 0) return;
-    ThreadPool.GetMinThreads(out _, out var minIo);
-    ThreadPool.GetMaxThreads(out _, out var maxIo);
-    ThreadPool.SetMinThreads(Math.Min(cap, Environment.ProcessorCount), minIo);
-    if (ThreadPool.SetMaxThreads(cap, maxIo)) ThreadCap = cap;
-  }
+  private static void ApplyThreadCap() => PerfBudget.Init(BrowserSettings.Load());
 
   public static AppBuilder BuildAvaloniaApp()
     => AppBuilder.Configure<App>()

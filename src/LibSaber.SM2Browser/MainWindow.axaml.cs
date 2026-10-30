@@ -964,8 +964,8 @@ public partial class MainWindow : Window
     // R76: decode in parallel (was serial; mip-0 decode was 70-80 % of a character open). Same images, same insert order.
     var pairs = wanted.ToArray();
     var images = new PreviewImage?[pairs.Length];
-    Parallel.For(0, pairs.Length, new ParallelOptions { MaxDegreeOfParallelism = Math.Clamp(Environment.ProcessorCount / 2, 1, 8) },
-      i => { images[i] = LoadPreviewImage(catalog, store, hint, pairs[i].Key, pairs[i].Value); if (images[i] is { } im) Gpu.GlPreview.Prepare(im); }); // R94: BC encode here, not on the UI thread
+    Parallel.For(0, pairs.Length, PerfBudget.Cpu, // R95: was Math.Clamp(cores / 2, 1, 8); now Threads + memory budget (PerfBudget.Heavy)
+      i => images[i] = PerfBudget.Heavy(() => { var im = LoadPreviewImage(catalog, store, hint, pairs[i].Key, pairs[i].Value); if (im is not null) Gpu.GlPreview.Prepare(im); return im; })); // R94: BC encode here, not on the UI thread
     for (var i = 0; i < pairs.Length; i++)
     {
       var pair = pairs[i];

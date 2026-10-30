@@ -114,6 +114,9 @@ public partial class MainWindow
     menu.Items.Add(Check("Cloth vertices (physics)", () => _ue.ShowClothVerts, UeShowClothVerts)); // R83
     menu.Items.Add(Check("Compressed textures (lighter GPU memory)", () => Gpu.GlPreview.TexBc, UeSetCompressedTextures)); // R87
     show.Flyout = menu;
+    var settingsBtn = new Button { Content = "Settings", FontSize = 11, Height = 26, Padding = new Thickness(8, 0) }; // R95
+    ToolTip.SetTip(settingsBtn, "Settings: worker threads, max working memory");
+    settingsBtn.Click += (_, _) => new SettingsWindow(_settings).ShowDialog(this);
     var help = new Button { Content = "?", FontSize = 11, Height = 26, Width = 26, Padding = new Thickness(0) };
     ToolTip.SetTip(help, "Shortcuts (F1)");
     help.Click += (_, _) => UeToggleHelp();
@@ -121,7 +124,7 @@ public partial class MainWindow
     {
       Background = new SolidColorBrush(Color.Parse("#99101216")), CornerRadius = new CornerRadius(4), Padding = new Thickness(4), Margin = new Thickness(8),
       HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Top,
-      Child = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 4, Children = { _ueViewBox, show, BuildUePanelsButton(), help } },
+      Child = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 4, Children = { _ueViewBox, show, BuildUePanelsButton(), settingsBtn, help } },
     };
     bar.AddHandler(PointerPressedEvent, (_, e) => e.Handled = true, RoutingStrategies.Bubble);
     bar.Bind(IsVisibleProperty, HudInfo.GetObservable(IsVisibleProperty));

@@ -12,7 +12,10 @@ namespace LibSaber.SM2Browser.Effects;
 /// </summary>
 internal sealed class EffectTextures
 {
-  private readonly ConcurrentDictionary<string, Task<EffectImage>> _cache = new(StringComparer.OrdinalIgnoreCase);
+  private readonly ConcurrentDictionary<string, Task<EffectImage>> _cache = new(StringComparer.OrdinalIgnoreCase); // R95: completed entries evicted on PerfBudget.Pressure
+  private void EvictCompleted() { foreach (var kv in _cache) if (kv.Value.IsCompleted) _cache.TryRemove(kv.Key, out _); }
+  private bool _evictHooked;
+  private void HookEvict() { if (_evictHooked) return; _evictHooked = true; var w = new WeakReference<EffectTextures>(this); Action? h = null; h = () => { if (w.TryGetTarget(out var me)) me.EvictCompleted(); else PerfBudget.Pressure -= h; }; PerfBudget.Pressure += h; }
   private readonly Func<string, TextureDocument?> _resolve;
   public Action? Loaded { get; set; }
 
@@ -30,7 +33,7 @@ internal sealed class EffectTextures
   /// <summary>Null while decoding; a 0x0 image when the texture is missing (drawn white).</summary>
   public EffectImage? Get(string name)
   {
-    var task = _cache.GetOrAdd(name, n => Task.Run(() =>
+    HookEvict(); var task = _cache.GetOrAdd(name, n => Task.Run(() =>
     {
       var image = Decode(n);
       Loaded?.Invoke();

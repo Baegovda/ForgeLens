@@ -54,6 +54,9 @@ public sealed class BrowserSettings
   /// <summary>propanim: context view "Prop anim" (null = default on) and the last playback condition (null/Auto).</summary>
   public bool? PropAnim { get; set; }
   public string? PropCondition { get; set; }
+  /// <summary>R95: worker threads (null/0 = Auto) and working-memory budget in MB (null/0 = Auto), see PerfBudget.</summary>
+  public int? WorkerThreads { get; set; }
+  public int? MaxMemoryMB { get; set; }
 
   public static BrowserSettings Load()
   {

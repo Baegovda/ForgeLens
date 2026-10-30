@@ -41,7 +41,10 @@ internal sealed class EffectMesh
 /// <summary>Loads <c>nameGeomTpl</c> templates (and their .td materials) on worker threads, like <see cref="EffectTextures"/>.</summary>
 internal sealed class EffectMeshes
 {
-  private readonly ConcurrentDictionary<string, Task<EffectMesh>> _cache = new(StringComparer.OrdinalIgnoreCase);
+  private readonly ConcurrentDictionary<string, Task<EffectMesh>> _cache = new(StringComparer.OrdinalIgnoreCase); // R95: completed entries evicted on PerfBudget.Pressure
+  private void EvictCompleted() { foreach (var kv in _cache) if (kv.Value.IsCompleted) _cache.TryRemove(kv.Key, out _); }
+  private bool _evictHooked;
+  private void HookEvict() { if (_evictHooked) return; _evictHooked = true; var w = new WeakReference<EffectMeshes>(this); Action? h = null; h = () => { if (w.TryGetTarget(out var me)) me.EvictCompleted(); else PerfBudget.Pressure -= h; }; PerfBudget.Pressure += h; }
   private readonly Func<string, ExportedMesh?> _load;
   private readonly Func<string, string?> _td;
   public Action? Loaded { get; set; }
@@ -75,7 +78,7 @@ internal sealed class EffectMeshes
   /// <summary>Null while loading; <see cref="EffectMesh.Missing"/> when the template is not available.</summary>
   public EffectMesh? Get(string name)
   {
-    var task = _cache.GetOrAdd(name, n => Task.Run(() =>
+    HookEvict(); var task = _cache.GetOrAdd(name, n => Task.Run(() =>
     {
       EffectMesh mesh;
       try { mesh = Build(n); }
