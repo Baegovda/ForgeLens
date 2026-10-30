@@ -19,12 +19,13 @@ c.find_or_add_setting_by_class(unreal.MoviePipelineDeferredPassBase)
 c.find_or_add_setting_by_class(unreal.MoviePipelineImageSequenceOutput_PNG)
 aa = c.find_or_add_setting_by_class(unreal.MoviePipelineAntiAliasingSetting); aa.engine_warm_up_count = 32; aa.use_camera_cut_for_warm_up = False
 cvs = c.find_or_add_setting_by_class(unreal.MoviePipelineConsoleVariableSetting)
-for kv in (a[4].split(";") if len(a) > 4 else []):
+for kv in ([x for x in a[4].split(";") if x] if len(a) > 4 else []):
     k, v = kv.split("="); cvs.add_or_update_console_variable(k, float(v))
 if ev:
     cv = c.find_or_add_setting_by_class(unreal.MoviePipelineConsoleVariableSetting); cv.add_or_update_console_variable("r.ExposureOffset", ev)
 ex = sub.render_queue_with_executor(unreal.MoviePipelinePIEExecutor)
 print("R97M MRQ started", out, s, e, ex)
+
 
 
 
