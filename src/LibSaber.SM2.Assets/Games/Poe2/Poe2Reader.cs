@@ -109,7 +109,8 @@ public sealed partial class Poe2Reader
     {
       using var sm = Json(meshPath);
       var smd = sm.RootElement.GetProperty("smd_file").GetString()!;
-      var mats = sm.RootElement.GetProperty("materials").EnumerateArray().Select(m => m.GetProperty("mat_file").GetString()).ToList();
+      // M2 F: .sm materials[].unk1 is the number of consecutive shapes using that material (BellCrow: bell x2, body, accessories).
+    var mats = sm.RootElement.GetProperty("materials").EnumerateArray().SelectMany(m => Enumerable.Repeat(m.GetProperty("mat_file").GetString(), m.TryGetProperty("unk1", out var u) && u.ValueKind == JsonValueKind.Number && u.GetInt32() > 0 ? u.GetInt32() : 1)).ToList();
       using var smdDoc = Json(smd);
       var v = smdDoc.RootElement.GetProperty("section").EnumerateObject().First().Value;
       var dolm = v.GetProperty("dolm");
@@ -212,8 +213,10 @@ public sealed partial class Poe2Reader
       using var doc = Json(mat);
       foreach (var gi in doc.RootElement.GetProperty("graphinstances").EnumerateArray())
       {
+        if (gi.TryGetProperty("parent", out var gp0) && Path.GetFileName(gp0.GetString() ?? "").StartsWith("ForceAlphaTest", StringComparison.Ordinal)) part.Blend = "masked"; // M2 F: fur cards (no parameters)
         if (!gi.TryGetProperty("custom_parameters", out var cps) || cps.ValueKind != JsonValueKind.Array) continue;
         var graph = gi.TryGetProperty("parent", out var gp) ? Path.GetFileNameWithoutExtension(gp.GetString() ?? "") : "";
+        if (graph.StartsWith("ForceAlphaTest", StringComparison.Ordinal)) part.Blend = "masked"; // M2 F: fur cards, lich spikes
         foreach (var cp in cps.EnumerateArray())
         {
           var name = cp.GetProperty("name").GetString() ?? "";
@@ -223,6 +226,16 @@ public sealed partial class Poe2Reader
           {
             var k = mv.GetSingle();
             part.AlbedoTint = new[] { k, k, k, 1f };
+          }
+          // M2 F: GlowAdd = Glow_TEX * Glow_MULT1 * Glow_MULT3 (rgb), kept as TdScalars glow_r/g/b (export + preview).
+          if (graph == "GlowAdd" && name is "Glow_MULT1" or "Glow_MULT3" && cp.GetProperty("parameters").EnumerateArray().FirstOrDefault() is { ValueKind: JsonValueKind.Object } gv
+              && gv.TryGetProperty("value", out var gm))
+          {
+            float[] v = gm.ValueKind == JsonValueKind.Number ? new[] { gm.GetSingle(), gm.GetSingle(), gm.GetSingle() }
+              : gm.ValueKind == JsonValueKind.Array ? gm.EnumerateArray().Take(3).Select(x => x.GetSingle()).ToArray() : new[] { 1f, 1f, 1f };
+            if (v.Length == 3)
+              foreach (var (c, i) in new[] { ("glow_r", 0), ("glow_g", 1), ("glow_b", 2) })
+                part.TdScalars[c] = (part.TdScalars.TryGetValue(c, out var o) ? o : 1f) * v[i];
           }
           var path = cp.GetProperty("parameters").EnumerateArray()
             .Select(p => p.TryGetProperty("path", out var pp) ? pp.GetString() : null).FirstOrDefault(s => s != null);

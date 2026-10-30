@@ -120,3 +120,25 @@ handoff/poe2_m2/monsters6_sheet.png shows bind pose and the first clip at t=0.5 
 - Not done in UE: the TWEAK_Albedo tint (BellCrow x1.6), SSS/spec maps, masked fur, more than one clip per mesh (FBX export writes one clip), and a visual UE viewport check.
 - Result files: handoff/poe2_m2/ue_import_result.json and ue_import_check.json. Checker: tools/poe2/ue_poe2_check.py.
 
+
+## Step F (2026-10-31 06:4x-07:xx KST)
+
+### F.1 UE viewport check and fixes (handoff/poe2_m2/ue_cap_before.png, ue_cap_7monsters.png, ue_cap_masked.png)
+- Capture: Scripts/ue_cap_lit.py (SceneCapture2D into an RGBA8 render target, FINAL_COLOR_LDR, manual exposure, three tagged point lights; all of it removed by "export"). The editor lock was held only for the capture calls.
+- BellCrow "almost black" ROOT CAUSE: the .sm `materials[].unk1` is the number of consecutive shapes that use the material (bell x2, body, accessories). The reader mapped material i to shape i, so the bell got the body material and the body got the accessories material. It now expands by unk1 (Poe2Reader). The viewer now shows pale skin and bronze bells (bellcrow_matfix.png), and UE matches.
+- Lich darkness: the abyssal colour map really is dark (mean 36/35/38). GlowAdd (Glow_TEX x Glow_MULT1 x Glow_MULT3 = 1.02 x (1.89, 1.36, 0.97)) was ignored. It is now kept per part (TdScalars glow_r/g/b), added to the preview albedo (Poe2Bench.AddGlow; lich_glow.png), exported in poe2export.txt ("glow <tex> glowmult r,g,b") and wired to UE emissive.
+- Masked: ForceAlphaTest* graphs (they have no parameters, so they are checked before the parameter loop) set part.Blend = masked. UE uses M_Poe2Lit_v2_Masked (two-sided, opacity mask = albedo alpha) for the wolf (body + fur) and the lich.
+- UE master: /Game/ForgeLens/POE/_Shared/M_Poe2Lit_v2 = BaseColorTex x Tint (TWEAK_Albedo, BellCrow body 1.6), NormalTex (normal sampler), GlowTex x GlowColor -> emissive, roughness 0.8. The old M_Poe2Lit (v1) is no longer referenced by the MIs.
+- Orientation and scale: humanoids face -X, the wolf / rhoa / harpy side views come out as profiles in "front". This is how the source rigs are authored; the viewer shows the same. Heights are plausible (skeleton 189 cm, BellCrow 375 cm). Unchanged.
+- Not modelled in UE: SSS (SSSAdd), specular colour maps, anisotropic fur specular, NormalGlossAO gloss/AO channels (the normal map is used as a plain normal).
+
+### F.2 All clips in UE (FL_POE2_ALLCLIPS=1 --poe2export writes anims/<clip>.fbx)
+- /Game/ForgeLens/POE/<name>/Anims: bellcrow 73, wolfremake 30, basicskeleton 252, wingedrhoa 10, harpymonstergull 57, lichboss 42, ramgiant 46. Each folder also has the mesh FBX's own <name>_Anim.
+- The legacy FBX import goes through Interchange: walk_01 (0.533 s) failed with "not frame-border aligned at 12 fps". The anim import now sets snap_to_closest_frame_boundary and a custom sample rate of 30.
+- Cleanup: only our importer-created FBXLegacyPhongSurfaceMaterial MICs without referencers in /Game/ForgeLens/POE/<name> were deleted (36 total, listed in ue_exp2/res_*.json "removed"). Nothing outside /Game/ForgeLens/POE was touched.
+- Harpy attack_01: measured in Blender (tools/poe2/bl_stretch.py). Only R_thumb/R_finger joints translate up to 2.24x their rest offset at frame 10, with bone scale 1.0. Other harpy clips peak at 1.21 (jaw). These are authored translation keys (claw extension), not a decoder or bone-map bug: the same decoder plays 56 other clips cleanly. Left as is.
+- Harpy, lich and ramgiant were imported with the rest.
+
+### Incident: shared ue_args.json
+- Scripts/uerun.ps1 writes the SHARED C:\Users\Revaptor_FX\ue_args.json. During one of my calls (lock taken as poe2m2) that file had been overwritten by the SM2 worker, so the editor ran its C:\Users\Revaptor_FX\fl_r95fid\tools\ue\ue_r97_orbhub7.py once. It failed at its line 12 (LightingChannels read-only); lines 1-11 may have run. The SM2 worker apparently called uerun while the lock said poe2m2. PoE2 now uses tools/poe2/ue_poe2_call.ps1 (private args file per call).
+- Also: one diagnostic import call for wolfremake (about 6 s, re-importing our own folder) ran without taking the lock. Protocol slip, no conflict observed.

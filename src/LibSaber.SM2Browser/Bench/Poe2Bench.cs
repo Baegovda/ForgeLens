@@ -38,11 +38,35 @@ internal static class Poe2Bench
         log.AppendLine($"texture {tex} {img.Width}x{img.Height} -> {Path.GetFileName(png)}");
       }
       foreach (var p in mesh.Parts)
-        log.AppendLine($"part {p.Name} tris {p.IndexCount / 3} mat {p.Variant} albedo {p.Texture} normal {p.Normal}");
+        log.AppendLine($"part {p.Name} tris {p.IndexCount / 3} mat {p.Variant} albedo {p.Texture} normal {p.Normal}"
+          + (p.Emissive != null ? $" glow {p.Emissive} glowmult {G(p, "glow_r")},{G(p, "glow_g")},{G(p, "glow_b")}" : "")
+          + (p.Blend == "masked" ? " blend masked" : "")
+          + (p.AlbedoTint != null ? $" tint {p.AlbedoTint[0].ToString(System.Globalization.CultureInfo.InvariantCulture)}" : ""));
       GltfWriter.Write(Path.Combine(output, name + ".glb"), mesh, ExportSpace.Unreal, files); // M2 E: GLB with embedded PNGs
       FbxWriter.Write(Path.Combine(output, name + ".fbx"), mesh, ExportSpace.Unreal, files);
       if (ast != null && clip == "*")
         log.AppendLine("animations: " + string.Join(", ", reader.Animations(ast)));
+      // M2 F: FL_POE2_ALLCLIPS=1 also writes every clip as anims/<clip>.fbx (same mesh + skeleton, one take each) for the
+      // Unreal animation-set import (ue_poe2_import.py imports them onto the mesh's skeleton).
+      if (ast != null && Environment.GetEnvironmentVariable("FL_POE2_ALLCLIPS") == "1")
+      {
+        var adir = Path.Combine(output, "anims");
+        Directory.CreateDirectory(adir);
+        var n = 0;
+        foreach (var c in reader.Animations(ast))
+        {
+          try
+          {
+            var cm = reader.Load(meshPath, ast, c);
+            if (cm.Clip == null) continue;
+            var safe = string.Concat(c.Select(ch => char.IsLetterOrDigit(ch) || ch is '_' or '-' ? ch : '_'));
+            FbxWriter.Write(Path.Combine(adir, safe + ".fbx"), cm, ExportSpace.Unreal, files);
+            n++;
+          }
+          catch (Exception e) { log.AppendLine($"clip {c}: {e.GetType().Name} {e.Message}"); }
+        }
+        log.AppendLine($"anims: {n} clip fbx in anims/");
+      }
       if (mesh.Clip != null)
         log.AppendLine($"clip {mesh.Clip.Name} {mesh.Clip.Duration:0.000}s tracks {mesh.Clip.Tracks.Count} keys {mesh.Clip.Tracks.Sum(t => t.Rotation.Count + t.Translation.Count + t.Scale.Count)} {string.Join(";", mesh.Clip.Notes)}");
     }
@@ -80,6 +104,7 @@ internal static class Poe2Bench
     foreach (var t in mesh.Parts.Select(p => p.Texture).Where(t => t != null).Distinct())
       if (reader.Texture(t!) is { } img) albedo[t!] = img;
     TintAlbedo(mesh, albedo);
+    AddGlow(reader, mesh, albedo);
     settings = new PreviewSettings { Albedo = albedo, InPlace = true };
     log = reader.Log;
     return mesh;
@@ -97,5 +122,22 @@ internal static class Poe2Bench
           for (int ch = 0; ch < 3; ch++) px[i + ch] = (byte)Math.Min(255f, px[i + ch] * f);
         a[p.Texture!] = new PreviewImage { Width = s0.Width, Height = s0.Height, Bgra = px, Channels = s0.Channels };
       }
+  }
+
+  private static string G(MeshPart p, string k) => (p.TdScalars.TryGetValue(k, out var v) ? v : 1f).ToString("0.###", System.Globalization.CultureInfo.InvariantCulture);
+
+  /// <summary>M2 F: preview has no emissive input for PoE2, so GlowAdd (glow texture x multipliers) is added onto the preview albedo.</summary>
+  public static void AddGlow(Poe2Reader reader, ExportedMesh m, Dictionary<string, PreviewImage> a)
+  {
+    foreach (var p in m.Parts.Concat(m.Levels.SelectMany(l => l.Parts)).Where(p => p.Texture != null && p.Emissive != null).GroupBy(p => p.Texture!).Select(g => g.First()))
+    {
+      if (!a.TryGetValue(p.Texture!, out var s0) || reader.Texture(p.Emissive!) is not { } gl || gl.Width != s0.Width || gl.Height != s0.Height) continue;
+      float M(string k) => p.TdScalars.TryGetValue(k, out var v) ? v : 1f;
+      var mul = new[] { M("glow_b"), M("glow_g"), M("glow_r") }; // BGRA
+      var px = (byte[])s0.Bgra.Clone();
+      for (int i = 0; i < px.Length; i += 4)
+        for (int ch = 0; ch < 3; ch++) px[i + ch] = (byte)Math.Min(255f, px[i + ch] + gl.Bgra[i + ch] * mul[ch]);
+      a[p.Texture!] = new PreviewImage { Width = s0.Width, Height = s0.Height, Bgra = px, Channels = s0.Channels };
+    }
   }
 }

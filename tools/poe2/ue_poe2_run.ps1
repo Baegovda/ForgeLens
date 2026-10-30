@@ -3,7 +3,7 @@
 # (EngineWire into the open UE_VFX_57 editor), always writes editor-free back. Never launches the editor or the game.
 param([Parameter(Mandatory)][string[]]$Dirs, [string]$Dest = '/Game/ForgeLens/POE', [int]$WaitMin = 60, [string]$Result = "$env:TEMP\poe2_ue_result.json")
 $lock = "$env:USERPROFILE\ue_editor_busy.txt"; $na = "$env:USERPROFILE\window_watch\NEEDS_ACTION.txt"
-$py = Join-Path $PSScriptRoot 'ue_poe2_import.py'; $uerun = "$env:USERPROFILE\Desktop\SM2_Work\Scripts\uerun.ps1"
+$py = Join-Path $PSScriptRoot 'ue_poe2_import.py'; $uerun = Join-Path $PSScriptRoot 'ue_poe2_call.ps1'  # private args file (uerun.ps1 shares ue_args.json)
 $end = (Get-Date).AddMinutes($WaitMin)
 while ((Get-Content $lock -ErrorAction SilentlyContinue) -notmatch '^editor-free') {
   if ((Get-Date) -gt $end) { "LOCK HELD: $(Get-Content $lock) after $WaitMin min"; exit 3 }

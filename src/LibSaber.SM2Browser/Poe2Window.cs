@@ -170,6 +170,7 @@ internal sealed class Poe2Window : Window
         foreach (var t in m.Parts.Concat(m.Levels.SelectMany(l => l.Parts)).Select(p => p.Texture).Where(t => t != null).Distinct())
           if (reader.Texture(t!) is { } img) a[t!] = img;
         Bench.Poe2Bench.TintAlbedo(m, a);
+        Bench.Poe2Bench.AddGlow(reader, m, a);
         List<string> c = new();
         var skel = isEffect ? reader.ReadAo(path).Skeleton : ast;
         if (skel != null) { try { c = reader.Animations(skel); } catch (Exception) { } }
