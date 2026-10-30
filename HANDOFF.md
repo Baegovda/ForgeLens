@@ -2825,3 +2825,11 @@ Fix in this pass: own-skeleton re-imports cc_titus_cloth/cc_titus_assault and cc
 - Hub level: red channel low/too saturated (UE means 4-19,13-42,22-47 vs game 22,29,32); sun direction placeholder; ColorCtrl channel order interpreted.
 - Pose/lighting not matched to game shots (bind pose, neutral room) -> comparisons are qualitative.
 - *_SIM proxy slots unmaterialed; old test meshes chars_cloth2/chars_phys cc_chaplain still on user skeleton (unused, not deleted); NS_vortex_orb, _v2.._v5, NS_orb_t/_t2 obsolete (not deleted).
+
+## R97x orb brightness/bloom/runes + SIM slot materials
+- Runes: M_orb_runes samples one frame of the 2x2 sheet (TexCoord tiling 0.5); verified single ring (vortex_orb_dark_r97x.jpg). Glow/runes intensity 3.
+- NS_vortex_orb_v7 (tools/ue/r97_orbbuild7.ps1 + notes): SingleLoopingParticle glow, Minimal runes (+spawn rate), Fountain sparks; second Minimal (Minimal001) ignored material calls (default grey disc) -> disabled. Template sprite size could not be changed (init module shrinks sprites), so the bloom comes from:
+- Hub (ue_r97_orbhub7.py 700 2): pink point light on DISK (700, radius 220, no shadows) + unbound PPV bloom 2 (tag R97X); Map_Floor saved.
+- Orb core (same box, 1280x720 MRQ): before 87,69,99 -> now 163,123,173; game 194,177,217 (~85 %). Body near the orb is now lit pink like the game; the floor picks up a pink tint (not in the game shot).
+- SIM proxy slots: ue_r97_simmats.py assigns the matching REND/visible slot MI (titus_cloth 6, chaplain 5), meshes saved (ours).
+- Obsolete orb effects NOT deleted: standing user rule "no deletion without the user's word"; candidates listed in final report.
