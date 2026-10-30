@@ -2787,3 +2787,11 @@ Parent agent use: tail events.jsonl (text, cheap) and check heartbeat.txt age < 
 - SetupFromJson: PA_cc_titus_assault_SM2 (812 simulated, 160 kinematic, 956 constraints, missingBones=0, jiggles 34/34) + ABP + damper, assigned.
 - ue_r90_cloth subject 'titus_cloth' (meshes r90_cloth/cc_titus_assault_cl_<tag>): run pen 0 skin 104 vs old titus run pen 198 skin 162. 6 cloths converted
   (each cloth reports missingBones=1 collision shape - not investigated).
+
+## R97r hub level sky/env capture (6) - tools/ue/ue_r97_levelcap.py, r97_imgstats.ps1
+- L_hub_battle_barge (still /Game/SM2_Work/Tests/r54_level): SkyLight specified cubemap T_buttle_barge_sky_1 intensity 6 angle -44.33; fog (0.039,0.049,0.081)
+  density 5e-5; 2 DirectionalLights + 1 PPV. 4 SceneCapture2D views (RTF_RGBA8 non-sRGB target, FINAL_COLOR_LDR, eye adaptation on) at 180 cm: docs/handoff/r97/hub_level_sheet.jpg.
+- vs the user's in-game hub shot (ingame_player_marine_hub_full.png): game mean RGB 22,29,32 (teal/blue, B>G>R); UE 55,58,46 / 26,28,23 / 44,47,36 / 22,22,21
+  (olive, B lowest), 0 % clipped both. Brightness 1-2.5x the game; hue is wrong. Note R/B swapped game mean (32,29,22) is about the UE ratio -> HYPOTHESIS:
+  the BC6H sky cubemap import has R and B swapped (tools/level/bc6hdr). Not changed; meshes are untextured grey so materials do not explain the tint.
+- Viewpoint is the actor-location median (0,0,0; no PlayerStart), not matched to the game camera.
