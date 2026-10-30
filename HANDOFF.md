@@ -2747,3 +2747,12 @@ Parent agent use: tail events.jsonl (text, cheap) and check heartbeat.txt age < 
 - Toolbar Settings -> Settings window; threads Auto off, typed 6; memory Auto off, typed 8 -> settings.json {WorkerThreads:6, MaxMemoryMB:8192}.
 - Window shows 'In use now: 6 worker threads (manual), memory limit 8.0 GB (manual)' = PerfBudget.Apply took effect. Physical events dropped 0, block 5.3 s.
 - settings.json restored to Auto (null/null) afterwards. UIA tree of the Avalonia window was empty -> coordinate clicks from window screenshots.
+
+## R97m BoltRifleFire_r97 frame render (MRQ PIE executor -> PNG 1280x720, Map_r90, frames 14-30) - NOT verified as a correct flash
+- tools/ue/ue_r97_firemrq.py (optional r.ExposureOffset). Shots\r97_fire\mrq\fire_00NN.png; docs/handoff/r97/fire_f19_mrq.jpg.
+- At the shot frames (18/19) the flash sits exactly at the muzzle (position OK, matches R59 socket proof) but renders as a hard-edged WHITE CARD,
+  and the sky is clipped white too (auto exposure). With r.ExposureOffset -3 (frames 17-19) no flash was visible at all.
+- Flash system is the third-party /Game/FX/01_A_Grade/MuzzleFlash3D NS_MuzzleFlash_Single (not ours, not edited): NE_FlameBurst M_Flames
+  (translucent, T_ThickSplatter_Diffuse), NE_Sparks uses Niagara DefaultSpriteMaterial. Likely an over-bright translucent card; needs a
+  fixed-exposure render + per-emitter check next.
+- Editor-only sequence scrub + SceneCapture does not show spawnables/particles (spawnables not in level actor list, no ticks) -> MRQ needed.
