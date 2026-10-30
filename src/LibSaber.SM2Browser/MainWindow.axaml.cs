@@ -120,7 +120,10 @@ public partial class MainWindow : Window
       await OpenLooseEffectFromEnvironmentAsync();
       await OpenLooseModelFromEnvironmentAsync();
       await OpenCatalogFileFromEnvironmentAsync();
+      await SelectFromEnvironmentAsync();
     };
+    if (Environment.GetEnvironmentVariable("SM2_SELECT") is { Length: > 0 })
+      ShowActivated = false;
   }
 
   private async void OpenClicked(object? sender, RoutedEventArgs e)

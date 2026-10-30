@@ -187,12 +187,12 @@ public sealed class LevelScene
   // instance by projected size, budget ranked by size/distance from the focus, disk cache of the built level
   // (template geometry + placements + cameras) and a shared texture cache, all under %LOCALAPPDATA%\ForgeLens.
   public sealed record Options(float MaxSize = 1000f, bool Textured = true, int ShrinkEdge = 512, long MaxTriangles = 20_000_000, float LightGain = 1f, bool UseCache = true);
-  public const int CacheVersion = 4;
+  public const int CacheVersion = 5;
 
   public OrbitCamera Persp, Close, Top;
   public bool FromDiskCache;
   public string Timing = "";
-  public int HiddenParts, WorkCount;
+  public int HiddenParts, WorkCount, DarkTranslucentDropped;
   public long Triangles;
   public List<string> Untextured = new();
   /// <summary>texture name -> catalog file index (pack stores refs into the shared texture cache, not pixels).</summary>
@@ -242,11 +242,13 @@ public sealed class LevelScene
   static Geo? MakeGeo(string tpl, int hint, ExportedMesh m, ref int dropped)
   {
     var g = new Geo { Tpl = tpl, Hint = hint };
-    g.V[0] = Compact(tpl, m.Positions, m.Normals, m.Uvs, m.Indices, m.Parts, p => p.Visible, ref dropped);
+    // sfx cards (light cones, flares) are hidden in the model viewer too (MaterialMaps.IsSfxPart); drawn opaque they were the
+    // black shards (hub: 3.36M tris "translucent/opaque/sfx" measured before this rule).
+    g.V[0] = Compact(tpl, m.Positions, m.Normals, m.Uvs, m.Indices, m.Parts, p => p.Visible && !MaterialMaps.IsSfxPart(p), ref dropped);
     if (m.Levels.Count > 0)
     {
       // Lower levels: Index unchecks them as "LOD"; keep those, drop volume / sfx / cloth-sim shells.
-      bool Keep(MeshPart p) => p.Visible || (p.HideReason is { } r && HideKeep.Contains(r));
+      bool Keep(MeshPart p) => !MaterialMaps.IsSfxPart(p) && (p.Visible || (p.HideReason is { } r && HideKeep.Contains(r)));
       var a = m.Levels[0]; var z = m.Levels[^1]; var d2 = 0;
       g.V[1] = Compact(tpl, a.Positions, a.Normals, a.Uvs, a.Indices, a.Parts, Keep, ref d2);
       if (m.Levels.Count > 1) g.V[2] = Compact(tpl, z.Positions, z.Normals, z.Uvs, z.Indices, z.Parts, Keep, ref d2);
@@ -385,6 +387,7 @@ public sealed class LevelScene
     // 4) textures of the chosen variants, decoded in parallel at the first mip <= ShrinkEdge, shared disk cache
     if (o.Textured) LoadTextures(scene, catalog, store, chosen.Select(c => (c.G, c.G.V[c.Level]!)).ToList(), o.ShrinkEdge, log);
     Mark("textures");
+    DropDarkTranslucent(scene, chosen.Select(c => (c.G, c.Level)).Distinct().ToList());
 
     // 5) merged mesh
     foreach (var (wi, g, lv) in chosen)
@@ -400,7 +403,7 @@ public sealed class LevelScene
     Mark("cameras");
     var k = scene.Objects.GroupBy(x => x.Kind).ToDictionary(g => g.Key, g => g.Count());
     scene.Stats = $"{scene.Name}: objects {scene.Objects.Count} (geom {k.GetValueOrDefault("geom")}, light {k.GetValueOrDefault("light")}, camera {k.GetValueOrDefault("camera")}, other {k.GetValueOrDefault("other")}); " +
-      $"placed {scene.Placed.Count}/{work.Count} instances from {geos.Count(x => x.Value != null)}/{geos.Count} templates, missing {scene.Missing.Count}, failed {failed}, hidden parts dropped {hidden}, skipped >{o.MaxSize:0} m {scene.Skipped.Count}, over budget {scene.BudgetSkipped}; lwi {scene.LwiPlaced}/{scene.LwiCount}; " +
+      $"placed {scene.Placed.Count}/{work.Count} instances from {geos.Count(x => x.Value != null)}/{geos.Count} templates, missing {scene.Missing.Count}, failed {failed}, hidden parts dropped {hidden}, dark translucent dropped {scene.DarkTranslucentDropped}, skipped >{o.MaxSize:0} m {scene.Skipped.Count}, over budget {scene.BudgetSkipped}; lwi {scene.LwiPlaced}/{scene.LwiCount}; " +
       $"{tris:N0} tris; lights {scene.Lights.Count}; spread {scene.Spread:0} m; textures {scene.Albedo.Count}/{scene.Normals.Count}/{scene.Specular.Count}; built in {sw.Elapsed.TotalSeconds:0.0}s";
     if (o.UseCache) WritePack(scene, pack, key, o.ShrinkEdge, geos.Values.Where(g => g is not null).Cast<Geo>().ToList(), chosen, work, log);
     Mark("write cache");
@@ -408,6 +411,34 @@ public sealed class LevelScene
     log?.Invoke(scene.Stats); log?.Invoke("timing " + scene.Timing);
     lock (Cache) Cache[path] = scene;
     return scene;
+  }
+
+  /// <summary>
+  ///   Translucent parts whose albedo averages near-black (luminance &lt; 20 of 255) are additive-looking holograms / glow
+  ///   cards in game; the CPU preview draws them opaque, which gave the big black spheres (hub hologram_planet,
+  ///   glob_sphere3). HEURISTIC rule: drop them. Opaque black (e.g. sc_black_01) stays.
+  /// </summary>
+  static void DropDarkTranslucent(LevelScene s, List<(Geo G, int Level)> used)
+  {
+    var lum = new Dictionary<string, double>(StringComparer.OrdinalIgnoreCase);
+    bool Dark(MeshPart p)
+    {
+      if (p.Blend != "translucent" || p.Texture is null || !s.Albedo.TryGetValue(p.Texture, out var im)) return false;
+      if (!lum.TryGetValue(p.Texture, out var v))
+      {
+        double sum = 0; for (var i = 0; i + 3 < im.Bgra.Length; i += 4) sum += 0.11 * im.Bgra[i] + 0.59 * im.Bgra[i + 1] + 0.3 * im.Bgra[i + 2];
+        lum[p.Texture] = v = sum / Math.Max(1, im.Bgra.Length / 4);
+      }
+      return v < 20;
+    }
+    foreach (var (g, lv) in used)
+    {
+      var m = g.V[lv]!;
+      if (!m.Parts.Any(Dark)) continue;
+      var d = 0;
+      g.V[lv] = Compact(m.Name, m.Positions, m.Normals, m.Uvs, m.Indices, m.Parts, p => !Dark(p), ref d) ?? new ExportedMesh { Name = m.Name };
+      s.DarkTranslucentDropped += d;
+    }
   }
 
   static void Focus(LevelScene scene, List<Vector3> origins)
