@@ -61,15 +61,23 @@ elif mode == "capture":
     out = sys.argv[2]
     eas = unreal.get_editor_subsystem(unreal.EditorActorSubsystem)
     acts = [a for a in eas.get_all_level_actors() if a.actor_has_tag("R54")]
-    lo = unreal.Vector(1e12, 1e12, 1e12); hi = unreal.Vector(-1e12, -1e12, -1e12)
-    for a in acts:
-        o, e = a.get_actor_bounds(False)
-        lo = unreal.Vector(min(lo.x, o.x - e.x), min(lo.y, o.y - e.y), min(lo.z, o.z - e.z)); hi = unreal.Vector(max(hi.x, o.x + e.x), max(hi.y, o.y + e.y), max(hi.z, o.z + e.z))
-    c0 = (lo + hi) * 0.5; size = max(hi.x - lo.x, hi.y - lo.y)
+    # Robust framing: median actor location and the 10..90 % spread (a few actors report infinite bounds).
+    L = [a.get_actor_location() for a in acts]
+    def q(vals, f): v = sorted(vals); return v[int((len(v) - 1) * f)]
+    xs = [v.x for v in L]; ys = [v.y for v in L]; zs = [v.z for v in L]
+    c0 = unreal.Vector(q(xs, .5), q(ys, .5), q(zs, .5)); size = max(q(xs, .9) - q(xs, .1), q(ys, .9) - q(ys, .1), 2000.0)
+    # densest 40 m cell (same rule as ForgeLens LevelScene), parts within 200 m of it
+    import collections
+    cell = collections.Counter((int(v.x // 4000), int(v.y // 4000), int(v.z // 4000)) for v in L).most_common(1)[0][0]
+    seed = unreal.Vector((cell[0] + .5) * 4000, (cell[1] + .5) * 4000, (cell[2] + .5) * 4000)
+    near = [v for v in L if (v - seed).length() < 20000] or L
+    xs = [v.x for v in near]; ys = [v.y for v in near]; zs = [v.z for v in near]
+    c0 = unreal.Vector(q(xs, .5), q(ys, .5), q(zs, .5)); size = max(q(xs, .9) - q(xs, .1), q(ys, .9) - q(ys, .1), 2000.0)
+    lo = unreal.Vector(q(xs, .1), q(ys, .1), q(zs, .1)); hi = unreal.Vector(q(xs, .9), q(ys, .9), q(zs, .9))
     print("actors", len(acts), "bounds", lo, hi)
     pend = []
-    for tag, loc, rot, ortho in (("top", c0 + unreal.Vector(0, 0, (hi.z - lo.z) + 10000), unreal.Rotator(roll=0, pitch=-90, yaw=0), True),
-                                 ("oblique", c0 + unreal.Vector(-size * 0.7, -size * 0.7, size * 0.6), unreal.Rotator(roll=0, pitch=-30, yaw=45), False)):
+    for tag, loc, rot, ortho in (("top", c0 + unreal.Vector(0, 0, size * 1.5), unreal.Rotator(roll=0, pitch=-90, yaw=0), True),
+                                 ("oblique", c0 + unreal.Vector(-size * 0.6, -size * 0.6, size * 0.5), unreal.Rotator(roll=0, pitch=-30, yaw=45), False)):
         rt = unreal.RenderingLibrary.create_render_target2d(unreal.get_editor_subsystem(unreal.UnrealEditorSubsystem).get_editor_world(), 1600, 1000, unreal.TextureRenderTargetFormat.RTF_RGBA8)
         cam = eas.spawn_actor_from_class(unreal.SceneCapture2D, loc, rot); cam.tags = [unreal.Name("R54Cap")]
         c = cam.capture_component2d; c.set_editor_property("texture_target", rt)

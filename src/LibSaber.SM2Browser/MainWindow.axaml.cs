@@ -48,6 +48,8 @@ public partial class MainWindow : Window
   private bool _drawAgain;
   private bool _drawFast;
   private Dictionary<string, PreviewImage>? _albedo;
+  /// <summary>Level shown in the viewer (R54), or null for a single model.</summary>
+  private LibSaber.SM2Browser.Level.LevelScene? _level;
   private Dictionary<string, PreviewImage>? _normals;
   private Dictionary<string, PreviewImage>? _specular;
   private HierarchicalTreeDataGridSource<CatalogDirectory>? _tree;
@@ -449,6 +451,7 @@ public partial class MainWindow : Window
       return;
     var generation = ++_previewGeneration;
     var file = _catalog.GetFile(index);
+    _level = null;
     _recent.Touch(file.Path, file.ArchiveName);
     ShowLoading();
     _playTimer.Stop();
@@ -565,6 +568,27 @@ public partial class MainWindow : Window
           ? "Play or the slider samples these curves onto the loaded skeleton. Bones this clip does not name stay on the bind pose."
           : "No sampled curves. The note above is what the reader could see.";
         HideLoading(generation);
+        return;
+      }
+
+      if (LibSaber.SM2Browser.Level.LevelScene.IsLevelFile(file.Path))
+      {
+        // R54: a level = scenes/<name>.scn/<name>.cd_list. Built from the user's game files (templates, textures, lights), cached in memory.
+        PreviewText.Text = "Building level " + file.Name + " (templates, textures, lights)…";
+        var catalog = _catalog; var store = _store;
+        var scene = await Task.Run(() => LibSaber.SM2Browser.Level.LevelScene.Load(catalog, store, index));
+        if (generation != _previewGeneration)
+          return;
+        _mesh = scene.Mesh;
+        _level = scene;
+        _previewFileIndex = index;
+        _albedo = scene.Albedo; _normals = scene.Normals; _specular = scene.Specular;
+        _yaw = 0.7f; _pitch = 0.45f; _distance = scene.Spread * 1.1f; _time = 0;
+        WireToggle.IsVisible = true;
+        PreviewNote.Text = scene.Stats;
+        PreviewText.IsVisible = false;
+        PreviewImage.IsVisible = true;
+        DrawMesh();
         return;
       }
 
@@ -809,6 +833,7 @@ public partial class MainWindow : Window
     var specular = _specular;
     var previewGeneration = _previewGeneration;
     var inPlace = InPlaceToggle.IsChecked == true;
+    var level = _level;
     var bounds = ViewBorder.Bounds;
     var scaling = RenderScaling > 0 ? RenderScaling : 1.0;
     // Render at physical pixels so the image is not stretched (stretching magnified every aliased texel).
@@ -824,14 +849,15 @@ public partial class MainWindow : Window
         mesh,
         width,
         height,
-        new OrbitCamera { Yaw = yaw, Pitch = pitch, Distance = distance },
+        new OrbitCamera { Yaw = yaw, Pitch = pitch, Distance = distance, Target = level?.Centre },
         skeleton,
         time,
         out var note,
         new PreviewSettings
         {
           Lod = lod, Part = part, Wireframe = wire, Albedo = albedo, Normals = normals, Specular = specular,
-          MaxEdge = 2048, Supersample = supersample, InPlace = inPlace,
+          MaxEdge = 2048, Supersample = level is null ? supersample : 1, InPlace = inPlace,
+          PointLights = level?.Lights, Ambient = level is null ? 0.16f : 0.22f, HeadLight = 0.6f, Exposure = level is null ? 1f : 1.3f,
         });
       return (pixels, width, height, note, MeshPreview.LastRenderMs, supersample);
     }).ContinueWith(task =>

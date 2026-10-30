@@ -3,6 +3,9 @@ using LibSaber.SM2.Assets.Animation;
 
 namespace LibSaber.SM2.Assets.Meshes;
 
+/// <summary>World-space point light for the level preview (colour RGB 0..n, radius metres).</summary>
+public readonly record struct PreviewPointLight(Vector3 Position, Vector3 Colour, float Radius);
+
 public readonly struct OrbitCamera
 {
   public float Yaw { get; init; }
@@ -34,6 +37,14 @@ public sealed record PreviewSettings
   /// <summary>Packed specular maps. <see cref="PreviewImage.Channels"/> selects metal, roughness, and AO.</summary>
   public IReadOnlyDictionary<string, PreviewImage>? Specular { get; init; }
   public int MaxEdge { get; init; } = 1280;
+  /// <summary>Optional world-space point lights (level preview, R54). Null keeps the default head/fill lighting unchanged.</summary>
+  public IReadOnlyList<PreviewPointLight>? PointLights { get; init; }
+  /// <summary>Ambient term used with <see cref="PointLights"/> (replaces the 0.16 base).</summary>
+  public float Ambient { get; init; } = 0.16f;
+  /// <summary>Headlight weight used with <see cref="PointLights"/>.</summary>
+  public float HeadLight { get; init; } = 1f;
+  /// <summary>Final multiplier used with <see cref="PointLights"/>.</summary>
+  public float Exposure { get; init; } = 1f;
   /// <summary>Supersampling factor per axis (1 = off, 2 = 4 samples per pixel). Box-filtered down.</summary>
   public int Supersample { get; init; } = 1;
   /// <summary>Rebase the clip so its first frame sits where the bind pose stands (cinematic clips stay in view).</summary>
@@ -131,6 +142,7 @@ public static partial class MeshPreview
     var view = Matrix4x4.CreateLookAt(eye, center, Vector3.UnitY);
     var projection = Matrix4x4.CreatePerspectiveFieldOfView(MathF.PI / 4f, width / (float)height, Math.Max(0.01f, distance * 0.01f), distance * 40f);
     var viewProjection = view * projection;
+    var points = settings?.PointLights is { } pl ? PointGrid.Build(pl, settings.Ambient, settings.HeadLight, settings.Exposure) : null;
     var light = new Lights
     {
       Key = Vector3.Normalize((eye - center) + Vector3.UnitY * distance * 0.45f),
@@ -254,7 +266,7 @@ public static partial class MeshPreview
       {
         Target = target, Sx = sx, Sy = sy, Sz = sz, Iw = iw,
         Positions = positions, Normals = normals, Uvs = prepared.Uvs, Indices = indices, TriPart = triPart,
-        Materials = partMat, Light = light, PartCountZero = partCount == 0,
+        Materials = partMat, Light = light, PartCountZero = partCount == 0, Points = points,
       };
       Parallel.For(0, bandCount, parallel, band =>
       {
@@ -590,6 +602,46 @@ public static partial class MeshPreview
     }
   }
 
+  /// <summary>Uniform-grid index of point lights for per-pixel lookup.</summary>
+  private sealed class PointGrid
+  {
+    public float Cell;
+    public Dictionary<(int, int, int), List<int>> Cells = new();
+    public PreviewPointLight[] Lights = Array.Empty<PreviewPointLight>();
+    public float Ambient, Head, Exposure;
+    public static PointGrid Build(IReadOnlyList<PreviewPointLight> lights, float ambient, float head, float exposure, float cell = 6f)
+    {
+      var g = new PointGrid { Cell = cell, Lights = lights.ToArray(), Ambient = ambient, Head = head, Exposure = exposure };
+      for (var i = 0; i < g.Lights.Length; i++)
+      {
+        var l = g.Lights[i]; var r = l.Radius;
+        var lo = Key(l.Position - new Vector3(r), cell); var hi = Key(l.Position + new Vector3(r), cell);
+        if ((long)(hi.Item1 - lo.Item1 + 1) * (hi.Item2 - lo.Item2 + 1) * (hi.Item3 - lo.Item3 + 1) > 4096) continue;
+        for (var x = lo.Item1; x <= hi.Item1; x++) for (var y = lo.Item2; y <= hi.Item2; y++) for (var z = lo.Item3; z <= hi.Item3; z++)
+        {
+          if (!g.Cells.TryGetValue((x, y, z), out var list)) g.Cells[(x, y, z)] = list = new List<int>();
+          list.Add(i);
+        }
+      }
+      return g;
+    }
+    public static (int, int, int) Key(Vector3 p, float cell) => ((int)MathF.Floor(p.X / cell), (int)MathF.Floor(p.Y / cell), (int)MathF.Floor(p.Z / cell));
+    public Vector3 Shade(Vector3 pos, Vector3 n)
+    {
+      var sum = Vector3.Zero;
+      if (!Cells.TryGetValue(Key(pos, Cell), out var list)) return sum;
+      foreach (var i in list)
+      {
+        var l = Lights[i]; var d = l.Position - pos; var dist = d.Length();
+        if (dist >= l.Radius) continue;
+        var att = 1f - dist / l.Radius; att *= att;
+        var ndl = dist > 1e-4f ? Math.Clamp(Vector3.Dot(n, d / dist), 0f, 1f) * 0.75f + 0.25f : 1f;
+        sum += l.Colour * (att * ndl);
+      }
+      return sum;
+    }
+  }
+
   private struct Lights
   {
     public Vector3 Key;
@@ -633,6 +685,7 @@ public static partial class MeshPreview
     public required PartMaterial[] Materials;
     public required Lights Light;
     public bool PartCountZero;
+    public PointGrid? Points;
   }
 
   private sealed class Prepared
@@ -913,6 +966,19 @@ public static partial class MeshPreview
         var diffuse = (0.16f + 0.72f * ndotl + 0.18f * ndotf) * (0.25f + 0.75f * ao);
         var pixel = index * 4;
         var specByte = spec * 255f;
+        if (f.Points is { } pg)
+        {
+          // Level preview: ambient + weak headlight + nearby point lights (BGR order like baseColor), then exposure.
+          var pos = pa * q0 + pb * q1 + pc * q2;
+          var pc3 = pg.Shade(pos, lit);
+          var head = (pg.Ambient + pg.Head * (0.5f * ndotl + 0.12f * ndotf)) * (0.25f + 0.75f * ao);
+          var e = pg.Exposure;
+          pixels[pixel] = (byte)Math.Clamp(baseColor.X * (head + pc3.Z) * e + specByte, 0, 255);
+          pixels[pixel + 1] = (byte)Math.Clamp(baseColor.Y * (head + pc3.Y) * e + specByte, 0, 255);
+          pixels[pixel + 2] = (byte)Math.Clamp(baseColor.Z * (head + pc3.X) * e + specByte, 0, 255);
+          pixels[pixel + 3] = 255;
+          continue;
+        }
         pixels[pixel] = (byte)Math.Clamp(baseColor.X * diffuse + specByte, 0, 255);
         pixels[pixel + 1] = (byte)Math.Clamp(baseColor.Y * diffuse + specByte, 0, 255);
         pixels[pixel + 2] = (byte)Math.Clamp(baseColor.Z * diffuse + specByte, 0, 255);

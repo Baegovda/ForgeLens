@@ -364,3 +364,12 @@ MigrationBackup/
 
 # Fody - auto-generated XML schema
 FodyWeavers.xsd
+# R54 level outputs / game data: never commit (read at runtime from the user's own game files)
+*.placement.tsv
+instances_ue.tsv
+levelbench.txt
+*.cd_list
+*.class_list
+*.lwi_container
+*.lwi_inst
+**/Exports/
