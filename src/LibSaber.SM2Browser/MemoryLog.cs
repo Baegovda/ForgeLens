@@ -51,9 +51,33 @@ internal static class MemoryLog
     long committed = info.TotalCommittedBytes, live = GC.GetTotalMemory(false);
     if (committed - live < 1L << 30 || committed - live < live / 2) return;
     var sw = Stopwatch.StartNew();
+    // R87: SM2_GC_TRIM=bg = try a background (non-blocking) gen2 first; =aggressive = GCCollectionMode.Aggressive
+    // (blocking compaction that also decommits the freed regions) = DEFAULT since R87; =old = R74 path. A/B in HANDOFF R87.
+    var mode = Environment.GetEnvironmentVariable("SM2_GC_TRIM");
+    if (mode == "bg")
+    {
+      var pauseBefore = GC.GetTotalPauseDuration();
+      var bgBefore = GC.GetGCMemoryInfo(GCKind.Background).Index;
+      GC.Collect(2, GCCollectionMode.Forced, blocking: false, compacting: false);
+      for (var i = 0; i < 200 && GC.GetGCMemoryInfo(GCKind.Background).Index == bgBefore; i++) Thread.Sleep(50);
+      var info2 = GC.GetGCMemoryInfo();
+      long c2 = info2.TotalCommittedBytes, l2 = GC.GetTotalMemory(false);
+      var pause1 = (GC.GetTotalPauseDuration() - pauseBefore).TotalMilliseconds;
+      Write(Line($"gc trim bg ({why}) wall {sw.ElapsedMilliseconds} ms pause {pause1:0} ms, committed {committed >> 20} -> {c2 >> 20} MB live {live >> 20} -> {l2 >> 20} MB ->"));
+      if (c2 - l2 < 1L << 30 || c2 - l2 < l2 / 2) return;
+      sw.Restart();
+    }
+    if (mode is null or "" or "aggressive")
+    {
+      var pa = GC.GetTotalPauseDuration();
+      GC.Collect(2, GCCollectionMode.Aggressive, blocking: true, compacting: true);
+      Write(Line($"gc trim aggressive ({why}) {sw.ElapsedMilliseconds} ms pause {(GC.GetTotalPauseDuration() - pa).TotalMilliseconds:0} ms, committed before {committed >> 20} MB live before {live >> 20} MB ->"));
+      return;
+    }
+    var pause0 = GC.GetTotalPauseDuration();
     System.Runtime.GCSettings.LargeObjectHeapCompactionMode = System.Runtime.GCLargeObjectHeapCompactionMode.CompactOnce;
     GC.Collect(2, GCCollectionMode.Forced, blocking: true, compacting: true);
-    Write(Line($"gc trim ({why}) {sw.ElapsedMilliseconds} ms, committed before {committed >> 20} MB live before {live >> 20} MB ->"));
+    Write(Line($"gc trim ({why}) {sw.ElapsedMilliseconds} ms pause {(GC.GetTotalPauseDuration() - pause0).TotalMilliseconds:0} ms, committed before {committed >> 20} MB live before {live >> 20} MB ->"));
   }
 
   public static string Line(string tag)

@@ -8,7 +8,7 @@
         Title="Forge Lens"
         Width="1440"
         Height="800"
-        MinWidth="1100"
+        MinWidth="960"
         MinHeight="640">
   <DockPanel>
     <Border DockPanel.Dock="Top" Padding="10,8" Background="{DynamicResource FL.Toolbar}" BorderBrush="{DynamicResource FL.Border}" BorderThickness="0,0,0,1">
@@ -83,7 +83,7 @@
         </ListBox>
       </Grid>
       <GridSplitter Grid.Column="1" Width="4" Background="{DynamicResource FL.Border}" ResizeDirection="Columns" />
-      <DockPanel Grid.Column="2" MinWidth="220">
+      <DockPanel Grid.Column="2" MinWidth="200">
         <!-- ui-43 browser bar: Files / Recent, scope, search; type chips, subfolders / all files, Grid | List, tile size. -->
         <Grid DockPanel.Dock="Top" ColumnDefinitions="Auto,*,Auto" Margin="8,6,8,0">
           <StackPanel Orientation="Horizontal" Spacing="2">
@@ -185,8 +185,9 @@
         </Grid>
       </DockPanel>
       <GridSplitter Grid.Column="3" Width="4" Background="{DynamicResource FL.Border}" ResizeDirection="Columns" />
-      <Grid x:Name="ViewerColumns" Grid.Column="4" ColumnDefinitions="*,6,240" MinWidth="320">
+      <Grid x:Name="ViewerColumns" Grid.Column="4" ColumnDefinitions="*,6,240" MinWidth="480">
       <DockPanel Grid.Column="0" Margin="8,8,4,8" MinWidth="280">
+        <ScrollViewer x:Name="TopBars" DockPanel.Dock="Top" HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Auto"><StackPanel>
         <WrapPanel DockPanel.Dock="Top" Orientation="Horizontal">
           <WrapPanel.Styles>
             <Style Selector="WrapPanel > :is(Control)">
@@ -309,19 +310,22 @@
             <ComboBoxItem Content="Covering demo: sphere (heuristic)" />
           </ComboBox>
         </WrapPanel>
+        </StackPanel></ScrollViewer>
         <!-- R66: short summary; full technical notes behind Details (and the tooltip) -->
         <DockPanel DockPanel.Dock="Bottom" Margin="2,8,2,0">
           <ToggleButton x:Name="NoteDetails" DockPanel.Dock="Right" Content="Details" IsVisible="False" Click="NoteDetailsClicked" Padding="8,2" FontSize="11" VerticalAlignment="Top"
                         ToolTip.Tip="Show the full reader notes" />
           <TextBlock x:Name="PreviewNote" TextWrapping="Wrap" MaxLines="5" TextTrimming="CharacterEllipsis" Foreground="{DynamicResource FL.TextDim}" FontSize="12" />
         </DockPanel>
-        <Border x:Name="ViewBorder" Background="{DynamicResource FL.Viewport}" CornerRadius="4" BorderBrush="{DynamicResource FL.Border}" BorderThickness="1" ClipToBounds="True"
+        <Border x:Name="ViewBorder" MinHeight="160" Background="{DynamicResource FL.Viewport}" CornerRadius="4" BorderBrush="{DynamicResource FL.Border}" BorderThickness="1" ClipToBounds="True"
                 PointerPressed="ViewPressed" PointerMoved="ViewMoved" PointerReleased="ViewReleased" PointerWheelChanged="ViewWheel" PointerExited="ViewExited">
           <Grid>
             <gpu:GpuPreviewControl x:Name="GpuView" IsVisible="False" />
             <Image x:Name="PreviewImage" Stretch="Uniform" />
             <TextBox x:Name="PreviewText" IsReadOnly="True" AcceptsReturn="True" TextWrapping="NoWrap"
                      FontFamily="Consolas,Courier New,monospace" FontSize="12" Background="Transparent" BorderThickness="0" />
+            <Button x:Name="DeferredOpenButton" IsVisible="False" HorizontalAlignment="Center" VerticalAlignment="Center" Classes="accent" Padding="16,8" Click="DeferredOpenClicked"
+                    ToolTip.Tip="R87: the last level is not rebuilt at startup (it costs several GB). Click to open it now. SM2_REOPEN_LEVEL=1 = old behaviour." />
             <!-- R66: Unreal-viewport-style HUD (camera info top-left, speed top-right); H toggles -->
             <Border x:Name="HudInfo" IsVisible="False" IsHitTestVisible="False" HorizontalAlignment="Left" VerticalAlignment="Top" Margin="8" Padding="8,5" CornerRadius="4" Background="#99101216">
               <StackPanel Spacing="1">

@@ -431,6 +431,7 @@ public partial class MainWindow : Window
     ContentBrowser.AssetTile.RefreshAll();
     // mtl1-42: a click / arrow key previews the row it just selected (Ctrl/Shift-adding rows previews the newest one).
     _previewRow = e.AddedItems?.OfType<FileRow>().LastOrDefault();
+    if (StartupDeferConsume(_previewRow)) return; // R87
     await PreviewSelectionAsync();
   }
 
@@ -1725,6 +1726,7 @@ public partial class MainWindow : Window
       return;
     }
 
+    StartupDeferCheck(pending);
     FileList.SelectedIndex = row;
     FileList.ScrollIntoView(rows[row]);
     if (_gridView && _gridColumns > 0)
@@ -1893,6 +1895,7 @@ public partial class MainWindow : Window
       main[2].Width = new GridLength(files, GridUnitType.Star);
       main[4].Width = new GridLength(2, GridUnitType.Star);
     }
+    Layout86Init(); // R87 adaptive columns + toolbar cap
   }
 
   private readonly HashSet<string> _expanded = new(StringComparer.OrdinalIgnoreCase);
@@ -2025,7 +2028,7 @@ public partial class MainWindow : Window
     if (main[0].ActualWidth > 0)
       _settings.FolderPaneWidth = Math.Round(main[0].ActualWidth);
     if (main[2].ActualWidth > 0 && main[4].ActualWidth > 0)
-      _settings.FilePaneWidth = Math.Round(2 * main[2].ActualWidth / main[4].ActualWidth, 3);
+      _settings.FilePaneWidth = _layoutNarrow ? _filesStarSaved : Math.Round(2 * main[2].ActualWidth / main[4].ActualWidth, 3);
     try { _settings.Save(); } catch { /* settings are best effort */ }
   }
 

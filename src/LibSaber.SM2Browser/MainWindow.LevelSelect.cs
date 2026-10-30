@@ -65,7 +65,8 @@ public partial class MainWindow
       Directory.CreateDirectory(Path.GetDirectoryName(Path.GetFullPath(shot))!);
       bmp.Save(shot);
       File.WriteAllText(shot + ".txt", $"selected {selected}\nlevel {(_level is null ? "(none)" : _level.Stats)}\nmesh {_mesh?.Name} summary {_mesh?.Summary.Replace("\n", " | ")}\nhud {HudSnapshot()}\nselect_to_level_shown {open:0.0}s gpu {UseGpu()} from_disk_cache {_level?.FromDiskCache}\ntiming {_level?.Timing}\n");
-      File.AppendAllText(shot + ".txt", $"r85 gpu_upload vbo_mb {Gpu.GlPreview.VboBytes / 1048576.0:0.0} ibo_mb {Gpu.GlPreview.IboBytes / 1048576.0:0.0} tex_mb {Gpu.GlPreview.TexBytes / 1048576.0:0.0} tex_capped_halvings {Gpu.GlPreview.TexCapped} packed {Gpu.GlPreview.Packed} texcap {Gpu.GlPreview.TexCap} bc_ext {Gpu.GlPreview.BcExt} bc_textures {Gpu.GlPreview.TexBcCount} bc_lin {Gpu.GlPreview.BcLinear} bc_srgb {Gpu.GlPreview.BcSrgb}\n");
+      File.AppendAllText(shot + ".txt", $"r85 gpu_upload vbo_mb {Gpu.GlPreview.VboBytes / 1048576.0:0.0} ibo_mb {Gpu.GlPreview.IboBytes / 1048576.0:0.0} tex_mb {Gpu.GlPreview.TexBytes / 1048576.0:0.0} tex_capped_halvings {Gpu.GlPreview.TexCapped} packed {Gpu.GlPreview.Packed} texcap {Gpu.GlPreview.TexCap} bc_ext {Gpu.GlPreview.BcExt} bc_textures {Gpu.GlPreview.TexBcCount} bc_lin {Gpu.GlPreview.BcLinear} bc_srgb {Gpu.GlPreview.BcSrgb} bc7 {Gpu.GlPreview.TexBc7Count} tex_upload_ms_total {Gpu.GlPreview.TexUploadMsTotal:0}\n");
+      File.AppendAllText(shot + ".txt", Layout86Snapshot() + "\n");
       if (UseGpu()) { Gpu.GlPreview.ShotPath = shot + ".gpu.raw"; GpuView.Redraw(); }
     }
     catch (Exception e) { File.WriteAllText(shot + ".txt", "winshot failed: " + e); }

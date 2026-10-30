@@ -35,6 +35,8 @@ public partial class MainWindow
     public bool DockLeft { get; set; }
     public bool OutlinerCollapsed { get; set; }
     public double OutlinerWidth { get; set; } = 240;
+    // R87: BC1/BC3 preview textures (R85, lighter) vs full RGBA8 (exact). SM2_TEXBC env wins when set.
+    public bool CompressedTextures { get; set; } = true;
   }
 
   private static readonly string UeSettingsPath = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "ForgeLens", "viewport_r79.json");
@@ -81,6 +83,7 @@ public partial class MainWindow
     InitInputProbe(); // R83 SM2_INPUTPROBE
     GpuView.ViewMode = UeGlMode(_ue.ViewMode);
     GpuView.ShowClothVerts = _ue.ShowClothVerts;
+    if (Environment.GetEnvironmentVariable("SM2_TEXBC") is not { Length: > 0 }) Gpu.GlPreview.TexBc = _ue.CompressedTextures;
   }
 
   private static int UeGlMode(int ui) => ui switch { 1 => 1, 3 => 2, 4 => 3, 5 => 4, _ => 0 };
@@ -109,6 +112,7 @@ public partial class MainWindow
     menu.Items.Add(Check("Grid", () => _ue.ShowGrid, v => { _ue.ShowGrid = v; UeSave(); UeApplyLines(); }));
     menu.Items.Add(Check("Stats", () => _ue.ShowStats, v => { _ue.ShowStats = v; UeSave(); UeUpdateStats(); }));
     menu.Items.Add(Check("Cloth vertices (physics)", () => _ue.ShowClothVerts, UeShowClothVerts)); // R83
+    menu.Items.Add(Check("Compressed textures (lighter GPU memory)", () => Gpu.GlPreview.TexBc, UeSetCompressedTextures)); // R87
     show.Flyout = menu;
     var help = new Button { Content = "?", FontSize = 11, Height = 26, Width = 26, Padding = new Thickness(0) };
     ToolTip.SetTip(help, "Shortcuts (F1)");
@@ -163,6 +167,15 @@ public partial class MainWindow
   }
 
   /// <summary>R83: cyan crosses on every physics-driven (cloth) vertex. GPU path only: the cloth simulation runs in the GPU preview.</summary>
+  /// <summary>R87: BC1/BC3 (R85) vs RGBA8 textures. Re-opens the current file so its textures upload again.</summary>
+  internal async void UeSetCompressedTextures(bool v)
+  {
+    _ue.CompressedTextures = v; UeSave();
+    Gpu.GlPreview.TexBc = v;
+    UeLog += $"compressed textures {v}\n";
+    if (_previewFileIndex >= 0 && _catalog is not null) await PreviewFileAsync(_previewFileIndex);
+  }
+
   internal void UeShowClothVerts(bool v)
   {
     _ue.ShowClothVerts = v; UeSave();

@@ -28,7 +28,11 @@ internal sealed unsafe class GlPreview : IDisposable
   internal static string BcExt = "?";
   internal static string? ShotPath;
   // R85: BC1/BC3 preview textures (SM2_TEXBC=0 off). Needs the s3tc (linear) / s3tc_srgb extensions.
-  internal static readonly bool TexBc = Environment.GetEnvironmentVariable("SM2_TEXBC") != "0";
+  internal static bool TexBc = Environment.GetEnvironmentVariable("SM2_TEXBC") != "0"; // R87: also Show menu "Compressed textures"
+  // R87: SM2_TEXBC=7 (or settings TextureQuality "bc7") = BC7 via BCnEncoder.Net (Fast) instead of the R85 BC1/BC3
+  // encoder; needs GL_EXT_texture_compression_bptc. Same 1 byte/px as BC3, closer to the uncompressed frame.
+  internal static bool TexBc7 = Environment.GetEnvironmentVariable("SM2_TEXBC") == "7";
+  internal static long TexBc7Count; internal static double TexUploadMsTotal;
   internal static bool BcLinear, BcSrgb; internal static long TexBcCount;
 
   /// <summary>R85: float staging vertices (Stride floats each) to the VBO byte layout.</summary>
@@ -621,7 +625,25 @@ internal sealed unsafe class GlPreview : IDisposable
     id = _gl.GenTexture();
     _gl.BindTexture(TextureTarget.Texture2D, id);
     _gl.PixelStore(PixelStoreParameter.UnpackAlignment, 1);
-    if (TexBc && (srgb ? BcSrgb : BcLinear))
+    if (TexBc && TexBc7 && BcExt.Contains("bptc"))
+    {
+      var enc = new BCnEncoder.Encoder.BcEncoder();
+      enc.OutputOptions.Format = BCnEncoder.Shared.CompressionFormat.Bc7;
+      enc.OutputOptions.Quality = BCnEncoder.Encoder.CompressionQuality.Fast;
+      enc.OutputOptions.GenerateMipMaps = true;
+      enc.Options.IsParallel = true;
+      var mips = enc.EncodeToRawBytes(rgba, w, h, BCnEncoder.Encoder.PixelFormat.Rgba32);
+      var fmt7 = (InternalFormat)(srgb ? 0x8E8D : 0x8E8C);
+      for (var l = 0; l < mips.Length; l++)
+      {
+        uint lw = (uint)Math.Max(1, w >> l), lh = (uint)Math.Max(1, h >> l);
+        fixed (byte* p = mips[l]) _gl.CompressedTexImage2D(TextureTarget.Texture2D, l, fmt7, lw, lh, 0, (uint)mips[l].Length, p);
+        TexBytes += mips[l].Length;
+      }
+      _gl.TexParameter(TextureTarget.Texture2D, TextureParameterName.TextureMaxLevel, mips.Length - 1);
+      TexBcCount++; TexBc7Count++;
+    }
+    else if (TexBc && (srgb ? BcSrgb : BcLinear))
     {
       // R85: BC1 (opaque) / BC3 (alpha) with CPU mips (GenerateMipmap does not work on compressed textures).
       var alpha = BcEncoder.HasAlpha(rgba);
@@ -652,6 +674,7 @@ internal sealed unsafe class GlPreview : IDisposable
       _gl.TexParameter(TextureTarget.Texture2D, (TextureParameterName)MaxAnisotropy, Anisotropy);
     _textures[image] = id;
     LastUploadMs += budget.Elapsed.TotalMilliseconds - start;
+    TexUploadMsTotal += budget.Elapsed.TotalMilliseconds - start;
     return id;
   }
 

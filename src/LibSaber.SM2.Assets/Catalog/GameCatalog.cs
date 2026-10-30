@@ -33,12 +33,11 @@ public sealed class GameCatalog
 
   private readonly CatalogFile[] _files;
   private readonly string[] _paths;
-  private readonly string[] _names;
   private readonly string[] _extensions;
-  private readonly Dictionary<string, int> _pathFirst;
-  private readonly Dictionary<string, int[]> _pathAll;
-  private readonly Dictionary<string, int> _nameFirst;
-  private readonly Dictionary<string, int[]> _nameAll;
+  // R87: sorted index arrays replace the per-file name strings and the four path/name dictionaries
+  // (measured catalog heap before: 222.8 MB for 511,392 files). Lookups are binary searches (OrdinalIgnoreCase).
+  private readonly int[] _byPath; // file indices ordered by path
+  private readonly int[] _byName; // file indices ordered by file name, then index
 
   public string RootPath { get; }
   public IReadOnlyList<ArchiveRecord> Archives { get; }
@@ -59,12 +58,9 @@ public sealed class GameCatalog
     CatalogDirectory root,
     CatalogFile[] files,
     string[] paths,
-    string[] names,
     string[] extensions,
-    Dictionary<string, int> pathFirst,
-    Dictionary<string, int[]> pathAll,
-    Dictionary<string, int> nameFirst,
-    Dictionary<string, int[]> nameAll,
+    int[] byPath,
+    int[] byName,
     int archivesSkipped,
     int duplicatesCollapsed,
     IReadOnlyList<string> warnings)
@@ -74,12 +70,9 @@ public sealed class GameCatalog
     Root = root;
     _files = files;
     _paths = paths;
-    _names = names;
     _extensions = extensions;
-    _pathFirst = pathFirst;
-    _pathAll = pathAll;
-    _nameFirst = nameFirst;
-    _nameAll = nameAll;
+    _byPath = byPath;
+    _byName = byName;
     ArchivesSkipped = archivesSkipped;
     DuplicatesCollapsed = duplicatesCollapsed;
     Warnings = warnings;
@@ -93,8 +86,8 @@ public sealed class GameCatalog
     return new CatalogFileInfo
     {
       Index = index,
-      Path = _paths[file.PathId],
-      Name = _names[file.NameId],
+      Path = _paths[index],
+      Name = NameOf(_paths[index]),
       Extension = extension,
       ArchiveName = archive.Name,
       ArchiveId = file.ArchiveId,
@@ -150,7 +143,7 @@ public sealed class GameCatalog
       {
         if (!AssetClassification.Matches(filter, KindOf(i)))
           continue;
-        if (text is not null && !MatchesAll(_paths[_files[i].PathId], words))
+        if (text is not null && !MatchesAll(_paths[i], words))
           continue;
         if (Keep(i))
           matches.Add(i);
@@ -173,27 +166,29 @@ public sealed class GameCatalog
   public bool TryGetByPath(string path, out int index)
   {
     var key = Normalize(path);
-    return _pathFirst.TryGetValue(key, out index);
+    index = FindPath(key);
+    return index >= 0;
   }
 
   public IReadOnlyList<int> FindByPath(string path)
   {
     var key = Normalize(path);
-    if (_pathAll.TryGetValue(key, out var all))
-      return all;
-    if (_pathFirst.TryGetValue(key, out var index))
-      return new[] { index };
-    return Array.Empty<int>();
+    var index = FindPath(key); // paths are unique (CollapseDuplicates, OrdinalIgnoreCase)
+    return index >= 0 ? new[] { index } : Array.Empty<int>();
   }
 
   public IReadOnlyList<int> FindByFileName(string fileName)
   {
     var name = Path.GetFileName(fileName.Replace('\\', '/'));
-    if (_nameAll.TryGetValue(name, out var all))
-      return all;
-    if (_nameFirst.TryGetValue(name, out var index))
-      return new[] { index };
-    return Array.Empty<int>();
+    var lo = LowerBoundName(name);
+    var hi = lo;
+    while (hi < _byName.Length && NameOf(_paths[_byName[hi]].AsSpan()).Equals(name, StringComparison.OrdinalIgnoreCase))
+      hi++;
+    if (hi == lo)
+      return Array.Empty<int>();
+    var all = new int[hi - lo];
+    Array.Copy(_byName, lo, all, 0, all.Length);
+    return all;
   }
 
   /// <summary>
@@ -202,7 +197,8 @@ public sealed class GameCatalog
   public int ResolveReference(string reference, int hintFileIndex)
   {
     var normalized = Normalize(reference);
-    if (_pathFirst.TryGetValue(normalized, out var exact))
+    var exact = FindPath(normalized);
+    if (exact >= 0)
       return exact;
 
     var hits = FindByFileName(normalized);
@@ -212,12 +208,12 @@ public sealed class GameCatalog
       return hits[0];
 
     var hint = _files[hintFileIndex];
-    var hintDir = DirectoryOf(_paths[hint.PathId]);
+    var hintDir = DirectoryOf(_paths[hintFileIndex]);
     var best = hits[0];
     foreach (var hit in hits)
     {
       var file = _files[hit];
-      if (file.ArchiveId == hint.ArchiveId && DirectoryOf(_paths[file.PathId]) == hintDir)
+      if (file.ArchiveId == hint.ArchiveId && DirectoryOf(_paths[hit]) == hintDir)
         return hit;
     }
 
@@ -337,25 +333,20 @@ public sealed class GameCatalog
 
     var files = new CatalogFile[raw.Count];
     var paths = new string[raw.Count];
-    var names = new string[raw.Count];
     var next = 0;
-    var root = Flatten(rootNode, raw, files, paths, names, ref next);
+    var root = Flatten(rootNode, raw, files, paths, ref next);
+    raw.Clear();
+    raw.TrimExcess();
 
-    var pathFirst = new Dictionary<string, int>(raw.Count, StringComparer.OrdinalIgnoreCase);
-    var nameFirst = new Dictionary<string, int>(raw.Count, StringComparer.OrdinalIgnoreCase);
-    var pathLists = new Dictionary<string, List<int>>(StringComparer.OrdinalIgnoreCase);
-    var nameLists = new Dictionary<string, List<int>>(StringComparer.OrdinalIgnoreCase);
-    for (var i = 0; i < files.Length; i++)
+    var byPath = new int[files.Length];
+    var byName = new int[files.Length];
+    for (var i = 0; i < files.Length; i++) { byPath[i] = i; byName[i] = i; }
+    Array.Sort(byPath, (a, b) => string.Compare(paths[a], paths[b], StringComparison.OrdinalIgnoreCase));
+    Array.Sort(byName, (a, b) =>
     {
-      var path = paths[files[i].PathId];
-      var name = names[files[i].NameId];
-      if (!pathFirst.ContainsKey(path))
-        pathFirst.Add(path, i);
-      if (!nameFirst.ContainsKey(name))
-        nameFirst.Add(name, i);
-      AddMulti(pathLists, path, i);
-      AddMulti(nameLists, name, i);
-    }
+      var c = NameOf(paths[a].AsSpan()).CompareTo(NameOf(paths[b].AsSpan()), StringComparison.OrdinalIgnoreCase);
+      return c != 0 ? c : a.CompareTo(b);
+    });
 
     return new GameCatalog(
       directory,
@@ -363,15 +354,48 @@ public sealed class GameCatalog
       root,
       files,
       paths,
-      names,
       extensions.ToArray(),
-      pathFirst,
-      Freeze(pathLists),
-      nameFirst,
-      Freeze(nameLists),
+      byPath,
+      byName,
       skipped,
       duplicatesCollapsed,
       warnings);
+  }
+
+  private static string NameOf(string path)
+  {
+    var slash = path.LastIndexOf('/');
+    return slash < 0 ? path : path[(slash + 1)..];
+  }
+
+  private static ReadOnlySpan<char> NameOf(ReadOnlySpan<char> path)
+  {
+    var slash = path.LastIndexOf('/');
+    return slash < 0 ? path : path[(slash + 1)..];
+  }
+
+  private int FindPath(string key)
+  {
+    int lo = 0, hi = _byPath.Length - 1;
+    while (lo <= hi)
+    {
+      var mid = (lo + hi) >>> 1;
+      var c = string.Compare(_paths[_byPath[mid]], key, StringComparison.OrdinalIgnoreCase);
+      if (c == 0) return _byPath[mid];
+      if (c < 0) lo = mid + 1; else hi = mid - 1;
+    }
+    return -1;
+  }
+
+  private int LowerBoundName(string name)
+  {
+    int lo = 0, hi = _byName.Length;
+    while (lo < hi)
+    {
+      var mid = (lo + hi) >>> 1;
+      if (NameOf(_paths[_byName[mid]].AsSpan()).CompareTo(name, StringComparison.OrdinalIgnoreCase) < 0) lo = mid + 1; else hi = mid;
+    }
+    return lo;
   }
 
   private AssetKind KindOf(int index)
@@ -441,7 +465,6 @@ public sealed class GameCatalog
     List<RawFile> raw,
     CatalogFile[] files,
     string[] paths,
-    string[] names,
     ref int next)
   {
     var first = next;
@@ -452,11 +475,8 @@ public sealed class GameCatalog
     {
       var source = raw[rawIndex];
       paths[next] = source.Path;
-      names[next] = source.Name;
       files[next] = new CatalogFile
       {
-        PathId = next,
-        NameId = next,
         ArchiveId = source.ArchiveId,
         ExtensionId = source.ExtensionId,
         Offset = source.Offset,
@@ -470,7 +490,7 @@ public sealed class GameCatalog
     var children = new CatalogDirectory[node.Children.Count];
     var childIndex = 0;
     foreach (var child in node.Children.Values.OrderBy(c => c.Name, StringComparer.OrdinalIgnoreCase))
-      children[childIndex++] = Flatten(child, raw, files, paths, names, ref next);
+      children[childIndex++] = Flatten(child, raw, files, paths, ref next);
 
     var subtree = node.Files.Count;
     for (var i = 0; i < children.Length; i++)
@@ -550,8 +570,6 @@ public sealed class GameCatalog
 
   private struct CatalogFile
   {
-    public int PathId;
-    public int NameId;
     public ushort ArchiveId;
     public ushort ExtensionId;
     public long Offset;
