@@ -1,3 +1,4 @@
+> **⭐ CORE CONCEPT:** Every supported game (SM2, PoE2, Black Myth: Wukong, Stellar Blade, Elden Ring) is **the SM2 feature set with only the game changed** — same models, skeletons, animations, textures, materials, physics/cloth, levels/props, viewer, and Unreal import under `/Game/ForgeLens/<CODE>/`. **Shared pipeline; only game-specific readers/parsers differ.** PoE2 skills (effects/animations) must be viewable in the viewer. Full text: `docs/RULES_CORE.md`.
 > **For AI agents (new SM2 / Forge Lens assistant): read [`docs/BOT_TRANSFER.md`](docs/BOT_TRANSFER.md) first (its §0 "Resume checklist"), then [`HANDOFF.md`](HANDOFF.md).** Reply to the user in short Korean 해요체.
 
 # LibSaber

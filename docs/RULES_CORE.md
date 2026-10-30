@@ -1,3 +1,14 @@
+# ⭐ CORE CONCEPT (READ FIRST)
+
+> **CORE CONCEPT: Every supported game (SM2, PoE2, Black Myth: Wukong, Stellar Blade, Elden Ring) is the SM2 feature set with only the game changed.**
+>
+> **Each new game must reach the same features as SM2:** models, skeletons, animations, textures, materials, physics/cloth, levels/props, the ForgeLens viewer, and Unreal import under `/Game/ForgeLens/<CODE>/`.
+>
+> **Build a shared pipeline; only the game-specific file readers/format parsers differ.**
+>
+> **PoE2 skills (effects/animations) must also be viewable in the viewer.**
+
+---
 # RULES_CORE — SM2 / Forge Lens standing rules (read once per session + after every context summary)
 Source of detail: BOT_TRANSFER §0/§5, HANDOFF ledger R01–R43. Newest dated owner statement wins. Run `rules_check` right after reading.
 

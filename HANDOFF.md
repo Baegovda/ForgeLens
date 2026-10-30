@@ -1,3 +1,4 @@
+> **⭐ CORE CONCEPT:** Every supported game (SM2, PoE2, Black Myth: Wukong, Stellar Blade, Elden Ring) is **the SM2 feature set with only the game changed** — same models, skeletons, animations, textures, materials, physics/cloth, levels/props, viewer, and Unreal import under `/Game/ForgeLens/<CODE>/`. **Shared pipeline; only game-specific readers/parsers differ.** PoE2 skills (effects/animations) must be viewable in the viewer. Full text: `docs/RULES_CORE.md`.
 > **For AI agents: 2026-10-29 20:50 KST — SM2 was transferred to a NEW Grok Bot: read [`docs/BOT_TRANSFER.md`](docs/BOT_TRANSFER.md) first** (BongThumbLive stays with the original bot).
 
 > **Standing rules: `docs/RULES_CORE.md` (read once per session + after summary; then run `tools/re/pc/rules_check.ps1`). Subagent preamble: `docs/SUBAGENT_PREAMBLE.md`.**
