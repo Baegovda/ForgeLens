@@ -15,7 +15,7 @@ def pp(s, ev):
     s.set_editor_property("override_auto_exposure_bias", True); s.set_editor_property("auto_exposure_bias", ev)
     s.set_editor_property("override_auto_exposure_apply_physical_camera_exposure", True); s.set_editor_property("auto_exposure_apply_physical_camera_exposure", False)
 def caps(): return {str(t)[4:]: x for x in E.get_all_level_actors() for t in x.tags if str(t).startswith("cap_")}
-def scene(ev=1.2):
+def scene(ev=9.0):  # R95: 1.2 overexposed (manual EV, physical camera off) -> near-white armour
     mp = F + "/Map_Floor"
     if EAL.does_asset_exist(mp): les.load_level(mp); [E.destroy_actor(x) for x in E.get_all_level_actors()]
     else: les.new_level(mp)
