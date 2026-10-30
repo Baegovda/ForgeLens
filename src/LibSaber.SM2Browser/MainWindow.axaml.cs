@@ -1364,7 +1364,7 @@ public partial class MainWindow : Window
       return;
     _playTimer.Stop();
     PlayButton.Content = "Play";
-    var play = _playOnLoad;
+    var play = true; // R84 (t201u): any user pick (click, keys, wheel) plays from 0 at once; model loads/programmatic picks are _suppressAnim
     _playOnLoad = false;
     if (choice.Seq is { } seq)
     {
