@@ -187,7 +187,7 @@ public sealed class LevelScene
   // instance by projected size, budget ranked by size/distance from the focus, disk cache of the built level
   // (template geometry + placements + cameras) and a shared texture cache, all under %LOCALAPPDATA%\ForgeLens.
   public sealed record Options(float MaxSize = 1000f, bool Textured = true, int ShrinkEdge = 512, long MaxTriangles = 20_000_000, float LightGain = 1f, bool UseCache = true);
-  public const int CacheVersion = 7;
+  public const int CacheVersion = 8;
 
   public OrbitCamera Persp, Close, Top;
   public bool FromDiskCache;
@@ -297,10 +297,14 @@ public sealed class LevelScene
     var cl = FindClassList(catalog, cdIndex);
     if (cl < 0) throw new FileNotFoundException("class_list next to " + path);
     var scene = new LevelScene { Name = Path.GetFileNameWithoutExtension(path) };
-    scene.Objects = ParseObjects(store.Read(cdIndex), store.Read(cl));
+    var cdBytes = store.Read(cdIndex); var clBytes = store.Read(cl);
+    scene.Objects = ParseObjects(cdBytes, clBytes);
     var lwiIndex = catalog.ResolveReference(Path.ChangeExtension(Path.GetFileName(path), ".lwi_container"), cdIndex);
     var hasLwi = lwiIndex >= 0 && Path.GetDirectoryName(catalog.GetFile(lwiIndex).Path) == Path.GetDirectoryName(path);
-    var key = $"v{CacheVersion}|{Stamp(catalog, cdIndex)}|{Stamp(catalog, cl)}|{(hasLwi ? Stamp(catalog, lwiIndex) : "-")}|{o}";
+    var lwiBytes = hasLwi ? store.Read(lwiIndex) : Array.Empty<byte>();
+    // content hashes: the viewer (game root) and levelbench (client_pc) can resolve the same path to different paks
+    static string H(byte[] b) => Convert.ToHexString(System.Security.Cryptography.SHA1.HashData(b))[..16];
+    var key = $"v{CacheVersion}|{H(cdBytes)}|{H(clBytes)}|{H(lwiBytes)}|{o}";
     var pack = Path.Combine(CacheDir, scene.Name + ".flpack");
     Mark("parse cd_list");
     foreach (var obj in scene.Objects)
@@ -320,7 +324,7 @@ public sealed class LevelScene
     var lwi = new List<(string Template, Matrix4x4 World)>();
     if (hasLwi)
     {
-      try { lwi = ParseLwi(store.Read(lwiIndex)); }
+      try { lwi = ParseLwi(lwiBytes); }
       catch (Exception e) { log?.Invoke("lwi parse failed: " + e.Message); }
     }
     scene.LwiCount = lwi.Count;
