@@ -114,6 +114,7 @@ public partial class MainWindow : Window
     // Space = Play/Pause anywhere in the window, except while typing (search, anim filter) or in an open dropdown.
     AddHandler(KeyDownEvent, SpaceKeyDown, RoutingStrategies.Tunnel);
     AddHandler(KeyDownEvent, ShortcutKeyDown, RoutingStrategies.Tunnel);
+    InitLightweight(); // R81
     InitUeViewport(); // R79 (before InitFly: F with a selection frames the part)
     InitFly();
     InitHud();

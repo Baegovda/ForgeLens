@@ -1,4 +1,4 @@
-<Window xmlns="https://github.com/avaloniaui"
+﻿<Window xmlns="https://github.com/avaloniaui"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:tdg="using:Avalonia.Controls"
         xmlns:local="using:LibSaber.SM2Browser"
@@ -373,7 +373,7 @@
             </Border>
             <Border x:Name="LoadingOverlay" IsVisible="False" Background="#CC121418">
               <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center" Spacing="12">
-                <ProgressBar IsIndeterminate="True" Width="200" Height="8" />
+                <ProgressBar x:Name="LoadingBar" IsIndeterminate="False" Width="200" Height="8" />
                 <TextBlock Text="Loading..." HorizontalAlignment="Center" FontSize="16" />
               </StackPanel>
             </Border>
