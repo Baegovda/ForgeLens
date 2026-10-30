@@ -26,3 +26,9 @@
 - ue_seq_fire.py (R59 tool, new root): LS_arifle_bolt_rifle in /Game/ForgeLens/SM2/Sequences/BoltRifleFire_r97. Aim clip = tacticus_wpn10_aim_hold_intercessor (from MUZZLE_AIM.tsv arifle_bolt_rifle_client.cls, wpnType 1). Aim section swapped (1), 8 MuzzleFlash bindings attached to socket SM2_shootTip.
 - The combimelta variant (wpn151 aim clip) is not imported, so it can't be built yet.
 - Not verified visually: no viewport frame render of the sequence.
+
+## R97h Vortex orb 04:22 KST
+- Game data: npc_vortex_beast_client.cls attaches fx_vortex_beast_back_idle to nameParent "DISK" (isAutoStart). The sfx has 23 emitters; the main ones (whirl_lines/whirl_core/core) are MESH particles of tpl/fx_vortex_beast_lwis (5 parts, texture vfx_vortex_beast); the sprite emitters are spark_01 sparks (6-11/s), runes (66/s), warp (22/s) and inner_glow (intensity 1111).
+- tools/ue/ue_r97_orb.py: imports the lwis mesh + texture into /Game/ForgeLens/SM2/VFX/vortex_orb, builds M_vortex_orb (additive unlit, rotator 0.15, OrbColor 1,0.35,1, OrbIntensity 20; colour/intensity HEURISTIC) and attaches R97_vortex_orb to bone DISK of R92_vortex in Map_Floor. ue_r97_orbxf.py sets the relative transform: roll 90, scale 0.3 (HEURISTIC, fitted to the ring).
+- docs/handoff/r97/vortex_orb_sbs.jpg: the swirl now fills the ring like the game. The game's bright magenta-white core (inner_glow sprites) is still missing.
+- NOT Niagara: UE 5.7 Python has no emitter/module authoring API, so the sprite emitters are not reproduced.
