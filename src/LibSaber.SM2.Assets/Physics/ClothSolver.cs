@@ -422,7 +422,12 @@ public sealed class ClothInstance
 
   private readonly record struct Collider(int Kind, Vector3 A, Vector3 B, float Ra, float Rb, Matrix4x4 Frame, Vector3 Half);
 
-  /// <summary>R73 experiment: scale on every capsule / sphere radius (SM2_PHYS_RSCALE).</summary>
+  /// <summary>
+  ///   R80: scale on every capsule / sphere radius (SM2_PHYS_RSCALE), default 1 = authored. Sweep (6 cloth models x
+  ///   death/run/attack/idle, CCD + backstop on), free particles inside the body: x0.5 5.60 %, x0.75 4.66 % (no CCD/backstop),
+  ///   x1 2.05 %, x1.15 1.96 %, x1.3 1.86 %; but x1.15 is worse on titus (2.42 -> 3.06) and calgar (1.47 -> 1.80), so the
+  ///   shared default stays 1. Shrinking is what hurts: that is the UE rest-fit bug fixed in R80.
+  /// </summary>
   public static float RadiusScale { get; set; } = float.TryParse(Environment.GetEnvironmentVariable("SM2_PHYS_RSCALE"), System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out var rs) ? rs : 1f;
 
   private List<Collider> Colliders(Matrix4x4[] worlds)

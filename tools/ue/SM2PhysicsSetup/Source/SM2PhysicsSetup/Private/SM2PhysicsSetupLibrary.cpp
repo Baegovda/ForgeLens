@@ -785,8 +785,17 @@ int32 AddCollision(UPhysicsAsset* PA, const TSharedPtr<FJsonObject>& Coll, const
   int32 Fitted = 0;
   float MinScale = 1.0f;
   // Largest radius scale s (<=1) so that every free rest particle P is outside the swept shape: dist(P) >= s*r(t) + ThickCm.
+  // R76 shared fix: the old fit took the MIN over every free rest particle, so one deeply embedded particle shrank the whole
+  // shape towards the 0.25 floor (R69 PROVEN 0.65-0.72 on the sorcerer) and every later frame collided against an undersized
+  // body (viewer R73: radius x0.75 4.66 %, x0.5 5.6 % vs x1 2.44 % free particles inside the body). Now particles deeper than
+  // half the radius count as authored-inside (Chaos pushes them out on the first step, as the viewer does) and do not drive
+  // the fit; shallow ones may shrink the shape to at most RestFitFloor. The raw (old) scale is kept only for remap rejection.
+  constexpr float RestFitFloor = 0.9f, DeepFrac = 0.5f;
+  int32 DeepIgnored = 0;
+  float LastRawScale = 1.0f;
   auto FitScale = [&](const FVector& A, const FVector& B, float RA, float RB) {
-    float S = 1.0f;
+    float S = 1.0f, Raw = 1.0f;
+    LastRawScale = 1.0f;
     if (!RestPV) return S;
     const FVector AB = B - A; const double L2 = AB.SizeSquared();
     for (int32 I = 0; I < RestPV->Num(); ++I)
@@ -797,9 +806,15 @@ int32 AddCollision(UPhysicsAsset* PA, const TSharedPtr<FJsonObject>& Coll, const
       const float R = FMath::Lerp(RA, RB, (float)T);
       const float D = (float)FVector::Dist(P, A + AB * T);
       if (R > KINDA_SMALL_NUMBER && D < R + ThickCm)
-        S = FMath::Min(S, FMath::Max(0.0f, D - ThickCm) / R);
+      {
+        const float Si = FMath::Max(0.0f, D - ThickCm) / R;
+        Raw = FMath::Min(Raw, Si);
+        if (D < R * DeepFrac) { ++DeepIgnored; continue; }
+        S = FMath::Min(S, Si);
+      }
     }
-    return FMath::Max(S, 0.25f); // HEURISTIC floor: keep a core so limbs still collide
+    LastRawScale = FMath::Max(Raw, 0.25f);
+    return FMath::Max(S, RestFitFloor); // HEURISTIC floor (R76): keep >= 90 % of the authored radius
   };
   if (!Coll.IsValid())
     return 0;
@@ -898,7 +913,7 @@ int32 AddCollision(UPhysicsAsset* PA, const TSharedPtr<FJsonObject>& Coll, const
       float R1 = (float)K->GetNumberField(TEXT("radiusFirstCm")), R2 = (float)K->GetNumberField(TEXT("radiusSecondCm"));
       {
         const float S = FitScale(T1.TransformPosition(P1), T1.TransformPosition(P2), R1, R2);
-        if (RejectRemap(B1, N1, SN, S <= 0.2501f) || (!B2.IsEmpty() && RejectRemap(B2, N2, SN, S <= 0.2501f))) continue;
+        if (RejectRemap(B1, N1, SN, LastRawScale <= 0.2501f) || (!B2.IsEmpty() && RejectRemap(B2, N2, SN, LastRawScale <= 0.2501f))) continue;
         if (S < 0.999f) { ++Fitted; MinScale = FMath::Min(MinScale, S); R1 *= S; R2 *= S; }
       }
       const FVector Axis = P2 - P1;
@@ -937,7 +952,7 @@ int32 AddCollision(UPhysicsAsset* PA, const TSharedPtr<FJsonObject>& Coll, const
       float Rs = (float)K->GetNumberField(TEXT("radiusCm"));
       const FVector C = JVec(K, TEXT("offsetCm"), bMirror);
       { const float S = FitScale(T.TransformPosition(C), T.TransformPosition(C), Rs, Rs);
-        if (RejectRemap(K->GetStringField(TEXT("Bone")), BN, K->HasField(TEXT("Name")) ? K->GetStringField(TEXT("Name")) : BN.ToString(), S <= 0.2501f)) continue;
+        if (RejectRemap(K->GetStringField(TEXT("Bone")), BN, K->HasField(TEXT("Name")) ? K->GetStringField(TEXT("Name")) : BN.ToString(), LastRawScale <= 0.2501f)) continue;
         if (S < 0.999f) { ++Fitted; MinScale = FMath::Min(MinScale, S); Rs *= S; } }
       FKSphereElem E(Rs);
       E.Center = C;
@@ -980,7 +995,7 @@ int32 AddCollision(UPhysicsAsset* PA, const TSharedPtr<FJsonObject>& Coll, const
       CollBody(PA, BN)->AggGeom.BoxElems.Add(E);
       ++N;
     }
-  Log.Add(FString::Printf(TEXT("%s: collision shapes=%d missingBones=%d remapped=%d remapRejected=%d unnegated=%d restFitted=%d minRadiusScale=%.2f boxRestInside=%d tplLocator=%d"), *Who, N, Missing, Remapped, Rejected, bMirror ? 1 : 0, Fitted, MinScale, BoxRestInside, FromLocator));
+  Log.Add(FString::Printf(TEXT("%s: collision shapes=%d missingBones=%d remapped=%d remapRejected=%d unnegated=%d restFitted=%d minRadiusScale=%.2f boxRestInside=%d tplLocator=%d deepIgnored=%d"), *Who, N, Missing, Remapped, Rejected, bMirror ? 1 : 0, Fitted, MinScale, BoxRestInside, FromLocator, DeepIgnored));
   if (RemapLog.Num()) Log.Add(FString::Printf(TEXT("%s: collision remap (HEURISTIC) %s"), *Who, *FString::Join(RemapLog, TEXT(" "))));
   if (MissLog.Num()) Log.Add(FString::Printf(TEXT("%s: collision skipped (bone not in mesh) %s"), *Who, *FString::Join(MissLog, TEXT(" "))));
   return N;
