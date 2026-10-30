@@ -39,7 +39,7 @@ internal static class Poe2Bench
       }
       foreach (var p in mesh.Parts)
         log.AppendLine($"part {p.Name} tris {p.IndexCount / 3} mat {p.Variant} albedo {p.Texture} normal {p.Normal}");
-      GltfWriter.Write(Path.Combine(output, name + ".gltf"), mesh, ExportSpace.Unreal);
+      GltfWriter.Write(Path.Combine(output, name + ".glb"), mesh, ExportSpace.Unreal, files); // M2 E: GLB with embedded PNGs
       FbxWriter.Write(Path.Combine(output, name + ".fbx"), mesh, ExportSpace.Unreal, files);
       if (ast != null && clip == "*")
         log.AppendLine("animations: " + string.Join(", ", reader.Animations(ast)));
@@ -79,8 +79,23 @@ internal static class Poe2Bench
     var albedo = new Dictionary<string, PreviewImage>(StringComparer.OrdinalIgnoreCase);
     foreach (var t in mesh.Parts.Select(p => p.Texture).Where(t => t != null).Distinct())
       if (reader.Texture(t!) is { } img) albedo[t!] = img;
+    TintAlbedo(mesh, albedo);
     settings = new PreviewSettings { Albedo = albedo, InPlace = true };
     log = reader.Log;
     return mesh;
+  }
+
+  /// <summary>M2 E: TWEAK_Albedo multiplier (linear) baked into preview albedo as an sRGB factor k^(1/2.2).</summary>
+  public static void TintAlbedo(ExportedMesh m, Dictionary<string, PreviewImage> a)
+  {
+    foreach (var p in m.Parts.Concat(m.Levels.SelectMany(l => l.Parts)).Where(p => p.Texture != null && p.AlbedoTint != null).GroupBy(p => p.Texture!).Select(g => g.First()))
+      if (a.TryGetValue(p.Texture!, out var s0) && MathF.Abs(p.AlbedoTint![0] - 1f) > 0.01f)
+      {
+        var f = MathF.Pow(p.AlbedoTint[0], 1f / 2.2f);
+        var px = (byte[])s0.Bgra.Clone();
+        for (int i = 0; i < px.Length; i += 4)
+          for (int ch = 0; ch < 3; ch++) px[i + ch] = (byte)Math.Min(255f, px[i + ch] * f);
+        a[p.Texture!] = new PreviewImage { Width = s0.Width, Height = s0.Height, Bgra = px, Channels = s0.Channels };
+      }
   }
 }

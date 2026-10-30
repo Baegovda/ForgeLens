@@ -74,3 +74,9 @@ Chain (PROVEN by row values for Firebolt):
 - cleaveGeo01.fmt: present; it uses the V8 .fmt layout (vertex_buffer/index_buffer), now supported by Poe2Reader.
 - BellCrow dark: albedo textures are dark in the data (mean RGB ~43-64). The body material applies TWEAK_Albedo Albedo_MULT1=1.6, which was ignored. It is now read into MeshPart.AlbedoTint (used by the UE/material export) and baked into the viewer preview albedo as an sRGB factor of 1.6^(1/2.2). It builds; the brighter result has not been checked visually yet.
 
+
+### Step E.2: BellCrow render, glTF images
+
+- BellCrow rendered with the TWEAK_Albedo fix (handoff/poe2_m2/bellcrow_tint.png). It is still very dark. NettleAnt renders correctly in the same renderer, so the renderer is fine; the crow's textures are dark (colour mean RGB 43-64, SSS mean 27/21/18). In game the SSSAdd and SpecGloss terms brighten it, and the preview does not model them. Judgement: the colour is correct; it looks darker than in game because SSS and specular are not shaded. The tint helper is Poe2Bench.TintAlbedo, shared by glbench and the viewer.
+- --poe2export now writes <name>.glb with embedded PNGs. Every visible part gets its own primitive with a baseColor/normal material, and baseColorFactor comes from AlbedoTint (clamped to 1). Khronos gltf-validator 0 errors on bellcrow.glb (3 materials, 6 images, 4 primitives, attack_01 anim, 87 nodes). Before: 20640 ACCESSOR_WEIGHTS_NON_NORMALIZED; GltfWriter now normalises weights and zeroes unused joints. This is a shared writer change and also applies to SM2 exports.
+

@@ -7,8 +7,15 @@ namespace LibSaber.SM2.Assets.Meshes;
 public static class GltfWriter
 {
 
-  public static void Write(string path, ExportedMesh mesh, ExportSpace space)
+  /// <summary>
+  ///   M2 E: <paramref name="images"/> (texture name to PNG file) embeds the PNGs in the GLB and gives every part its own
+  ///   primitive with a baseColor (+ normal) material. Without it the output is unchanged (one primitive, no materials).
+  /// </summary>
+  public static void Write(string path, ExportedMesh mesh, ExportSpace space, IReadOnlyDictionary<string, string>? images = null)
   {
+    var materialsJson = new List<string>();
+    var texturesJson = new List<string>();
+    var imagesJson = new List<string>();
     var bin = new MemoryStream();
     var views = new List<string>();
     var accessors = new List<string>();
@@ -103,6 +110,14 @@ public static class GltfWriter
         weights[i * 4 + 1] = skin.W1;
         weights[i * 4 + 2] = skin.W2;
         weights[i * 4 + 3] = skin.W3;
+        // M2 E: glTF requires sum(weights) == 1 and joint 0 for unused slots (Khronos validator errors otherwise).
+        var sum = weights[i * 4] + weights[i * 4 + 1] + weights[i * 4 + 2] + weights[i * 4 + 3];
+        for (var k = 0; k < 4; k++)
+        {
+          if (sum > 0) weights[i * 4 + k] /= sum;
+          if (weights[i * 4 + k] == 0) joints[i * 4 + k] = 0;
+        }
+        if (sum <= 0) weights[i * 4] = 1;
       }
 
       jointAccessor = Accessor(Add(MemoryMarshalBytes(joints), 4, 34962), "VEC4", mesh.Skin.Count, "5123");
@@ -173,7 +188,44 @@ public static class GltfWriter
       attributes.Append('}');
 
       var primitives = new List<string>();
-      if (indexAccessor is int indices)
+      if (images is { Count: > 0 } && mesh.Indices.Count > 0 && mesh.Parts.Count > 0)
+      {
+        var imageIndex = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
+        int? Tex(string? name)
+        {
+          if (name == null || !images.TryGetValue(name, out var file) || !File.Exists(file)) return null;
+          if (!imageIndex.TryGetValue(name, out var ti))
+          {
+            var view = Add(File.ReadAllBytes(file), 4, 0);
+            imagesJson.Add($"{{\"name\":{Quote(Path.GetFileNameWithoutExtension(file))},\"bufferView\":{view},\"mimeType\":\"image/png\"}}");
+            texturesJson.Add($"{{\"source\":{imagesJson.Count - 1}}}");
+            ti = imageIndex[name] = texturesJson.Count - 1;
+          }
+          return ti;
+        }
+        var matIndex = new Dictionary<string, int>(StringComparer.Ordinal);
+        foreach (var part in mesh.Parts.Where(p => p.Visible && p.IndexCount > 0))
+        {
+          var key = (part.Texture ?? "") + "|" + (part.Normal ?? "");
+          if (!matIndex.TryGetValue(key, out var mi))
+          {
+            var sb = new StringBuilder("{\"name\":").Append(Quote(part.Variant ?? part.Name)).Append(",\"pbrMetallicRoughness\":{\"metallicFactor\":0,\"roughnessFactor\":0.8");
+            if (Tex(part.Texture) is int bt) sb.Append(",\"baseColorTexture\":{\"index\":").Append(bt).Append('}');
+            if (part.AlbedoTint is { Length: >= 3 } k) sb.Append(",\"baseColorFactor\":[").Append(F(Math.Min(1f, k[0]))).Append(',').Append(F(Math.Min(1f, k[1]))).Append(',').Append(F(Math.Min(1f, k[2]))).Append(",1]");
+            sb.Append('}');
+            if (Tex(part.Normal) is int nt) sb.Append(",\"normalTexture\":{\"index\":").Append(nt).Append('}');
+            sb.Append('}');
+            materialsJson.Add(sb.ToString());
+            mi = matIndex[key] = materialsJson.Count - 1;
+          }
+          var slice = new uint[part.IndexCount];
+          for (var i = 0; i < slice.Length; i++) slice[i] = (uint)mesh.Indices[part.IndexStart + i];
+          var pa = Accessor(Add(MemoryMarshalBytes(slice), 4, 34963), "SCALAR", slice.Length, "5125");
+          primitives.Add($"{{\"attributes\":{attributes},\"indices\":{pa},\"mode\":4,\"material\":{mi}}}");
+        }
+      }
+      if (primitives.Count > 0) { }
+      else if (indexAccessor is int indices)
         primitives.Add($"{{\"attributes\":{attributes},\"indices\":{indices},\"mode\":4}}");
       else
         primitives.Add($"{{\"attributes\":{attributes},\"mode\":0}}");
@@ -209,6 +261,10 @@ public static class GltfWriter
       json.Append(",\"skins\":").Append(skins);
     if (animations is not null)
       json.Append(",\"animations\":").Append(animations);
+    if (materialsJson.Count > 0)
+      json.Append(",\"materials\":[").Append(string.Join(',', materialsJson)).Append(']');
+    if (texturesJson.Count > 0)
+      json.Append(",\"textures\":[").Append(string.Join(',', texturesJson)).Append("],\"images\":[").Append(string.Join(',', imagesJson)).Append(']');
     json.Append(",\"buffers\":[{\"byteLength\":").Append(bin.Length).Append("}]");
     json.Append(",\"bufferViews\":[").Append(string.Join(',', views)).Append(']');
     json.Append(",\"accessors\":[").Append(string.Join(',', accessors)).Append("]}");

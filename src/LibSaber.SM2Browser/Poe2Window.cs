@@ -169,16 +169,7 @@ internal sealed class Poe2Window : Window
         var a = new Dictionary<string, PreviewImage>(StringComparer.OrdinalIgnoreCase);
         foreach (var t in m.Parts.Concat(m.Levels.SelectMany(l => l.Parts)).Select(p => p.Texture).Where(t => t != null).Distinct())
           if (reader.Texture(t!) is { } img) a[t!] = img;
-        // M2 E: TWEAK_Albedo multiplier (linear) baked into the preview albedo as an sRGB factor k^(1/2.2).
-        foreach (var p in m.Parts.Concat(m.Levels.SelectMany(l => l.Parts)).Where(p => p.Texture != null && p.AlbedoTint != null).GroupBy(p => p.Texture!).Select(g => g.First()))
-          if (a.TryGetValue(p.Texture!, out var src0) && MathF.Abs(p.AlbedoTint![0] - 1f) > 0.01f)
-          {
-            var f = MathF.Pow(p.AlbedoTint[0], 1f / 2.2f);
-            var px = (byte[])src0.Bgra.Clone();
-            for (int i = 0; i < px.Length; i += 4)
-              for (int ch = 0; ch < 3; ch++) px[i + ch] = (byte)Math.Min(255f, px[i + ch] * f);
-            a[p.Texture!] = new PreviewImage { Width = src0.Width, Height = src0.Height, Bgra = px, Channels = src0.Channels };
-          }
+        Bench.Poe2Bench.TintAlbedo(m, a);
         List<string> c = new();
         var skel = isEffect ? reader.ReadAo(path).Skeleton : ast;
         if (skel != null) { try { c = reader.Animations(skel); } catch (Exception) { } }
