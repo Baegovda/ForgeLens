@@ -12,6 +12,8 @@ $psi.WindowStyle = 'Minimized'
 $t = [Diagnostics.Stopwatch]::StartNew()
 $p = [Diagnostics.Process]::Start($psi); try { $p.PriorityClass = 'High' } catch {}
 while (-not (Test-Path "$shot.txt") -and $t.Elapsed.TotalSeconds -lt 600) { Start-Sleep 1 }
+# R64: with SM2_FLYTEST=1 the app appends fly lines after the first shot; wait for the last one ("after F")
+if ($env:SM2_FLYTEST -eq "1") { while (-not ((Get-Content "$shot.txt" -Raw -EA 0) -match "after F") -and $t.Elapsed.TotalSeconds -lt 700) { Start-Sleep 1 } }
 Add-Type @"
 using System; using System.Runtime.InteropServices;
 public static class PW { [DllImport("user32.dll")] public static extern bool PrintWindow(IntPtr h, IntPtr dc, uint f);
