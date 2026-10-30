@@ -35,6 +35,9 @@ public partial class MainWindow
     for (var i = 0; i < 6000 && _level is null && _mesh is null; i++) // R66: meshes too
       await Task.Delay(100);
     var open = sw.Elapsed.TotalSeconds;
+    // R66: SM2_WINSHOT_CPU=1: after the mesh is shown, switch to the CPU path so RenderTargetBitmap shots contain the
+    // 3D view (the GPU control is not in RenderTargetBitmap). Not persisted (Click handler not raised).
+    if (Environment.GetEnvironmentVariable("SM2_WINSHOT_CPU") == "1" && _level is null) { GpuToggle.IsChecked = false; GpuToggled(null, new Avalonia.Interactivity.RoutedEventArgs()); await Task.Delay(8000); }
     await Task.Delay(6000); // first frame (CPU or GPU path)
     var selected = (FileList.SelectedItem as FileRow) is { } row && _catalog is { } c ? c.GetFile(row.Index).Path : "(none)";
     try

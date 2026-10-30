@@ -884,7 +884,8 @@ public partial class MainWindow : Window
           }
 
           UpdateStats(task.Result.Item5, task.Result.width, task.Result.height, task.Result.supersample);
-          if (!string.IsNullOrEmpty(task.Result.note))
+          // R66: the CPU renderer echoes mesh.Message; keep the compact summary (Details shows the notes)
+          if (!string.IsNullOrEmpty(task.Result.note) && task.Result.note != _noteDetails)
             PreviewNote.Text = task.Result.note;
           HideLoading(previewGeneration);
         }

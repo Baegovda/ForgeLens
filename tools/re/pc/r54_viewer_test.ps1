@@ -1,12 +1,14 @@
 # R54b: open the real ForgeLens window (no activation), select a level .cd_list via SM2_SELECT (same path as a file-list
 # click), save the in-app window capture (SM2_WINSHOT) and a PrintWindow capture of the OS window. Hidden, High priority.
-param([string]$Level = "pvp_city", [string]$Out = "$env:USERPROFILE\Desktop\SM2_Work\Shots\r54b")
-$exe = "$env:USERPROFILE\Desktop\SM2_Work\Bin\ForgeLens_r54\ForgeLens.exe"
+# R66: -Select <catalog path> opens any file (e.g. tpl/cc_calgar.tpl/cc_calgar.tpl); -Level stays the shortcut for levels.
+param([string]$Level = "pvp_city", [string]$Out = "$env:USERPROFILE\Desktop\SM2_Work\Shots\r54b", [string]$Select = "", [string]$Exe = "")
+$exe = if ($Exe) { $Exe } else { "$env:USERPROFILE\Desktop\SM2_Work\Bin\ForgeLens_r54\ForgeLens.exe" }
+if ($Select) { $Level = [IO.Path]::GetFileNameWithoutExtension($Select) }
 New-Item -ItemType Directory -Force $Out | Out-Null
 $shot = "$Out\viewer_$Level.png"; Remove-Item "$shot*" -EA 0
 $psi = New-Object Diagnostics.ProcessStartInfo $exe
 $psi.UseShellExecute = $false
-$psi.EnvironmentVariables["SM2_SELECT"] = "scenes/$Level.scn/$Level.cd_list"
+$psi.EnvironmentVariables["SM2_SELECT"] = if ($Select) { $Select } else { "scenes/$Level.scn/$Level.cd_list" }
 $psi.EnvironmentVariables["SM2_WINSHOT"] = $shot
 $psi.WindowStyle = 'Minimized'
 $t = [Diagnostics.Stopwatch]::StartNew()

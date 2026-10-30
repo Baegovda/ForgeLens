@@ -214,6 +214,10 @@ public partial class MainWindow
     _flyLooking = true; FlyAdjustSpeed(3); Note("after RMB+wheel +3"); await Task.Delay(1500); await save(shot.Replace(".png", "_fly4.png")); _flyLooking = false;
     log.Append("hud: " + HudSnapshot() + "\n");
     FlyFrame(); Note("after F");
+    // R66: Details expander (full notes) and HUD hidden
+    if (NoteDetails.IsVisible) { NoteDetails.IsChecked = true; NoteDetailsClicked(null, new RoutedEventArgs()); await Task.Delay(1500); await save(shot.Replace(".png", "_details.png")); NoteDetails.IsChecked = false; NoteDetailsClicked(null, new RoutedEventArgs()); }
+    HudToggle.IsChecked = false; UpdateHud(); await Task.Delay(1500); await save(shot.Replace(".png", "_nohud.png")); HudToggle.IsChecked = true; UpdateHud();
+    log.Append("details/nohud shots saved\n");
     File.AppendAllText(shot + ".txt", log.ToString());
   }
 }
