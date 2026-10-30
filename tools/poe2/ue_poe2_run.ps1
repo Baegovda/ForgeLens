@@ -11,7 +11,8 @@ while ((Get-Content $lock -ErrorAction SilentlyContinue) -notmatch '^editor-free
 }
 if (Test-Path $na) { "NEEDS_ACTION present: $(Get-Content $na -Raw)"; exit 4 }
 if (Get-Process | Where-Object { $_.Name -match 'PathOfExile|Warhammer40000' }) { 'GAME RUNNING'; exit 5 }
-if (-not (Get-Process UnrealEditor -ErrorAction SilentlyContinue | Where-Object MainWindowTitle -match 'UE_VFX_57')) { 'UE_VFX_57 editor not running (not launching it)'; exit 6 }
+# the -unattended editor can have an empty MainWindowTitle: match the command line instead
+if (-not (Get-CimInstance Win32_Process -Filter "Name='UnrealEditor.exe'" | Where-Object CommandLine -match 'UE_VFX_57')) { 'UE_VFX_57 editor not running (not launching it)'; exit 6 }
 Set-Content $lock "poe2m2 $(Get-Date -Format 'yyyy-MM-dd HH:mm')"
 try {
   & $uerun $py (@($Result, $Dest) + $Dirs)

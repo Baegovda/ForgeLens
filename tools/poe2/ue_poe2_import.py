@@ -62,6 +62,77 @@ def fbx(src, dest):
     t.set_editor_property("options", ui)
     return import_tasks([t])
 
+MASTER = "/Game/ForgeLens/POE/_Shared/M_Poe2Lit"
+
+def master():
+    """Shared lit master: BaseColor = TextureSample(BaseColorTex), Normal = TextureSample(NormalTex, normal sampler)."""
+    if unreal.EditorAssetLibrary.does_asset_exist(MASTER):
+        return unreal.load_asset(MASTER)
+    mel = unreal.MaterialEditingLibrary
+    pkg, name = MASTER.rsplit("/", 1)
+    m = unreal.AssetToolsHelpers.get_asset_tools().create_asset(name, pkg, unreal.Material, unreal.MaterialFactoryNew())
+    bc = mel.create_material_expression(m, unreal.MaterialExpressionTextureSampleParameter2D, -600, -100)
+    bc.set_editor_property("parameter_name", "BaseColorTex")
+    mel.connect_material_property(bc, "RGB", unreal.MaterialProperty.MP_BASE_COLOR)
+    nm = mel.create_material_expression(m, unreal.MaterialExpressionTextureSampleParameter2D, -600, 200)
+    nm.set_editor_property("parameter_name", "NormalTex")
+    nm.set_editor_property("sampler_type", unreal.MaterialSamplerType.SAMPLERTYPE_NORMAL)
+    default_n = unreal.load_asset("/Engine/EngineMaterials/DefaultNormal")
+    if default_n:
+        nm.set_editor_property("texture", default_n)
+    mel.connect_material_property(nm, "RGB", unreal.MaterialProperty.MP_NORMAL)
+    rough = mel.create_material_expression(m, unreal.MaterialExpressionConstant, -300, 400)
+    rough.set_editor_property("r", 0.8)
+    mel.connect_material_property(rough, "", unreal.MaterialProperty.MP_ROUGHNESS)
+    mel.recompile_material(m)
+    unreal.EditorAssetLibrary.save_loaded_asset(m)
+    return m
+
+def part_maps(src):
+    """part name -> (albedo png base, normal png base) from poe2export.txt 'part <n> tris .. albedo <path> normal <path>'."""
+    maps = {}
+    txt = os.path.join(src, "poe2export.txt")
+    if not os.path.exists(txt):
+        return maps
+    for line in open(txt, encoding="utf-8", errors="replace"):
+        if not line.startswith("part "):
+            continue
+        w = line.split()
+        name = w[1]
+        def after(k):
+            return os.path.splitext(os.path.basename(w[w.index(k) + 1]))[0] if k in w and w.index(k) + 1 < len(w) and w[w.index(k) + 1] != "normal" else None
+        maps[name.replace("|", "_")] = (after("albedo"), after("normal"))  # FBX slot names replace | with _
+    return maps
+
+def materials(src, dest, mesh_path):
+    """M2 E: one MaterialInstanceConstant per mesh slot (MI_<slot>) on M_Poe2Lit with the part's albedo/normal textures."""
+    sk = unreal.load_asset(mesh_path)
+    if not isinstance(sk, unreal.SkeletalMesh):
+        return 0
+    parent = master()
+    maps = part_maps(src)
+    mel = unreal.MaterialEditingLibrary
+    mats = list(sk.get_editor_property("materials"))
+    done = 0
+    for i, sm in enumerate(mats):
+        slot = str(sm.get_editor_property("material_slot_name"))
+        alb, nrm = maps.get(slot, (None, None))
+        mi_name = "MI_" + slot
+        mi_path = f"{dest}/Materials/{mi_name}"
+        mi = unreal.load_asset(mi_path) if unreal.EditorAssetLibrary.does_asset_exist(mi_path) else \
+            unreal.AssetToolsHelpers.get_asset_tools().create_asset(mi_name, f"{dest}/Materials", unreal.MaterialInstanceConstant, unreal.MaterialInstanceConstantFactoryNew())
+        mel.set_material_instance_parent(mi, parent)
+        for pname, base in (("BaseColorTex", alb), ("NormalTex", nrm)):
+            if base and unreal.EditorAssetLibrary.does_asset_exist(f"{dest}/Textures/{base}"):
+                mel.set_material_instance_texture_parameter_value(mi, pname, unreal.load_asset(f"{dest}/Textures/{base}"))
+        unreal.EditorAssetLibrary.save_loaded_asset(mi)
+        sm.set_editor_property("material_interface", mi)
+        mats[i] = sm
+        done += 1
+    sk.set_editor_property("materials", mats)
+    unreal.EditorAssetLibrary.save_loaded_asset(sk)
+    return done
+
 def main(argv):
     result, root, dirs = argv[0], argv[1].rstrip("/"), argv[2:]
     if not root.startswith("/Game/ForgeLens/POE"):
@@ -72,13 +143,15 @@ def main(argv):
         dest = f"{root}/{name}"
         tex = textures(d, dest)
         assets = fbx(d, dest)
+        mesh = next((str(x).split(".")[0] for x in assets if str(x).split("/")[-1].split(".")[0] == name), f"{dest}/{name}")
+        mats = materials(d, dest, mesh)
         listed = unreal.EditorAssetLibrary.list_assets(dest, recursive=True)
         classes = {}
         for a in listed:
             data = unreal.EditorAssetLibrary.find_asset_data(a)
             c = str(data.asset_class_path.asset_name)
             classes[c] = classes.get(c, 0) + 1
-        report[name] = {"dest": dest, "textures": len(tex), "fbx_objects": [str(x) for x in assets], "classes": classes}
+        report[name] = {"dest": dest, "textures": len(tex), "fbx_objects": [str(x) for x in assets], "material_slots": mats, "classes": classes}
         log(f"{name}: {classes}")
     unreal.EditorLoadingAndSavingUtils.save_dirty_packages(True, True)
     with open(result, "w") as f:

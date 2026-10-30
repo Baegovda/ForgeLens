@@ -111,3 +111,12 @@ handoff/poe2_m2/monsters6_sheet.png shows bind pose and the first clip at t=0.5 
 - Inputs on the PC: PoE2\ue_exp\{bellcrow, wolfremake, basicskeleton, wingedrhoa} (--poe2export, one clip each). Blender 5.0 imports every FBX and GLB with the right bone count, the clip and the images (handoff/poe2_m2/ue_exp_blender_check.txt).
 - Note: RULES_CORE says UE work only under /Game/SM2_Work; the owner's M2 brief names /Game/ForgeLens/POE/. The script is restricted to /Game/ForgeLens/POE.
 
+
+### Step E.6: Unreal import (done, 06:39-06:50 KST)
+
+- The lock was held by the SM2 worker (sm2fid-r97o/r97s/r97t) from 05:39 until 06:38 'editor-free'. The editor was relaunched by that worker at 06:35 with -unattended -nosplash. Its MainWindowTitle is empty, so the runner now matches the process command line. Route: EngineWire (port 3000) via Scripts/uerun.ps1. The lock was taken as 'poe2m2 <ts>' for each run and released. NEEDS_ACTION.txt was absent before and after.
+- Imported into /Game/ForgeLens/POE/{bellcrow, wolfremake, basicskeleton, wingedrhoa}: SkeletalMesh, Skeleton and AnimSequence (attack_01 1.833 s, attack_01 1.5 s, approach_sword_sword_01 1.333 s, death_01 1.0 s), plus Textures/*.png. Bone counts in UE: 86/40/49/52, the same as the source.
+- Materials: shared /Game/ForgeLens/POE/_Shared/M_Poe2Lit (BaseColorTex, NormalTex, roughness 0.8), with Materials/MI_<slot> per mesh slot. Textures are assigned from the part map in poe2export.txt (checked: all slots have colour and normal). FBX slot names replace | with _. The importer's own FBXLegacyPhong MICs (untextured) are still in each folder and unused.
+- Not done in UE: the TWEAK_Albedo tint (BellCrow x1.6), SSS/spec maps, masked fur, more than one clip per mesh (FBX export writes one clip), and a visual UE viewport check.
+- Result files: handoff/poe2_m2/ue_import_result.json and ue_import_check.json. Checker: tools/poe2/ue_poe2_check.py.
+

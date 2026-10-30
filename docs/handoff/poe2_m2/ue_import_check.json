@@ -1,0 +1,302 @@
+{
+ "/Game/ForgeLens/POE/basicskeleton/basicskeleton.basicskeleton": {
+  "bones": 49,
+  "mats": 15,
+  "bounds": "<Struct 'Vector' (0x000002434C9B2FD8) {x: 77.204002, y: 14.510499, z: 94.393507}>"
+ },
+ "/Game/ForgeLens/POE/basicskeleton/basicskeleton_Anim.basicskeleton_Anim": {
+  "len": 1.333,
+  "skel": "basicskeleton_Skeleton"
+ },
+ "/Game/ForgeLens/POE/basicskeleton/HipsShape.HipsShape": {
+  "parent": "FBXLegacyPhongSurfaceMaterial",
+  "tex": []
+ },
+ "/Game/ForgeLens/POE/basicskeleton/L_FemurShape.L_FemurShape": {
+  "parent": "FBXLegacyPhongSurfaceMaterial",
+  "tex": []
+ },
+ "/Game/ForgeLens/POE/basicskeleton/L_FootShape.L_FootShape": {
+  "parent": "FBXLegacyPhongSurfaceMaterial",
+  "tex": []
+ },
+ "/Game/ForgeLens/POE/basicskeleton/L_ForearmShape.L_ForearmShape": {
+  "parent": "FBXLegacyPhongSurfaceMaterial",
+  "tex": []
+ },
+ "/Game/ForgeLens/POE/basicskeleton/L_HandShape.L_HandShape": {
+  "parent": "FBXLegacyPhongSurfaceMaterial",
+  "tex": []
+ },
+ "/Game/ForgeLens/POE/basicskeleton/L_HumerusShape.L_HumerusShape": {
+  "parent": "FBXLegacyPhongSurfaceMaterial",
+  "tex": []
+ },
+ "/Game/ForgeLens/POE/basicskeleton/L_ShinShape.L_ShinShape": {
+  "parent": "FBXLegacyPhongSurfaceMaterial",
+  "tex": []
+ },
+ "/Game/ForgeLens/POE/basicskeleton/Materials/MI_HipsShape.MI_HipsShape": {
+  "parent": "M_Poe2Lit",
+  "tex": [
+   "BasicSkeleton_colour_DXT1",
+   "BasicSkeleton_normal_DXT5"
+  ]
+ },
+ "/Game/ForgeLens/POE/basicskeleton/Materials/MI_L_FemurShape.MI_L_FemurShape": {
+  "parent": "M_Poe2Lit",
+  "tex": [
+   "BasicSkeleton_colour_DXT1",
+   "BasicSkeleton_normal_DXT5"
+  ]
+ },
+ "/Game/ForgeLens/POE/basicskeleton/Materials/MI_L_FootShape.MI_L_FootShape": {
+  "parent": "M_Poe2Lit",
+  "tex": [
+   "BasicSkeleton_colour_DXT1",
+   "BasicSkeleton_normal_DXT5"
+  ]
+ },
+ "/Game/ForgeLens/POE/basicskeleton/Materials/MI_L_ForearmShape.MI_L_ForearmShape": {
+  "parent": "M_Poe2Lit",
+  "tex": [
+   "BasicSkeleton_colour_DXT1",
+   "BasicSkeleton_normal_DXT5"
+  ]
+ },
+ "/Game/ForgeLens/POE/basicskeleton/Materials/MI_L_HandShape.MI_L_HandShape": {
+  "parent": "M_Poe2Lit",
+  "tex": [
+   "BasicSkeleton_colour_DXT1",
+   "BasicSkeleton_normal_DXT5"
+  ]
+ },
+ "/Game/ForgeLens/POE/basicskeleton/Materials/MI_L_HumerusShape.MI_L_HumerusShape": {
+  "parent": "M_Poe2Lit",
+  "tex": [
+   "BasicSkeleton_colour_DXT1",
+   "BasicSkeleton_normal_DXT5"
+  ]
+ },
+ "/Game/ForgeLens/POE/basicskeleton/Materials/MI_L_ShinShape.MI_L_ShinShape": {
+  "parent": "M_Poe2Lit",
+  "tex": [
+   "BasicSkeleton_colour_DXT1",
+   "BasicSkeleton_normal_DXT5"
+  ]
+ },
+ "/Game/ForgeLens/POE/basicskeleton/Materials/MI_R_FemurShape.MI_R_FemurShape": {
+  "parent": "M_Poe2Lit",
+  "tex": [
+   "BasicSkeleton_colour_DXT1",
+   "BasicSkeleton_normal_DXT5"
+  ]
+ },
+ "/Game/ForgeLens/POE/basicskeleton/Materials/MI_R_FootShape.MI_R_FootShape": {
+  "parent": "M_Poe2Lit",
+  "tex": [
+   "BasicSkeleton_colour_DXT1",
+   "BasicSkeleton_normal_DXT5"
+  ]
+ },
+ "/Game/ForgeLens/POE/basicskeleton/Materials/MI_R_ForearmShape.MI_R_ForearmShape": {
+  "parent": "M_Poe2Lit",
+  "tex": [
+   "BasicSkeleton_colour_DXT1",
+   "BasicSkeleton_normal_DXT5"
+  ]
+ },
+ "/Game/ForgeLens/POE/basicskeleton/Materials/MI_R_HandShape.MI_R_HandShape": {
+  "parent": "M_Poe2Lit",
+  "tex": [
+   "BasicSkeleton_colour_DXT1",
+   "BasicSkeleton_normal_DXT5"
+  ]
+ },
+ "/Game/ForgeLens/POE/basicskeleton/Materials/MI_R_HumerusShape.MI_R_HumerusShape": {
+  "parent": "M_Poe2Lit",
+  "tex": [
+   "BasicSkeleton_colour_DXT1",
+   "BasicSkeleton_normal_DXT5"
+  ]
+ },
+ "/Game/ForgeLens/POE/basicskeleton/Materials/MI_R_ShinShape.MI_R_ShinShape": {
+  "parent": "M_Poe2Lit",
+  "tex": [
+   "BasicSkeleton_colour_DXT1",
+   "BasicSkeleton_normal_DXT5"
+  ]
+ },
+ "/Game/ForgeLens/POE/basicskeleton/Materials/MI_RibsShape.MI_RibsShape": {
+  "parent": "M_Poe2Lit",
+  "tex": [
+   "BasicSkeleton_colour_DXT1",
+   "BasicSkeleton_normal_DXT5"
+  ]
+ },
+ "/Game/ForgeLens/POE/basicskeleton/Materials/MI_SkullShape.MI_SkullShape": {
+  "parent": "M_Poe2Lit",
+  "tex": [
+   "BasicSkeleton_colour_DXT1",
+   "BasicSkeleton_normal_DXT5"
+  ]
+ },
+ "/Game/ForgeLens/POE/basicskeleton/R_FemurShape.R_FemurShape": {
+  "parent": "FBXLegacyPhongSurfaceMaterial",
+  "tex": []
+ },
+ "/Game/ForgeLens/POE/basicskeleton/R_FootShape.R_FootShape": {
+  "parent": "FBXLegacyPhongSurfaceMaterial",
+  "tex": []
+ },
+ "/Game/ForgeLens/POE/basicskeleton/R_ForearmShape.R_ForearmShape": {
+  "parent": "FBXLegacyPhongSurfaceMaterial",
+  "tex": []
+ },
+ "/Game/ForgeLens/POE/basicskeleton/R_HandShape.R_HandShape": {
+  "parent": "FBXLegacyPhongSurfaceMaterial",
+  "tex": []
+ },
+ "/Game/ForgeLens/POE/basicskeleton/R_HumerusShape.R_HumerusShape": {
+  "parent": "FBXLegacyPhongSurfaceMaterial",
+  "tex": []
+ },
+ "/Game/ForgeLens/POE/basicskeleton/R_ShinShape.R_ShinShape": {
+  "parent": "FBXLegacyPhongSurfaceMaterial",
+  "tex": []
+ },
+ "/Game/ForgeLens/POE/basicskeleton/RibsShape.RibsShape": {
+  "parent": "FBXLegacyPhongSurfaceMaterial",
+  "tex": []
+ },
+ "/Game/ForgeLens/POE/basicskeleton/SkullShape.SkullShape": {
+  "parent": "FBXLegacyPhongSurfaceMaterial",
+  "tex": []
+ },
+ "/Game/ForgeLens/POE/bellcrow/Bell_ClapperShape.Bell_ClapperShape": {
+  "parent": "FBXLegacyPhongSurfaceMaterial",
+  "tex": []
+ },
+ "/Game/ForgeLens/POE/bellcrow/Bell_mainShape.Bell_mainShape": {
+  "parent": "FBXLegacyPhongSurfaceMaterial",
+  "tex": []
+ },
+ "/Game/ForgeLens/POE/bellcrow/bellcrow.bellcrow": {
+  "bones": 86,
+  "mats": 4,
+  "bounds": "<Struct 'Vector' (0x000002434CC59168) {x: 157.181015, y: 100.383003, z: 187.776493}>"
+ },
+ "/Game/ForgeLens/POE/bellcrow/bellcrow_Anim.bellcrow_Anim": {
+  "len": 1.833,
+  "skel": "bellcrow_Skeleton"
+ },
+ "/Game/ForgeLens/POE/bellcrow/bodyShape.bodyShape": {
+  "parent": "FBXLegacyPhongSurfaceMaterial",
+  "tex": []
+ },
+ "/Game/ForgeLens/POE/bellcrow/extrasShape.extrasShape": {
+  "parent": "FBXLegacyPhongSurfaceMaterial",
+  "tex": []
+ },
+ "/Game/ForgeLens/POE/bellcrow/Materials/MI_Bell_ClapperShape.MI_Bell_ClapperShape": {
+  "parent": "M_Poe2Lit",
+  "tex": [
+   "bell_ColourSpecular_DXT1",
+   "bell_Normal_DXT5"
+  ]
+ },
+ "/Game/ForgeLens/POE/bellcrow/Materials/MI_Bell_mainShape.MI_Bell_mainShape": {
+  "parent": "M_Poe2Lit",
+  "tex": [
+   "bellcrow_body_colour_DXT1",
+   "bellcrow_body_normal_DXT5"
+  ]
+ },
+ "/Game/ForgeLens/POE/bellcrow/Materials/MI_bodyShape.MI_bodyShape": {
+  "parent": "M_Poe2Lit",
+  "tex": [
+   "bellcrow_accessories_colour_DXT1",
+   "bellcrow_accessories_normal_DXT5"
+  ]
+ },
+ "/Game/ForgeLens/POE/bellcrow/Materials/MI_extrasShape.MI_extrasShape": {
+  "parent": "M_Poe2Lit",
+  "tex": [
+   "bellcrow_accessories_colour_DXT1",
+   "bellcrow_accessories_normal_DXT5"
+  ]
+ },
+ "/Game/ForgeLens/POE/wingedrhoa/ArmFeatherShape.ArmFeatherShape": {
+  "parent": "FBXLegacyPhongSurfaceMaterial",
+  "tex": []
+ },
+ "/Game/ForgeLens/POE/wingedrhoa/CartRhoaShape.CartRhoaShape": {
+  "parent": "FBXLegacyPhongSurfaceMaterial",
+  "tex": []
+ },
+ "/Game/ForgeLens/POE/wingedrhoa/Materials/MI_ArmFeatherShape.MI_ArmFeatherShape": {
+  "parent": "M_Poe2Lit",
+  "tex": [
+   "WingedRhoa_colour_BC1",
+   "WingedRhoa_normal_BC7"
+  ]
+ },
+ "/Game/ForgeLens/POE/wingedrhoa/Materials/MI_CartRhoaShape.MI_CartRhoaShape": {
+  "parent": "M_Poe2Lit",
+  "tex": [
+   "WingedRhoa_colour_BC1",
+   "WingedRhoa_normal_BC7"
+  ]
+ },
+ "/Game/ForgeLens/POE/wingedrhoa/wingedrhoa.wingedrhoa": {
+  "bones": 52,
+  "mats": 2,
+  "bounds": "<Struct 'Vector' (0x000002434C9B19D8) {x: 28.820002, y: 146.739006, z: 71.823001}>"
+ },
+ "/Game/ForgeLens/POE/wingedrhoa/wingedrhoa_Anim.wingedrhoa_Anim": {
+  "len": 1.0,
+  "skel": "wingedrhoa_Skeleton"
+ },
+ "/Game/ForgeLens/POE/wolfremake/armour_WolfRemake_fur1_fur1Shape.armour_WolfRemake_fur1_fur1Shape": {
+  "parent": "FBXLegacyPhongSurfaceMaterial",
+  "tex": []
+ },
+ "/Game/ForgeLens/POE/wolfremake/fur3Shape.fur3Shape": {
+  "parent": "FBXLegacyPhongSurfaceMaterial",
+  "tex": []
+ },
+ "/Game/ForgeLens/POE/wolfremake/Materials/MI_armour_WolfRemake_fur1_fur1Shape.MI_armour_WolfRemake_fur1_fur1Shape": {
+  "parent": "M_Poe2Lit",
+  "tex": [
+   "WolfRemake_colour_BC7",
+   "WolfRemake_normal_DXT5"
+  ]
+ },
+ "/Game/ForgeLens/POE/wolfremake/Materials/MI_fur3Shape.MI_fur3Shape": {
+  "parent": "M_Poe2Lit",
+  "tex": [
+   "WolfRemake_colour_BC7",
+   "WolfRemake_normal_DXT5"
+  ]
+ },
+ "/Game/ForgeLens/POE/wolfremake/Materials/MI_WolfRemake_tweakedShape.MI_WolfRemake_tweakedShape": {
+  "parent": "M_Poe2Lit",
+  "tex": [
+   "WolfRemake_colour_DXT1",
+   "WolfRemake_normal_DXT5"
+  ]
+ },
+ "/Game/ForgeLens/POE/wolfremake/wolfremake.wolfremake": {
+  "bones": 40,
+  "mats": 3,
+  "bounds": "<Struct 'Vector' (0x000002434C9B5318) {x: 29.687500, y: 156.239502, z: 71.437500}>"
+ },
+ "/Game/ForgeLens/POE/wolfremake/wolfremake_Anim.wolfremake_Anim": {
+  "len": 1.5,
+  "skel": "wolfremake_Skeleton"
+ },
+ "/Game/ForgeLens/POE/wolfremake/WolfRemake_tweakedShape.WolfRemake_tweakedShape": {
+  "parent": "FBXLegacyPhongSurfaceMaterial",
+  "tex": []
+ }
+}

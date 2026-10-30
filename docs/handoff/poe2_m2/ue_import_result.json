@@ -1,0 +1,62 @@
+{
+ "basicskeleton": {
+  "dest": "/Game/ForgeLens/POE/basicskeleton",
+  "textures": 2,
+  "fbx_objects": [
+   "/Game/ForgeLens/POE/basicskeleton/basicskeleton.basicskeleton"
+  ],
+  "material_slots": 15,
+  "classes": {
+   "SkeletalMesh": 1,
+   "AnimSequence": 1,
+   "Skeleton": 1,
+   "MaterialInstanceConstant": 30,
+   "Texture2D": 2
+  }
+ },
+ "bellcrow": {
+  "dest": "/Game/ForgeLens/POE/bellcrow",
+  "textures": 10,
+  "fbx_objects": [
+   "/Game/ForgeLens/POE/bellcrow/bellcrow.bellcrow"
+  ],
+  "material_slots": 4,
+  "classes": {
+   "MaterialInstanceConstant": 8,
+   "SkeletalMesh": 1,
+   "AnimSequence": 1,
+   "Skeleton": 1,
+   "Texture2D": 10
+  }
+ },
+ "wingedrhoa": {
+  "dest": "/Game/ForgeLens/POE/wingedrhoa",
+  "textures": 3,
+  "fbx_objects": [
+   "/Game/ForgeLens/POE/wingedrhoa/wingedrhoa.wingedrhoa"
+  ],
+  "material_slots": 2,
+  "classes": {
+   "MaterialInstanceConstant": 4,
+   "Texture2D": 3,
+   "SkeletalMesh": 1,
+   "AnimSequence": 1,
+   "Skeleton": 1
+  }
+ },
+ "wolfremake": {
+  "dest": "/Game/ForgeLens/POE/wolfremake",
+  "textures": 6,
+  "fbx_objects": [
+   "/Game/ForgeLens/POE/wolfremake/wolfremake.wolfremake"
+  ],
+  "material_slots": 3,
+  "classes": {
+   "MaterialInstanceConstant": 6,
+   "Texture2D": 6,
+   "SkeletalMesh": 1,
+   "AnimSequence": 1,
+   "Skeleton": 1
+  }
+ }
+}
