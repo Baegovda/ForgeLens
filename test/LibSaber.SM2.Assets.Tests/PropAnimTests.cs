@@ -83,16 +83,16 @@ public class PropAnimTests
   }
 
   [Fact]
-  public void KoreanLabelsAndConditionOrder()
+  public void EnglishLabelsAndConditionOrder()
   {
-    Assert.Equal("사격 1", PropAnimStates.Label("SHOOT_1"));
-    Assert.Equal("톱니 회전 3단", PropAnimStates.Label("chain_anim3"));
-    Assert.Equal("보조 사격(증강 조준)", PropAnimStates.Label("SHOOT_AUX"));
+    Assert.Equal("Shoot 1", PropAnimStates.Label("SHOOT_1"));
+    Assert.Equal("Teeth spin 3", PropAnimStates.Label("chain_anim3"));
+    Assert.Equal("Aux shot (augmented aim)", PropAnimStates.Label("SHOOT_AUX"));
     Assert.Equal("", PropAnimStates.Label("whatever"));
     var conds = PropAnimStates.Conditions(TplAnimation.From(Track()));
     Assert.True(conds[0].IsAuto);
     Assert.Equal("SHOOT_1", conds[1].Name);
-    Assert.Equal("SHOOT_1 · 사격 1", conds[1].Display);
+    Assert.Equal("SHOOT_1 · Shoot 1", conds[1].Display);
     Assert.Equal("HIDE", conds.Single(c => c.Name == "HIDE").Display);
   }
 

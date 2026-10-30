@@ -9,9 +9,9 @@ namespace LibSaber.SM2Browser;
 
 /// <summary>
 ///   propanim: a template's own embedded sequences (<see cref="TplAnimation" />). Standalone: one ANIM row per sequence
-///   and the playback-condition box (재생 조건). Context view: the held weapon's sequences composed over the character
+///   and the playback-condition box. Context view: the held weapon's sequences composed over the character
 ///   clip (<see cref="ExportedMesh.Overlay" />), Auto = follow the character's action (<see cref="PropAnimStates.AutoPlays" />),
-///   toggled by "Prop anim / 프롭 애님" (persisted).
+///   toggled by "Prop anim" (persisted).
 /// </summary>
 public partial class MainWindow
 {

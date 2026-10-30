@@ -5,7 +5,7 @@ using LibSaber.SM2.Assets.Export;
 
 namespace LibSaber.SM2Browser;
 
-/// <summary>oneclick (원클릭 내보내기 옵션): "Direct to Unreal" after an export.</summary>
+/// <summary>oneclick: "Direct to Unreal" after an export.</summary>
 public partial class MainWindow
 {
   /// <summary>Name the suggested /Game folder after: the first selected model (else the first file).</summary>

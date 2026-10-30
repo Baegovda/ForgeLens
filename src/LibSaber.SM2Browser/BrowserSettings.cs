@@ -51,7 +51,7 @@ public sealed class BrowserSettings
   public string? KitbashNpcPreset { get; set; }
   public Dictionary<string, Dictionary<string, string>>? KitbashNpcLayers { get; set; }
   public string? KitbashPowerFist { get; set; }
-  /// <summary>propanim: context view "Prop anim / 프롭 애님" (null = default on) and the last playback condition (null/Auto).</summary>
+  /// <summary>propanim: context view "Prop anim" (null = default on) and the last playback condition (null/Auto).</summary>
   public bool? PropAnim { get; set; }
   public string? PropCondition { get; set; }
 

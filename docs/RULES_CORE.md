@@ -11,6 +11,7 @@ Source of detail: BOT_TRANSFER §0/§5, HANDOFF ledger R01–R43. Newest dated o
 
 ## Work
 - Act first, report after; work non-stop; questions at the end. Work has top priority.
+- REAL-INPUT TESTS (owner t220u 10/30): never abort because the owner's windows/input interfere; block his physical mouse+keyboard for the test: `tools/input_block.ps1 -Script <test.ps1> -ArgsJson '{...}'` (default `-Mode hook` = low-level hooks drop non-injected events, no elevation; `-Mode blockinput` = user32 BlockInput, self-elevates, but the viewer's 3D viewport then ignored injected LMB/hover in R88). Watchdog kills the run after `-MaxBlockSec` (60), finally always unblocks, cursor restored, covering windows minimised and restored (never closed, never UnrealEditor). Tests call `InputBlockOn` before the first input (r83/r84/r87 scripts do it in `Focus`).
 - PC jobs: High priority, hidden, never steal focus. Don't drop to Idle unasked (owner 10/29; supersedes R26 "Idle while gaming").
 - Record every owner request in the HANDOFF ledger at once.
 - Fixes are generic rules, never per-character patches. Never ask for in-game captures.
@@ -53,4 +54,5 @@ Source of detail: BOT_TRANSFER §0/§5, HANDOFF ledger R01–R43. Newest dated o
 | `box/push_lock.sh`, `box/refresh_origin.sh` | push flow |
 | `uerun.ps1` / `enginewire_call.py` / `uemcp_call.py` | UE editor control (route rule) |
 | `nmb_verify.py` | fire-clip table vs primaris.nmb |
+| `tools/input_block.ps1` | any real mouse/keyboard test: blocks owner input (hook / BlockInput), 60 s watchdog |
 Full registry: `tools/re/README.md`.

@@ -21,7 +21,7 @@ public sealed record PropCondition(string Name, string Label, TplSequence? Seq)
 public sealed record PropAutoPlan(List<TplPlay> Plays, List<string> Notes);
 
 /// <summary>
-///   propanim: the weapon/prop states a tpl's embedded sequences stand for, their short Korean labels, and the "Auto"
+///   propanim: the weapon/prop states a tpl's embedded sequences stand for, their short English labels, and the "Auto"
 ///   mapping from a character clip to sequence plays.
 ///   <list type="bullet">
 ///     <item>Firearms (<c>prop_firearm_animation</c>, DATA): Idle (initial) ⇄ Shoot ⇄ Reload; IDLE=[IDLE,CHARGING,TAP,COOLING],
@@ -39,54 +39,54 @@ public sealed record PropAutoPlan(List<TplPlay> Plays, List<string> Notes);
 public static class PropAnimStates
 {
   public const string AutoName = "Auto";
-  public const string AutoLabel = "Auto (follow character action) · 자동(캐릭터 동작 따라)";
+  public const string AutoLabel = "Auto (follow character action)";
   public static readonly PropCondition Auto = new(AutoName, AutoLabel, null);
 
   private static readonly (Regex Pattern, Func<Match, string> Label, int Order)[] Labels =
   [
-    (R("^idle$"), _ => "대기", 0),
-    (R(@"^idle_(\d+)$"), m => "대기 " + m.Groups[1].Value, 0),
-    (R("^idle_no_stack$"), _ => "대기(스택 없음)", 0),
-    (R("^charging$"), _ => "충전", 1),
-    (R("^tap$"), _ => "탭(실린더 회전)", 1),
-    (R("^cooling$"), _ => "냉각", 1),
-    (R(@"^shoot_(\d+)$"), m => "사격 " + m.Groups[1].Value, 2),
-    (R("^last_shoot$"), _ => "마지막 사격", 3),
-    (R("^shoot_aux$"), _ => "보조 사격(증강 조준)", 4),
-    (R("^reload_start$"), _ => "재장전 시작", 5),
-    (R("^reload_end$"), _ => "재장전 끝", 5),
-    (R("^reload_full$"), _ => "재장전 전체", 5),
-    (R(@"^anim(\d+)$"), m => "근접 타격 " + m.Groups[1].Value, 6),
-    (R("^anim_stop$"), _ => "타격 정지", 6),
-    (R("^chain_anim$"), _ => "톱니 회전 1단", 7),
-    (R(@"^chain_anim(\d+)$"), m => $"톱니 회전 {m.Groups[1].Value}단", 7),
-    (R("^chain_anim_stop$"), _ => "톱니 정지", 7),
-    (R("^power_on$"), _ => "전원 켜기", 8),
-    (R("^power_off$"), _ => "전원 끄기", 8),
-    (R("^inc_start$"), _ => "가열 시작", 8),
-    (R("^inc_stop$"), _ => "가열 끝", 8),
-    (R("^small_inc_start$"), _ => "약가열 시작", 8),
-    (R("^inc_hit$"), _ => "가열 타격", 8),
-    (R("^vfx_idle$"), _ => "FX 대기", 8),
-    (R("^vfx_charge_on$"), _ => "충전 켜기", 8),
-    (R("^vfx_charge_off$"), _ => "충전 끄기", 8),
-    (R("^vfx_charge_chill"), _ => "충전 유지", 8),
-    (R("^hit_no_stack$"), _ => "스택 없는 타격", 8),
-    (R(@"^hit_stack_(\d+)$"), m => "스택 타격 " + m.Groups[1].Value, 8),
-    (R("^init$"), _ => "초기화", 9),
-    (R(@"^finisher(\d+)$"), m => "처형 " + m.Groups[1].Value, 9),
-    (R("^start$"), _ => "시작", 9),
-    (R("^stop$"), _ => "정지", 9),
-    (R("^open$"), _ => "열기", 9),
-    (R("^close$"), _ => "닫기", 9),
-    (R("^used$"), _ => "사용", 9),
-    (R("^active$"), _ => "활성", 9),
-    (R("^screen_on$"), _ => "화면 켜기", 9),
+    (R("^idle$"), _ => "Idle", 0),
+    (R(@"^idle_(\d+)$"), m => "Idle " + m.Groups[1].Value, 0),
+    (R("^idle_no_stack$"), _ => "Idle (no stack)", 0),
+    (R("^charging$"), _ => "Charging", 1),
+    (R("^tap$"), _ => "Tap (cylinder spin)", 1),
+    (R("^cooling$"), _ => "Cooling", 1),
+    (R(@"^shoot_(\d+)$"), m => "Shoot " + m.Groups[1].Value, 2),
+    (R("^last_shoot$"), _ => "Last shot", 3),
+    (R("^shoot_aux$"), _ => "Aux shot (augmented aim)", 4),
+    (R("^reload_start$"), _ => "Reload start", 5),
+    (R("^reload_end$"), _ => "Reload end", 5),
+    (R("^reload_full$"), _ => "Full reload", 5),
+    (R(@"^anim(\d+)$"), m => "Melee hit " + m.Groups[1].Value, 6),
+    (R("^anim_stop$"), _ => "Hit stop", 6),
+    (R("^chain_anim$"), _ => "Teeth spin 1", 7),
+    (R(@"^chain_anim(\d+)$"), m => $"Teeth spin {m.Groups[1].Value}", 7),
+    (R("^chain_anim_stop$"), _ => "Teeth stop", 7),
+    (R("^power_on$"), _ => "Power on", 8),
+    (R("^power_off$"), _ => "Power off", 8),
+    (R("^inc_start$"), _ => "Heat start", 8),
+    (R("^inc_stop$"), _ => "Heat end", 8),
+    (R("^small_inc_start$"), _ => "Light heat start", 8),
+    (R("^inc_hit$"), _ => "Heat hit", 8),
+    (R("^vfx_idle$"), _ => "FX idle", 8),
+    (R("^vfx_charge_on$"), _ => "Charge on", 8),
+    (R("^vfx_charge_off$"), _ => "Charge off", 8),
+    (R("^vfx_charge_chill"), _ => "Charge hold", 8),
+    (R("^hit_no_stack$"), _ => "Hit (no stack)", 8),
+    (R(@"^hit_stack_(\d+)$"), m => "Stack hit " + m.Groups[1].Value, 8),
+    (R("^init$"), _ => "Init", 9),
+    (R(@"^finisher(\d+)$"), m => "Finisher " + m.Groups[1].Value, 9),
+    (R("^start$"), _ => "Start", 9),
+    (R("^stop$"), _ => "Stop", 9),
+    (R("^open$"), _ => "Open", 9),
+    (R("^close$"), _ => "Close", 9),
+    (R("^used$"), _ => "Used", 9),
+    (R("^active$"), _ => "Active", 9),
+    (R("^screen_on$"), _ => "Screen on", 9),
   ];
 
   private static Regex R(string p) => new(p, RegexOptions.IgnoreCase | RegexOptions.CultureInvariant | RegexOptions.Compiled);
 
-  /// <summary>Short Korean label for a sequence name (empty when unknown: the raw data name is shown alone).</summary>
+  /// <summary>Short English label for a sequence name (empty when unknown: the raw data name is shown alone).</summary>
   public static string Label(string seq)
   {
     foreach (var (pattern, label, _) in Labels)

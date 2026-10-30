@@ -1,4 +1,4 @@
-# Forge Lens "Direct to Unreal" import (oneclick, 원클릭 내보내기 옵션).
+# Forge Lens "Direct to Unreal" import (oneclick export option).
 # Forge Lens writes the normal export (FBX, textures, materials.json, import_sm2_materials.py, clips, physics.json), then
 # a manifest and runs this script inside Unreal: through the open editor (EngineWire MCP :3000 or Python Remote
 # Execution) or headless (UnrealEditor-Cmd.exe <project> -run=pythonscript -script=<run_import.py>).

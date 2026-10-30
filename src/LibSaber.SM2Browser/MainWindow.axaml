@@ -227,7 +227,7 @@
           <local:WheelComboBox x:Name="AnimBox" Width="360" SelectionChanged="AnimChanged"
                     ToolTip.Tip="Mouse wheel over the closed box: previous / next clip of the (filtered) list, and it plays." />
           <ComboBox x:Name="PropCondBox" Width="300" IsVisible="False" SelectionChanged="PropCondChanged"
-                    ToolTip.Tip="Prop / weapon playback condition (재생 조건): the template's own embedded sequences by game state (data names, short Korean labels). Auto = the holding state from the blueprint / firearm FSM (Idle)." />
+                    ToolTip.Tip="Prop / weapon playback condition: the template's own embedded sequences by game state (data names, short English labels). Auto = the holding state from the blueprint / firearm FSM (Idle)." />
           <Slider x:Name="ScrubSlider" Width="180" Minimum="0" Maximum="1" IsEnabled="False" ValueChanged="ScrubChanged" />
           <TextBlock x:Name="ScrubLabel" VerticalAlignment="Center" Text="0.00s" />
           <CheckBox x:Name="InPlaceToggle" Content="In place" IsChecked="True" Click="ViewChanged"
@@ -269,10 +269,10 @@
                     ToolTip.Tip="Held weapon for this clip on the hand locator (prop_model_weapon_holds GUN_R / GUN_L). Off: model + animation only." />
           <CheckBox x:Name="CtxFxToggle" Content="Show effects" IsChecked="True" Click="CtxOptionsChanged"
                     ToolTip.Tip="Effects the clip starts: morpheme events through the blueprints the character / weapon own, and Shoot track -> weapon muzzle (HEURISTIC). Off: model + animation only." />
-          <CheckBox x:Name="CtxPropAnimToggle" Content="Prop anim / 프롭 애님" IsChecked="True" Click="CtxPropAnimChanged"
+          <CheckBox x:Name="CtxPropAnimToggle" Content="Prop anim" IsChecked="True" Click="CtxPropAnimChanged"
                     ToolTip.Tip="The held weapon's own animation (tpl embedded sequences: bolt / slide, chainsword teeth, charge glow) while the character shoots, reloads or swings. Off: the weapon stays rigid." />
           <ComboBox x:Name="CtxPropCondBox" Width="300" IsVisible="False" SelectionChanged="CtxPropCondChanged"
-                    ToolTip.Tip="Weapon playback condition (재생 조건). Auto: follow the character clip (Shoot track -> shootAnimation, reload clip -> RELOAD_*, morpheme events -> blueprint Startanim, holding -> OnHoldInArms anim). Else that sequence loops." />
+                    ToolTip.Tip="Weapon playback condition. Auto: follow the character clip (Shoot track -> shootAnimation, reload clip -> RELOAD_*, morpheme events -> blueprint Startanim, holding -> OnHoldInArms anim). Else that sequence loops." />
           <ComboBox x:Name="CtxCharacterBox" Width="300" IsVisible="False" SelectionChanged="CtxCharacterChanged"
                     ToolTip.Tip="Characters that own this effect (directly, through a held weapon or a spawned actor), best link first" />
           <ComboBox x:Name="CtxClipBox" Width="360" IsVisible="False" SelectionChanged="CtxClipChanged"

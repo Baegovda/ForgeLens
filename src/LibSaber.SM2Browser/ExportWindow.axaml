@@ -16,7 +16,7 @@
           <Button Content="Export" Classes="accent" MinWidth="96" MinHeight="32" IsDefault="True" Click="ExportClicked" />
         </StackPanel>
         <TextBlock x:Name="FolderError" DockPanel.Dock="Bottom" Foreground="#E85D4C" TextWrapping="Wrap" Margin="0,4,0,0" />
-        <!-- oneclick: Direct to Unreal (원클릭 내보내기 옵션). Off by default: the plain export stays the default. -->
+        <!-- oneclick: Direct to Unreal. Off by default: the plain export stays the default. -->
         <Border x:Name="DirectPanel" DockPanel.Dock="Bottom" Margin="0,10,0,0" Padding="10" CornerRadius="6" BorderThickness="1" BorderBrush="#3A3F4B" Background="#1E2128">
           <StackPanel Spacing="6">
             <CheckBox x:Name="DirectBox" Content="Direct to Unreal: import into the project automatically after the export" IsCheckedChanged="DirectChanged" />

@@ -37,16 +37,24 @@ Start-Sleep 3
 function P { $l=(Get-Content $probe -Raw -EA 0); $h=@{}; $a=$l.Trim() -split ' '; for($i=0;$i+1 -lt $a.Count;$i+=2){ $h[$a[$i]]=$a[$i+1] }; $h }
 function L([string]$s){ $s | Tee-Object -FilePath $log -Append }
 # A harmless F24 tap lets SetForegroundWindow through (the caller sent the last input).
-function Focus { $p.Refresh(); [SI]::Key(0x87,$false)|Out-Null; [SI]::Key(0x87,$true)|Out-Null; [SI]::ShowWindow($p.MainWindowHandle,9)|Out-Null; [SI]::SetForegroundWindow($p.MainWindowHandle)|Out-Null; Start-Sleep -Milliseconds 400 }
+function Focus { if(Get-Command InputBlockOn -EA 0){ InputBlockOn }; $p.Refresh(); [SI]::Key(0x87,$false)|Out-Null; [SI]::Key(0x87,$true)|Out-Null; [SI]::ShowWindow($p.MainWindowHandle,9)|Out-Null; [SI]::SetForegroundWindow($p.MainWindowHandle)|Out-Null; Start-Sleep -Milliseconds 400 }
 # Safety (R83 incident 18:12 KST: another worker's BLTest editor took the foreground mid-run and the remaining keys /
 # clicks went to it): before every step the viewer must still be the foreground window, else the run stops at once.
-function Guard { $p.Refresh(); if([SI]::GetForegroundWindow() -ne $p.MainWindowHandle){ L "ABORT: viewer lost the foreground (another window took focus); no more input sent"; if(-not $p.HasExited){ $p.CloseMainWindow()|Out-Null }; if(Test-Path $keep){ Copy-Item $keep $vp -Force }; exit 2 } }
+function Guard { $p.Refresh(); for($gi=0;$gi -lt 4 -and [SI]::GetForegroundWindow() -ne $p.MainWindowHandle;$gi++){ if($gi -ge 1 -and (Get-Command IBMinimize -EA 0)){ IBMinimize ([SI]::GetForegroundWindow()) }; Focus; $p.Refresh() }; if([SI]::GetForegroundWindow() -ne $p.MainWindowHandle){ L "ABORT: viewer lost the foreground (another window took focus); no more input sent"; if(-not $p.HasExited){ $p.CloseMainWindow()|Out-Null }; if(Test-Path $keep){ Copy-Item $keep $vp -Force }; exit 2 } }
+# t220u: a covering (topmost) window over the viewport eats real clicks; log it and minimise it (never UnrealEditor).
+Add-Type @"
+using System;using System.Text;using System.Runtime.InteropServices;
+public static class HW{public struct PT{public int x,y;}[DllImport("user32.dll")]public static extern IntPtr WindowFromPoint(PT p);[DllImport("user32.dll")]public static extern IntPtr GetAncestor(IntPtr h,uint f);[DllImport("user32.dll")]public static extern uint GetWindowThreadProcessId(IntPtr h,out uint pid);[DllImport("user32.dll")]public static extern int GetClassName(IntPtr h,StringBuilder s,int n);}
+"@
+function HitCheck([int]$x,[int]$y){ for($k=0;$k -lt 3;$k++){ $pt=New-Object HW+PT; $pt.x=$x;$pt.y=$y; $h=[HW]::GetAncestor([HW]::WindowFromPoint($pt),2); $id=0;[HW]::GetWindowThreadProcessId($h,[ref]$id)|Out-Null; if($id -eq $p.Id){ L "  hit-test $x,$y = viewer"; return }
+  $sb=New-Object Text.StringBuilder 256;[HW]::GetClassName($h,$sb,256)|Out-Null; $pn=(Get-Process -Id $id -EA 0).Name; L "  hit-test $x,$y covered by pid $id $pn class $sb hwnd $h"
+  if($pn -ne 'UnrealEditor' -and (Get-Command IBMinimize -EA 0)){ IBMinimize $h; Start-Sleep -Milliseconds 300 } else { Focus } } }
 function XY([string]$s){ $a=$s -split ','; ,@([int]$a[0],[int]$a[1]) }
 function Grab([string]$name){ $p.Refresh(); $r=(XY (P).vpc); $w=760;$h=520; $bmp=New-Object Drawing.Bitmap $w,$h; $g=[Drawing.Graphics]::FromImage($bmp); $g.CopyFromScreen($r[0]-$w/2,$r[1]-$h/2,0,0,$bmp.Size); $bmp.Save("$Out\si_$name.png"); $g.Dispose(); $bmp.Dispose() }
 function Line([string]$tag){ Guard; $s=P; L ("{0,-22} yaw {1} pitch {2} dist {3} pivot {4} hover {5} sel {6} visible {7} undo {8} redo {9} help {10} focus {11}" -f $tag,$s.yaw,$s.pitch,$s.dist,$s.pivot,$s.hover,$s.sel,$s.visible,$s.undo,$s.redo,$s.help,$s.focus); $s }
 $VK=@{ALT=0x12;CTRL=0x11;SHIFT=0x10;F=0x46;Z=0x5A;Y=0x59;D1=0x31;F1=0x70}
 Focus
-$s0=Line "start"; L "  hud $($s0.hud)"; $c=XY $s0.vpc; L "viewport centre screen px $($s0.vpc)  fg-is-viewer $([SI]::GetForegroundWindow() -eq $p.MainWindowHandle)"
+$s0=Line "start"; L "  hud $($s0.hud)"; $c=XY $s0.vpc; HitCheck $c[0] $c[1]; [SI]::Btn(4)|Out-Null; [SI]::Btn(0x10)|Out-Null; [SI]::Key(0x1B,$false)|Out-Null; [SI]::Key(0x1B,$true)|Out-Null; Start-Sleep -Milliseconds 300; $s0=Line "after button reset"; L "viewport centre screen px $($s0.vpc)  fg-is-viewer $([SI]::GetForegroundWindow() -eq $p.MainWindowHandle)"
 Grab "0_start"
 # hover
 [SI]::Move($c[0]-40,$c[1]-60)|Out-Null; Start-Sleep -Milliseconds 150; [SI]::Move($c[0],$c[1]-30)|Out-Null; Start-Sleep -Milliseconds 700; $s=Line "hover centre"; Grab "1_hover"

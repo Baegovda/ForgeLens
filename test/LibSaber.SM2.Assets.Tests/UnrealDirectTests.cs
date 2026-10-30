@@ -3,7 +3,7 @@ using LibSaber.SM2.Assets.Export;
 
 namespace LibSaber.SM2.Assets.Tests;
 
-/// <summary>oneclick (원클릭 내보내기 옵션): Direct-to-Unreal path rules, manifest, locator and MCP parsing.</summary>
+/// <summary>oneclick: Direct-to-Unreal path rules, manifest, locator and MCP parsing.</summary>
 public class UnrealDirectTests
 {
   [Theory]

@@ -4,7 +4,7 @@ using System.Text.Json.Nodes;
 namespace LibSaber.SM2.Assets.Export;
 
 /// <summary>
-///   oneclick (원클릭 내보내기 옵션, "Direct to Unreal"): content-path rules for the automatic import. Same rule as
+///   oneclick ("Direct to Unreal"): content-path rules for the automatic import. Same rule as
 ///   <c>dest_error</c> in tools/ue/ue_forge_direct.py: under /Game, never /Game/SM2_Work/Original/* or /Game/Work/*
 ///   (HANDOFF R05), and not a top-level folder (the importer backs a whole folder up as _bakN before reimporting).
 /// </summary>
