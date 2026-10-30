@@ -58,36 +58,13 @@ internal static class Poe2Bench
 
   /// <summary>
   ///   <c>--poe2skills &lt;prepared&gt; &lt;out.tsv&gt;</c>: every ActiveSkills row with its GrantedEffect and the Projectiles rows
-  ///   whose id matches the skill's ActionType or id (HEURISTIC name match, not a proven table link), with their effect .ao files.
+  ///   linked through SkillArtVariations (see Poe2Skills).
   /// </summary>
   public static int Skills(string[] args)
   {
-    var tables = Path.Combine(args[1], "tables", "data", "balance");
-    using var skills = System.Text.Json.JsonDocument.Parse(File.ReadAllBytes(Path.Combine(tables, "activeskills.datc64.json")));
-    using var projs = System.Text.Json.JsonDocument.Parse(File.ReadAllBytes(Path.Combine(tables, "projectiles.datc64.json")));
-    static string Norm(string s) => new string(s.Where(char.IsLetterOrDigit).ToArray()).ToLowerInvariant();
-    var projList = projs.RootElement.EnumerateArray().Select(p => (Id: p.GetProperty("Id").GetString() ?? "",
-      Ao: string.Join(";", p.GetProperty("AOFiles").EnumerateArray().Select(a => a.GetString())),
-      Loop: string.Join(";", p.GetProperty("LoopAnimationIds").EnumerateArray().Select(a => a.GetString())),
-      Impact: string.Join(";", p.GetProperty("ImpactAnimationIds").EnumerateArray().Select(a => a.GetString())))).ToList();
-    var sb = new StringBuilder("skill_id\tname\tgranted_effect\taction_type\ttypes\tprojectile\tao\tloop_anim\timpact_anim\n");
-    int total = 0, linked = 0;
-    foreach (var s in skills.RootElement.EnumerateArray())
-    {
-      total++;
-      var id = s.GetProperty("Id").GetString() ?? "";
-      var name = s.TryGetProperty("DisplayedName", out var dn) ? dn.GetString() : "";
-      var ge = s.TryGetProperty("GrantedEffect", out var g) && g.ValueKind == System.Text.Json.JsonValueKind.String ? g.GetString() : "";
-      var at = s.TryGetProperty("ActionType", out var a) && a.ValueKind == System.Text.Json.JsonValueKind.Object && a.TryGetProperty("Id", out var ai) ? ai.GetString() ?? "" : "";
-      var types = s.TryGetProperty("ActiveSkillTypes", out var t) && t.ValueKind == System.Text.Json.JsonValueKind.Object && t.TryGetProperty("Ids", out var ti)
-        ? string.Join(",", ti.EnumerateArray().Where(x => x.ValueKind == System.Text.Json.JsonValueKind.String).Select(x => x.GetString())) : "";
-      var keys = new[] { Norm(at), Norm(id) }.Where(k => k.Length >= 4).ToArray();
-      var match = projList.FirstOrDefault(p => p.Ao.Length > 0 && keys.Any(k => Norm(p.Id.Split('/').Last()) == k));
-      if (match.Id != null) linked++;
-      sb.Append($"{id}\t{name}\t{ge}\t{at}\t{types}\t{match.Id}\t{match.Ao}\t{match.Loop}\t{match.Impact}\n");
-    }
-    File.WriteAllText(args[2], sb.ToString());
-    Console.WriteLine($"skills {total}, with a name-matched projectile effect {linked}, projectiles {projList.Count} ({projList.Count(p => p.Ao.Length > 0)} with .ao)");
+    var sk = Poe2Skills.Load(Path.Combine(args[1], "tables", "data", "balance"));
+    File.WriteAllText(args[2], sk.Tsv());
+    Console.WriteLine($"skills {sk.Skills.Count}, with table-linked effects {sk.Skills.Count(s => s.Effects.Count > 0)}, projectile-linked {sk.Skills.Count(s => s.Effects.Any(e => e.Kind == "projectile"))}, effect rows {sk.Skills.Sum(s => s.Effects.Count)}");
     return 0;
   }
 
