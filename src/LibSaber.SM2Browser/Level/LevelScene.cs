@@ -33,6 +33,43 @@ public sealed class LevelScene
   public static bool IsLevelFile(string path) => path.EndsWith(".cd_list", StringComparison.OrdinalIgnoreCase);
 
   static readonly Dictionary<string, LevelScene> Cache = new(StringComparer.OrdinalIgnoreCase);
+  // R74: the in-memory level cache used to keep EVERY opened level for the life of the process (each one = its whole
+  // merged mesh, decoded textures and, once drawn, the preview's prepared copies). Now LRU, at most MemoryLevels entries
+  // (env SM2_LEVEL_MEM_CACHE, default 0 = none: the viewer's own _level holds the shown level, so leaving it frees it);
+  // levels re-open from the .flpack disk cache (~1-2 s measured). 99 = the old keep-everything behaviour.
+  static readonly LinkedList<string> CacheOrder = new();
+  public static int MemoryLevels => int.TryParse(Environment.GetEnvironmentVariable("SM2_LEVEL_MEM_CACHE"), out var n) ? Math.Max(0, n) : 0;
+  public static int CachedCount { get { lock (Cache) return Cache.Count; } }
+  public static long CachedBytes { get { lock (Cache) return Cache.Values.Sum(s => s.ApproxBytes); } }
+
+  /// <summary>Rough managed size: mesh streams + decoded texture pixels (not counting renderer copies).</summary>
+  public long ApproxBytes
+  {
+    get
+    {
+      long b = (long)Mesh.Positions.Count * 12 + (long)Mesh.Normals.Count * 12 + (long)Mesh.Uvs.Count * 8 + (long)Mesh.Indices.Count * 4 + (long)Mesh.Skin.Count * 32;
+      foreach (var m in new[] { Albedo, Normals, Specular })
+        foreach (var img in m.Values) b += img.Bgra.LongLength;
+      return b;
+    }
+  }
+
+  static void Remember(string path, LevelScene scene)
+  {
+    lock (Cache)
+    {
+      Cache[path] = scene;
+      CacheOrder.Remove(path);
+      CacheOrder.AddFirst(path);
+      while (Cache.Count > MemoryLevels && CacheOrder.Last is { } last)
+      {
+        Cache.Remove(last.Value);
+        CacheOrder.RemoveLast();
+        MemoryLog.Write(MemoryLog.Line("level evicted " + last.Value));
+      }
+    }
+    MemoryLog.TrimSoon();
+  }
 
   public static string CacheDir => Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "ForgeLens", "levels");
 
@@ -290,7 +327,7 @@ public sealed class LevelScene
   public static LevelScene Load(GameCatalog catalog, ArchiveStore store, int cdIndex, Options? o = null, Action<string>? log = null)
   {
     var path = catalog.GetFile(cdIndex).Path;
-    lock (Cache) if (Cache.TryGetValue(path, out var hit)) { log?.Invoke("memory cache hit " + path); return hit; }
+    lock (Cache) if (Cache.TryGetValue(path, out var hit)) { CacheOrder.Remove(path); CacheOrder.AddFirst(path); log?.Invoke("memory cache hit " + path); return hit; }
     o ??= new Options();
     var sw = Stopwatch.StartNew(); var times = new StringBuilder();
     void Mark(string what) { times.Append($"{what} {sw.Elapsed.TotalSeconds:0.0}s; "); }
@@ -318,7 +355,7 @@ public sealed class LevelScene
       Mark("disk cache"); scene.FromDiskCache = true; scene.Timing = times.ToString();
       scene.Stats += $" | opened from disk cache in {sw.Elapsed.TotalSeconds:0.0}s";
       log?.Invoke(scene.Stats); log?.Invoke("timing " + scene.Timing);
-      lock (Cache) Cache[path] = scene;
+      Remember(path, scene);
       return scene;
     }
     var lwi = new List<(string Template, Matrix4x4 World)>();
@@ -415,7 +452,7 @@ public sealed class LevelScene
     Mark("write cache");
     scene.Timing = times.ToString();
     log?.Invoke(scene.Stats); log?.Invoke("timing " + scene.Timing);
-    lock (Cache) Cache[path] = scene;
+    Remember(path, scene);
     return scene;
   }
 

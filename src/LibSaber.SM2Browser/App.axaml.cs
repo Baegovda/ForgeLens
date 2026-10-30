@@ -15,7 +15,12 @@ public class App : Application
   public override void OnFrameworkInitializationCompleted()
   {
     if (ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktop)
+    {
       desktop.MainWindow = WindowFactory?.Invoke() ?? new MainWindow();
+      MemoryLog.Start(); // R74: memory readout in %LOCALAPPDATA%\ForgeLens\memory.log
+      if (desktop.MainWindow is MainWindow main && Environment.GetEnvironmentVariable("SM2_MEMSOAK") is { Length: > 0 })
+      { main.ShowActivated = false; main.Opened += async (_, _) => await main.RunMemSoakAsync(); }
+    }
 
     base.OnFrameworkInitializationCompleted();
   }

@@ -13,9 +13,16 @@
     <AssemblyName>ForgeLens</AssemblyName>
     <!-- R71 (t148u): the ONE app version source; bump with the HANDOFF ledger id (0.NN.0 = rNN). Shown in the title. -->
     <Version>0.71.0</Version>
+    <!-- R74: workstation + concurrent GC (explicit), ConserveMemory lets the GC compact the LOH when it is fragmented. -->
+    <ServerGarbageCollection>false</ServerGarbageCollection>
+    <ConcurrentGarbageCollection>true</ConcurrentGarbageCollection>
     <Product>Forge Lens</Product>
     <AssemblyTitle>Forge Lens</AssemblyTitle>
   </PropertyGroup>
+
+  <ItemGroup>
+    <RuntimeHostConfigurationOption Include="System.GC.ConserveMemory" Value="5" />
+  </ItemGroup>
 
   <ItemGroup>
     <ProjectReference Include="..\LibSaber.SM2.Assets\LibSaber.SM2.Assets.csproj" />
