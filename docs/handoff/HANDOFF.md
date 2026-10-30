@@ -16,3 +16,8 @@
   * 68 tool scripts repointed to /Game/ForgeLens/SM2 (maps + Original kept). SM2PhysicsSetup plugin has no SM2_Work path (nothing to change). Importer default already /Game/ForgeLens/SM2 (fl_roots.py / UnrealDirect.cs).
 - Map_Floor blowout (t263u): the cause was 24 R95c point lights (key 800 / green rim 2500 / fill 150) + PPV manual bias 8, not R97 emissive (Vortex MIs EmissiveStrength 0/1). Now: 0 point lights, 1 warm directional 3 lux + DaylightAmbient sky 3, PPV and captures manual bias -5 (ue_r97_floor.py 3 3 -5). Captures Shots\r97_floor\s3_*.png: no clipped pixels. Vortex centre mean 35,39,48 vs game crop 95,100,103 (the game orb/body glow is VFX, see R97h).
 - R97h Vortex orb: game data proves it is VFX: blueprint_vfx_vortex_beast.sso starts 'fx_vortex_beast_back_idle' (CPU emitters, emissiveIntensity overrides). Exported to Exports\r97\vortex_vfx\export (niagara.json + 6 textures). Not yet built in UE.
+
+## R97a applied 2026-10-31 04:14 KST (new root)
+- ue_r97_apply.py on the 6 /Game/ForgeLens/SM2/Characters meshes: M_SM2_r97 + .td scalars (calgar_work 8, calgar 8, titus 6, vortex 10, hormagaunt 0, sorcerer_exalted 17 slots). MI backups in /Game/ForgeLens/SM2/Tests/_bak_r97/<char>; old masters kept.
+- Map_Floor capture after shaders compiled (docs/handoff/r97/floor_r97.jpg): no clipped pixels. Vortex spike tips now glow blue (emissive 9); Vortex centre mean 38,47,59.
+- R97b Titus side-by-side: docs/handoff/r97/titus_sbs.jpg (in-game photo mode vs UE Map_Floor). Blue armour and gold aquila/trim match qualitatively; the game scene is darker and warm-lit. Calgar: no user/in-game screenshot this session, so only the material/.td check was done (8 slots carry tdScalars, head nmScale 0.5/0.65 applied).

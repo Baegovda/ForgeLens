@@ -1,5 +1,5 @@
 # ue_r97_apply.py (R97a): give an existing imported character the R97 .td values without re-import.
-# Backs up every MI to /Game/SM2_Work/_bak_r97/<char>/ (first run only), builds M_SM2_r97 next to the mesh,
+# Backs up every MI to /Game/ForgeLens/SM2/Tests/_bak_r97/<char>/ (first run only), builds M_SM2_r97 next to the mesh,
 # re-parents M_SM2* MIs to it and runs apply_td_scalars from the sidecar. Undo: copy the backups back (old masters are kept).
 # uerun.ps1 ue_r97_apply.py <import_sm2_materials.py> <meshpath> <materials.json>
 import unreal, sys, json
@@ -7,7 +7,7 @@ scr, mp, sc = sys.argv[1:4]; argv = sys.argv; sys.argv = [scr]; g = {"__name__":
 exec(compile(open(scr, encoding="utf-8").read().split("\nif __name__")[0], scr, "exec"), g); sys.argv = argv
 EAL = unreal.EditorAssetLibrary; mel = unreal.MaterialEditingLibrary
 mesh = unreal.load_asset(mp); folder = mp.rsplit("/", 1)[0]; char = mp.rsplit("/", 1)[1]
-bak = "/Game/SM2_Work/_bak_r97/" + folder.strip("/").replace("/", "_")
+bak = "/Game/ForgeLens/SM2/Tests/_bak_r97/" + folder.strip("/").replace("/", "_")
 master = g["make_master"](folder, "M_SM2_r97"); mel.recompile_material(master); EAL.save_loaded_asset(master)
 slots = {s["slot"]: s for s in json.load(open(sc, encoding="utf-8"))["slots"]}
 n = t = 0
