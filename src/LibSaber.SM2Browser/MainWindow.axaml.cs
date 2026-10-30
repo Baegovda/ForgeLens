@@ -77,6 +77,7 @@ public partial class MainWindow : Window
   public MainWindow()
   {
     InitializeComponent();
+    Title = $"Forge Lens v{AppVersion.Version}"; // R71 (t148u/t149u): version right after the name, nothing else
     InitHostVfx();
     InitContext();
     InitPropAnim();

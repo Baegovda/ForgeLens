@@ -4,6 +4,7 @@
 // With SM2_SELECT the window opens without activation (no focus stealing on the PC).
 using System.Diagnostics;
 using Avalonia;
+using Avalonia.Controls;
 using Avalonia.Media.Imaging;
 using Avalonia.Threading;
 
@@ -18,6 +19,22 @@ public partial class MainWindow
     bmp.Render(this);
     bmp.Save(png);
     return Task.CompletedTask;
+  }
+
+  private string MeshTreeDump()
+  {
+    var sb = new System.Text.StringBuilder();
+    void Walk(IEnumerable<MeshToggle> items, int depth)
+    {
+      foreach (var t in items)
+      {
+        sb.Append(' ', depth * 2).Append(t.IsGroup ? "[group] " : "").Append(t.Label).Append(t.Visible ? " (on)" : " (off)").Append('\n');
+        Walk(t.Children, depth + 1);
+      }
+    }
+    if (MeshList.ItemsSource is IEnumerable<MeshToggle> roots)
+      Walk(roots, 0);
+    return sb.ToString();
   }
 
   private async Task SelectFromEnvironmentAsync()
@@ -50,6 +67,31 @@ public partial class MainWindow
       File.WriteAllText(shot + ".txt", $"selected {selected}\nlevel {(_level is null ? "(none)" : _level.Stats)}\nmesh {_mesh?.Name} summary {_mesh?.Summary.Replace("\n", " | ")}\nhud {HudSnapshot()}\nselect_to_level_shown {open:0.0}s gpu {UseGpu()} from_disk_cache {_level?.FromDiskCache}\ntiming {_level?.Timing}\n");
     }
     catch (Exception e) { File.WriteAllText(shot + ".txt", "winshot failed: " + e); }
+    // R71: mesh tree dump (+ collapsed / expanded shots of the "Collision / Helpers" group).
+    try { File.AppendAllText(shot + ".txt", $"note_runs {PreviewNote.Inlines?.Count ?? 0} note_text {(PreviewNote.Inlines is { Count: > 0 } il ? string.Concat(il.OfType<Avalonia.Controls.Documents.Run>().Select(r => r.Text)) : PreviewNote.Text)?.Replace("\n", " | ")}\n"); } catch { }
+    try { File.WriteAllText(shot + ".meshes.txt", MeshTreeDump()); } catch { /* best effort */ }
+    if (Environment.GetEnvironmentVariable("SM2_MESHGROUP_SHOT") == "1" && MeshList.ItemsSource is IEnumerable<MeshToggle> roots
+        && roots.FirstOrDefault(r => r.IsGroup) is { } group)
+    {
+      var kit = _kitOpen;
+      if (kit) ShowKitbashTab(false, save: false);
+      MeshList.ScrollIntoView(group);
+      await Task.Delay(1500);
+      try { await SaveWindowAsync(Path.ChangeExtension(shot, null) + "_collapsed.png"); } catch { /* best effort */ }
+      await Task.Delay(1000);
+      if (MeshList.ContainerFromItem(group) is TreeViewItem tvi)
+      {
+        tvi.IsExpanded = true;
+        await Task.Delay(1500);
+        try { await SaveWindowAsync(Path.ChangeExtension(shot, null) + "_expanded.png"); } catch (Exception e) { File.AppendAllText(shot + ".txt", "expanded shot failed: " + e + "\n"); }
+        MeshList.SelectedItem = group.Children[0];
+        await Task.Delay(800);
+        File.AppendAllText(shot + ".txt", $"group_select {(MeshList.SelectedItem as MeshToggle)?.Label}\n");
+        tvi.IsExpanded = false;
+      }
+      else File.AppendAllText(shot + ".txt", "group container not found\n");
+      if (kit) ShowKitbashTab(true, save: false);
+    }
     if (Environment.GetEnvironmentVariable("SM2_FLYTEST") == "1")
       await FlyTestAsync(shot, SaveWindowAsync);
     if (Environment.GetEnvironmentVariable("SM2_WINSHOT_EXIT") == "1")

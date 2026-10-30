@@ -6,8 +6,35 @@ namespace LibSaber.SM2Browser;
 
 public sealed class MeshToggle : INotifyPropertyChanged
 {
-  private readonly MeshPart _part;
+  private readonly MeshPart? _part;
   private bool _suppress;
+
+  /// <summary>
+  ///   R71: the one place that decides whether a part is a non-render entry (collision / occluder / shadow-caster
+  ///   volume, cloth simulation shell, placeholder sfx emitter/trail source). Data-driven: only the reader's own
+  ///   HideReason flags count (IndexMeshVisibility "volume", "clothSim", MaterialMaps "sfxSource"); "LOD", "sfx"
+  ///   (shown while an effect drives it) and "variant" (other armor pieces) are real geometry and stay on top.
+  ///   Conservative: an unflagged part is always treated as visible geometry.
+  /// </summary>
+  public static bool IsNonRender(MeshPart part)
+    => part.HideReason is "volume" or "clothSim" or "sfxSource";
+
+  public const string HelperGroupTitle = "Collision / Helpers";
+
+  public bool IsGroup => _part is null;
+  public bool NonRender => _part is not null && IsNonRender(_part);
+
+  private readonly string? _label;
+
+  /// <summary>R71: group row ("Collision / Helpers (N)"); its checkbox shows / hides every part under it.</summary>
+  private MeshToggle(string label, List<MeshToggle> children)
+  {
+    _label = label;
+    Children.AddRange(children);
+    Tip = "Not drawn by the game: collision / occluder / shadow-caster volumes, cloth simulation shells, sfx emitter helpers. Check to show them.";
+    foreach (var child in AllParts())
+      child.PropertyChanged += (_, e) => { if (e.PropertyName == nameof(Visible)) OnPropertyChanged(nameof(Visible)); };
+  }
 
   public MeshToggle(MeshPart part)
   {
@@ -25,7 +52,7 @@ public sealed class MeshToggle : INotifyPropertyChanged
     };
   }
 
-  public string Label => _part.Name;
+  public string Label => _part?.Name ?? _label ?? "";
 
   /// <summary>LOD variants of this mesh (<c>_LOD1</c>.. <c>_LODn</c>), shown collapsed under it.</summary>
   public List<MeshToggle> Children { get; } = new();
@@ -54,16 +81,37 @@ public sealed class MeshToggle : INotifyPropertyChanged
     }
 
     roots.Sort((a, b) => string.Compare(a.Label, b.Label, StringComparison.OrdinalIgnoreCase));
-    return roots;
+    // R71: non-render roots (a base row decides for its LOD children) go into one collapsed group at the end.
+    var helpers = roots.Where(r => r.NonRender).ToList();
+    if (helpers.Count == 0)
+      return roots;
+    var visible = roots.Where(r => !r.NonRender).ToList();
+    var helperGroup = new MeshToggle($"{HelperGroupTitle} ({helpers.Sum(h => 1 + h.Children.Count)})", helpers);
+    visible.Add(helperGroup);
+    return visible;
   }
 
   public string Tip { get; }
 
+  private IEnumerable<MeshToggle> AllParts()
+    => Children.SelectMany(c => c.IsGroup ? c.AllParts() : new[] { c }.Concat(c.Children));
+
   public bool Visible
   {
-    get => _part.Visible;
+    get => _part?.Visible ?? AllParts().Any(c => c.Visible);
     set
     {
+      if (_part is null)
+      {
+        var parts = AllParts().ToList();
+        foreach (var c in parts)
+          c.SetVisible(value);
+        OnPropertyChanged();
+        if (!_suppress && parts.Count > 0)
+          parts[0].Toggled?.Invoke(parts[0], EventArgs.Empty);
+        return;
+      }
+
       if (_part.Visible == value)
         return;
       _part.Visible = value;

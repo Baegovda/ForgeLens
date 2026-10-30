@@ -26,7 +26,10 @@ public partial class MainWindow
     }, RoutingStrategies.Tunnel);
     PreviewNote.PropertyChanged += (_, e) =>
     {
-      if (e.Property == TextBlock.TextProperty && PreviewNote.Text != _noteSummary && PreviewNote.Text != _noteDetails)
+      // R71: a plain Text set by any other code path replaces the coloured summary Runs.
+      if (e.Property == TextBlock.TextProperty && PreviewNote.Text is not null && PreviewNote.Inlines is { Count: > 0 })
+        PreviewNote.Inlines = null;
+      if (e.Property == TextBlock.TextProperty && PreviewNote.Text is not null && PreviewNote.Text != _noteSummary && PreviewNote.Text != _noteDetails)
       {
         NoteDetails.IsVisible = false;
         ToolTip.SetTip(PreviewNote, PreviewNote.Text);
@@ -41,7 +44,8 @@ public partial class MainWindow
     _noteSummary = mesh.Summary.Length > 0 ? mesh.Summary : mesh.Message;
     NoteDetails.IsChecked = false;
     PreviewNote.MaxLines = 5;
-    PreviewNote.Text = _noteSummary;
+    ShowSummaryText(_noteSummary, mesh.Summary.Length > 0); // R71: coloured Runs
+
     NoteDetails.IsVisible = _noteDetails.Length > 0 && _noteDetails != _noteSummary;
     ToolTip.SetTip(PreviewNote, _noteDetails);
   }
@@ -50,7 +54,7 @@ public partial class MainWindow
   {
     var open = NoteDetails.IsChecked == true;
     PreviewNote.MaxLines = open ? 0 : 5;
-    PreviewNote.Text = open ? _noteDetails : _noteSummary;
+    ShowSummaryText(open ? _noteDetails : _noteSummary, !open && _mesh is { Summary.Length: > 0 });
   }
 
   private void HudToggleClicked(object? sender, RoutedEventArgs e) => UpdateHud();

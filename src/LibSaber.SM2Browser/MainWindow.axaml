@@ -5,7 +5,7 @@
         xmlns:gpu="using:LibSaber.SM2Browser.Gpu"
         xmlns:cb="using:LibSaber.SM2Browser.ContentBrowser"
         x:Class="LibSaber.SM2Browser.MainWindow"
-        Title="Forge Lens — Space Marine 2 assets"
+        Title="Forge Lens"
         Width="1440"
         Height="800"
         MinWidth="1100"
