@@ -121,10 +121,10 @@ internal static class PerfBudget
   {
     var now = Environment.TickCount64;
     var last = Interlocked.Read(ref _lastGc);
-    if ((!force && now - last < 250) || Interlocked.CompareExchange(ref _lastGc, now, last) != last) return;
+    if (now - last < (force ? 250 : 1000) || Interlocked.CompareExchange(ref _lastGc, now, last) != last) return;
     Interlocked.Increment(ref Evictions);
     try { Pressure?.Invoke(); } catch { }
-    GC.Collect(GC.MaxGeneration, GCCollectionMode.Forced, true, true);
+    GC.Collect(GC.MaxGeneration, GCCollectionMode.Forced, false, false); // R95b: background GC (blocking compacting GC froze the UI 1-3.5 s at 1 GB)
     if (OperatingSystem.IsWindows()) { try { SetProcessWorkingSetSize(Process.GetCurrentProcess().Handle, -1, -1); } catch { } }
   }
 
