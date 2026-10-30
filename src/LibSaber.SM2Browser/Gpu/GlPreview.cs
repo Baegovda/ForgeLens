@@ -57,6 +57,11 @@ internal sealed unsafe class GlPreview : IDisposable
   public IReadOnlyList<(MeshPart Part, Vector3 Colour, float Px)> Highlights { get; set; } = Array.Empty<(MeshPart, Vector3, float)>();
   public double LastUploadMs { get; private set; }
 
+  /// <summary>R79 view mode (UE "View Mode"): 0 Lit, 1 Unlit, 2 Clay (no textures, grey), 3 Normals (world, after normal map), 4 UV checker.</summary>
+  public int ViewMode { get; set; }
+  /// <summary>R79 Show-menu overlay lines (bounds box, grid) in model space, each with its colour; drawn like the bone lines.</summary>
+  public IReadOnlyList<(Vector3 A, Vector3 B, Vector3 Colour)> ExtraLines { get; set; } = Array.Empty<(Vector3, Vector3, Vector3)>();
+
   private sealed class GpuBatch
   {
     public uint Vao, Vbo, Ibo, LineIbo;
@@ -543,6 +548,7 @@ internal sealed unsafe class GlPreview : IDisposable
     _gl.Uniform1(U("uNormal"), 1);
     _gl.Uniform1(U("uSpec"), 2);
     _gl.Uniform1(U("uBones"), 3);
+    _gl.Uniform1(U("uView"), ViewMode); // R79
 
     var skin = scene.SkinMatrices;
     if (skin is { Length: > 0 })
@@ -630,6 +636,26 @@ internal sealed unsafe class GlPreview : IDisposable
       _gl.BindBuffer(BufferTargetARB.ArrayBuffer, _lineVbo);
       _gl.BufferData<float>(BufferTargetARB.ArrayBuffer, points, BufferUsageARB.StreamDraw);
       _gl.DrawArrays(PrimitiveType.Lines, 0, (uint)(scene.BoneLines.Count * 2));
+    }
+
+    if (ExtraLines.Count > 0) // R79: Show menu bounds / grid
+    {
+      _gl.Uniform1(U("uSkin"), 0);
+      _gl.BindVertexArray(_lineVao);
+      _gl.BindBuffer(BufferTargetARB.ArrayBuffer, _lineVbo);
+      foreach (var colourGroup in ExtraLines.GroupBy(l => l.Colour))
+      {
+        var list = colourGroup.ToList();
+        var pts = new float[list.Count * 6];
+        for (var i = 0; i < list.Count; i++)
+        {
+          var (a, b, _) = list[i];
+          pts[i * 6] = a.X; pts[i * 6 + 1] = a.Y; pts[i * 6 + 2] = a.Z; pts[i * 6 + 3] = b.X; pts[i * 6 + 4] = b.Y; pts[i * 6 + 5] = b.Z;
+        }
+        SetVec3("uColor", colourGroup.Key);
+        _gl.BufferData<float>(BufferTargetARB.ArrayBuffer, pts, BufferUsageARB.StreamDraw);
+        _gl.DrawArrays(PrimitiveType.Lines, 0, (uint)(list.Count * 2));
+      }
     }
 
     _gl.BindVertexArray(0);
@@ -981,6 +1007,7 @@ internal sealed unsafe class GlPreview : IDisposable
     uniform vec4 uMetalRough;
     uniform vec3 uMetalTint;
     uniform int uTonemap;
+    uniform int uView;
     out vec4 oColor;
     // mtl1-23: CB_PASS_HDR curve from the RenderDoc captures (LibSaber.SM2.Assets.Effects.CaptureTonemap, LUT bake CS s1996).
     float hable(float x) { x = max(x, 0.0); return (x * (0.12 * x + 0.0225) + 0.004) / (x * (0.12 * x + 0.05) + 0.016) - 0.25; }
@@ -1033,6 +1060,21 @@ internal sealed unsafe class GlPreview : IDisposable
       }
       else if (uBlend == 2 && alpha < 0.004)
         discard;
+      // R79 view modes (1 unlit albedo, 4 UV checker); 2 clay and 3 normals are applied below.
+      if (uView == 1)
+      {
+        vec3 u = toSrgb(base);
+        oColor = uBlend == 2 ? vec4(u * alpha, alpha) : vec4(u, uBlend == 1 ? alpha : 1.0);
+        return;
+      }
+      if (uView == 4)
+      {
+        vec2 ck = floor(fract(vUv) * 8.0);
+        float c = mod(ck.x + ck.y, 2.0) < 0.5 ? 0.85 : 0.25;
+        vec3 uvc = vec3(c) * mix(vec3(1.0), vec3(fract(vUv), 0.5), 0.35);
+        oColor = vec4(uvc, 1.0);
+        return;
+      }
       vec3 L = N;
       float gloss = 1.0;
       vec3 frameT = vec3(0.0);
@@ -1061,10 +1103,15 @@ internal sealed unsafe class GlPreview : IDisposable
           gloss = clamp(len, 0.05, 1.0);
         }
       }
+      if (uView == 3)
+      {
+        oColor = vec4(L * 0.5 + 0.5, 1.0);
+        return;
+      }
       float metal = 0.0;
       float rough = 0.45;
       float ao = 1.0;
-      if (uHasSpec == 1)
+      if (uHasSpec == 1 && uView != 2)
       {
         vec4 s = texture(uSpec, vUv);
         // mtl1-23: base metal/rough {scale, bias} (capture OBJ_MTLBLEND_LAYER_CONST rows 2/3; PS _580 = sat(spec * x + y)).
@@ -1083,6 +1130,7 @@ internal sealed unsafe class GlPreview : IDisposable
         c = mix(c, uChamC[3], clamp((t - uChamR1.x) * uChamR1.y, 0.0, 1.0));
         base *= mix(c, vec3(1.0), metal);
       }
+      if (uView == 2) { base = vec3(0.42); metal = 0.0; rough = 0.6; ao = 1.0; }
       if (uAniso == 1 && uHasNormal == 0)
       {
         vec3 dp1 = dFdx(vPos);

@@ -1,4 +1,4 @@
-// R54b: SM2_SELECT=<catalog path> drives the file list exactly like a click (folder scope -> row selected ->
+﻿// R54b: SM2_SELECT=<catalog path> drives the file list exactly like a click (folder scope -> row selected ->
 // FileSelectionChanged -> PreviewFileAsync). SM2_WINSHOT=<png> saves the real window (RenderTargetBitmap) once the
 // level is shown, plus <png>.txt with the level stats and the open time; SM2_WINSHOT_EXIT=1 closes the window after.
 // With SM2_SELECT the window opens without activation (no focus stealing on the PC).
@@ -95,6 +95,8 @@ public partial class MainWindow
       await OrbitTestAsync(shot);
     if (Environment.GetEnvironmentVariable("SM2_PICKTEST") == "1")
       await PickTestAsync(shot);
+    if (Environment.GetEnvironmentVariable("SM2_UETEST") == "1")
+      await UeTestAsync(shot); // R79
     if (Environment.GetEnvironmentVariable("SM2_FLYTEST") == "1")
       await FlyTestAsync(shot, SaveWindowAsync);
     if (Environment.GetEnvironmentVariable("SM2_WINSHOT_EXIT") == "1")

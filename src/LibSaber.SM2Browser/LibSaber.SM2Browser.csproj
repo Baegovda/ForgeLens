@@ -1,4 +1,4 @@
-<Project Sdk="Microsoft.NET.Sdk">
+﻿<Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
     <OutputType>WinExe</OutputType>
@@ -12,7 +12,7 @@
     <RootNamespace>LibSaber.SM2Browser</RootNamespace>
     <AssemblyName>ForgeLens</AssemblyName>
     <!-- R71 (t148u): the ONE app version source; bump with the HANDOFF ledger id (0.NN.0 = rNN). Shown in the title. -->
-    <Version>0.76.0</Version>
+    <Version>0.79.0</Version>
     <!-- R74: workstation + concurrent GC (explicit), ConserveMemory lets the GC compact the LOH when it is fragmented. -->
     <ServerGarbageCollection>false</ServerGarbageCollection>
     <ConcurrentGarbageCollection>true</ConcurrentGarbageCollection>

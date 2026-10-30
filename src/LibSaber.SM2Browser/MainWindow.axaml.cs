@@ -1,4 +1,4 @@
-using LibSaber.SM2.Assets.Customization;
+﻿using LibSaber.SM2.Assets.Customization;
 using LibSaber.SM2Browser.Gpu;
 using Avalonia;
 using Avalonia.Controls;
@@ -114,6 +114,7 @@ public partial class MainWindow : Window
     // Space = Play/Pause anywhere in the window, except while typing (search, anim filter) or in an open dropdown.
     AddHandler(KeyDownEvent, SpaceKeyDown, RoutingStrategies.Tunnel);
     AddHandler(KeyDownEvent, ShortcutKeyDown, RoutingStrategies.Tunnel);
+    InitUeViewport(); // R79 (before InitFly: F with a selection frames the part)
     InitFly();
     InitHud();
     Opened += async (_, _) =>

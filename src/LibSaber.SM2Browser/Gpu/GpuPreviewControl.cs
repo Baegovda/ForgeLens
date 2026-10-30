@@ -1,4 +1,4 @@
-using System.Diagnostics;
+﻿using System.Diagnostics;
 using Avalonia;
 using Avalonia.OpenGL;
 using Avalonia.OpenGL.Controls;
@@ -66,6 +66,10 @@ internal sealed class GpuPreviewControl : OpenGlControlBase
 
   /// <summary>R75: outlined parts (hover / selection); applied on the next frame.</summary>
   public IReadOnlyList<(MeshPart Part, System.Numerics.Vector3 Colour, float Px)> Highlights { get; set; } = Array.Empty<(MeshPart, System.Numerics.Vector3, float)>();
+
+  /// <summary>R79: view mode (GlPreview.ViewMode) and Show-menu lines, applied on the next frame.</summary>
+  public int ViewMode { get; set; }
+  public IReadOnlyList<(System.Numerics.Vector3 A, System.Numerics.Vector3 B, System.Numerics.Vector3 Colour)> ExtraLines { get; set; } = Array.Empty<(System.Numerics.Vector3, System.Numerics.Vector3, System.Numerics.Vector3)>();
 
   public void Redraw() => RequestNextFrameRendering();
 
@@ -191,6 +195,8 @@ internal sealed class GpuPreviewControl : OpenGlControlBase
       renderer.Effect = request.Overlay?.Invoke(request.Mesh, scene, time);
       LastScene = scene;
       renderer.Highlights = Highlights;
+      renderer.ViewMode = ViewMode;
+      renderer.ExtraLines = ExtraLines;
       renderer.Render(request.Mesh, scene, width, height, request.Wireframe, fb);
       var cpu = _clock.Elapsed.TotalMilliseconds - start;
       if (_capture is { } cap)
