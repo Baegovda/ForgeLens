@@ -39,6 +39,8 @@ internal static class Program
       return Bench.MeshPartsBench.Run(args);
     if (args.Length > 0 && args[0] == "--openbench")
       return Bench.OpenBench.Run(args);
+    if (args.Length > 0 && args[0] == "--poe2export")
+      return Bench.Poe2Bench.Run(args);
     if (args.Length > 0 && args[0] == "--glbench")
       return Bench.GpuBench.Run(args);
     return BuildAvaloniaApp().StartWithClassicDesktopLifetime(args);

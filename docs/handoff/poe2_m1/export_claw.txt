@@ -1,0 +1,4 @@
+art/models/items/weapons/onehandweapons/claws/basetypes/crudeclaw.fmt: 796 verts, 651 tris, 1 parts, 0 bones, clip - s
+texture Art/Models/Items/Weapons/OneHandWeapons/Claws/Basetypes/Textures/CrudeClaw_Colour_BC7.dds 1024x1024 -> CrudeClaw_Colour_BC7.png
+texture Art/Models/Items/Weapons/OneHandWeapons/Claws/Basetypes/Textures/CrudeClaw_Normal_BC7.dds 1024x1024 -> CrudeClaw_Normal_BC7.png
+part CrudeClawShape tris 651 mat Art/Models/Items/Weapons/OneHandWeapons/Claws/Basetypes/Textures/CrudeClawc.mat albedo Art/Models/Items/Weapons/OneHandWeapons/Claws/Basetypes/Textures/CrudeClaw_Colour_BC7.dds normal Art/Models/Items/Weapons/OneHandWeapons/Claws/Basetypes/Textures/CrudeClaw_Normal_BC7.dds

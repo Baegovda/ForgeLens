@@ -1,0 +1,7 @@
+art/models/monsters/basicskeleton/rig.ast: 49 bones, 252 animations
+art/models/monsters/basicskeleton/basicskeleton1.sm: 2480 verts, 3625 tris, 1 parts, 49 bones, clip attack_01 1.50s
+texture Art/Textures/Monsters/KatarinaSkeleton/KatarinaSkeleton1_colour.dds 2048x2048 -> KatarinaSkeleton1_colour.png
+texture Art/Textures/Monsters/KatarinaSkeleton/KatarinaSkeleton1_normal.dds 2048x2048 -> KatarinaSkeleton1_normal.png
+texture Art/Textures/Monsters/KatarinaSkeleton/KatarinaSkeleton1_sss_BC1.dds 1024x1024 -> KatarinaSkeleton1_sss_BC1.png
+part BasicSkeleton1Shape tris 3625 mat Art/Textures/Monsters/KatarinaSkeleton/KatarinaSkeleton1c.mat albedo Art/Textures/Monsters/KatarinaSkeleton/KatarinaSkeleton1_colour.dds normal Art/Textures/Monsters/KatarinaSkeleton/KatarinaSkeleton1_normal.dds
+clip attack_01 1.500s tracks 49 keys 2547 

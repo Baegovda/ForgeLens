@@ -50,6 +50,13 @@ internal static class GpuBench
           InPlace = true,
         };
       }
+      else if (game.StartsWith("poe2:", StringComparison.Ordinal))
+      {
+        mesh = Poe2Bench.Load(game[5..], model, out settings, out var poeLog);
+        foreach (var l in poeLog) Line(l);
+        clip = mesh.Clip;
+        mesh.Clip = null;
+      }
       else
       {
         var watch = Stopwatch.StartNew();

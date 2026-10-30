@@ -1,0 +1,18 @@
+glbench 2026-10-31 04:43:19 cores=32 source=poe2:m1 model=art/models/monsters/basicskeleton/basicskeleton1.sm|art/models/monsters/basicskeleton/rig.ast|attack_01
+art/models/monsters/basicskeleton/rig.ast: 49 bones, 252 animations
+art/models/monsters/basicskeleton/basicskeleton1.sm: 2480 verts, 3625 tris, 1 parts, 49 bones, clip attack_01 1.50s
+GL: ANGLE (NVIDIA, NVIDIA GeForce RTX 4090 (0x00002684) Direct3D11 vs_5_0 ps_5_0, D3D11-32.0.16.1088) | OpenGL ES 3.0.0 (ANGLE 2.1.22045 git hash: 4a177dd16290) | MSAA 8x | aniso 16x
+first frame incl. upload 114 ms
+
+-- vsync off (back-to-back frames, glFinish at the end) --
+uncapped static 1100x1000 MSAA 8x:   0.15 ms/frame (  6545 fps)  cpu-submit 0.08 ms
+uncapped play   1100x1000 MSAA 8x:   0.15 ms/frame (  6508 fps)  cpu-submit 0.10 ms
+uncapped static 1600x1200 MSAA 8x:   0.10 ms/frame ( 10340 fps)  cpu-submit 0.02 ms
+uncapped play   1600x1200 MSAA 8x:   0.14 ms/frame (  6970 fps)  cpu-submit 0.08 ms
+uncapped static 1920x1080 MSAA 8x:   0.10 ms/frame ( 10096 fps)  cpu-submit 0.03 ms
+uncapped play   1920x1080 MSAA 8x:   0.16 ms/frame (  6451 fps)  cpu-submit 0.08 ms
+uncapped static 2560x1440 MSAA 8x:   0.14 ms/frame (  7272 fps)  cpu-submit 0.02 ms
+uncapped play   2560x1440 MSAA 8x:   0.18 ms/frame (  5496 fps)  cpu-submit 0.08 ms
+vsync on  static orbit 1280x800: 60.2 presented fps
+vsync on  playback    1280x800: 60.0 presented fps
+done
