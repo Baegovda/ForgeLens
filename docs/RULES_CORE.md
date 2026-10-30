@@ -74,3 +74,7 @@ Full registry: `tools/re/README.md`.
 - EVERY worker checks %USERPROFILE%\window_watch\NEEDS_ACTION.txt at start and before/after each editor step; if present: read the summary, handle it (relaunch the editor only if the game is not running, fix the lock file), then delete the marker.
 - If the watcher heartbeat (window_watch\heartbeat.txt) is older than 30 s, restart it with tools/watch/start.ps1 before using the editor.
 - Launch the editor with -unattended -nosplash (no modal dialogs/Message Log windows). The 01:54 and 03:29 crashes were D3D11 CreateSwapChainForHwnd 80070005 while a NEW editor window (Message Log/dialog) was created; swap-chain hooks (RTSS/MSI Afterburner, DisplayFusion) are loaded. Correlated, not proven.
+
+## Game is user-only (R97, owner t265u)
+- NEVER launch, focus, send input to, or otherwise control Space Marine 2 yourself, in any worker, ever. In-game captures are taken only by the user. Use game data (extractor), the viewer and Unreal only.
+
