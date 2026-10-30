@@ -1,6 +1,6 @@
 # ForgeLens window watcher: polls top-level windows ~1s, no image streaming.
-# Message Log -> WM_CLOSE. Save Content / Crash Reporter / other UE modal -> one event + one monitor screenshot per appearance.
-param([string]$Root="$env:USERPROFILE\window_watch",[string]$ProcNames="UnrealEditor,CrashReportClient,CrashReportClientEditor",[int]$PollMs=1000)
+# Message Log -> WM_CLOSE. Crash Reporter (R97 t261u/t262u): within 5 s -> crash summary + WM_CLOSE (= Close Without Sending, no upload) + NEEDS_ACTION marker. Save Content / Crash Reporter / other UE modal -> one event + one monitor screenshot per appearance.
+param([string]$Root="$env:USERPROFILE\window_watch",[string]$ProcNames="UnrealEditor,CrashReportClient,CrashReportClientEditor",[int]$PollMs=250)
 $ErrorActionPreference='Continue'
 Add-Type -AssemblyName System.Drawing,System.Windows.Forms
 Add-Type @"
@@ -17,7 +17,7 @@ public class WW{
  [DllImport("user32.dll")] public static extern bool PostMessage(IntPtr h,uint m,IntPtr w,IntPtr l);
  [StructLayout(LayoutKind.Sequential)] public struct R{public int L,T,Rt,B;}
  [DllImport("user32.dll")] public static extern bool GetWindowRect(IntPtr h,out R r);
- public static List<IntPtr> Of(HashSet<uint> pids){var l=new List<IntPtr>();EnumWindows((h,x)=>{uint p;GetWindowThreadProcessId(h,out p);if(pids.Contains(p)&&IsWindowVisible(h))l.Add(h);return true;},IntPtr.Zero);return l;}
+ public static List<IntPtr> Of(HashSet<uint> pids){var l=new List<IntPtr>();EnumWindows((h,x)=>{uint p;GetWindowThreadProcessId(h,out p);if(IsWindowVisible(h)&&(pids.Contains(p)||T(h).EndsWith("Crash Reporter")))l.Add(h);return true;},IntPtr.Zero);return l;}
  public static string T(IntPtr h){var s=new StringBuilder(512);GetWindowText(h,s,512);return s.ToString();}
  public static string C(IntPtr h){var s=new StringBuilder(256);GetClassName(h,s,256);return s.ToString();}
 }
@@ -40,7 +40,7 @@ while($true){
   $list= if($set.Count){[WW]::Of($set)}else{@()}
   foreach($h in $list){
    $p=[uint32]0; [void][WW]::GetWindowThreadProcessId($h,[ref]$p)
-   $pr=$procs[$p]; if(-not $pr){continue}; $pn=$pr.ProcessName.ToLower()
+   $pr=$procs[$p]; if(-not $pr){ try{ $pr=[System.Diagnostics.Process]::GetProcessById([int]$p) }catch{ continue } }; $pn=$pr.ProcessName.ToLower()
    $t=[WW]::T($h); $ow=[WW]::GetWindow($h,4); $owned=($ow -ne [IntPtr]::Zero -and -not [WW]::IsWindowEnabled($ow))  # modal = owner disabled
    $k=Kind $t $owned; if(-not $k){continue}
    if($pn -like 'crashreport*'){ $k='crash_reporter' }
@@ -52,6 +52,19 @@ while($true){
    $scr=[System.Windows.Forms.Screen]::FromHandle($h); $b=$scr.Bounds
    $o=[ordered]@{time=(Get-Date -f o);kind=$k;title=$t;class=[WW]::C($h);process=$pr.ProcessName;pid=$p;hwnd=[int64]$h;rect=@($r.L,$r.T,$r.Rt,$r.B);monitor=$scr.DeviceName;monitor_bounds=@($b.X,$b.Y,$b.Width,$b.Height);action='none';shot=$null}
    if($k -eq 'message_log'){ [void][WW]::PostMessage($h,0x10,[IntPtr]::Zero,[IntPtr]::Zero); $o.action='wm_close' }
+   elseif($k -eq 'crash_reporter'){
+    $t0=Get-Date; [void][WW]::PostMessage($h,0x10,[IntPtr]::Zero,[IntPtr]::Zero); $o.action='wm_close_without_sending'
+    $gone=$false; for($i=0;$i -lt 40;$i++){ Start-Sleep -Milliseconds 100; if(-not [WW]::IsWindowVisible($h)){ $gone=$true; break } }
+    if(-not $gone){ try{ Stop-Process -Id $p -Force; $o.action='killed_after_wm_close' }catch{} }
+    $o.closed=(Get-Date -f o); $o.close_ms=[int]((Get-Date)-$t0).TotalMilliseconds
+    try{ $proj='K:\Unreal Projects\UE_VFX_57\Saved'; $cf=Get-ChildItem "$proj\Crashes" -Directory -EA 0|sort LastWriteTime|select -Last 1
+     $sum=Join-Path $Root ("crash_{0}.txt" -f (Get-Date -f yyyyMMdd_HHmmss))
+     $lt= if($cf){ Get-ChildItem $cf.FullName -Filter *.log -EA 0|select -First 1 } else { $null }
+     $body=@("detected=$($o.time) closed=$($o.closed) close_ms=$($o.close_ms) title=$t pid=$p process=$($pr.ProcessName)","crash_folder=$($cf.FullName)","--- errors ---")
+     if($lt){ $body+= (Get-Content $lt.FullName -Tail 400 | Select-String 'Fatal|Error: |Assertion|appError' | select -First 20 | %{$_.Line}); $body+='--- log tail ---'; $body+= (Get-Content $lt.FullName -Tail 60) }
+     $body|Set-Content $sum -Encoding UTF8; $o.summary=$sum
+     "$(Get-Date -f o) crash reporter closed; summary $sum; crash_folder=$($cf.FullName). Workers: read summary, then delete this file." | Add-Content (Join-Path $Root 'NEEDS_ACTION.txt') }catch{ Log "summary fail $_" }
+   }
    else{
     try{ $f=Join-Path $shots ("{0}_{1}.png" -f (Get-Date -f yyyyMMdd_HHmmss),$k)
      $bmp=New-Object System.Drawing.Bitmap $b.Width,$b.Height; $g=[System.Drawing.Graphics]::FromImage($bmp)

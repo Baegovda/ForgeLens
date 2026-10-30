@@ -68,3 +68,9 @@ Source of detail: BOT_TRANSFER §0/§5, HANDOFF ledger R01–R43. Newest dated o
 | `nmb_verify.py` | fire-clip table vs primaris.nmb |
 | `tools/input_block.ps1` | any real mouse/keyboard test: blocks owner input (hook / BlockInput), 60 s watchdog |
 Full registry: `tools/re/README.md`.
+
+## Crash Reporter windows (R97, owner t261u/t262u)
+- A UE Crash Reporter window must never stay open: the window watcher (tools/watch/watcher.ps1, 250 ms poll) closes it within 5 SECONDS (measured detect->closed 105 ms; dummy window launch->closed 1.28 s). It sends WM_CLOSE (= Close Without Sending), saves %USERPROFILE%\window_watch\crash_<ts>.txt (crash folder, errors, log tail) and appends %USERPROFILE%\window_watch\NEEDS_ACTION.txt.
+- EVERY worker checks %USERPROFILE%\window_watch\NEEDS_ACTION.txt at start and before/after each editor step; if present: read the summary, handle it (relaunch the editor only if the game is not running, fix the lock file), then delete the marker.
+- If the watcher heartbeat (window_watch\heartbeat.txt) is older than 30 s, restart it with tools/watch/start.ps1 before using the editor.
+- Launch the editor with -unattended -nosplash (no modal dialogs/Message Log windows). The 01:54 and 03:29 crashes were D3D11 CreateSwapChainForHwnd 80070005 while a NEW editor window (Message Log/dialog) was created; swap-chain hooks (RTSS/MSI Afterburner, DisplayFusion) are loaded. Correlated, not proven.
