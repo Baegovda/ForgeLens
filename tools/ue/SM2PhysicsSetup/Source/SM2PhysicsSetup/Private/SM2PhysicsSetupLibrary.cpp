@@ -5,6 +5,7 @@
 // bone are kinematic, and every other helper is ball-jointed (swing/twist limited) to its nearest helper that is
 // closer to the anchor. Cloth swing limits are DERIVED from maxDistanceMeters (atan(r/L)); radius, clamps and damping are not from the game.
 #include "SM2PhysicsSetupLibrary.h"
+#include "HAL/IConsoleManager.h"
 
 #include "AnimGraphNode_LinkedInputPose.h"
 #include "AnimGraphNode_RigidBody.h"
@@ -790,7 +791,11 @@ int32 AddCollision(UPhysicsAsset* PA, const TSharedPtr<FJsonObject>& Coll, const
   // body (viewer R73: radius x0.75 4.66 %, x0.5 5.6 % vs x1 2.44 % free particles inside the body). Now particles deeper than
   // half the radius count as authored-inside (Chaos pushes them out on the first step, as the viewer does) and do not drive
   // the fit; shallow ones may shrink the shape to at most RestFitFloor. The raw (old) scale is kept only for remap rejection.
-  constexpr float RestFitFloor = 0.9f, DeepFrac = 0.5f;
+  // R91: A/B knobs without a rebuild. sm2.RestFitFloor (default 0.9) and sm2.RestFitDeepFrac (default 0.5; 0 = legacy:
+  // every particle drives the fit, as before R76). Legacy pre-R76 behaviour = RestFitFloor 0.25 + RestFitDeepFrac 0.
+  static TAutoConsoleVariable<float> CVarFitFloor(TEXT("sm2.RestFitFloor"), 0.9f, TEXT("SM2 cloth rest-fit radius floor (R76 default 0.9; legacy 0.25)"));
+  static TAutoConsoleVariable<float> CVarDeepFrac(TEXT("sm2.RestFitDeepFrac"), 0.5f, TEXT("SM2 cloth rest-fit: particles deeper than this fraction of the radius are ignored (0 = legacy, none ignored)"));
+  const float RestFitFloor = FMath::Clamp(CVarFitFloor.GetValueOnGameThread(), 0.0f, 1.0f), DeepFrac = FMath::Clamp(CVarDeepFrac.GetValueOnGameThread(), 0.0f, 1.0f);
   int32 DeepIgnored = 0;
   float LastRawScale = 1.0f;
   auto FitScale = [&](const FVector& A, const FVector& B, float RA, float RB) {
@@ -995,6 +1000,7 @@ int32 AddCollision(UPhysicsAsset* PA, const TSharedPtr<FJsonObject>& Coll, const
       CollBody(PA, BN)->AggGeom.BoxElems.Add(E);
       ++N;
     }
+  Log.Add(FString::Printf(TEXT("fitFloor=%.2f deepFrac=%.2f"), RestFitFloor, DeepFrac));
   Log.Add(FString::Printf(TEXT("%s: collision shapes=%d missingBones=%d remapped=%d remapRejected=%d unnegated=%d restFitted=%d minRadiusScale=%.2f boxRestInside=%d tplLocator=%d deepIgnored=%d"), *Who, N, Missing, Remapped, Rejected, bMirror ? 1 : 0, Fitted, MinScale, BoxRestInside, FromLocator, DeepIgnored));
   if (RemapLog.Num()) Log.Add(FString::Printf(TEXT("%s: collision remap (HEURISTIC) %s"), *Who, *FString::Join(RemapLog, TEXT(" "))));
   if (MissLog.Num()) Log.Add(FString::Printf(TEXT("%s: collision skipped (bone not in mesh) %s"), *Who, *FString::Join(MissLog, TEXT(" "))));

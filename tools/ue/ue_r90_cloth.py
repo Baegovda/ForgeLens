@@ -9,10 +9,13 @@ SUB = {
  "titus": ("cc_titus_assault", {"run": A+"cc_titus_assault/yaw180/cc_titus_assault__tacticus_unarmed_run_fwd_intercessor",
                                 "melee": A+"cc_titus_assault/yaw180/cc_titus_assault__npc_assault_attack_melee_thunder_hammer_light_1_intercessor"}),
  "calgar": ("cc_calgar", {"run": "/Game/SM2_Work/Tests/r67_phys/anims/cc_calgar__calgar_run_fwd_calgar"}),
+ "tech_priest": ("cc_tech_priest", {"death": "/Game/ForgeLens/SM2/Tests/chars_cloth2/cc_tech_priest/Anims/cc_tech_priest__tech_priest_hordemode_death_tech_priest", "walk": "/Game/ForgeLens/SM2/Tests/chars_cloth2/cc_tech_priest/Anims/cc_tech_priest__tech_priest_censer_walk_loop_tech_priest"}),
+ "chaplain": ("cc_chaplain", {"turn": "/Game/ForgeLens/SM2/Tests/chars_cloth2/cc_chaplain/Anims/cc_chaplain__chaplain_turn_180_lwd_chaplain"}),
+ "commissar": ("cc_commissar", {"death": "/Game/ForgeLens/SM2/Tests/chars_cloth2/cc_commissar/Anims/cc_commissar__death_1_commissar", "run": "/Game/ForgeLens/SM2/Tests/chars_cloth2/cc_commissar/Anims/cc_commissar__trooper_run_start_fwd_v01_commissar", "melee": "/Game/ForgeLens/SM2/Tests/chars_cloth2/cc_commissar/Anims/cc_commissar__trooper_death_melee_front_v01_commissar"}),
  "vortex": ("cc_vortex_beast", {"melee": A+"cc_vortex_beast/cc_vortex_beast__vortex_beast_attack_melee_180_rwd_vortex_beast"}),
 }
 def pj(n):
-    for d in ("chars_cloth", "chars_phys52"):
+    for d in ("chars_cloth2", "chars_cloth", "chars_phys52"):  # R91: chars_cloth2 = tech_priest/chaplain/commissar with _SIM
         p = W + "/Exports/%s/%s/tpl/%s.tpl/%s.physics.json" % (d, n, n, n)
         if os.path.exists(p): return p
 def les(): return unreal.get_editor_subsystem(unreal.LevelEditorSubsystem)
@@ -29,11 +32,13 @@ def mesh_path(subj, tag): return "%s/%s_%s" % (F, SUB[subj][0], tag)
 def prep(subj, tag):
     n = SUB[subj][0]; mp = mesh_path(subj, tag)
     if EAL.does_asset_exist(mp): EAL.delete_asset(mp)
-    m = EAL.duplicate_asset("/Game/SM2_Work/Characters/%s/%s" % (n, n), mp)
+    src = "/Game/SM2_Work/Characters/%s/%s" % (n, n)
+    if not EAL.does_asset_exist(src): src = "/Game/ForgeLens/SM2/Tests/chars_cloth2/%s/%s" % (n, n)  # R91 imports under /Game/ForgeLens/SM2
+    m = EAL.duplicate_asset(src, mp)
     r = L.create_chaos_cloth(m, pj(n)); conv, rep = (r if isinstance(r, tuple) else ([], ""))[-2:]
     print("R90 converted", subj, tag, len(conv))
     for l in str(rep).split(" | "):
-        if "restFitted" in l or "deepIgnored" in l: print("R90LOG", l[:300])
+        if "restFitted" in l or "deepIgnored" in l or "fitFloor=" in l: print("R90LOG", l[:300])
     print("R90 clothing", len(m.get_editor_property("mesh_clothing_assets"))); EAL.save_asset(mp, only_if_is_dirty=False)
 def grey():
     p = F + "/M_r90_grey"
