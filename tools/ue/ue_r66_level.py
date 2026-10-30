@@ -124,6 +124,15 @@ elif mode == "sky":
     f.component.set_editor_property("fog_inscattering_luminance", unreal.LinearColor(0.05, 0.07, 0.12, 1))
     sun = [a for a in eas.get_all_level_actors() if a.actor_has_tag("R64L") and isinstance(a, unreal.DirectionalLight)]
     for a in sun: a.light_component.set_editor_property("atmosphere_sun_light", a.get_actor_rotation().pitch < 0)
+    # neutral/cool fill instead of R64's SunsetAmbientCubemap (warm cast made the grey steel look rust-brown vs the viewer)
+    for a in eas.get_all_level_actors():
+        if not a.actor_has_tag("R64L"): continue
+        if isinstance(a, unreal.SkyLight):
+            k = a.light_component; cube = unreal.load_asset("/Engine/MapTemplates/Sky/DaylightAmbientCubemap")
+            if cube: k.set_editor_property("source_type", unreal.SkyLightSourceType.SLS_SPECIFIED_CUBEMAP); k.set_editor_property("cubemap", cube); k.set_light_color(unreal.LinearColor(1, 1, 1, 1))
+            else: k.set_editor_property("source_type", unreal.SkyLightSourceType.SLS_CAPTURED_SCENE); k.set_light_color(unreal.LinearColor(1, 0.9, 0.8, 1))
+            print("R66 skylight cubemap", cube.get_name() if cube else "captured"); k.recapture_sky()
+        elif isinstance(a, (unreal.DirectionalLight, unreal.SpotLight, unreal.PointLight)): a.light_component.set_light_color(unreal.LinearColor(0.9, 0.95, 1.0, 1))
     unreal.get_editor_subsystem(unreal.LevelEditorSubsystem).save_current_level()
     print("R66 sky atmosphere + fog base z", base, "sun", len(sun))
 elif mode in ("capture", "export"):

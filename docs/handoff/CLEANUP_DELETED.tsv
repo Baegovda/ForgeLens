@@ -3084,3 +3084,4 @@ Content/SM2_Work/Tests/physics/cc_calgar/cc_calgar.uasset.bak1	53738893
 Content/SM2_Work/Tests/physics/cc_titus/cc_titus.uasset.bak1	91974761
 Content/SM2_Work/Tests/sani_before/hologram_planet/localbake/hologram_planet_Skeleton.uasset.bak1	21925
 /Game/SM2/cc_sorcerer_exalted (95 files: M_SM2 masters, MI_*, Textures; created by R63 by mistake 2026-10-30 13:36 KST, 0 external referencers)	0
+/Game/SM2_Work/Tests/r54_level/Meshes (R54 OBJ meshes, untextured, 386 static meshes; replaced by Meshes66; deleted by ue_r66_level.py reset 2026-10-30 ~14:40 KST with the 2850 R54 actors, the only referencers; bytes not measured)	0
