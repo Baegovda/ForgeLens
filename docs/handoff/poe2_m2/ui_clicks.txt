@@ -1,0 +1,10 @@
+05:45:55 foreground before: 'Path of Exile 2'
+05:45:55 foreground now: 'Path of Exile 2'
+05:45:55 click 54,107
+05:45:56 click 300,147
+05:45:59 click 300,183
+05:46:11 click 125,107
+05:46:12 click 300,147
+05:46:14 click 300,183
+05:46:14 click 300,431
+05:46:25 done

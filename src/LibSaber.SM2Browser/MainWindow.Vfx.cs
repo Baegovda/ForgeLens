@@ -112,17 +112,27 @@ public partial class MainWindow
     if (!await ShowEffectAsync(name, ++_previewGeneration)) PreviewNote.Text = name + ": not an effect";
   }
 
-  private async Task<bool> ShowEffectAsync(string name, int generation)
+  private async Task<bool> ShowEffectAsync(string name, int generation, Func<(EffectDefinition Def, EffectInstance Instance)?>? make = null)
   {
     var aspect = VfxViewAspect();
     var built = await Task.Run(() =>
     {
-      if (_vfxLibrary!.Resolve(name) is not { } tree) return null;
-      var def = EffectDefinition.Build(name, tree);
+      EffectDefinition def;
+      EffectInstance? made = null;
+      if (make is not null) // PoE2 (M2 D): definition built by the game reader
+      {
+        if (make() is not { } m) return null;
+        (def, made) = m;
+      }
+      else
+      {
+        if (_vfxLibrary!.Resolve(name) is not { } tree) return null;
+        def = EffectDefinition.Build(name, tree);
+      }
       if (def.Emitters.Count == 0 && def.Lights.Count == 0 && def.Trails.Count == 0) return null;
       _vfxTextures!.Prefetch(def.Textures);
       _vfxMeshes.Prefetch(def.Emitters.Select(e => e.Geom?.Template));
-      var instance = EffectInstance.Standalone(def, 1);
+      var instance = made ?? EffectInstance.Standalone(def, 1);
       // mtl1-42: frame the whole effect (first run, up to 6 s) instead of the bench's dense-core fit.
       var camera = EffectCamera.FitAll(instance, Math.Min(def.Duration, 6f), aspect);
       return new VfxState { Definition = def, Instance = instance, Camera = camera };

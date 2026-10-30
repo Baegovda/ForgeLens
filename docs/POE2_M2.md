@@ -34,3 +34,36 @@ Chain (PROVEN by row values for Firebolt):
 - Verified on the PC (no clicks, env hooks only): Open GGPK -> Skills -> fireball -> 4 effects listed; greater.ao loaded into the main viewport with 4 emitter parts (254 verts, 13 bones, 1.00 s clip), about 21 s including extraction. Screenshots: handoff/poe2_m2/ui_poe2_window.png, ui_main_fireball.png.
 - Not verified: manual clicking through the Files tab; the effect still renders as untextured flat meshes (particle sim is step D).
 - Side finding: mp_halfsphere_LOD1_FF.fmt reports 2 LODs (380/190 tris), the first multi-LOD asset seen.
+
+## Step D - particle simulation (PoE2 effects -> SM2 EffectDefinition)
+- New: Games/Poe2/Poe2Particles.cs maps an effect .ao to the shared SM2 EffectDefinition (CORE CONCEPT: the SM2 fixed-step
+  simulation, sprite/trail builders, viewer VFX view and --vfxbench are reused unchanged).
+  - .pet GPU emitters: duration, particle life min/max, particles_per_second / burst+particles_count, is_continuous, particle_mesh.
+  - update .mat graphs: SphereEmitter Radius, EmitVelocityRandom / EmitVelocityAlong (Velocity, Cone Size), Gravity, Air,
+    AirResistanceMultiplier, CurlNoise_Wind, EmitScale.
+  - render .mat graphs: Colour (RGBA over life), Scale / ScaleXYZ, Vibrance / COLORV / Channel_LookUpColor / SIM_Smoke2 tint,
+    Alpha_Multiply, Force* blend, first albedo-like texture, flipbook grid from the _NxM_ file name (random pick or over life),
+    LuminanceAlpha (texture key suffix #lum).
+  - .pet CPU emitters (key_values, 7-point graphs over life: rate, life, scale, colour/opacity, velocity, acceleration, frames).
+  - .trl trails: trail_length, max_segment_length, segment_duration, scale curve, material texture/tint.
+- Older .fmt (section V8, vertex_buffer/index_buffer) now loads: cleaveGeo01.fmt was never missing, it failed on the V8 layout.
+- Bench: `--vfxbench poe2:<prepared> - - <out> <effect.ao>@sec`; prepare with `--poe2prep <ggpk> <out> <tools> <ao...>`.
+- Viewer: selecting an .ao effect in the PoE2 window plays it in the SM2 particle view (fallback / FL_POE2_RIGVIEW=1: M1 rig view).
+- Textures: no-alpha particle textures get alpha = max(RGB); SIM_* smoke maps use density as alpha with the material tint.
+- HEURISTIC (no in-game comparison possible, game not launched): Scale unit 0.05 m (FL_POE2_FX_SIZE), colour intensity 60
+  (FL_POE2_FX_INTENSITY, CPU x0.35), trail width 0.05 m per unit, gravity -4 m/s2, Air friction 1, curl noise as tangential
+  speed, mesh particles drawn as glow sprites, world-locked (face_lock None/X/Y/Z) and tileable-mask sprites hidden,
+  distortion passes hidden, projectile fly-by 8 m/s over 4 m.
+- Verified: bench sheets for Firebolt (GreaterFireball greater.ao + impact_greater.ao), crossbow stormblast explosion, arc impact,
+  wind spear projectile, spark projectile (handoff/poe2_m2/fx_sheets.png, fx_vfxbench.txt): all deterministic (replay identical).
+  Viewer: Firebolt projectile (rig.ao) plays with heads + trails after real clicks (ui_firebolt_particles.png).
+- Not verified / weak: spark draws nothing visible (its lightning trail texture/mask), arc impact is overexposed, smoke shading is
+  a flat tint, no in-game reference; event start times and emitter intervals are ignored.
+
+## Step C+ - real clicks in the PoE2 window
+- tools/poe2/poe2_clicks.ps1 run under tools/input_block.ps1 (hook mode, 30 s, 0 physical events dropped; foreground was
+  checked first, game not running): Files tab -> search mp_halfsphere_lod1_ff -> first result opens in the main viewport
+  (230 verts, LODs 2 = 380/190 tris, LOD combo lists both) -> Skills -> firebolt -> projectile effect plays as particles.
+  Screenshots: ui_files_tab_click.png, ui_firebolt_particles.png; log ui_clicks.txt.
+- Fix: two selection events raced (generation counter) and the loser fell back to the rig view; superseded requests now skip
+  the fallback.

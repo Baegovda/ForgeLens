@@ -67,12 +67,34 @@ public sealed partial class Poe2Reader
       using var doc = Json(meshPath);
       var root = doc.RootElement;
       var section = root.GetProperty("section").EnumerateObject().First().Value;
-      var lods = section.GetProperty("lods");
-      var lod = lods[0];
-      ReadVertices(mesh, lod, false);
-      var tris = ReadIndices(mesh, lod);
-      for (var l = 1; l < lods.GetArrayLength(); l++)
-        mesh.Levels.Add(ReadLod(lods[l], l, new List<string> { "lod" }, new List<string?>(), false));
+      int tris;
+      if (section.TryGetProperty("vertex_buffer", out var vb))
+      {
+        // M2 E: older .fmt (section V8, e.g. normalized_prtcls/cleaveGeo01.fmt): one LOD, vertex_buffer [{pos, unk[8], uv}] and
+        // index_buffer {U16|U32: [...]}. unk[0..2] read as a biased-byte normal (INFERRED: unit length, matches face winding).
+        foreach (var vx in vb.EnumerateArray())
+        {
+          var p = vx.GetProperty("pos");
+          mesh.Positions.Add(P(p[0].GetSingle(), p[1].GetSingle(), p[2].GetSingle()));
+          var n = vx.TryGetProperty("unk", out var un) && un.ValueKind == JsonValueKind.Array && un.GetArrayLength() >= 3
+            ? D((un[0].GetInt32() - 128) / 127f, (un[1].GetInt32() - 128) / 127f, (un[2].GetInt32() - 128) / 127f) : Vector3.UnitY;
+          mesh.Normals.Add(Vector3.Normalize(n + new Vector3(1e-6f)));
+          var uv = vx.GetProperty("uv");
+          mesh.Uvs.Add(new Vector2(uv[0].GetSingle(), uv[1].GetSingle()));
+        }
+        var ib = section.GetProperty("index_buffer").EnumerateObject().First().Value.EnumerateArray().Select(i => i.GetInt32()).ToList();
+        for (var t = 0; t + 2 < ib.Count; t += 3) { mesh.Indices.Add(ib[t]); mesh.Indices.Add(ib[t + 2]); mesh.Indices.Add(ib[t + 1]); }
+        tris = mesh.Indices.Count;
+      }
+      else
+      {
+        var lods = section.GetProperty("lods");
+        var lod = lods[0];
+        ReadVertices(mesh, lod, false);
+        tris = ReadIndices(mesh, lod);
+        for (var l = 1; l < lods.GetArrayLength(); l++)
+          mesh.Levels.Add(ReadLod(lods[l], l, new List<string> { "lod" }, new List<string?>(), false));
+      }
       var shapes = root.GetProperty("shapes").EnumerateArray().ToList();
       for (var i = 0; i < shapes.Count; i++)
       {

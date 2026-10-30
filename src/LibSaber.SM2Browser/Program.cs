@@ -41,6 +41,13 @@ internal static class Program
       return Bench.OpenBench.Run(args);
     if (args.Length > 0 && args[0] == "--poe2skills")
       return Bench.Poe2Bench.Skills(args);
+    if (args.Length > 0 && args[0] == "--poe2prep") // --poe2prep <ggpk> <prepared folder> <tool dir> <game path> ... (M2 D)
+    {
+      var src = new LibSaber.SM2.Assets.Games.Poe2.Poe2Source(args[1], args[2], args[3]);
+      foreach (var a in args.Skip(4)) { src.Prepare(a); Console.WriteLine("prepared " + a); }
+      foreach (var l in src.Log) Console.WriteLine(l);
+      return 0;
+    }
     if (args.Length > 0 && args[0] == "--poe2export")
       return Bench.Poe2Bench.Run(args);
     if (args.Length > 0 && args[0] == "--glbench")

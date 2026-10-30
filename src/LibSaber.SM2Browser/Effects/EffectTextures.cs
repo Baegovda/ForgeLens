@@ -20,6 +20,9 @@ internal sealed class EffectTextures
   public Action? Loaded { get; set; }
 
   public EffectTextures(Func<string, TextureDocument?> resolve) => _resolve = resolve;
+  private Func<string, EffectImage?>? _images;
+  /// <summary>PoE2 (M2 D): images decoded by the game reader (RGBA).</summary>
+  public static EffectTextures FromImages(Func<string, EffectImage?> images) => new(_ => null) { _images = images };
 
   public static EffectTextures FromDirectory(string root)
   {
@@ -63,6 +66,7 @@ internal sealed class EffectTextures
   {
     try
     {
+      if (_images is not null) return _images(name) ?? new EffectImage(0, 0, []);
       var doc = _resolve(name);
       if (doc is null) return new EffectImage(0, 0, []);
       var rgba = doc.Decode(0, 0, out var w, out var h, out _);

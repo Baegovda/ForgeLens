@@ -34,9 +34,12 @@ internal static class VfxBench
 
   public static int Run(string[] args)
   {
-    var library = new EffectLibrary(new DirectoryEffectSource(args[1]));
+    // PoE2 (M2 D): --vfxbench poe2:<prepared folder> - - <out> <effect.ao>[@seconds[@distance]] ...
+    var poe2 = args[1].StartsWith("poe2:", StringComparison.Ordinal) ? new LibSaber.SM2.Assets.Games.Poe2.Poe2Reader(args[1][5..]) : null;
+    var poeResults = new Dictionary<string, LibSaber.SM2.Assets.Games.Poe2.Poe2Particles.Result>();
+    var library = new EffectLibrary(new DirectoryEffectSource(poe2 is null ? args[1] : Directory.CreateDirectory(Path.Combine(Path.GetTempPath(), "fl_poe2_nosfx")).FullName));
     var aliases = PartAliases.Load(args[2]);
-    var textures = EffectTextures.FromDirectory(args[3]);
+    var textures = poe2 is null ? EffectTextures.FromDirectory(args[3]) : Effects.Poe2FxTextures.For(poe2);
     var meshes = EffectMeshes.FromDirectory(Environment.GetEnvironmentVariable("SM2_VFX_MESHES") is { Length: > 0 } md ? md : Path.Combine(Path.GetDirectoryName(Path.GetFullPath(args[3]).TrimEnd('/')) ?? ".", "mesh"), args[3]);
     var output = args[4];
     var names = args.Skip(5).ToList();
@@ -63,14 +66,27 @@ internal static class VfxBench
       {
         var parts = spec.Split('@');
         var name = parts[0];
-        var tree = library.Resolve(name);
-        if (tree is null)
+        EffectDefinition def;
+        if (poe2 is not null)
         {
-          Line($"{name}: not found");
-          continue;
+          var pr = LibSaber.SM2.Assets.Games.Poe2.Poe2Particles.Build(poe2, name);
+          poeResults[name] = pr;
+          aliases = PartAliases.From(pr.Frames);
+          foreach (var note in pr.Notes) Line("  poe2 " + note);
+          def = pr.Definition;
         }
+        else
+        {
+          var tree = library.Resolve(name);
+          if (tree is null)
+          {
+            Line($"{name}: not found");
+            continue;
+          }
 
-        var def = EffectDefinition.Build(name, tree);
+          def = EffectDefinition.Build(name, tree);
+        }
+        EffectInstance NewInstance() => poe2 is not null ? LibSaber.SM2.Assets.Games.Poe2.Poe2Particles.Instance(poeResults[name]) : EffectInstance.Standalone(def, 1);
         var seconds = parts.Length > 1 ? float.Parse(parts[1], CultureInfo.InvariantCulture) : Math.Min(def.Duration, 3f);
         textures.Prefetch(def.Textures);
         meshes.Prefetch(def.Emitters.Select(e => e.Geom?.Template));
@@ -82,7 +98,7 @@ internal static class VfxBench
         var sprites = def.Emitters.Count(e => e.IsSprite);
         var meshCount = def.Emitters.Count(e => e.Geom is not null);
         Line($"{name}: emitters {def.Emitters.Count} (sprite {sprites}, mesh {meshCount}, other {def.Emitters.Count - sprites - meshCount}) lights {def.Lights.Count} trails {def.Trails.Count} covering {def.Coverings.Count} other {def.Unsupported.Count} [{string.Join(", ", def.Unsupported.Select(u => u.Type).Distinct())}] duration {def.Duration:0.00}s capture {seconds:0.00}s missing textures [{string.Join(", ", missing)}] missing meshes [{string.Join(", ", missingMeshes)}]");
-        var instance = EffectInstance.Standalone(def, 1);
+        var instance = NewInstance();
         var camera = EffectCamera.Fit(instance, seconds);
         // SM2_VFX_COVERING=plane|sphere: DEMO/HEURISTIC covering host for em_covering_* effects.
         var coverKind = Enum.TryParse<CoveringHostKind>(Environment.GetEnvironmentVariable("SM2_VFX_COVERING"), true, out var ck) ? ck : CoveringHostKind.Off;
@@ -139,14 +155,14 @@ internal static class VfxBench
           for (var y = 0; y < Size; y++)
             Buffer.BlockCopy(pixels, y * Size * 4, sheet, ((oy + y) * Cols * Size + ox) * 4, Size * 4);
           if (Environment.GetEnvironmentVariable("SM2_VFX_FRAMES") == "1")
-            PreviewBench.Png(Path.Combine(output, $"{name}_f{f}_{t:0.000}s.png"), pixels, Size, Size);
+            PreviewBench.Png(Path.Combine(output, $"{Path.GetFileNameWithoutExtension(name)}_f{f}_{t:0.000}s.png"), pixels, Size, Size);
           Line($"  t={t:0.000}s particles {instance.ParticleCount} quads {layer.Quads} meshes {layer.MeshInstances} batches {layer.Batches.Count} (trail {layer.Batches.Count(b => b.Kind == VfxDrawKind.Trail)} spark {layer.Batches.Count(b => b.Kind == VfxDrawKind.Spark)}) lights {layer.Lights.Count} distortion {gpu.DistortionQuads} vatDraws(cum) {gpu.VatDraws}{(cover is null ? "" : $" coverHits(cum) {cover.Hits} coverMax {cover.Mask.Max():0.00}")}");
         }
 
-        PreviewBench.Png(Path.Combine(output, name + "_sheet.png"), sheet, Cols * Size, Rows * Size);
+        PreviewBench.Png(Path.Combine(output, Path.GetFileNameWithoutExtension(name) + "_sheet.png"), sheet, Cols * Size, Rows * Size);
         // Determinism: replay from zero with the same seed (scrub backwards) and compare every frame's quads.
         var replay = new StringBuilder();
-        var again = EffectInstance.Standalone(def, 1);
+        var again = NewInstance();
         for (var f = frames - 1; f >= 0; f--)
           again.Seek(seconds * (f + 0.5f) / frames);
         for (var f = 0; f < frames; f++)
@@ -156,7 +172,7 @@ internal static class VfxBench
         }
 
         var sw = Stopwatch.StartNew();
-        var full = EffectInstance.Standalone(def, 1);
+        var full = NewInstance();
         full.Seek(seconds);
         var stepMs = sw.Elapsed.TotalMilliseconds / Math.Max(1, full.StepCount);
         Line($"  peak particles {peak}; sim {stepMs:0.000} ms/step (60 Hz); sprite build mean {buildMs.Average():0.00} ms; GPU draw+finish mean {gpuMs.Average():0.00} ms max {gpuMs.Max():0.00} ms; deterministic {(fingerprint.ToString() == replay.ToString() ? "yes" : "NO")}");

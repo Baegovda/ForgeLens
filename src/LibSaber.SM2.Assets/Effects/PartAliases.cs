@@ -49,4 +49,11 @@ public sealed class PartAliases
 
   public TextureFrames this[string? texture] => texture is not null && _entries.TryGetValue(texture, out var e) ? e : TextureFrames.Single;
   public bool Contains(string texture) => _entries.ContainsKey(texture);
+  /// <summary>PoE2 (M2 D): grids come from the texture file name, not part_aliases.ps.</summary>
+  public static PartAliases From(IEnumerable<KeyValuePair<string, TextureFrames>> entries)
+  {
+    var a = new PartAliases();
+    foreach (var (k, v) in entries) a._entries[k] = v;
+    return a;
+  }
 }

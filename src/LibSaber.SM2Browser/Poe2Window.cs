@@ -182,7 +182,10 @@ internal sealed class Poe2Window : Window
         _clips.SelectedItem = mesh.Clip?.Name;
         _loadingClips = false;
       }
-      _main.ShowPoe2(mesh, albedo, path);
+      // M2 D: effects play as particles (SM2 simulation); the M1 rig/emitter-mesh view is the fallback (or FL_POE2_RIGVIEW=1).
+      if (!(isEffect && await _main.ShowPoe2EffectAsync(new Poe2Reader(src.Cache), path, clip)))
+        _main.ShowPoe2(mesh, albedo, path);
+      else log.Add("effect particles: SM2 simulation");
       Status($"{string.Join("  ", log.Where(l => l.Contains("verts") || l.Contains("effect ")).Take(2))}  ({sw.Elapsed.TotalSeconds:0.0} s)");
     }
     catch (Exception e)
