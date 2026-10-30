@@ -2841,3 +2841,7 @@ Fix in this pass: own-skeleton re-imports cc_titus_cloth/cc_titus_assault and cc
 - Orb light: lighting channel 1 only, Vortex components channels 0+1 (ue_r97_orbhub7.py 700 2). Floor 162,145,166 -> 109,117,124 (pre-light 115,123,130); orb core stays 163,123,173.
 - final_sheet_vortex.jpg now game | neutral room | hub MRQ final orb.
 - Obsolete NS_vortex_orb, _v2.._v5, NS_orb_t, NS_orb_t2 left in place (deletion needs the user's word).
+
+## SM2 FINAL STATUS (2026-10-31 07:05 KST, supersedes the R97w status list)
+Matches (verified by captures): 9 characters textured incl. cloth-sim slots; muzzle flash soft flame+sparks; cloth (commissar 68->24, titus_cloth pen 0); 0 missing-bone ensures after restart; vortex orb glow/runes(1 frame)/sparks + bloom, core 163,123,173 vs game 194,177,217 (~85 %), floor unaffected; hub level 4-view avg 22,33,32 vs game 22,29,32 (sun colour ARGB proven, direction from matrix).
+Remains: orb ~15 % dimmer, no large soft bloom sprite (template size not settable); sun direction axis (+Z) and fill intensity 6 are assumptions/fit; game-shot comparisons qualitative (pose/camera differ); obsolete NS_vortex_orb, _v2.._v5, NS_orb_t/_t2 kept (deletion needs the user's word); old chars_cloth2/chars_phys cc_chaplain still on user skeleton (unused).
