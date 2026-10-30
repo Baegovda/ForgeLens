@@ -2707,3 +2707,7 @@ Parent agent use: tail events.jsonl (text, cheap) and check heartbeat.txt age < 
 - Not budgeted still: CPU mesh copies, GL textures (VRAM; old model's GL textures not evicted early).
 - Settings real-click test FAILED to reach ForgeLens: the game window stayed on top at the click point even with ForgeLens HWND_TOPMOST; 3 test runs each sent 1 left click at screen (1580,730) which landed on the game window (pid 41216). Stopped there. `tools/re/pc/r95_settings_click.ps1`.
 - Push lock: `push_lock.sh acquire` was called without an owner name (owner file " <epoch>"), so release failed; cleared /workspace/.push_lock (owner = my 00:42:58 epoch). Build `Bin\ForgeLens_r95b`.
+
+## R95 in-game fidelity (Titus)
+- See docs/handoff/R95_INGAME.md. Game route found (windowed, click-to-focus, terminal E-hold, campaign Continue, photo mode). Titus unlit base colour in UE = ultramarine blue; r92 near-white armour is lighting/exposure. Lit same-condition match and other 4 characters still unverified.
+

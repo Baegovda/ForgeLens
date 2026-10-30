@@ -1,0 +1,11 @@
+phase: continue clicked 10/31/2026 00:26:33
+photo-mode found in pause menu; ForgeLens window of other worker overlaps; game set TOPMOST during test 10/31/2026 00:29:51
+ref captured: ingame_player_marine_hub_full.png (photo mode, hub battle barge, player custom tactical-like marine, UI hidden) 10/31/2026 00:33:40
+checkpoint 10/31/2026 00:35:10: game closed gracefully. Hub only has player custom marine (not in UE). UE SM2 chars: calgar, sorcerer_exalted, hormagaunt, titus_assault, vortex. Titus needs campaign mission via war map (not reached). Method that works: Alt+Enter windowed at 0,0 primary, keyboard via input_block hook, RMB drag rotates photo cam, WASD/Space move, F hide UI. TASK2 not done (other worker's ForgeLens r94d PID 78620 running). Editor lock not taken this round.
+checkpoint 10/31/2026 00:49:08: run2 relaunched (fullscreen 3840 primary persisted). Title Enter/accept + Continue click worked -> hub. In hub ALL injected input ignored (mouse look, WASD hold vk+scancode, Esc vk & scancode-only, LMB, Alt+Enter) though foreground verified = game thread and process Responding. Not reached war map/Titus. Game closed gracefully.
+FIX 10/31/2026 01:00:49: game accepts input only after a real click inside the window (title bar + client click), then keys work.
+checkpoint 10/31/2026 01:03:25: run3 windowed via robust focus+Alt+Enter at title; hub input works after real click in window (walk/turn ok). War map not found (HUD marker stays at right edge, M no-op). No hero captured. Game closed.
+checkpoint 10/31/2026 01:12:56: war map opened via terminal left of start (hold E).
+checkpoint 10/31/2026 01:18:23: war map campaign tab -> hold Enter (계속) -> accept mode switch -> campaign barge with Titus as player.
+checkpoint 10/31/2026 01:22:16: Titus captured in photo mode: ingame_titus_photomode_01.png (face/chest right edge), _02 (back). Camera control non-deterministic.
+checkpoint 10/31/2026 01:24:37: sheet_titus_game_vs_ue.png + metrics_titus.txt (UE r92 floor shot, different light). Game closed.

@@ -1,0 +1,6 @@
+r95 Titus in-game vs UE (r92 ev1.2_titus.png, lit floor test map)
+game (photo mode, campaign barge chapel, green ambient) shoulder crop rgb=(9,20,23) hue=193 sat=0.61 val=0.09
+game chest crop rgb=(17,22,20) hue=154 sat=0.24 val=0.09   (crop placement approximate)
+UE thigh rgb=(220,222,226) hue=224 sat=0.03 val=0.89
+UE chest rgb=(232,228,222) hue=36 sat=0.04 val=0.91
+Note: different lighting, pose and camera; not a same-condition comparison.
