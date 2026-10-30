@@ -1,0 +1,7 @@
+art/models/items/weapons/onehandweapons/claws/basetypes/textures/crudeclaw_colour_bc7.dds
+models/items/weapons/onehandweapons/claws/basetypes/textures/crudeclaw_colour.png
+art/models/items/weapons/onehandweapons/claws/basetypes/textures/crudeclaw_normal_bc7.dds
+models/items/weapons/onehandweapons/claws/basetypes/textures/crudeclaw_normal.png
+metadata/materials/specglossspecmaskopaquebn.fxgraph
+art/models/items/weapons/onehandweapons/claws/basetypes/textures/crudeclaw_colour_bc7.dds
+art/models/items/weapons/onehandweapons/claws/basetypes/textures/crudeclaw_normal_bc7.dds
