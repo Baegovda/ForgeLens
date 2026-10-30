@@ -74,7 +74,7 @@
 | R51 | 10/30 | 폴리싱 5) 총구 화염 위치·조준 자세 | Muzzle offset / aim pose | done (switch, default off) 10/30 KST: `MUZZLE_AIM.tsv` + viewer `SM2_MUZZLE_SHOOTTIP=1` (+`SM2_MUZZLE_LOCATOR`) + `ue_r51_muzzle.py`; visual check pending owner (POLISH_R48) |
 | R52 | 10/30 | 폴리싱 6) 다른 캐릭터 물리 | phys52 on other characters | done 10/30 KST via EngineWire, `_bak1` backups (POLISH_R48) |
 | R53 | 10/30 | 폴리싱 7) 천 build28 | Cloth plugin verify | done 10/30 KST: 4/4 cloths converted on cc_sorcerer_exalted (EngineWire) |
-| R54 | 10/30 | 폴리싱 8) 레벨·소품 배치 추출 | Level placement extraction | done (data) 10/30 KST: `tools/level/placement.py`, 5,898 objects |
+| R54 | 10/30 | 폴리싱 8) 레벨·소품 배치 추출 | Level placement extraction | done (data) 10/30 KST: `tools/level/placement.py`, 5,898 objects; 10/30 11:40 KST follow-up (t110u): `placement_view.py` HTML (5,898 markers) + `ForgeLens --levelbench` real meshes (2,483 geom rows → 2,850 parts, 392 templates, 0 missing, 6 sky/backdrop >1000 m skipped, 14.6M tris, ~61 s on PC) + `ue_r54_level.py` (UE scratch map; import blocked: editor in PIE from another job) |
 | R55 | 10/30 | 폴리싱 9) `_bakN` 점검(삭제 없음) | Backup inventory | done: `docs/handoff/BAKN_LIST.tsv` |
 | R56 | 10/30 | 폴리싱 10) proj_sm2 백업 | Ghidra project backup | done: K:\SM2_Backup\proj_sm2, sha manifests equal |
 
