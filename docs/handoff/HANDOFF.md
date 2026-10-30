@@ -21,3 +21,8 @@
 - ue_r97_apply.py on the 6 /Game/ForgeLens/SM2/Characters meshes: M_SM2_r97 + .td scalars (calgar_work 8, calgar 8, titus 6, vortex 10, hormagaunt 0, sorcerer_exalted 17 slots). MI backups in /Game/ForgeLens/SM2/Tests/_bak_r97/<char>; old masters kept.
 - Map_Floor capture after shaders compiled (docs/handoff/r97/floor_r97.jpg): no clipped pixels. Vortex spike tips now glow blue (emissive 9); Vortex centre mean 38,47,59.
 - R97b Titus side-by-side: docs/handoff/r97/titus_sbs.jpg (in-game photo mode vs UE Map_Floor). Blue armour and gold aquila/trim match qualitatively; the game scene is darker and warm-lit. Calgar: no user/in-game screenshot this session, so only the material/.td check was done (8 slots carry tdScalars, head nmScale 0.5/0.65 applied).
+
+## R97c-item (muzzle/aim) 04:22 KST
+- ue_seq_fire.py (R59 tool, new root): LS_arifle_bolt_rifle in /Game/ForgeLens/SM2/Sequences/BoltRifleFire_r97. Aim clip = tacticus_wpn10_aim_hold_intercessor (from MUZZLE_AIM.tsv arifle_bolt_rifle_client.cls, wpnType 1). Aim section swapped (1), 8 MuzzleFlash bindings attached to socket SM2_shootTip.
+- The combimelta variant (wpn151 aim clip) is not imported, so it can't be built yet.
+- Not verified visually: no viewport frame render of the sequence.
