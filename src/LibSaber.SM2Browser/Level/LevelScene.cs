@@ -187,7 +187,7 @@ public sealed class LevelScene
   // instance by projected size, budget ranked by size/distance from the focus, disk cache of the built level
   // (template geometry + placements + cameras) and a shared texture cache, all under %LOCALAPPDATA%\ForgeLens.
   public sealed record Options(float MaxSize = 1000f, bool Textured = true, int ShrinkEdge = 512, long MaxTriangles = 20_000_000, float LightGain = 1f, bool UseCache = true);
-  public const int CacheVersion = 6;
+  public const int CacheVersion = 7;
 
   public OrbitCamera Persp, Close, Top;
   public bool FromDiskCache;
@@ -283,7 +283,8 @@ public sealed class LevelScene
     var f = catalog.GetFile(index);
     long t = 0; try { t = File.GetLastWriteTimeUtc(catalog.Archives[f.ArchiveId].PakPath).Ticks; } catch (Exception) { }
     // catalog-independent (the viewer and levelbench may index the game differently: file indices / counts differ)
-    return $"{f.Path}-{f.Size}-{f.ArchiveName}-{t}";
+    // ArchiveName is relative to the opened folder (game root vs client_pc differ), so use the pak file name.
+    return $"{f.Path}-{f.Size}-{Path.GetFileName(catalog.Archives[f.ArchiveId].PakPath)}-{t}";
   }
 
   public static LevelScene Load(GameCatalog catalog, ArchiveStore store, int cdIndex, Options? o = null, Action<string>? log = null)
@@ -516,7 +517,7 @@ public sealed class LevelScene
         Take(p.Normal, "Normalmap(rgb)", g.Hint); Take(p.Specular, p.SpecularChannels, g.Hint);
       }
     var res = new System.Collections.Concurrent.ConcurrentDictionary<string, PreviewImage>(StringComparer.OrdinalIgnoreCase);
-    var stamp = "v1"; var hits = 0;
+    var stamp = "v2"; var hits = 0;
     Parallel.ForEach(wanted, new ParallelOptions { MaxDegreeOfParallelism = Environment.ProcessorCount }, kv =>
     {
       var im = LoadTexture(catalog, store, kv.Value.Hint, kv.Key, kv.Value.Channels, edge, stamp, ref hits, out var ti);
@@ -537,7 +538,7 @@ public sealed class LevelScene
     index = known >= 0 ? known : TemplateMeshReader.ResolveTexture(catalog, hint, name);
     if (index < 0) return null;
     var f = catalog.GetFile(index);
-    var hash = Convert.ToHexString(System.Security.Cryptography.SHA1.HashData(Encoding.UTF8.GetBytes($"{f.Path}|{f.Size}|{f.ArchiveName}")))[..20];
+    var hash = Convert.ToHexString(System.Security.Cryptography.SHA1.HashData(Encoding.UTF8.GetBytes($"{f.Path}|{f.Size}|{Path.GetFileName(catalog.Archives[f.ArchiveId].PakPath)}")))[..20];
     var file = Path.Combine(TexDir, stamp, $"{hash}_{edge}.tex");
     try
     {
@@ -678,7 +679,7 @@ public sealed class LevelScene
         }
       if (r.ReadString() != "END") throw new InvalidDataException("pack truncated");
       // texture refs: shared texture cache (decoded from the game files again if the cache file is gone)
-      var stamp = "v1"; var hits = 0;
+      var stamp = "v2"; var hits = 0;
       var got = new System.Collections.Concurrent.ConcurrentBag<(int D, string Name, int Ti, PreviewImage Im)>();
       Parallel.ForEach(refs, new ParallelOptions { MaxDegreeOfParallelism = Environment.ProcessorCount }, x =>
       {
