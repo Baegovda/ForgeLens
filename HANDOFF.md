@@ -2732,3 +2732,9 @@ Parent agent use: tail events.jsonl (text, cheap) and check heartbeat.txt age < 
 - **Vortex:** UE lit body darker than the game and the orb lattice is dark where the game's orb glows bright pink-white. Body textures are mid-dark (sRGB mean 68-84), so most of the body gap is lighting; the orb slot (`body`, chameleon, texture mean 204,139,187) looks wrong -> open (chameleon/emissive on that slot).
 - Editor: OOM crash 02:18:51 KST (D3D11 E_OUTOFMEMORY creating an SRV during the cc_sorcerer import, SM2 running at the same time) -> second data point for the rule: no editor work while SM2 runs. Relaunched after the game was closed.
 - Pauldrons (item 1, partial): Titus `titus_sholder_armor_L/R` + torso use the baked `ch_titus_shoulders_02` (no colour scheme/override; blue + gold trim, red crux on the right as in the game back shot). Nothing to fix for Titus; L/R override (R48 SectionOf) only matters for scheme-driven marines.
+
+## R97j coat A/B (ShallowFrac 1 / 0.04 / 0.20; floor 0.9, deep 0.5), 10 jobs
+- commissar death pen: cur 68, sf04 24, sf20 68. run/melee pen 0 in all.
+- sf04 side effects: titus run skin 179->743, titus melee pen 32->69; tech_priest/chaplain radii drop to 0.25.
+- sf20: same as cur except titus (pen 198->193, 32->28) - no commissar gain.
+- DECISION: default NOT changed (no global value fixes the coat without harming others). Next: per-cloth override for coat_SIM_01 only.
