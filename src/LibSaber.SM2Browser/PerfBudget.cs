@@ -65,12 +65,43 @@ internal static class PerfBudget
   public static string Describe()
     => $"{Threads} worker threads ({ThreadSource}, {Logical} logical processors), memory budget {BudgetMB} MB ({MemorySource}, {TotalRamMB} MB RAM)";
 
+  // R95b: per-texture reservation + mip pick. A decode reserves its estimated peak (BGRA + BC prep copy + transient
+  // ~2.5x w*h*4) before it starts; when the headroom (budget - working set - reservations) is too small the decode
+  // drops to a smaller mip (min 128 px) instead of going over. Auto: headroom is tens of GB, so mip 0 as before.
+  private static long _reservedMB;
+  public static long MipDrops;
+  public static long HeadroomMB() => EffectiveBudgetMB() - WorkingSetMB() - Interlocked.Read(ref _reservedMB);
+  public static int PickMip(int w, int h, int mipCount, out long reservedMB)
+  {
+    var mip = 0; reservedMB = 0;
+    if (Roomy) return 0;
+    long Need(int m) => Math.Max(1, ((long)Math.Max(1, w >> m) * Math.Max(1, h >> m) * 4 * 5 / 2) >> 20);
+    var room = HeadroomMB();
+    while (mip < mipCount - 1 && Math.Max(w, h) >> mip > 128 && Need(mip) > Math.Max(0, room)) mip++;
+    if (mip > 0) Interlocked.Add(ref MipDrops, mip);
+    reservedMB = Need(mip); Interlocked.Add(ref _reservedMB, reservedMB);
+    return mip;
+  }
+  /// <summary>Budget far above need (checked at most every 500 ms): skip per-texture accounting.</summary>
+  private static long _roomyAt; private static bool _roomy;
+  public static bool Roomy { get { var now = Environment.TickCount64; if (now - _roomyAt > 500) { _roomy = EffectiveBudgetMB() - WorkingSetMB() > 16384; _roomyAt = now; } return _roomy; } }
+  public static void Unreserve(long mb) => Interlocked.Add(ref _reservedMB, -mb);
+  /// <summary>Parallelism for the decode loop: all Threads with room, fewer (down to 1) when the headroom is small.</summary>
+  public static ParallelOptions DecodeOptions()
+  {
+    var room = HeadroomMB();
+    var n = room >= 4096 ? Threads : (int)Math.Clamp(room / 128, 1, Threads);
+    return new ParallelOptions { MaxDegreeOfParallelism = n };
+  }
+  /// <summary>True when the budget is small enough that a new model should drop the previous model's textures first.</summary>
+  public static bool Tight => EffectiveBudgetMB() < 8192;
   private static int _inFlight;
   private static long _lastGc;
 
   /// <summary>Runs one memory-heavy background job (texture decode) at BelowNormal priority under the memory budget.</summary>
   public static T Heavy<T>(Func<T> job)
   {
+    if (Roomy) { var th = Thread.CurrentThread; var pr = th.Priority; try { th.Priority = ThreadPriority.BelowNormal; return job(); } finally { th.Priority = pr; } }
     var spins = 0;
     while (WorkingSetMB() > EffectiveBudgetMB())
     {
@@ -86,11 +117,11 @@ internal static class PerfBudget
     finally { t.Priority = old; Interlocked.Decrement(ref _inFlight); }
   }
 
-  private static void Relieve()
+  public static void Relieve(bool force = false)
   {
     var now = Environment.TickCount64;
     var last = Interlocked.Read(ref _lastGc);
-    if (now - last < 250 || Interlocked.CompareExchange(ref _lastGc, now, last) != last) return;
+    if ((!force && now - last < 250) || Interlocked.CompareExchange(ref _lastGc, now, last) != last) return;
     Interlocked.Increment(ref Evictions);
     try { Pressure?.Invoke(); } catch { }
     GC.Collect(GC.MaxGeneration, GCCollectionMode.Forced, true, true);

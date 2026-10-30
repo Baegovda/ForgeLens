@@ -965,7 +965,8 @@ public partial class MainWindow : Window
     // R76: decode in parallel (was serial; mip-0 decode was 70-80 % of a character open). Same images, same insert order.
     var pairs = wanted.ToArray();
     var images = new PreviewImage?[pairs.Length];
-    Parallel.For(0, pairs.Length, PerfBudget.Cpu, // R95: was Math.Clamp(cores / 2, 1, 8); now Threads + memory budget (PerfBudget.Heavy)
+    if (PerfBudget.Tight) { PerfBudget.Relieve(force: true); } // R95b
+    Parallel.For(0, pairs.Length, PerfBudget.DecodeOptions(), // R95: was Math.Clamp(cores / 2, 1, 8); now Threads + memory budget (PerfBudget.Heavy)
       i => images[i] = PerfBudget.Heavy(() => { var im = LoadPreviewImage(catalog, store, hint, pairs[i].Key, pairs[i].Value); if (im is not null) Gpu.GlPreview.Prepare(im); return im; })); // R94: BC encode here, not on the UI thread
     for (var i = 0; i < pairs.Length; i++)
     {
@@ -999,8 +1000,10 @@ public partial class MainWindow : Window
       var document = TextureLoader.Load(catalog, store, index);
       if (!document.CanDecode)
         return null;
-      var pixels = document.Decode(0, 0, out var width, out var height, out _);
-      return new PreviewImage { Width = width, Height = height, Bgra = pixels, Channels = channels };
+      var mip = PerfBudget.PickMip(document.Width, document.Height, document.MipCount, out var reserved); // R95b
+      try { var pixels = document.Decode(mip, 0, out var width, out var height, out _);
+      return new PreviewImage { Width = width, Height = height, Bgra = pixels, Channels = channels }; }
+      finally { PerfBudget.Unreserve(reserved); }
     }
     catch (Exception)
     {
