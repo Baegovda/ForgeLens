@@ -796,17 +796,21 @@ int32 AddCollision(UPhysicsAsset* PA, const TSharedPtr<FJsonObject>& Coll, const
   static TAutoConsoleVariable<float> CVarFitFloor(TEXT("sm2.RestFitFloor"), 0.9f, TEXT("SM2 cloth rest-fit radius floor (R76 default 0.9; legacy 0.25)"));
   static TAutoConsoleVariable<float> CVarDeepFrac(TEXT("sm2.RestFitDeepFrac"), 0.5f, TEXT("SM2 cloth rest-fit: particles deeper than this fraction of the radius are ignored (0 = legacy, none ignored)"));
   const float RestFitFloor = FMath::Clamp(CVarFitFloor.GetValueOnGameThread(), 0.0f, 1.0f), DeepFrac = FMath::Clamp(CVarDeepFrac.GetValueOnGameThread(), 0.0f, 1.0f);
-  int32 DeepIgnored = 0;
+  // R93 A/B: the floor is only applied when fewer than this fraction of the free rest particles sit shallowly inside the shape
+  // (many shallow hits = the authored shape is really too big for this mesh, e.g. a single coat capsule). 1 = always floor (R91).
+  static TAutoConsoleVariable<float> CVarShallowFrac(TEXT("sm2.RestFitShallowFrac"), 1.0f, TEXT("SM2 cloth rest-fit: skip the radius floor when the shallow-inside fraction of free particles is >= this (1 = always floor)"));
+  const float ShallowFrac = FMath::Clamp(CVarShallowFrac.GetValueOnGameThread(), 0.0f, 1.0f);
+  int32 DeepIgnored = 0, FloorSkipped = 0;
   float LastRawScale = 1.0f;
   auto FitScale = [&](const FVector& A, const FVector& B, float RA, float RB) {
-    float S = 1.0f, Raw = 1.0f;
+    float S = 1.0f, Raw = 1.0f; int32 Shallow = 0, Free = 0;
     LastRawScale = 1.0f;
     if (!RestPV) return S;
     const FVector AB = B - A; const double L2 = AB.SizeSquared();
     for (int32 I = 0; I < RestPV->Num(); ++I)
     {
       if (RestMaxDist && RestMaxDist->IsValidIndex(I) && (*RestMaxDist)[I] <= 0.1f) continue; // pinned: follows skin
-      const FVector P((*RestPV)[I]);
+      ++Free; const FVector P((*RestPV)[I]);
       const double T = L2 > 1e-6 ? FMath::Clamp(FVector::DotProduct(P - A, AB) / L2, 0.0, 1.0) : 0.0;
       const float R = FMath::Lerp(RA, RB, (float)T);
       const float D = (float)FVector::Dist(P, A + AB * T);
@@ -819,6 +823,7 @@ int32 AddCollision(UPhysicsAsset* PA, const TSharedPtr<FJsonObject>& Coll, const
       }
     }
     LastRawScale = FMath::Max(Raw, 0.25f);
+    if (ShallowFrac < 1.0f && Free > 0 && (float)Shallow >= ShallowFrac * (float)Free) { ++FloorSkipped; return FMath::Max(S, 0.25f); }
     return FMath::Max(S, RestFitFloor); // HEURISTIC floor (R76): keep >= 90 % of the authored radius
   };
   if (!Coll.IsValid())
@@ -1000,7 +1005,7 @@ int32 AddCollision(UPhysicsAsset* PA, const TSharedPtr<FJsonObject>& Coll, const
       CollBody(PA, BN)->AggGeom.BoxElems.Add(E);
       ++N;
     }
-  Log.Add(FString::Printf(TEXT("fitFloor=%.2f deepFrac=%.2f"), RestFitFloor, DeepFrac));
+  Log.Add(FString::Printf(TEXT("fitFloor=%.2f deepFrac=%.2f shallowFrac=%.3f floorSkipped=%d"), RestFitFloor, DeepFrac, ShallowFrac, FloorSkipped));
   Log.Add(FString::Printf(TEXT("%s: collision shapes=%d missingBones=%d remapped=%d remapRejected=%d unnegated=%d restFitted=%d minRadiusScale=%.2f boxRestInside=%d tplLocator=%d deepIgnored=%d"), *Who, N, Missing, Remapped, Rejected, bMirror ? 1 : 0, Fitted, MinScale, BoxRestInside, FromLocator, DeepIgnored));
   if (RemapLog.Num()) Log.Add(FString::Printf(TEXT("%s: collision remap (HEURISTIC) %s"), *Who, *FString::Join(RemapLog, TEXT(" "))));
   if (MissLog.Num()) Log.Add(FString::Printf(TEXT("%s: collision skipped (bone not in mesh) %s"), *Who, *FString::Join(MissLog, TEXT(" "))));
