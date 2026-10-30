@@ -9,8 +9,13 @@ na = [x for x in acts if x.get_actor_label() == "R97_vortex_orb_ns"][0]; na.niag
 vx = na.get_attach_parent_actor(); loc = na.get_actor_location()
 pl = A.spawn_actor_from_class(unreal.PointLight, loc); pl.tags = ["R97X"]; pl.set_actor_label("R97X_orb_light")
 c = pl.point_light_component; c.set_intensity(LI); c.set_light_color(unreal.LinearColor(1.0, 0.45, 0.9, 1)); c.set_attenuation_radius(220.0); c.set_editor_property("cast_shadows", False)
+c.set_lighting_channels(False, True, False)  # R97y: orb light only on the Vortex (floor stays neutral)
+for sc in vx.get_components_by_class(unreal.PrimitiveComponent):
+    sc.set_lighting_channels(True, True, False)
 pl.attach_to_actor(vx, "DISK", unreal.AttachmentRule.KEEP_WORLD, unreal.AttachmentRule.KEEP_WORLD, unreal.AttachmentRule.KEEP_WORLD, False)
 pp = A.spawn_actor_from_class(unreal.PostProcessVolume, loc); pp.tags = ["R97X"]; pp.unbound = True; s = pp.settings
 s.override_bloom_intensity = True; s.bloom_intensity = BI; s.override_bloom_threshold = True; s.bloom_threshold = 1.0; pp.settings = s
 LV.save_current_level(); print("R97X hub7", LI, BI, vx.get_actor_label())
+
+
 

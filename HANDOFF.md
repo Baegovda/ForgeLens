@@ -2833,3 +2833,11 @@ Fix in this pass: own-skeleton re-imports cc_titus_cloth/cc_titus_assault and cc
 - Orb core (same box, 1280x720 MRQ): before 87,69,99 -> now 163,123,173; game 194,177,217 (~85 %). Body near the orb is now lit pink like the game; the floor picks up a pink tint (not in the game shot).
 - SIM proxy slots: ue_r97_simmats.py assigns the matching REND/visible slot MI (titus_cloth 6, chaplain 5), meshes saved (ours).
 - Obsolete orb effects NOT deleted: standing user rule "no deletion without the user's word"; candidates listed in final report.
+
+## R97y hub colour from game data + orb light restricted + final vortex sheet
+- Colour order PROVEN [A,R,G,B]: armory_pairing bot_3 ColorCtrl [255,165,255,247] x35 -> captured P1 rgb 13.4,35,32.6 = (R165,G255,B247)^2.2 x35. So sun 165,207,226 (red low is the data, not a swap).
+- Sun direction from cd_list lighting__sun_light matrix row z (game Y-up) (0.652,-0.709,0.268) -> UE (x,z,y) (0.652,0.268,-0.709) -> pitch -45.2 yaw 22.3 (assumes the light shines along local +Z; not proven).
+- Fill light = game env preset sun [255,236,196] (sky_env.py) at 6. tools/ue/ue_r97_sun2.py. 4-view avg: none 9,22,25 / x4 17,28,29 / x6 22,33,32 / x8 28,37,35 vs game 22,29,32 -> x6 kept, level saved. Sheet hub_level_sheet_r97y.jpg. Fill intensity is a fit, not data.
+- Orb light: lighting channel 1 only, Vortex components channels 0+1 (ue_r97_orbhub7.py 700 2). Floor 162,145,166 -> 109,117,124 (pre-light 115,123,130); orb core stays 163,123,173.
+- final_sheet_vortex.jpg now game | neutral room | hub MRQ final orb.
+- Obsolete NS_vortex_orb, _v2.._v5, NS_orb_t, NS_orb_t2 left in place (deletion needs the user's word).
