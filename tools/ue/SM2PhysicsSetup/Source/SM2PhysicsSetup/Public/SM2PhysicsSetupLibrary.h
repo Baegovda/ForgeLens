@@ -91,4 +91,8 @@ public:
   // than ThresholdCm behind the body surface while both ends are outside = cloth on the wrong side of a limb.
   UFUNCTION(BlueprintCallable, Category = "SM2")
   static int32 MeasureClothWrongSide(USkeletalMeshComponent* Comp, float ThresholdCm, float MaxDistCm, FString& Report);
+  // R93: deterministic cloth measurement - GEngine->bUseFixedFrameRate/FixedFrameRate (not Python-visible; console 'set' is blocked in the editor).
+  // With it on, every engine tick gets DeltaTime = 1/Fps exactly. Returns the previous bUseFixedFrameRate.
+  UFUNCTION(BlueprintCallable, Category = "SM2")
+  static bool SetEngineFixedFrameRate(bool bEnable, float Fps);
 };

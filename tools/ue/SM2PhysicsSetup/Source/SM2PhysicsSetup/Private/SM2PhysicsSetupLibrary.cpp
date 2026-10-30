@@ -2165,3 +2165,14 @@ int32 USM2PhysicsSetupLibrary::SetClothConfigProps(USkeletalMesh* Mesh, const FS
   Report = FString::Join(Log, TEXT(" | "));
   return N;
 }
+
+#include "Engine/Engine.h"
+bool USM2PhysicsSetupLibrary::SetEngineFixedFrameRate(bool bEnable, float Fps)
+{
+  if (!GEngine) return false;
+  const bool bPrev = GEngine->bUseFixedFrameRate;
+  if (Fps > 0.f) GEngine->FixedFrameRate = Fps;
+  GEngine->bUseFixedFrameRate = bEnable;
+  return bPrev;
+}
+
