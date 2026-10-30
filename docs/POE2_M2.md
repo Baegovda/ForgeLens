@@ -80,3 +80,17 @@ Chain (PROVEN by row values for Firebolt):
 - BellCrow rendered with the TWEAK_Albedo fix (handoff/poe2_m2/bellcrow_tint.png). It is still very dark. NettleAnt renders correctly in the same renderer, so the renderer is fine; the crow's textures are dark (colour mean RGB 43-64, SSS mean 27/21/18). In game the SSSAdd and SpecGloss terms brighten it, and the preview does not model them. Judgement: the colour is correct; it looks darker than in game because SSS and specular are not shaded. The tint helper is Poe2Bench.TintAlbedo, shared by glbench and the viewer.
 - --poe2export now writes <name>.glb with embedded PNGs. Every visible part gets its own primitive with a baseColor/normal material, and baseColorFactor comes from AlbedoTint (clamped to 1). Khronos gltf-validator 0 errors on bellcrow.glb (3 materials, 6 images, 4 primitives, attack_01 anim, 87 nodes). Before: 20640 ACCESSOR_WEIGHTS_NON_NORMALIZED; GltfWriter now normalises weights and zeroes unused joints. This is a shared writer change and also applies to SM2 exports.
 
+
+### Step E.3: six more rigged monsters (prepared folder m4 via tools/poe2/mesh_prep.ps1)
+
+handoff/poe2_m2/monsters6_sheet.png shows bind pose and the first clip at t=0.5 (glbench poe2:m4). All six have a GLB export with embedded textures.
+
+| model | bones | clips | tris | result |
+|---|---|---|---|---|
+| basicskeleton | 49 | 252 | 4322 | good; skeleton overlay draws some bones to a common point (overlay only, mesh OK) |
+| wingedrhoa | 52 | 10 | 5862 | good |
+| harpymonstergull | 54 | 57 | 4864 | bind good; attack_01 at t0.5 shows stretched legs/claws: likely a bad track or bone mapping, OPEN |
+| wolfremake | 40 | 30 | 6996 | good |
+| ramgiant | 56 | 46 | 5160 | bind good; Wheel_attack_01 pose is crouched; plausible, not checked against the game |
+| lichboss | 115 | 42 | 50294 | renders almost black, same class as BellCrow (dark albedo plus missing SSS/spec/emissive shading), OPEN |
+
