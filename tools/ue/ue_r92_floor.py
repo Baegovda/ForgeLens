@@ -7,7 +7,7 @@ F = "/Game/ForgeLens/SM2/Tests/r92_floor"; EAL = unreal.EditorAssetLibrary
 C = "/Game/ForgeLens/SM2/Characters/"; T2 = "/Game/ForgeLens/SM2/Tests/chars_cloth2/"
 CH = {"vortex": C + "cc_vortex_beast/cc_vortex_beast", "sorcerer": C + "cc_sorcerer_exalted/cc_sorcerer_exalted", "calgar": C + "cc_calgar/cc_calgar",
       "hormagaunt": C + "cc_swarm_hormagaunt/cc_swarm_hormagaunt", "titus": C + "cc_titus_assault/cc_titus_assault",
-      "chaplain": T2 + "cc_chaplain/cc_chaplain", "commissar": T2 + "cc_commissar/cc_commissar", "tech_priest": T2 + "cc_tech_priest/cc_tech_priest"}
+      "chaplain": C + "cc_chaplain/cc_chaplain", "commissar": T2 + "cc_commissar/cc_commissar", "tech_priest": T2 + "cc_tech_priest/cc_tech_priest"}
 les = unreal.get_editor_subsystem(unreal.LevelEditorSubsystem); E = unreal.get_editor_subsystem(unreal.EditorActorSubsystem)
 def world(): return unreal.EditorLevelLibrary.get_editor_world()
 def pp(s, ev):
@@ -65,3 +65,4 @@ else:
             cc = c.capture_component2d; cc.capture_scene(); cc.capture_scene()
             unreal.RenderingLibrary.export_render_target(world(), cc.get_editor_property("texture_target"), a[1], "%s_%s.png" % (a[2], k))
         print("R92 cap", a[2], len(caps()))
+

@@ -20,6 +20,7 @@ for ad in AR.get_assets_by_class(unreal.TopLevelAssetPath("/Script/Engine", "Ske
     B = set(str(b) for b in unreal.AnimPoseExtensions.get_bone_names(unreal.AnimPoseExtensions.get_reference_pose(sk)))
     N = fnames(pa.get_outermost().get_name())
     cand = sorted(n for n in N if n not in B and re.search(r"(?i)(phys|bone|spine|arm|leg|head|neck|clav|hand|foot|pelvis|cdt|_SIM|cloth|_[LR]$|\d$)", n) and not re.search(r"(?i)(Property|Elem|Setup|Body|Profile|Physics|Constraint|Class|Script|Package|Default|Instance|Collision|Agg|Vector|Rotator|Float|Struct)", n))
-    if cand: out.append((pa.get_path_name(), sk.get_path_name(), len(B), cand[:15]))
+    if cand: out.append((pkg, pa.get_path_name(), sk.get_path_name(), len(B), cand[:15]))
 for o in out: print("R97B", o)
 print("R97B checked", len(seen), "with suspects", len(out))
+

@@ -2800,3 +2800,11 @@ Parent agent use: tail events.jsonl (text, cheap) and check heartbeat.txt age < 
 - R/B-swap hypothesis REJECTED with data: decoded game cubemap Build/r78/buttle_barge_sky_1.hdr mean RGB (0.0146,0.0191,0.0355) = blue (B>G>R) like the game shot; bc6hdr writes r,g,b in order; UE TextureCube imports that .hdr (srgb off, HDR_COMPRESSED). No swap anywhere.
 - Real cause: both DirectionalLights were UE-default warm (255,246,227). Game data Raw/level_lights/hub_battle_barge_lights.tsv: lighting__sun_light ColorCtrl [255,165,207,226] Intensity 30 (read as A,R,G,B -> 165,207,226 cool). Set both DLs to 165,207,226, level saved (ours).
 - Recapture (same 4 views, non-sRGB RGBA8, FINAL_COLOR_LDR): means 19,42,47 / 7,18,24 / 13,32,38 / 4,13,22 vs game 22,29,32 -> hue now teal B>G>R like game (was olive 55,58,46 ...). Red still low / saturation high; sun direction not taken from data (placeholder pitch -55 yaw 35); ColorCtrl channel order is an interpretation. Sheet docs/handoff/r97/hub_level_sheet_r97u.jpg.
+
+## R97v missing-bone ensure fix verified (5b) - tools/ue/ue_r97_floorchap.py, ue_r97_pabones.py (now prints mesh), ue_r92_floor.py
+- Scan (ue_r97_pabones.py): of OUR meshes only chars_cloth2/cc_chaplain and chars_phys/cc_chaplain still sit on the user's /Game/Characters/.../cc_chaplain_Skeleton.
+  The live source of the ensure was Map_Floor actor R92_chaplain using chars_cloth2/cc_chaplain (placed by ue_r92_floor.py).
+- Fix: R92_chaplain -> /Game/ForgeLens/SM2/Characters/cc_chaplain/cc_chaplain (own skeleton, PA_cc_chaplain_SM2); Map_Floor saved; ue_r92_floor.py chaplain path updated.
+- In-place FBX re-import onto our skeleton (ue_r97_reskel.py) does NOT rebind the skeleton (UE keeps the old one; SkeletalMesh.skeleton is read-only in Python) - nothing saved, discarded by editor restart. User skeleton .uasset mtime unchanged (2025-05-23).
+- The two old test meshes remain (no deletion) but nothing we load references them now.
+- Verified: editor restarted (-unattended), Map_Floor loaded + MRQ PIE render: 0 'Ensure condition failed' / AnimNode_RigidBody lines (previous session log: 874).
