@@ -513,10 +513,14 @@ public partial class MainWindow : Window
 
       if (file.Kind is AssetKind.Model)
       {
+        OpenProf.Begin(file.Path);
         var loaded = await Task.Run(() =>
         {
           var decoded = TemplateMeshReader.Load(_catalog, _store, index);
-          return (decoded, ResolvePreview(_catalog, _store, decoded, index));
+          OpenProf.Mesh(decoded.Positions.Count, TemplateMeshReader.LastStages);
+          var resolved = ResolvePreview(_catalog, _store, decoded, index);
+          OpenProf.Tex(resolved.Albedo.Count + resolved.Normals.Count + resolved.Specular.Count);
+          return (decoded, resolved);
         });
         if (generation != _previewGeneration)
           return;
@@ -552,6 +556,7 @@ public partial class MainWindow : Window
           PreviewText.IsVisible = false;
           PreviewImage.IsVisible = true;
           DrawMesh();
+          OpenProf.Ui();
         }
         else
         {

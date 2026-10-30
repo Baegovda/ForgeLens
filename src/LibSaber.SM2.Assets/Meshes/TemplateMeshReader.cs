@@ -16,8 +16,13 @@ namespace LibSaber.SM2.Assets.Meshes;
 public static class TemplateMeshReader
 {
 
+  /// <summary>R94: stage times (ms) of the last <see cref="Load"/> on this thread: read, deserialize, skeleton, graph, maps.</summary>
+  [ThreadStatic] public static string? LastStages;
+
   public static ExportedMesh Load(GameCatalog catalog, ArchiveStore store, int fileIndex)
   {
+    var stageClock = System.Diagnostics.Stopwatch.StartNew();
+    double tRead = 0, tDeser = 0, tSkel = 0, tGraph = 0;
     var file = catalog.GetFile(fileIndex);
     var mesh = new ExportedMesh { Name = AssetClassification.BaseName(file.Name) };
     var notes = new List<string>();
@@ -56,6 +61,7 @@ public static class TemplateMeshReader
       bytes = store.Read(fileIndex);
     }
 
+    tRead = stageClock.Elapsed.TotalMilliseconds;
     if (TextureLoaderLooksText(bytes))
     {
       mesh.Message = "This model file is text. The binary .tpl is the one that can carry a skeleton. " + string.Join(" ", notes);
@@ -69,10 +75,13 @@ public static class TemplateMeshReader
       stream = new MemoryStream(bytes, writable: false);
       var reader = new NativeReader(stream, Endianness.LittleEndian);
       template = Serializer<animTPL>.Deserialize(reader);
+      tDeser = stageClock.Elapsed.TotalMilliseconds;
       ReadSkeleton(mesh, template, notes);
       ReadTrack(mesh, template, notes);
+      tSkel = stageClock.Elapsed.TotalMilliseconds;
       if (template?.GeometryGraph is { } graph)
         ReadGraph(mesh, graph, template, reader, () => FindGeometryPayload(catalog, store, fileIndex, description), name => ResolveTexture(catalog, fileIndex, name) >= 0, notes);
+      tGraph = stageClock.Elapsed.TotalMilliseconds;
     }
     catch (Exception ex)
     {
@@ -108,6 +117,8 @@ public static class TemplateMeshReader
 
     mesh.Message = string.Join(" ", notes.Where(note => note.Length > 0));
     mesh.Summary = BuildSummary(mesh);
+    var tEnd = stageClock.Elapsed.TotalMilliseconds;
+    LastStages = $"read {tRead:0} deser {tDeser - tRead:0} skel {tSkel - tDeser:0} graph {tGraph - tSkel:0} maps {tEnd - tGraph:0}";
     return mesh;
   }
 

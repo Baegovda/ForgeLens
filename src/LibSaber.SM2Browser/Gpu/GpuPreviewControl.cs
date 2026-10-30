@@ -194,6 +194,7 @@ internal sealed class GpuPreviewControl : OpenGlControlBase
       var start = _clock.Elapsed.TotalMilliseconds;
       var time = request.Clock?.Invoke() ?? request.Time;
       var scene = MeshPreview.BuildScene(request.Mesh, width, height, request.Camera, request.Skeleton, time, request.Settings);
+      var buildMs = _clock.Elapsed.TotalMilliseconds - start;
       // Effects on the model (sockets / anim events): drawn by GlPreview after the translucent pass, depth-tested.
       renderer.Effect = request.Overlay?.Invoke(request.Mesh, scene, time);
       LastScene = scene;
@@ -204,6 +205,7 @@ internal sealed class GpuPreviewControl : OpenGlControlBase
       renderer.Render(request.Mesh, scene, width, height, request.Wireframe, fb);
       LastClothVerts = renderer.LastClothVerts;
       var cpu = _clock.Elapsed.TotalMilliseconds - start;
+      OpenProf.Frame(buildMs, renderer.LastUploadMs, cpu - buildMs, renderer.Pending);
       if (_capture is { } cap)
       {
         _capture = null;

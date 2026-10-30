@@ -207,7 +207,7 @@ public static class MaterialMaps
     SpaceMarine2.Enumerations.SM2TextureFormat format;
     try
     {
-      format = TextureLoader.Load(catalog, store, textureIndex).Format;
+      format = TextureLoader.ReadFormat(catalog, store, textureIndex);
     }
     catch
     {

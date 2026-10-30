@@ -84,6 +84,40 @@ public sealed class TextureDocument
 public static class TextureLoader
 {
 
+  /// <summary>
+  ///   R94: the stored format of a texture without reading its mip payloads (MaterialMaps only needs the format; the
+  ///   full <see cref="Load"/> read every mip of every map a second time on each model open). Same result as
+  ///   <c>Load(...).Format</c>: throws when Load would (no usable mip in the catalog); <c>.pct</c> pictures use Load.
+  /// </summary>
+  public static SM2TextureFormat ReadFormat(GameCatalog catalog, ArchiveStore store, int fileIndex)
+  {
+    var file = catalog.GetFile(fileIndex);
+    if (file.Kind == AssetKind.TextureMip || file.Extension.Equals(".pct", StringComparison.OrdinalIgnoreCase))
+      return Load(catalog, store, fileIndex).Format;
+    var bytes = store.Read(fileIndex);
+    if (!LooksText(bytes))
+      throw new InvalidDataException("not a texture resource");
+    resDESC description;
+    using (var stream = new MemoryStream(bytes, writable: false))
+      description = Serializer<resDESC>.Deserialize(new NativeReader(stream, Endianness.LittleEndian));
+    if (description is not resDESC_PCT pct || pct.header is null)
+      throw new InvalidDataException("not res_desc_pct");
+    if (!string.IsNullOrWhiteSpace(pct.pct))
+      return Load(catalog, store, fileIndex).Format;
+    var names = pct.mipMaps ?? Array.Empty<string>();
+    var format = pct.TextureFormat;
+    int width = Math.Max(1, pct.header.sx), height = Math.Max(1, pct.header.sy);
+    for (var i = 0; i < names.Length; i++)
+    {
+      var index = catalog.ResolveReference(names[i], fileIndex);
+      if (index < 0) continue;
+      var expect = TextureInfo.MipByteSize(format, Math.Max(1, width >> i), Math.Max(1, height >> i));
+      if (expect <= 0 || catalog.GetFile(index).Size >= expect)
+        return format;
+    }
+    throw new FileNotFoundException("no mip file in the catalog");
+  }
+
   public static TextureDocument Load(GameCatalog catalog, ArchiveStore store, int fileIndex)
   {
     var file = catalog.GetFile(fileIndex);
