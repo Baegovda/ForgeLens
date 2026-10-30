@@ -79,7 +79,7 @@ def cams():
     rtp = F + "/RT_r90"; T = unreal.AssetToolsHelpers.get_asset_tools()
     rt = unreal.load_asset(rtp) if EAL.does_asset_exist(rtp) else T.create_asset("RT_r90", F, unreal.TextureRenderTarget2D, unreal.TextureRenderTargetFactoryNew())
     rt.set_editor_property("size_x", 1000); rt.set_editor_property("size_y", 1200)
-    rt.set_editor_property("render_target_format", unreal.TextureRenderTargetFormat.RTF_RGBA8_SRGB); EAL.save_loaded_asset(rt)
+    rt.set_editor_property("render_target_format", unreal.TextureRenderTargetFormat.RTF_RGBA8); EAL.save_loaded_asset(rt)
     for nm, loc, rot in (("back", (0, -420, 170), (-8, 90)), ("side", (420, 0, 170), (-8, 180))):
         cap = E.spawn_actor_from_class(unreal.SceneCapture2D, unreal.Vector(*loc), unreal.Rotator(roll=0, pitch=rot[0], yaw=rot[1]))
         cap.tags = ["R90cap_" + nm]; cc = cap.capture_component2d

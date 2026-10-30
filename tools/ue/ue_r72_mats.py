@@ -89,7 +89,7 @@ def scene(ev=0.0):
         fov = 35.0; dist = max(ext.z * 2 * 0.6, w * 0.75) / math.tan(math.radians(fov / 2)) + 100
         rp = F + "/RT_" + k
         rt = unreal.load_asset(rp) if EAL.does_asset_exist(rp) else T.create_asset("RT_" + k, F, unreal.TextureRenderTarget2D, unreal.TextureRenderTargetFactoryNew())
-        rt.set_editor_property("size_x", 900); rt.set_editor_property("size_y", 1000); rt.set_editor_property("render_target_format", unreal.TextureRenderTargetFormat.RTF_RGBA8_SRGB); EAL.save_loaded_asset(rt)
+        rt.set_editor_property("size_x", 900); rt.set_editor_property("size_y", 1000); rt.set_editor_property("render_target_format", unreal.TextureRenderTargetFormat.RTF_RGBA8); EAL.save_loaded_asset(rt)
         cp = unreal.Vector(x + dist * 0.35, dist, ext.z * 1.3); tg = unreal.Vector(x, 0, ext.z)
         cap = E.spawn_actor_from_class(unreal.SceneCapture2D, cp, unreal.MathLibrary.find_look_at_rotation(cp, tg)); cap.tags = ["cap_" + k]
         cc = cap.capture_component2d; cc.set_editor_property("texture_target", rt); cc.set_editor_property("capture_every_frame", False)

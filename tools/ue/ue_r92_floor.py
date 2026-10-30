@@ -15,14 +15,14 @@ def pp(s, ev):
     s.set_editor_property("override_auto_exposure_bias", True); s.set_editor_property("auto_exposure_bias", ev)
     s.set_editor_property("override_auto_exposure_apply_physical_camera_exposure", True); s.set_editor_property("auto_exposure_apply_physical_camera_exposure", False)
 def caps(): return {str(t)[4:]: x for x in E.get_all_level_actors() for t in x.tags if str(t).startswith("cap_")}
-def scene(ev=9.0):  # R95: 1.2 overexposed (manual EV, physical camera off) -> near-white armour
+def scene(ev=8.0):  # R95c: chapel-style lights (R95b variant c: key 800 / rim 2500 / fill 150, EV 8); old dir2+sky1+point3000 left armour near-white at any EV
     mp = F + "/Map_Floor"
     if EAL.does_asset_exist(mp): les.load_level(mp); [E.destroy_actor(x) for x in E.get_all_level_actors()]
     else: les.new_level(mp)
     fl = E.spawn_actor_from_object(unreal.load_asset("/Engine/BasicShapes/Plane"), unreal.Vector(0, 0, 0))
     fl.set_actor_scale3d(unreal.Vector(400, 400, 1)); fl.static_mesh_component.set_material(0, unreal.load_asset("/Game/SM2_Work/Tests/r72_mats/M_r72_grey"))
-    d = E.spawn_actor_from_class(unreal.DirectionalLight, unreal.Vector(0, 0, 800), unreal.Rotator(roll=0, pitch=-45, yaw=60)); d.light_component.set_intensity(2.0)
-    s = E.spawn_actor_from_class(unreal.SkyLight, unreal.Vector(0, 0, 500)); s.light_component.set_intensity(1.0)
+    d = E.spawn_actor_from_class(unreal.DirectionalLight, unreal.Vector(0, 0, 800), unreal.Rotator(roll=0, pitch=-45, yaw=60)); d.light_component.set_intensity(0.0)
+    s = E.spawn_actor_from_class(unreal.SkyLight, unreal.Vector(0, 0, 500)); s.light_component.set_intensity(0.05)
     s.light_component.set_editor_property("source_type", unreal.SkyLightSourceType.SLS_SPECIFIED_CUBEMAP)
     s.light_component.set_editor_property("cubemap", unreal.load_asset("/Engine/MapTemplates/Sky/DaylightAmbientCubemap")); s.light_component.recapture_sky()
     v = E.spawn_actor_from_class(unreal.PostProcessVolume, unreal.Vector(0, 0, 0)); v.set_editor_property("unbound", True)
@@ -33,11 +33,16 @@ def scene(ev=9.0):  # R95: 1.2 overexposed (manual EV, physical camera off) -> n
         a = E.spawn_actor_from_class(unreal.SkeletalMeshActor, unreal.Vector(x, 0, 0), unreal.Rotator(0, 0, 0))
         a.skeletal_mesh_component.set_skinned_asset_and_update(mesh); a.set_actor_label("R92_" + k); a.tags = ["R92_" + k]
         a.skeletal_mesh_component.set_editor_property("disable_cloth_simulation", True)
-        pl = E.spawn_actor_from_class(unreal.PointLight, unreal.Vector(x, max(600, w * 2), ext.z * 1.5)); pl.point_light_component.set_intensity(3000); pl.point_light_component.set_attenuation_radius(max(3000, w * 6))
+        h = ext.z * 2; c = unreal.Vector(x, 0, ext.z)
+        for off, col, inten in ((unreal.Vector(-h * 0.8, h * 0.9, h * 0.4), unreal.LinearColor(1.0, 0.75, 0.45, 1), 800),
+                                (unreal.Vector(h * 0.9, -h * 0.6, h * 0.2), unreal.LinearColor(0.3, 1.0, 0.5, 1), 2500),
+                                (unreal.Vector(0, h * 1.2, -h * 0.3), unreal.LinearColor(0.35, 0.55, 0.6, 1), 150)):
+            pl = E.spawn_actor_from_class(unreal.PointLight, c + off); lc = pl.point_light_component
+            lc.set_intensity(inten); lc.set_light_color(col); lc.set_attenuation_radius(h * 4)
         fov = 35.0; dist = max(ext.z * 2 * 0.6, w * 0.75) / math.tan(math.radians(fov / 2)) + 100
         rp = F + "/RT_" + k
         rt = unreal.load_asset(rp) if EAL.does_asset_exist(rp) else AT.create_asset("RT_" + k, F, unreal.TextureRenderTarget2D, unreal.TextureRenderTargetFactoryNew())
-        rt.set_editor_property("size_x", 900); rt.set_editor_property("size_y", 1000); rt.set_editor_property("render_target_format", unreal.TextureRenderTargetFormat.RTF_RGBA8_SRGB); EAL.save_loaded_asset(rt)
+        rt.set_editor_property("size_x", 900); rt.set_editor_property("size_y", 1000); rt.set_editor_property("render_target_format", unreal.TextureRenderTargetFormat.RTF_RGBA8_SRGB); rt.set_editor_property("render_target_format", unreal.TextureRenderTargetFormat.RTF_RGBA8);  # toggle forces resource re-init EAL.save_loaded_asset(rt)
         cp = unreal.Vector(x + dist * 0.35, dist, ext.z * 1.3); tg = unreal.Vector(x, 0, ext.z * 0.8)
         cap = E.spawn_actor_from_class(unreal.SceneCapture2D, cp, unreal.MathLibrary.find_look_at_rotation(cp, tg)); cap.tags = ["cap_" + k]
         cc = cap.capture_component2d; cc.set_editor_property("texture_target", rt); cc.set_editor_property("capture_every_frame", False)

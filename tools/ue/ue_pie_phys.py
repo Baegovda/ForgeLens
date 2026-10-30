@@ -174,7 +174,7 @@ if __name__ == "__main__":
         rt = unreal.AssetToolsHelpers.get_asset_tools().create_asset("RT_R60cap", "/Game/SM2_Work/Tests/r60_pie", unreal.TextureRenderTarget2D, unreal.TextureRenderTargetFactoryNew()) \
             if not unreal.EditorAssetLibrary.does_asset_exist("/Game/SM2_Work/Tests/r60_pie/RT_R60cap") else unreal.load_asset("/Game/SM2_Work/Tests/r60_pie/RT_R60cap")
         rt.set_editor_property("size_x", 1600); rt.set_editor_property("size_y", 900)
-        rt.set_editor_property("render_target_format", unreal.TextureRenderTargetFormat.RTF_RGBA8_SRGB)
+        rt.set_editor_property("render_target_format", unreal.TextureRenderTargetFormat.RTF_RGBA8)
         unreal.EditorAssetLibrary.save_loaded_asset(rt)
         eas = unreal.get_editor_subsystem(unreal.EditorActorSubsystem)
         for x in unreal.GameplayStatics.get_all_actors_of_class(world(), unreal.SceneCapture2D): eas.destroy_actor(x)

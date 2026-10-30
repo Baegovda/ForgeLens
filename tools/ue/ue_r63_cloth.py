@@ -87,7 +87,7 @@ def scene(ev=0.0):
         rtp = FOLD + "/RT_" + k
         rt = unreal.load_asset(rtp) if EAL.does_asset_exist(rtp) else rt_tools.create_asset("RT_" + k, FOLD, unreal.TextureRenderTarget2D, unreal.TextureRenderTargetFactoryNew())
         rt.set_editor_property("size_x", 1000); rt.set_editor_property("size_y", 1200)
-        rt.set_editor_property("render_target_format", unreal.TextureRenderTargetFormat.RTF_RGBA8_SRGB); EAL.save_loaded_asset(rt)
+        rt.set_editor_property("render_target_format", unreal.TextureRenderTargetFormat.RTF_RGBA8); EAL.save_loaded_asset(rt)
         # character faces +Y (yaw 90 mesh rotation) -> back is -Y; camera behind-left, chest height
         cap = E.spawn_actor_from_class(unreal.SceneCapture2D, unreal.Vector(x + 120, y - 260, 170), unreal.Rotator(roll=0, pitch=-8, yaw=65))
         cap.set_actor_label("R63cap_" + k); cap.tags = ["R63cap_" + k]; cc = cap.capture_component2d

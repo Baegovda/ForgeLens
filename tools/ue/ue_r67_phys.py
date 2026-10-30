@@ -74,7 +74,7 @@ def scene(subj, ev=0.0):
         c.set_editor_property("animation_data", dd)
         rp = F + "/RT_" + tag
         rt = unreal.load_asset(rp) if EAL.does_asset_exist(rp) else T.create_asset("RT_" + tag, F, unreal.TextureRenderTarget2D, unreal.TextureRenderTargetFactoryNew())
-        rt.set_editor_property("size_x", 900); rt.set_editor_property("size_y", 1100); rt.set_editor_property("render_target_format", unreal.TextureRenderTargetFormat.RTF_RGBA8_SRGB); EAL.save_loaded_asset(rt)
+        rt.set_editor_property("size_x", 900); rt.set_editor_property("size_y", 1100); rt.set_editor_property("render_target_format", unreal.TextureRenderTargetFormat.RTF_RGBA8); EAL.save_loaded_asset(rt)
         cp = unreal.Vector(x + dist * 0.35, dist, ext.z * 1.3); tg = unreal.Vector(x, 0, ext.z)
         cap = E.spawn_actor_from_class(unreal.SceneCapture2D, cp, unreal.MathLibrary.find_look_at_rotation(cp, tg))
         cap.tags = ["cap_" + tag]; cc = cap.capture_component2d
