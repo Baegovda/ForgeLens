@@ -40,6 +40,18 @@ internal static class LevelBench
     Line("missing: " + string.Join(" ", scene.Missing.Take(30)));
     Line("skipped: " + string.Join(" ", scene.Skipped.Take(30)));
     Line("untextured (largest): " + string.Join(" ", scene.Untextured));
+    // R54b diagnostics: blend modes by triangles, and the biggest parts whose albedo is near-black
+    var lum = new Dictionary<string, double>(StringComparer.OrdinalIgnoreCase);
+    double Lum(string? t)
+    {
+      if (t is null || !scene.Albedo.TryGetValue(t, out var im)) return -1;
+      if (lum.TryGetValue(t, out var v)) return v;
+      double sum = 0; for (var i = 0; i + 3 < im.Bgra.Length; i += 4) sum += 0.11 * im.Bgra[i] + 0.59 * im.Bgra[i + 1] + 0.3 * im.Bgra[i + 2];
+      return lum[t] = sum / Math.Max(1, im.Bgra.Length / 4);
+    }
+    Line("blend tris: " + string.Join(" ", scene.Mesh.Parts.GroupBy(p => p.Blend + "/" + p.BlendMode + (p.Sfx ? "/sfx" : "")).Select(g => $"{g.Key}={g.Sum(p => p.IndexCount / 3L):N0}")));
+    foreach (var g in scene.Mesh.Parts.Where(p => Lum(p.Texture) is >= 0 and < 20).GroupBy(p => p.Name).Select(g => (g.Key, Tris: g.Sum(p => p.IndexCount / 3L), N: g.Count(), P: g.First())).OrderByDescending(x => x.Tris).Take(25))
+      Line($"dark part {g.Key} x{g.N} tris {g.Tris:N0} blend {g.P.Blend}/{g.P.BlendMode} tex {g.P.Texture} lum {Lum(g.P.Texture):0.0} variant {g.P.Variant} hide {g.P.HideReason}");
     Line($"open {sw.Elapsed.TotalSeconds:0.0}s from_disk_cache={scene.FromDiskCache} coverage instances {scene.Placed.Count}/{scene.WorkCount} lwi {scene.LwiPlaced}/{scene.LwiCount} tris {scene.Triangles:N0} hidden_parts_dropped {scene.HiddenParts}");
     Line($"cameras persp yaw {scene.Persp.Yaw:0.00} d {scene.Persp.Distance:0} close yaw {scene.Close.Yaw:0.00} d {scene.Close.Distance:0}; timing {scene.Timing}");
     Line($"camera centre {scene.Centre} spread(10-90%) {scene.Spread:0.0} m");

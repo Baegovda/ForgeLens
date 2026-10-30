@@ -187,7 +187,7 @@ public sealed class LevelScene
   // instance by projected size, budget ranked by size/distance from the focus, disk cache of the built level
   // (template geometry + placements + cameras) and a shared texture cache, all under %LOCALAPPDATA%\ForgeLens.
   public sealed record Options(float MaxSize = 1000f, bool Textured = true, int ShrinkEdge = 512, long MaxTriangles = 20_000_000, float LightGain = 1f, bool UseCache = true);
-  public const int CacheVersion = 3;
+  public const int CacheVersion = 4;
 
   public OrbitCamera Persp, Close, Top;
   public bool FromDiskCache;
@@ -195,6 +195,8 @@ public sealed class LevelScene
   public int HiddenParts, WorkCount;
   public long Triangles;
   public List<string> Untextured = new();
+  /// <summary>texture name -> catalog file index (pack stores refs into the shared texture cache, not pixels).</summary>
+  public Dictionary<string, int> TexIndex = new(StringComparer.OrdinalIgnoreCase);
 
   sealed class Geo
   {
@@ -351,7 +353,7 @@ public sealed class LevelScene
     Focus(scene, work.Where(x => geos.TryGetValue(x.Tpl, out var g) && g is not null).Select(x => x.World.Translation).ToList());
 
     // 3) rank: projected size (world size / distance to focus) so big near things win and far clutter goes first;
-    //    LOD per instance: >0.4 LOD0, >0.08 first LOD, else coarsest.
+    //    LOD per instance: >1 LOD0, >0.2 first LOD, else coarsest.
     var cand = new List<(int Work, Geo G, float Score, int Level)>(work.Count);
     for (var i = 0; i < work.Count; i++)
     {
@@ -361,7 +363,7 @@ public sealed class LevelScene
       if (size > o.MaxSize) { scene.Skipped.Add(tpl); continue; }
       var dist = MathF.Max(5f, Vector3.Distance(world.Translation, scene.Centre) - size * 0.5f);
       var score = size / dist;
-      cand.Add((i, g, score, g.PickLevel(score > 0.4f ? 0 : score > 0.08f ? 1 : 2)));
+      cand.Add((i, g, score, g.PickLevel(score > 1f ? 0 : score > 0.2f ? 1 : 2)));
     }
     cand.Sort((a, b) => b.Score.CompareTo(a.Score));
     var chosen = new List<(int Work, Geo G, int Level)>(); long tris = 0;
@@ -400,7 +402,7 @@ public sealed class LevelScene
     scene.Stats = $"{scene.Name}: objects {scene.Objects.Count} (geom {k.GetValueOrDefault("geom")}, light {k.GetValueOrDefault("light")}, camera {k.GetValueOrDefault("camera")}, other {k.GetValueOrDefault("other")}); " +
       $"placed {scene.Placed.Count}/{work.Count} instances from {geos.Count(x => x.Value != null)}/{geos.Count} templates, missing {scene.Missing.Count}, failed {failed}, hidden parts dropped {hidden}, skipped >{o.MaxSize:0} m {scene.Skipped.Count}, over budget {scene.BudgetSkipped}; lwi {scene.LwiPlaced}/{scene.LwiCount}; " +
       $"{tris:N0} tris; lights {scene.Lights.Count}; spread {scene.Spread:0} m; textures {scene.Albedo.Count}/{scene.Normals.Count}/{scene.Specular.Count}; built in {sw.Elapsed.TotalSeconds:0.0}s";
-    if (o.UseCache) WritePack(scene, pack, key, geos.Values.Where(g => g is not null).Cast<Geo>().ToList(), chosen, work, log);
+    if (o.UseCache) WritePack(scene, pack, key, o.ShrinkEdge, geos.Values.Where(g => g is not null).Cast<Geo>().ToList(), chosen, work, log);
     Mark("write cache");
     scene.Timing = times.ToString();
     log?.Invoke(scene.Stats); log?.Invoke("timing " + scene.Timing);
@@ -450,9 +452,12 @@ public sealed class LevelScene
           var cam = new OrbitCamera { Yaw = y * MathF.PI / 6, Pitch = pitch, Target = s.Centre, Distance = s.Spread * d };
           byte[] px;
           try { px = MeshPreview.Render(s.Mesh, 160, 100, cam, false, 0, out _, settings); } catch (Exception) { continue; }
-          double sum = 0; var lit = 0;
-          for (var i = 0; i + 3 < px.Length; i += 4) { var l = 0.11 * px[i] + 0.59 * px[i + 1] + 0.3 * px[i + 2]; sum += l; if (l > 24) lit++; }
-          var score = sum / (px.Length / 4) * (0.5 + (double)lit / (px.Length / 4));
+          // well exposed (20..235) share x luminance std-dev: a wall filling the view (flat, over/under exposed) or a
+          // camera inside geometry (near-black) scores low; open views with structure score high.
+          double sum = 0, sq = 0; var ok = 0; var n = px.Length / 4;
+          for (var i = 0; i + 3 < px.Length; i += 4) { var l = 0.11 * px[i] + 0.59 * px[i + 1] + 0.3 * px[i + 2]; sum += l; sq += l * l; if (l > 20 && l < 235) ok++; }
+          var mean = sum / n; var sd = Math.Sqrt(Math.Max(0, sq / n - mean * mean));
+          var score = sd * ok / n;
           if (score > bestScore) { bestScore = score; best = cam; }
         }
       return best;
@@ -482,8 +487,8 @@ public sealed class LevelScene
     var stamp = catalog.FileCount.ToString(CultureInfo.InvariantCulture); var hits = 0;
     Parallel.ForEach(wanted, new ParallelOptions { MaxDegreeOfParallelism = Environment.ProcessorCount }, kv =>
     {
-      var im = LoadTexture(catalog, store, kv.Value.Hint, kv.Key, kv.Value.Channels, edge, stamp, ref hits);
-      if (im is not null) res[kv.Key] = im;
+      var im = LoadTexture(catalog, store, kv.Value.Hint, kv.Key, kv.Value.Channels, edge, stamp, ref hits, out var ti);
+      if (im is not null) { res[kv.Key] = im; lock (scene.TexIndex) scene.TexIndex[kv.Key] = ti; }
     });
     foreach (var (name, im) in res)
     {
@@ -495,9 +500,9 @@ public sealed class LevelScene
     log?.Invoke($"textures: {wanted.Count} wanted, {res.Count} decoded, {hits} from disk cache");
   }
 
-  static PreviewImage? LoadTexture(GameCatalog catalog, ArchiveStore store, int hint, string name, string channels, int edge, string stamp, ref int hits)
+  static PreviewImage? LoadTexture(GameCatalog catalog, ArchiveStore store, int hint, string name, string channels, int edge, string stamp, ref int hits, out int index, int known = -1)
   {
-    var index = TemplateMeshReader.ResolveTexture(catalog, hint, name);
+    index = known >= 0 ? known : TemplateMeshReader.ResolveTexture(catalog, hint, name);
     if (index < 0) return null;
     var file = Path.Combine(TexDir, stamp, $"{index}_{edge}.tex");
     try
@@ -558,7 +563,7 @@ public sealed class LevelScene
   static void WriteStrings(BinaryWriter w, IEnumerable<string> s) { var l = s.ToList(); w.Write(l.Count); foreach (var x in l) w.Write(x); }
   static List<string> ReadStrings(BinaryReader r) { var n = r.ReadInt32(); var l = new List<string>(n); for (var i = 0; i < n; i++) l.Add(r.ReadString()); return l; }
 
-  static void WritePack(LevelScene s, string file, string key, List<Geo> all, List<(int Work, Geo G, int Level)> chosen, List<(string Tpl, int Index, Matrix4x4 World, bool Lwi)> work, Action<string>? log)
+  static void WritePack(LevelScene s, string file, string key, int edge, List<Geo> all, List<(int Work, Geo G, int Level)> chosen, List<(string Tpl, int Index, Matrix4x4 World, bool Lwi)> work, Action<string>? log)
   {
     try
     {
@@ -585,8 +590,11 @@ public sealed class LevelScene
         w.Write(chosen.Count);
         foreach (var c in chosen) { var x = work[c.Work]; w.Write(ids[(c.G, c.Level)]); w.Write(x.Index); w.Write(x.Lwi); WriteMat(w, x.World); }
         WriteStrings(w, s.Albedo.Keys); WriteStrings(w, s.Normals.Keys); WriteStrings(w, s.Specular.Keys);
+        w.Write(edge);
         foreach (var d in new[] { s.Albedo, s.Normals, s.Specular })
-          foreach (var im in d.Values) { w.Write(im.Width); w.Write(im.Height); w.Write(im.Channels ?? ""); w.Write(im.Bgra.Length); w.Write(im.Bgra); }
+          foreach (var (name, im) in d)
+            if (s.TexIndex.TryGetValue(name, out var ti)) { w.Write(ti); w.Write(im.Channels ?? ""); }
+            else { w.Write(-1); w.Write(im.Width); w.Write(im.Height); w.Write(im.Channels ?? ""); w.Write(im.Bgra.Length); w.Write(im.Bgra); }
         w.Write("END");
       }
       File.Move(tmp, file, true);
@@ -624,14 +632,27 @@ public sealed class LevelScene
         s.Placed.Add((meshes[id].Name, idx, world));
       }
       var names = new[] { ReadStrings(r), ReadStrings(r), ReadStrings(r) };
+      var edge = r.ReadInt32(); var refs = new List<(int D, string Name, int Ti, string Ch)>();
       var dicts = new[] { s.Albedo, s.Normals, s.Specular };
       for (var d = 0; d < 3; d++)
         foreach (var name in names[d])
         {
+          var ti = r.ReadInt32();
+          if (ti >= 0) { refs.Add((d, name, ti, r.ReadString())); continue; }
           var w = r.ReadInt32(); var h = r.ReadInt32(); var ch = r.ReadString(); var len = r.ReadInt32();
           dicts[d][name] = new PreviewImage { Width = w, Height = h, Channels = ch, Bgra = r.ReadBytes(len) };
         }
       if (r.ReadString() != "END") throw new InvalidDataException("pack truncated");
+      // texture refs: shared texture cache (decoded from the game files again if the cache file is gone)
+      var stamp = catalog.FileCount.ToString(CultureInfo.InvariantCulture); var hits = 0;
+      var got = new System.Collections.Concurrent.ConcurrentBag<(int D, string Name, int Ti, PreviewImage Im)>();
+      Parallel.ForEach(refs, new ParallelOptions { MaxDegreeOfParallelism = Environment.ProcessorCount }, x =>
+      {
+        var im = LoadTexture(catalog, store, -1, x.Name, x.Ch, edge, stamp, ref hits, out _, x.Ti);
+        if (im is not null) got.Add((x.D, x.Name, x.Ti, im));
+      });
+      foreach (var x in got) { dicts[x.D][x.Name] = x.Im; s.TexIndex[x.Name] = x.Ti; }
+      log?.Invoke($"pack textures: {refs.Count} refs, {hits} from texture cache");
       return true;
     }
     catch (Exception e)
