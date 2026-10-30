@@ -41,3 +41,16 @@
   * Vortex, Calgar and Sorcerer already had PAs.
 - (e) Level/props: the R54 levelbench hub_battle_barge level (map still /Game/SM2_Work/Tests/r54_level/L_hub_battle_barge) survives the migration: 1441 actors, 1401 static mesh components, 0 missing meshes, 1390 unique meshes under /Game/ForgeLens/SM2/Tests.
 - (f) Sky/env from game data is already applied on that level (tools/level/sky_env.py state): SkyLight = game cubemap T_buttle_barge_sky_1 (now /Game/ForgeLens/SM2/Tests/r54_level/Sky), angle -44.33, intensity 6; fog colour (0.039,0.049,0.081) = game hbbm_fog_v2 (40,50,83); atmosphere hidden. Game-unit to UE mapping is HEURISTIC. Not re-captured this session.
+
+## R97g commissar coat plugin 04:29 KST
+- Bug found: in FitScale the 'Shallow' counter was never incremented, so sm2.RestFitShallowFrac could never trigger. That is why R93 saw floorSkipped=0 everywhere.
+- Fixed and added a per-shape log ('restShape capsule|sphere <bones> r preFloor raw final shallow deep freeParticles') plus a per-cloth 'restParticles total'. Defaults unchanged (RestFitShallowFrac 1 = always floor).
+- Built pkg97 (BUILD SUCCESSFUL, Build\sm2phys\build97.log) and installed. Backups: installed plugin -> Build\sm2phys\installed_SM2PhysicsSetup.bak29; repo source -> Build\sm2phys\src_SM2PhysicsSetup.bak1. Editor restarted with -unattended.
+- Measurement (ue_r90_cloth.py prep commissar, Shots\r97_coat\{cur,sf04}.txt):
+  * coat_SIM_01 (3021 particles, 1113 free) has ONE capsule BACKdown->LEG2L r 9.2/12.5: preFloor 0.286, 46 shallow (4.1%), 0 deep. The 0.90 floor raises it to 0.90. This CONFIRMS the R92 inferred cause.
+  * With sm2.RestFitShallowFrac 0.04: coat final 0.286 (floorSkipped 1). The straps (566 free, 30-45 shallow) also drop to 0.77-0.88 (floorSkipped 4).
+  * The sim A/B (skin/pen counts on the run clip) was NOT run.
+- 03:50 ensures: two handled (non-fatal) ensures at editor start (frame 0, 03:50:00), AnimNode_RigidBody.cpp:1156 'SkeletonBoneIndex >= 0' and :1915. A RigidBody anim node references a bone missing from its skeleton.
+  * Map_Floor has no ABP on any actor (ue_r97_rbcheck.py), so the source is something loaded at startup: BongThumbLive asset thumbnails or a chars_phys ABP.
+  * INFERRED: the commissar/tech_priest meshes in chars_cloth2 use chars_phys skeletons (mismatch), and the log shows a linker warning on PA_cc_commissar_SM2.
+  * No symbols in the stack, so the exact asset is not pinned.

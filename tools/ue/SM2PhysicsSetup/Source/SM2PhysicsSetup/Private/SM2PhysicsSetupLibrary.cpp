@@ -802,9 +802,11 @@ int32 AddCollision(UPhysicsAsset* PA, const TSharedPtr<FJsonObject>& Coll, const
   const float ShallowFrac = FMath::Clamp(CVarShallowFrac.GetValueOnGameThread(), 0.0f, 1.0f);
   int32 DeepIgnored = 0, FloorSkipped = 0;
   float LastRawScale = 1.0f;
+  // R97g: per-shape rest-fit log (raw S before the floor, shallow/deep/free particle counts) for the commissar coat A/B.
+  float LastPreFloor = 1.0f; int32 LastShallow = 0, LastDeep = 0, LastFree = 0;
   auto FitScale = [&](const FVector& A, const FVector& B, float RA, float RB) {
     float S = 1.0f, Raw = 1.0f; int32 Shallow = 0, Free = 0;
-    LastRawScale = 1.0f;
+    LastRawScale = 1.0f; LastPreFloor = 1.0f; LastShallow = LastDeep = LastFree = 0;
     if (!RestPV) return S;
     const FVector AB = B - A; const double L2 = AB.SizeSquared();
     for (int32 I = 0; I < RestPV->Num(); ++I)
@@ -818,11 +820,12 @@ int32 AddCollision(UPhysicsAsset* PA, const TSharedPtr<FJsonObject>& Coll, const
       {
         const float Si = FMath::Max(0.0f, D - ThickCm) / R;
         Raw = FMath::Min(Raw, Si);
-        if (D < R * DeepFrac) { ++DeepIgnored; continue; }
+        if (D < R * DeepFrac) { ++DeepIgnored; ++LastDeep; continue; }
+        ++Shallow; // R97g: was never counted, so sm2.RestFitShallowFrac could not trigger (R93 floorSkipped 0 everywhere)
         S = FMath::Min(S, Si);
       }
     }
-    LastRawScale = FMath::Max(Raw, 0.25f);
+    LastRawScale = FMath::Max(Raw, 0.25f); LastPreFloor = S; LastShallow = Shallow; LastFree = Free;
     if (ShallowFrac < 1.0f && Free > 0 && (float)Shallow >= ShallowFrac * (float)Free) { ++FloorSkipped; return FMath::Max(S, 0.25f); }
     return FMath::Max(S, RestFitFloor); // HEURISTIC floor (R76): keep >= 90 % of the authored radius
   };
@@ -923,6 +926,7 @@ int32 AddCollision(UPhysicsAsset* PA, const TSharedPtr<FJsonObject>& Coll, const
       float R1 = (float)K->GetNumberField(TEXT("radiusFirstCm")), R2 = (float)K->GetNumberField(TEXT("radiusSecondCm"));
       {
         const float S = FitScale(T1.TransformPosition(P1), T1.TransformPosition(P2), R1, R2);
+        Log.Add(FString::Printf(TEXT("%s: restShape capsule %s%s%s r=%.1f/%.1f preFloor=%.3f raw=%.3f final=%.3f shallow=%d deep=%d freeParticles=%d"), *Who, *B1, B2.IsEmpty() ? TEXT("") : TEXT("->"), *B2, R1, R2, LastPreFloor, LastRawScale, S, LastShallow, LastDeep, LastFree));
         if (RejectRemap(B1, N1, SN, LastRawScale <= 0.2501f) || (!B2.IsEmpty() && RejectRemap(B2, N2, SN, LastRawScale <= 0.2501f))) continue;
         if (S < 0.999f) { ++Fitted; MinScale = FMath::Min(MinScale, S); R1 *= S; R2 *= S; }
       }
@@ -962,6 +966,7 @@ int32 AddCollision(UPhysicsAsset* PA, const TSharedPtr<FJsonObject>& Coll, const
       float Rs = (float)K->GetNumberField(TEXT("radiusCm"));
       const FVector C = JVec(K, TEXT("offsetCm"), bMirror);
       { const float S = FitScale(T.TransformPosition(C), T.TransformPosition(C), Rs, Rs);
+        Log.Add(FString::Printf(TEXT("%s: restShape sphere %s r=%.1f preFloor=%.3f raw=%.3f final=%.3f shallow=%d deep=%d freeParticles=%d"), *Who, *K->GetStringField(TEXT("Bone")), Rs, LastPreFloor, LastRawScale, S, LastShallow, LastDeep, LastFree));
         if (RejectRemap(K->GetStringField(TEXT("Bone")), BN, K->HasField(TEXT("Name")) ? K->GetStringField(TEXT("Name")) : BN.ToString(), LastRawScale <= 0.2501f)) continue;
         if (S < 0.999f) { ++Fitted; MinScale = FMath::Min(MinScale, S); Rs *= S; } }
       FKSphereElem E(Rs);
@@ -1006,6 +1011,7 @@ int32 AddCollision(UPhysicsAsset* PA, const TSharedPtr<FJsonObject>& Coll, const
       ++N;
     }
   Log.Add(FString::Printf(TEXT("fitFloor=%.2f deepFrac=%.2f shallowFrac=%.3f floorSkipped=%d"), RestFitFloor, DeepFrac, ShallowFrac, FloorSkipped));
+  Log.Add(FString::Printf(TEXT("%s: restParticles total=%d"), *Who, RestPV ? RestPV->Num() : 0)); // R97g particle count
   Log.Add(FString::Printf(TEXT("%s: collision shapes=%d missingBones=%d remapped=%d remapRejected=%d unnegated=%d restFitted=%d minRadiusScale=%.2f boxRestInside=%d tplLocator=%d deepIgnored=%d"), *Who, N, Missing, Remapped, Rejected, bMirror ? 1 : 0, Fitted, MinScale, BoxRestInside, FromLocator, DeepIgnored));
   if (RemapLog.Num()) Log.Add(FString::Printf(TEXT("%s: collision remap (HEURISTIC) %s"), *Who, *FString::Join(RemapLog, TEXT(" "))));
   if (MissLog.Num()) Log.Add(FString::Printf(TEXT("%s: collision skipped (bone not in mesh) %s"), *Who, *FString::Join(MissLog, TEXT(" "))));

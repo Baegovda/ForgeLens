@@ -38,7 +38,7 @@ def prep(subj, tag):
     r = L.create_chaos_cloth(m, pj(n)); conv, rep = (r if isinstance(r, tuple) else ([], ""))[-2:]
     print("R90 converted", subj, tag, len(conv))
     for l in str(rep).split(" | "):
-        if "restFitted" in l or "deepIgnored" in l or "fitFloor=" in l: print("R90LOG", l[:300])
+        if "restFitted" in l or "deepIgnored" in l or "fitFloor=" in l or "restShape" in l or "restParticles" in l: print("R90LOG", l[:300])
     print("R90 clothing", len(m.get_editor_property("mesh_clothing_assets"))); EAL.save_asset(mp, only_if_is_dirty=False)
 def grey():
     p = F + "/M_r90_grey"
@@ -112,5 +112,6 @@ if __name__ == "__main__":
     elif m == "measure": measure(a[1])
     elif m == "sim": les().editor_play_simulate(); print("R90 sim")
     elif m == "stop": les().editor_request_end_play(); print("R90 stop")
+
 
 
