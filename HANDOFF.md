@@ -2795,3 +2795,8 @@ Parent agent use: tail events.jsonl (text, cheap) and check heartbeat.txt age < 
   (olive, B lowest), 0 % clipped both. Brightness 1-2.5x the game; hue is wrong. Note R/B swapped game mean (32,29,22) is about the UE ratio -> HYPOTHESIS:
   the BC6H sky cubemap import has R and B swapped (tools/level/bc6hdr). Not changed; meshes are untextured grey so materials do not explain the tint.
 - Viewpoint is the actor-location median (0,0,0; no PlayerStart), not matched to the game camera.
+
+## R97u hub sky/env hue fix (6) - tools/ue/ue_r97_suncolor.py
+- R/B-swap hypothesis REJECTED with data: decoded game cubemap Build/r78/buttle_barge_sky_1.hdr mean RGB (0.0146,0.0191,0.0355) = blue (B>G>R) like the game shot; bc6hdr writes r,g,b in order; UE TextureCube imports that .hdr (srgb off, HDR_COMPRESSED). No swap anywhere.
+- Real cause: both DirectionalLights were UE-default warm (255,246,227). Game data Raw/level_lights/hub_battle_barge_lights.tsv: lighting__sun_light ColorCtrl [255,165,207,226] Intensity 30 (read as A,R,G,B -> 165,207,226 cool). Set both DLs to 165,207,226, level saved (ours).
+- Recapture (same 4 views, non-sRGB RGBA8, FINAL_COLOR_LDR): means 19,42,47 / 7,18,24 / 13,32,38 / 4,13,22 vs game 22,29,32 -> hue now teal B>G>R like game (was olive 55,58,46 ...). Red still low / saturation high; sun direction not taken from data (placeholder pitch -55 yaw 35); ColorCtrl channel order is an interpretation. Sheet docs/handoff/r97/hub_level_sheet_r97u.jpg.
