@@ -67,3 +67,10 @@ Chain (PROVEN by row values for Firebolt):
   Screenshots: ui_files_tab_click.png, ui_firebolt_particles.png; log ui_clicks.txt.
 - Fix: two selection events raced (generation counter) and the loser fell back to the rig view; superseded requests now skip
   the fallback.
+
+## Step E (partial)
+
+- Multi-LOD: mp_halfsphere_lod1_ff opens with 2 LODs (380/190 tris) via a real Files-tab click.
+- cleaveGeo01.fmt: present; it uses the V8 .fmt layout (vertex_buffer/index_buffer), now supported by Poe2Reader.
+- BellCrow dark: albedo textures are dark in the data (mean RGB ~43-64). The body material applies TWEAK_Albedo Albedo_MULT1=1.6, which was ignored. It is now read into MeshPart.AlbedoTint (used by the UE/material export) and baked into the viewer preview albedo as an sRGB factor of 1.6^(1/2.2). It builds; the brighter result has not been checked visually yet.
+

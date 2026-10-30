@@ -212,10 +212,18 @@ public sealed partial class Poe2Reader
       using var doc = Json(mat);
       foreach (var gi in doc.RootElement.GetProperty("graphinstances").EnumerateArray())
       {
-        if (!gi.TryGetProperty("custom_parameters", out var cps)) continue;
+        if (!gi.TryGetProperty("custom_parameters", out var cps) || cps.ValueKind != JsonValueKind.Array) continue;
+        var graph = gi.TryGetProperty("parent", out var gp) ? Path.GetFileNameWithoutExtension(gp.GetString() ?? "") : "";
         foreach (var cp in cps.EnumerateArray())
         {
           var name = cp.GetProperty("name").GetString() ?? "";
+          // M2 E: TWEAK_Albedo Albedo_MULT1 (BellCrow body 1.6) scales the albedo; kept as the shared AlbedoTint (RGB multiply).
+          if (graph == "TWEAK_Albedo" && name == "Albedo_MULT1" && cp.GetProperty("parameters").EnumerateArray().FirstOrDefault() is { ValueKind: JsonValueKind.Object } av
+              && av.TryGetProperty("value", out var mv) && mv.ValueKind == JsonValueKind.Number)
+          {
+            var k = mv.GetSingle();
+            part.AlbedoTint = new[] { k, k, k, 1f };
+          }
           var path = cp.GetProperty("parameters").EnumerateArray()
             .Select(p => p.TryGetProperty("path", out var pp) ? pp.GetString() : null).FirstOrDefault(s => s != null);
           if (path == null) continue;
