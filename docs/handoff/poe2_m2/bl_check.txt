@@ -1,0 +1,4 @@
+basicskeleton1.fbx	meshes 1 verts 2480 faces 3625 bones 49 actions [('Armature|attack_01', (1.0, 46.0))] dims [(0.731, 0.783, 1.903)] images 3
+basicskeleton1.gltf	meshes 2 verts 2522 faces 3705 bones 49 actions [('attack_01', (0.0, 36.0))] dims [(0.729, 0.782, 1.903), (1.902, 2.0, 2.0)] images 0
+crudeclaw.fbx	meshes 1 verts 796 faces 651 bones 0 actions [] dims [(0.179, 0.036, 0.167)] images 3
+crudeclaw.gltf	meshes 1 verts 796 faces 651 bones 0 actions [] dims [(0.179, 0.036, 0.167)] images 0

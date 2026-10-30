@@ -12,3 +12,17 @@ Chain (PROVEN by row values for Firebolt):
 - Result: 1,147 skills, 629 with table-linked effects (M1 name match: 89), 184 with a projectile, 1,666 effect rows. `docs/handoff/poe2_m2/skills.tsv`.
 - Not linked yet: skills whose art is in EffectPacksArt / BeamArt / ObjectArt / BuffVisuals / ground effects (e.g. Ice Nova has none of ProjectileArt/AnimatedArt). Only Variant 0 (Default) art is used.
 - Tables needed in the prepared folder (`dump-tables --mode json`): activeskills, grantedeffects, skillartvariations, projectilesartvariations, projectiles, miscanimatedartvariations, miscanimated.
+
+## Step B (~05:05-05:15 KST) - orientation fix, LODs, more characters, independent glTF/FBX check - DONE
+- Orientation (INFERRED from bone names, no in-game check): BasicSkeleton toes (L_ankle->L_foot->aux_L_foot) point to PoE -Y and L_* bones are at +X
+  => PoE space is left-handed (D3D style). New map (x,y,z) -> (x,-z,-y)*0.01 (PoE -Y -> ForgeLens +Z front, -Z -> +Y up, L stays left) is a
+  reflection, so triangle winding is flipped. M1 renders showed the back of the skeleton; M2 default view shows the face (mon_sheet.png).
+- LODs: smd/fmt `lods[1..]` now read into `ExportedMesh.Levels` (hidden by default, like SM2). All 6 tested meshes have 1 LOD, so the LOD path is UNTESTED.
+- `?` as clip name picks the first idle (else run, else first) animation. `tools/poe2/mesh_prep.ps1` also pulls the .mat files an .sm names and every .dds they use.
+- Rendered in the viewer GL path (bind + clip t=0.5 s, `docs/handoff/poe2_m2/mon_sheet.png`):
+  BasicSkeleton1 attack_01 (49 bones) / AnglerFishParasite idle_01 (34 bones, 26 clips) / BellCrow bell_enraged_idle_01 (86 bones, 73 clips, 57k tris, 4 parts) /
+  BansheeRemake idle_01 (69 bones) / NettleAnt idle_01 (42 bones). Textured and animating, except BellCrow renders almost black (cause NOT found:
+  textures decode to normal colours, mean RGB 64,59,53; material-per-shape order or lighting suspected).
+- Independent check in Blender 5.0 (headless, `tools/poe2/bl_check.py`): basicskeleton1.fbx imports 2480 verts / 3625 faces / 49 bones / action attack_01 frames 1-46,
+  height 1.903 m; basicskeleton1.gltf same mesh + 49 bones + action attack_01; crudeclaw fbx/gltf 796 verts / 651 faces. glTF carries no images (writer limitation, same as SM2).
+  (These exports were made before the orientation fix.)

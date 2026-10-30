@@ -13,7 +13,9 @@ namespace LibSaber.SM2.Assets.Games.Poe2;
 ///   .sm/.smd/.fmt/.ast/.mat (<c>json/</c>), the raw files for .dds (<c>raw/</c>), and for .ast version 8+ the decompressed
 ///   animation bundle written by <c>ast_bundle.exe</c> next to the raw .ast as <c>&lt;file&gt;.ast.anim.bin</c>.
 ///   Space: PoE stores centimetres with -Z up (BasicSkeleton1 bbox z -195.6..0.18). ForgeLens internal space is metres, Y-up:
-///   (x, y, z) -> (x, -z, y) * 0.01 (a proper rotation, no mirror; handedness vs the game NOT verified in-game).
+///   (x, y, z) -> (x, -z, -y) * 0.01. M2 orientation fix (INFERRED from bone names, no in-game check): BasicSkeleton toes point
+///   to PoE -Y (forward) and L_* bones sit at +X, which is a left-handed frame (D3D style); this map turns PoE -Y into ForgeLens +Z
+///   front and keeps L_* on the character's left, so it is a reflection (det -1) and every triangle's winding is flipped.
 /// </summary>
 public sealed partial class Poe2Reader
 {
@@ -27,12 +29,12 @@ public sealed partial class Poe2Reader
     RawRoot = Path.Combine(prepared, "raw");
   }
 
-  private static readonly Matrix4x4 C = new(1, 0, 0, 0, 0, 0, 1, 0, 0, -1, 0, 0, 0, 0, 0, 1);
+  private static readonly Matrix4x4 C = new(1, 0, 0, 0, 0, 0, -1, 0, 0, -1, 0, 0, 0, 0, 0, 1);
   private static readonly Matrix4x4 CInv = Matrix4x4.Transpose(C);
   public const float Scale = 0.01f;
 
-  public static Vector3 P(float x, float y, float z) => new Vector3(x, -z, y) * Scale;
-  public static Vector3 D(float x, float y, float z) => new(x, -z, y);
+  public static Vector3 P(float x, float y, float z) => new Vector3(x, -z, -y) * Scale;
+  public static Vector3 D(float x, float y, float z) => new(x, -z, -y);
 
   public static Matrix4x4 M(Matrix4x4 m)
   {
@@ -65,9 +67,12 @@ public sealed partial class Poe2Reader
       using var doc = Json(meshPath);
       var root = doc.RootElement;
       var section = root.GetProperty("section").EnumerateObject().First().Value;
-      var lod = section.GetProperty("lods")[0];
+      var lods = section.GetProperty("lods");
+      var lod = lods[0];
       ReadVertices(mesh, lod, false);
       var tris = ReadIndices(mesh, lod);
+      for (var l = 1; l < lods.GetArrayLength(); l++)
+        mesh.Levels.Add(ReadLod(lods[l], l, new List<string> { "lod" }, new List<string?>(), false));
       var shapes = root.GetProperty("shapes").EnumerateArray().ToList();
       for (var i = 0; i < shapes.Count; i++)
       {
@@ -87,9 +92,12 @@ public sealed partial class Poe2Reader
       var v = smdDoc.RootElement.GetProperty("section").EnumerateObject().First().Value;
       var dolm = v.GetProperty("dolm");
       var names = v.TryGetProperty("shape_names", out var sn) ? sn.EnumerateArray().Select(x => x.GetString() ?? "shape").ToList() : new List<string>();
-      var lod = dolm.GetProperty("lods")[0];
+      var lods = dolm.GetProperty("lods");
+      var lod = lods[0];
       ReadVertices(mesh, lod, true);
       ReadIndices(mesh, lod);
+      for (var l = 1; l < lods.GetArrayLength(); l++)
+        mesh.Levels.Add(ReadLod(lods[l], l, names, mats, true));
       var i = 0;
       foreach (var ext2 in lod.GetProperty("shape_extents").EnumerateArray())
       {
@@ -109,7 +117,7 @@ public sealed partial class Poe2Reader
 
     if (ast != null)
       ReadSkeleton(mesh, ast, clip);
-    Log.Add($"{meshPath}: {mesh.Positions.Count} verts, {mesh.Indices.Count / 3} tris, {mesh.Parts.Count} parts, {mesh.Bones.Count} bones, clip {mesh.Clip?.Name ?? "-"} {mesh.Clip?.Duration:0.00}s");
+    Log.Add($"{meshPath}: {mesh.Positions.Count} verts, {mesh.Indices.Count / 3} tris, {mesh.Parts.Count} parts, LODs {1 + mesh.Levels.Count} ({string.Join("/", new[] { mesh.Indices.Count / 3 }.Concat(mesh.Levels.Select(l => l.Indices.Count / 3)))} tris), {mesh.Bones.Count} bones, clip {mesh.Clip?.Name ?? "-"} {mesh.Clip?.Duration:0.00}s");
     return mesh;
   }
 
@@ -138,11 +146,37 @@ public sealed partial class Poe2Reader
     }
   }
 
+  /// <summary>Lower LOD (lods[1..]) into a <see cref="MeshLod"/>; parts from its shape_extents when present, else one part.</summary>
+  private MeshLod ReadLod(JsonElement lodEl, int level, List<string> names, List<string?> mats, bool skinned)
+  {
+    var tmp = new ExportedMesh();
+    ReadVertices(tmp, lodEl, skinned);
+    ReadIndices(tmp, lodEl);
+    var lod = new MeshLod { Name = $"LOD{level}" };
+    lod.Positions.AddRange(tmp.Positions); lod.Normals.AddRange(tmp.Normals); lod.Uvs.AddRange(tmp.Uvs);
+    lod.Indices.AddRange(tmp.Indices); lod.Skin.AddRange(tmp.Skin);
+    var i = 0;
+    if (lodEl.TryGetProperty("shape_extents", out var se) && se.ValueKind == JsonValueKind.Array)
+      foreach (var e in se.EnumerateArray())
+      {
+        var part = new MeshPart { Name = (i < names.Count ? names[i] : $"shape{i}") + $"_LOD{level}", IndexStart = e.GetProperty("start_index").GetInt32(), IndexCount = e.GetProperty("count_index").GetInt32(), Visible = false, HideReason = "LOD" };
+        ApplyMaterial(part, i < mats.Count ? mats[i] : mats.LastOrDefault());
+        lod.Parts.Add(part); i++;
+      }
+    if (lod.Parts.Count == 0)
+      lod.Parts.Add(new MeshPart { Name = $"LOD{level}", IndexStart = 0, IndexCount = lod.Indices.Count, Visible = false, HideReason = "LOD" });
+    return lod;
+  }
+
   private static int ReadIndices(ExportedMesh mesh, JsonElement lod)
   {
     var idx = lod.GetProperty("indices").EnumerateObject().First().Value;
-    foreach (var i in idx.EnumerateArray())
-      mesh.Indices.Add(i.GetInt32());
+    var list = idx.EnumerateArray().Select(i => i.GetInt32()).ToList();
+    for (var t = 0; t + 2 < list.Count; t += 3)
+    {
+      // Winding flip: the space map is a reflection.
+      mesh.Indices.Add(list[t]); mesh.Indices.Add(list[t + 2]); mesh.Indices.Add(list[t + 1]);
+    }
     return mesh.Indices.Count;
   }
 
@@ -223,6 +257,10 @@ public sealed partial class Poe2Reader
     Log.Add($"{ast}: {bones.Count} bones, {anims.Count} animations");
     if (clipName == null || anims.Count == 0)
       return;
+    if (clipName == "?")
+      clipName = anims.Select(a => a.GetProperty("name").GetString() ?? "").FirstOrDefault(n => n.Contains("idle", StringComparison.OrdinalIgnoreCase))
+        ?? anims.Select(a => a.GetProperty("name").GetString() ?? "").FirstOrDefault(n => n.Contains("run", StringComparison.OrdinalIgnoreCase))
+        ?? anims[0].GetProperty("name").GetString();
     var anim = anims.FirstOrDefault(a => string.Equals(a.GetProperty("name").GetString(), clipName, StringComparison.OrdinalIgnoreCase));
     if (anim.ValueKind == JsonValueKind.Undefined) anim = anims[0];
     var bin = RawPath(ast) + ".anim.bin";
