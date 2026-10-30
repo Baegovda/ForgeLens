@@ -197,6 +197,10 @@ public partial class MainWindow
       return;
     if (e.Key == Key.F && e.KeyModifiers == KeyModifiers.None)
     {
+      // R83 (real SendInput, r83_sendinput.ps1): window tunnel handlers registered later run FIRST (the probe saw the
+      // HUD handler's change before the earlier-registered handlers), so this Fly handler took F before UeKeyDown and
+      // F with a selection framed the whole model in the real window (SM2_UETEST calls UeFrameSelection directly and passed).
+      if (_selPart is not null && !_flyLooking && UeFrameSelection()) { e.Handled = true; return; }
       FlyFrame();
       e.Handled = true;
       return;

@@ -1,4 +1,4 @@
-﻿using System.Diagnostics;
+using System.Diagnostics;
 using Avalonia;
 using Avalonia.OpenGL;
 using Avalonia.OpenGL.Controls;
@@ -69,6 +69,9 @@ internal sealed class GpuPreviewControl : OpenGlControlBase
 
   /// <summary>R79: view mode (GlPreview.ViewMode) and Show-menu lines, applied on the next frame.</summary>
   public int ViewMode { get; set; }
+  /// <summary>R83: Show menu cloth vertices (GlPreview.ShowClothVerts); LastClothVerts = count drawn in the last frame.</summary>
+  public bool ShowClothVerts { get; set; }
+  public int LastClothVerts { get; private set; }
   public IReadOnlyList<(System.Numerics.Vector3 A, System.Numerics.Vector3 B, System.Numerics.Vector3 Colour)> ExtraLines { get; set; } = Array.Empty<(System.Numerics.Vector3, System.Numerics.Vector3, System.Numerics.Vector3)>();
 
   public void Redraw() => RequestNextFrameRendering();
@@ -197,7 +200,9 @@ internal sealed class GpuPreviewControl : OpenGlControlBase
       renderer.Highlights = Highlights;
       renderer.ViewMode = ViewMode;
       renderer.ExtraLines = ExtraLines;
+      renderer.ShowClothVerts = ShowClothVerts;
       renderer.Render(request.Mesh, scene, width, height, request.Wireframe, fb);
+      LastClothVerts = renderer.LastClothVerts;
       var cpu = _clock.Elapsed.TotalMilliseconds - start;
       if (_capture is { } cap)
       {

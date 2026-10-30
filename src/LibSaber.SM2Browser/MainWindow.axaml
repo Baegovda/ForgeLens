@@ -1,4 +1,4 @@
-﻿<Window xmlns="https://github.com/avaloniaui"
+<Window xmlns="https://github.com/avaloniaui"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:tdg="using:Avalonia.Controls"
         xmlns:local="using:LibSaber.SM2Browser"
@@ -451,11 +451,41 @@
         <GridSplitter x:Name="KitbashSplitter" Grid.Row="1" Height="4" IsVisible="False" Background="{DynamicResource FL.Border}" ResizeDirection="Rows" />
         <TextBlock Grid.Row="2" Text="MESHES" Classes="section" Margin="4,6,0,2" ToolTip.Tip="Objects of the previewed model (check to show); click a row to select it in 3D" />
         <TreeView x:Name="MeshList" Grid.Row="3" Background="{DynamicResource FL.PanelDeep}" SelectionChanged="MeshListSelectionChanged">
+          <TreeView.Styles>
+            <!-- R83: UE-style eye icon per row (same Visible binding as the checkbox) -->
+            <Style Selector="ToggleButton.eye">
+              <Setter Property="Background" Value="Transparent" />
+              <Setter Property="BorderThickness" Value="0" />
+              <Setter Property="Padding" Value="2,0" />
+              <Setter Property="MinWidth" Value="0" />
+              <Setter Property="Width" Value="22" />
+              <Setter Property="Height" Value="20" />
+              <Setter Property="VerticalAlignment" Value="Center" />
+            </Style>
+            <Style Selector="ToggleButton.eye:checked /template/ ContentPresenter#PART_ContentPresenter">
+              <Setter Property="Background" Value="Transparent" />
+            </Style>
+            <Style Selector="ToggleButton.eye:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+              <Setter Property="Background" Value="#30FFFFFF" />
+            </Style>
+            <Style Selector="ToggleButton.eye Path.open"><Setter Property="IsVisible" Value="False" /></Style>
+            <Style Selector="ToggleButton.eye:checked Path.open"><Setter Property="IsVisible" Value="True" /></Style>
+            <Style Selector="ToggleButton.eye Path.shut"><Setter Property="IsVisible" Value="True" /></Style>
+            <Style Selector="ToggleButton.eye:checked Path.shut"><Setter Property="IsVisible" Value="False" /></Style>
+          </TreeView.Styles>
           <TreeView.ItemTemplate>
             <TreeDataTemplate x:DataType="local:MeshToggle" ItemsSource="{Binding Children}">
-              <CheckBox IsChecked="{Binding Visible}" ToolTip.Tip="{Binding Tip}" Margin="2,1">
-                <TextBlock Text="{Binding Label}" TextTrimming="CharacterEllipsis" />
-              </CheckBox>
+              <StackPanel Orientation="Horizontal">
+                <ToggleButton Classes="eye" IsChecked="{Binding Visible}" Focusable="False" ToolTip.Tip="Visibility (eye): same as the checkbox">
+                  <Panel>
+                    <Path Classes="open" Fill="#D8D8D8" Data="M0,5 C2.5,1 9.5,1 12,5 C9.5,9 2.5,9 0,5 Z M6,2.6 A2.4,2.4 0 1 0 6.01,2.6 Z" Stretch="Uniform" Width="14" Height="10" />
+                    <Path Classes="shut" Stroke="#707070" StrokeThickness="1.3" Data="M0,4 C2.5,8 9.5,8 12,4 M2,6.5 L1,8.5 M6,7.5 L6,9.6 M10,6.5 L11,8.5" Stretch="Uniform" Width="14" Height="9" />
+                  </Panel>
+                </ToggleButton>
+                <CheckBox IsChecked="{Binding Visible}" ToolTip.Tip="{Binding Tip}" Margin="2,1">
+                  <TextBlock Text="{Binding Label}" TextTrimming="CharacterEllipsis" />
+                </CheckBox>
+              </StackPanel>
             </TreeDataTemplate>
           </TreeView.ItemTemplate>
         </TreeView>

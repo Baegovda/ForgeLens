@@ -61,6 +61,8 @@ public sealed record PreviewSettings
   public System.Numerics.Matrix4x4? PhysicsFrame { get; init; }
   /// <summary>R75: wall-clock seconds for the physics step (sim keeps running while the clip is paused). Null = clip time.</summary>
   public float? PhysicsClock { get; init; }
+  /// <summary>R83 (UE "View Mode") on the CPU path: 0 Lit, 1 Unlit, 2 Clay, 3 Normals (world, after the normal map), 4 UV checker. Same meaning as GlPreview.ViewMode.</summary>
+  public int ViewMode { get; init; }
 }
 /// <summary>
 ///   CPU preview renderer. Every frame it skins (only when a clip is active), projects each vertex once,
@@ -274,7 +276,7 @@ public static partial class MeshPreview
       {
         Target = target, Sx = sx, Sy = sy, Sz = sz, Iw = iw,
         Positions = positions, Normals = normals, Uvs = prepared.Uvs, Indices = indices, TriPart = triPart,
-        Materials = partMat, Light = light, PartCountZero = partCount == 0, Points = points,
+        Materials = partMat, Light = light, PartCountZero = partCount == 0, Points = points, ViewMode = settings?.ViewMode ?? 0,
       };
       Parallel.For(0, bandCount, parallel, band =>
       {
@@ -694,6 +696,7 @@ public static partial class MeshPreview
     public required Lights Light;
     public bool PartCountZero;
     public PointGrid? Points;
+    public int ViewMode;
   }
 
   private sealed class Prepared
@@ -924,11 +927,35 @@ public static partial class MeshPreview
         var u = ua.X * q0 + ub.X * q1 + uc.X * q2;
         var v = ua.Y * q0 + ub.Y * q1 + uc.Y * q2;
 
+        var vm = f.ViewMode;
+        if (vm == 4)
+        {
+          // R83 UV checker (same pattern as the GPU shader): 8x8 checker per UV tile, tinted by the UV.
+          var fu = u - MathF.Floor(u); var fv = v - MathF.Floor(v);
+          var ck = ((int)(fu * 8f) + (int)(fv * 8f)) % 2 == 0 ? 0.85f : 0.25f;
+          var pxo = index * 4;
+          pixels[pxo] = (byte)Math.Clamp(ck * (0.65f + 0.35f * 0.5f) * 255f, 0, 255);
+          pixels[pxo + 1] = (byte)Math.Clamp(ck * (0.65f + 0.35f * fv) * 255f, 0, 255);
+          pixels[pxo + 2] = (byte)Math.Clamp(ck * (0.65f + 0.35f * fu) * 255f, 0, 255);
+          pixels[pxo + 3] = 255;
+          continue;
+        }
         Vector3 baseColor;
-        if (albedo is not null)
+        if (vm == 2)
+          baseColor = new Vector3(173f); // clay: linear 0.42 grey in sRGB bytes (GPU Clay)
+        else if (albedo is not null)
           baseColor = albedo.Sample(albedoLevel, u, v, out _);
         else
           baseColor = material.Solid;
+        if (vm == 1)
+        {
+          var pxo = index * 4;
+          pixels[pxo] = (byte)Math.Clamp(baseColor.X, 0, 255);
+          pixels[pxo + 1] = (byte)Math.Clamp(baseColor.Y, 0, 255);
+          pixels[pxo + 2] = (byte)Math.Clamp(baseColor.Z, 0, 255);
+          pixels[pxo + 3] = 255;
+          continue;
+        }
 
         var lit = normal;
         var gloss = 1f;
@@ -953,10 +980,19 @@ public static partial class MeshPreview
           }
         }
 
+        if (vm == 3)
+        {
+          var pxo = index * 4;
+          pixels[pxo] = (byte)Math.Clamp((lit.Z * 0.5f + 0.5f) * 255f, 0, 255);
+          pixels[pxo + 1] = (byte)Math.Clamp((lit.Y * 0.5f + 0.5f) * 255f, 0, 255);
+          pixels[pxo + 2] = (byte)Math.Clamp((lit.X * 0.5f + 0.5f) * 255f, 0, 255);
+          pixels[pxo + 3] = 255;
+          continue;
+        }
         var metal = 0f;
-        var rough = 0.45f;
+        var rough = vm == 2 ? 0.6f : 0.45f;
         var ao = 1f;
-        if (specMip is not null)
+        if (specMip is not null && vm != 2)
         {
           var s = specMip.Sample(specLevel, u, v, out var sa);
           metal = s.Z / 255f;

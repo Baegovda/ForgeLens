@@ -62,6 +62,11 @@ internal sealed unsafe class GlPreview : IDisposable
   /// <summary>R79 Show-menu overlay lines (bounds box, grid) in model space, each with its colour; drawn like the bone lines.</summary>
   public IReadOnlyList<(Vector3 A, Vector3 B, Vector3 Colour)> ExtraLines { get; set; } = Array.Empty<(Vector3, Vector3, Vector3)>();
 
+  /// <summary>R83 Show menu "Cloth vertices": every physics-driven vertex of this frame (scene.VertexOverrides) as a small cyan cross.</summary>
+  public bool ShowClothVerts { get; set; }
+  /// <summary>R83: cloth vertices drawn in the last frame (log / test).</summary>
+  public int LastClothVerts { get; private set; }
+
   /// <summary>R82: total triangle index bytes uploaded this process (log only).</summary>
   internal static long IboBytes;
 
@@ -670,6 +675,30 @@ internal sealed unsafe class GlPreview : IDisposable
         _gl.BufferData<float>(BufferTargetARB.ArrayBuffer, pts, BufferUsageARB.StreamDraw);
         _gl.DrawArrays(PrimitiveType.Lines, 0, (uint)(list.Count * 2));
       }
+    }
+
+    LastClothVerts = 0;
+    if (ShowClothVerts && scene.VertexOverrides.Count > 0)
+    {
+      var total = 0;
+      foreach (var o in scene.VertexOverrides) total += o.Positions.Length;
+      var pts = new float[total * 18];
+      const float s = 0.006f;
+      var k = 0;
+      foreach (var o in scene.VertexOverrides)
+        foreach (var p in o.Positions)
+        {
+          pts[k++] = p.X - s; pts[k++] = p.Y; pts[k++] = p.Z; pts[k++] = p.X + s; pts[k++] = p.Y; pts[k++] = p.Z;
+          pts[k++] = p.X; pts[k++] = p.Y - s; pts[k++] = p.Z; pts[k++] = p.X; pts[k++] = p.Y + s; pts[k++] = p.Z;
+          pts[k++] = p.X; pts[k++] = p.Y; pts[k++] = p.Z - s; pts[k++] = p.X; pts[k++] = p.Y; pts[k++] = p.Z + s;
+        }
+      _gl.Uniform1(U("uSkin"), 0);
+      _gl.BindVertexArray(_lineVao);
+      _gl.BindBuffer(BufferTargetARB.ArrayBuffer, _lineVbo);
+      SetVec3("uColor", new Vector3(0.25f, 0.95f, 1f));
+      _gl.BufferData<float>(BufferTargetARB.ArrayBuffer, pts, BufferUsageARB.StreamDraw);
+      _gl.DrawArrays(PrimitiveType.Lines, 0, (uint)(total * 6));
+      LastClothVerts = total;
     }
 
     _gl.BindVertexArray(0);

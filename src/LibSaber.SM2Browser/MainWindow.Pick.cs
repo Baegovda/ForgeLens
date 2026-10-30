@@ -107,6 +107,7 @@ public partial class MainWindow
     if (_selPart is not null) list.Add((_selPart, SelectColour, 3f));
     GpuView.Highlights = list;
     if (UseGpu()) GpuView.Redraw();
+    UeUpdateDetails(); // R83 Details panel follows the selection
   }
 
   private void ClearPick()
@@ -115,6 +116,7 @@ public partial class MainWindow
     _selPart = null;
     GpuView.Highlights = Array.Empty<(MeshPart, Vector3, float)>();
     PickInfo.IsVisible = false;
+    UeUpdateDetails();
   }
 
   private void ShowPickInfo(PickHit? hit)

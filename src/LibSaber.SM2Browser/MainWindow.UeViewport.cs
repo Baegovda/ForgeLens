@@ -28,6 +28,13 @@ public partial class MainWindow
     public bool ShowGrid { get; set; }
     public bool ShowStats { get; set; } = true;
     public Dictionary<string, float[]> Bookmarks { get; set; } = new();
+    // R83 panel layout + cloth vertices
+    public bool ShowClothVerts { get; set; }
+    public bool DetailsOpen { get; set; } = true;
+    public double DetailsHeight { get; set; } = 220;
+    public bool DockLeft { get; set; }
+    public bool OutlinerCollapsed { get; set; }
+    public double OutlinerWidth { get; set; } = 240;
   }
 
   private static readonly string UeSettingsPath = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "ForgeLens", "viewport_r79.json");
@@ -69,7 +76,11 @@ public partial class MainWindow
     };
     BuildUeOverlays();
     BuildUeOutliner();
+    BuildUePanels(); // R83
+    InitPinnedWindow(); // R83 SM2_WINRECT
+    InitInputProbe(); // R83 SM2_INPUTPROBE
     GpuView.ViewMode = UeGlMode(_ue.ViewMode);
+    GpuView.ShowClothVerts = _ue.ShowClothVerts;
   }
 
   private static int UeGlMode(int ui) => ui switch { 1 => 1, 3 => 2, 4 => 3, 5 => 4, _ => 0 };
@@ -81,7 +92,7 @@ public partial class MainWindow
   {
     if (ViewBorder.Child is not Grid grid) return;
     _ueViewBox = new ComboBox { ItemsSource = UeViewModes, SelectedIndex = Math.Clamp(_ue.ViewMode, 0, UeViewModes.Length - 1), FontSize = 11, MinWidth = 108, Height = 26, Padding = new Thickness(6, 0) };
-    ToolTip.SetTip(_ueViewBox, "View mode (UE: Lit / Unlit / Wireframe / Clay / Normals / UV checker). GPU view only; Wireframe also works on the CPU path.");
+    ToolTip.SetTip(_ueViewBox, "View mode (UE: Lit / Unlit / Wireframe / Clay / Normals / UV checker). R83: GPU and CPU paths both draw every mode.");
     _ueViewBox.SelectionChanged += (_, _) => UeSetViewMode(_ueViewBox.SelectedIndex);
     var show = new Button { Content = "Show ▾", FontSize = 11, Height = 26, Padding = new Thickness(8, 0) };
     var menu = new MenuFlyout();
@@ -97,6 +108,7 @@ public partial class MainWindow
     menu.Items.Add(Check("Bounds", () => _ue.ShowBounds, v => { _ue.ShowBounds = v; UeSave(); UeApplyLines(); }));
     menu.Items.Add(Check("Grid", () => _ue.ShowGrid, v => { _ue.ShowGrid = v; UeSave(); UeApplyLines(); }));
     menu.Items.Add(Check("Stats", () => _ue.ShowStats, v => { _ue.ShowStats = v; UeSave(); UeUpdateStats(); }));
+    menu.Items.Add(Check("Cloth vertices (physics)", () => _ue.ShowClothVerts, UeShowClothVerts)); // R83
     show.Flyout = menu;
     var help = new Button { Content = "?", FontSize = 11, Height = 26, Width = 26, Padding = new Thickness(0) };
     ToolTip.SetTip(help, "Shortcuts (F1)");
@@ -105,7 +117,7 @@ public partial class MainWindow
     {
       Background = new SolidColorBrush(Color.Parse("#99101216")), CornerRadius = new CornerRadius(4), Padding = new Thickness(4), Margin = new Thickness(8),
       HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Top,
-      Child = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 4, Children = { _ueViewBox, show, help } },
+      Child = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 4, Children = { _ueViewBox, show, BuildUePanelsButton(), help } },
     };
     bar.AddHandler(PointerPressedEvent, (_, e) => e.Handled = true, RoutingStrategies.Bubble);
     bar.Bind(IsVisibleProperty, HudInfo.GetObservable(IsVisibleProperty));
@@ -148,6 +160,15 @@ public partial class MainWindow
     };
     _ueHelp.AddHandler(PointerPressedEvent, (_, e) => { _ueHelp.IsVisible = false; e.Handled = true; }, RoutingStrategies.Bubble);
     grid.Children.Add(_ueHelp);
+  }
+
+  /// <summary>R83: cyan crosses on every physics-driven (cloth) vertex. GPU path only: the cloth simulation runs in the GPU preview.</summary>
+  internal void UeShowClothVerts(bool v)
+  {
+    _ue.ShowClothVerts = v; UeSave();
+    GpuView.ShowClothVerts = v;
+    UeLog += $"show cloth vertices {v} (physics {PhysicsToggle.IsChecked == true}, visible {PhysicsToggle.IsVisible})\n";
+    if (_mesh is not null) DrawMesh(false);
   }
 
   private void UeToggleHelp() { if (_ueHelp is not null) _ueHelp.IsVisible = !_ueHelp.IsVisible; }
@@ -262,8 +283,11 @@ public partial class MainWindow
   // ---------------- keys ----------------
   private bool UeTyping(KeyEventArgs e) => e.Source is TextBox || FocusManager?.GetFocusedElement() is TextBox;
 
+  internal string UeLastKey { get; private set; } = "-";
+
   private void UeKeyDown(object? sender, KeyEventArgs e)
   {
+    UeLastKey = $"{e.Key}/{e.PhysicalKey}/{e.KeyModifiers}"; // R83 input probe
     if (UeTyping(e)) return;
     if (e.Key == Key.F1 || (e.Key == Key.OemQuestion && e.KeyModifiers == KeyModifiers.Shift)) { UeToggleHelp(); e.Handled = true; return; }
     if (_mesh is null || _fx is not null) return;

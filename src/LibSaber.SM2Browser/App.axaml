@@ -170,6 +170,15 @@
       <Setter Property="Opacity" Value="0.75" />
     </Style>
     <!-- ui-43 Content Browser: type chips, small header buttons, asset tiles, the HEURISTIC badge. -->
+    <!-- R83: the Details expander header is a ToggleButton: keep it flat (no checked accent fill) -->
+    <Style Selector="Expander /template/ ToggleButton /template/ ContentPresenter">
+      <Setter Property="Background" Value="Transparent" />
+      <Setter Property="BorderThickness" Value="0" />
+    </Style>
+    <Style Selector="Expander /template/ ToggleButton:checked /template/ ContentPresenter">
+      <Setter Property="Background" Value="Transparent" />
+      <Setter Property="BorderThickness" Value="0" />
+    </Style>
     <Style Selector="ToggleButton.chip">
       <Setter Property="CornerRadius" Value="11" />
       <Setter Property="Padding" Value="10,1" />

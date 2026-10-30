@@ -1,4 +1,4 @@
-﻿using LibSaber.SM2.Assets.Customization;
+using LibSaber.SM2.Assets.Customization;
 using LibSaber.SM2Browser.Gpu;
 using Avalonia;
 using Avalonia.Controls;
@@ -112,6 +112,8 @@ public partial class MainWindow : Window
       DrawMesh();
     };
     // Space = Play/Pause anywhere in the window, except while typing (search, anim filter) or in an open dropdown.
+    if (Environment.GetEnvironmentVariable("SM2_INPUTPROBE") is { Length: > 0 } kp0)
+      AddHandler(KeyDownEvent, (_, e) => { try { File.AppendAllText(kp0 + ".keys.txt", $"first-instance-handler {e.Key} handled {e.Handled} hud {HudToggle.IsChecked}\n"); } catch { } }, RoutingStrategies.Tunnel, handledEventsToo: true);
     AddHandler(KeyDownEvent, SpaceKeyDown, RoutingStrategies.Tunnel);
     AddHandler(KeyDownEvent, ShortcutKeyDown, RoutingStrategies.Tunnel);
     InitLightweight(); // R81
@@ -847,6 +849,7 @@ public partial class MainWindow : Window
     var specular = _specular;
     var previewGeneration = _previewGeneration;
     var inPlace = InPlaceToggle.IsChecked == true;
+    var cpuViewMode = UeGlMode(_ue.ViewMode);
     var level = _level;
     var bounds = ViewBorder.Bounds;
     var scaling = RenderScaling > 0 ? RenderScaling : 1.0;
@@ -872,6 +875,7 @@ public partial class MainWindow : Window
           Lod = lod, Part = part, Wireframe = wire, Albedo = albedo, Normals = normals, Specular = specular,
           MaxEdge = 2048, Supersample = level is null ? supersample : 1, InPlace = inPlace,
           PointLights = level?.Lights, Ambient = level is null ? 0.16f : 0.22f, HeadLight = 0.6f, Exposure = level is null ? 1f : 1.3f,
+          ViewMode = cpuViewMode, // R83: CPU path view modes
         });
       return (pixels, width, height, note, MeshPreview.LastRenderMs, supersample);
     }).ContinueWith(task =>
@@ -2028,6 +2032,7 @@ public partial class MainWindow : Window
   protected override void OnClosed(EventArgs e)
   {
     SaveLayoutMemory();
+    try { UeSaveLayout(); } catch { /* best effort (R83) */ }
     _load?.Cancel();
     _store?.Dispose();
     base.OnClosed(e);
