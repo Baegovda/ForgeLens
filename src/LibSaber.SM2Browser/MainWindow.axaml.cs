@@ -583,7 +583,7 @@ public partial class MainWindow : Window
         _level = scene;
         _previewFileIndex = index;
         _albedo = scene.Albedo; _normals = scene.Normals; _specular = scene.Specular;
-        _yaw = 0.7f; _pitch = 0.45f; _distance = scene.Spread * 1.1f; _time = 0;
+        _yaw = scene.Persp.Yaw; _pitch = scene.Persp.Pitch; _distance = scene.Persp.Distance; _time = 0;
         WireToggle.IsVisible = true;
         PreviewNote.Text = scene.Stats;
         PreviewText.IsVisible = false;

@@ -36,9 +36,12 @@ internal static class LevelBench
     var name = level.EndsWith(".cd_list", StringComparison.OrdinalIgnoreCase) ? Path.GetFileName(level) : level + ".cd_list";
     var hits = catalog.FindByFileName(name);
     if (hits.Count == 0) { Line("level not found: " + name); return 2; }
-    var scene = LevelScene.Load(catalog, store, hits[0], new LevelScene.Options(LightGain: Env("SM2_LEVEL_LIGHT_GAIN", 1f)), Line);
+    var scene = LevelScene.Load(catalog, store, hits[0], new LevelScene.Options(LightGain: Env("SM2_LEVEL_LIGHT_GAIN", 1f), UseCache: Environment.GetEnvironmentVariable("SM2_LEVEL_NOCACHE") != "1"), Line);
     Line("missing: " + string.Join(" ", scene.Missing.Take(30)));
     Line("skipped: " + string.Join(" ", scene.Skipped.Take(30)));
+    Line("untextured (largest): " + string.Join(" ", scene.Untextured));
+    Line($"open {sw.Elapsed.TotalSeconds:0.0}s from_disk_cache={scene.FromDiskCache} coverage instances {scene.Placed.Count}/{scene.WorkCount} lwi {scene.LwiPlaced}/{scene.LwiCount} tris {scene.Triangles:N0} hidden_parts_dropped {scene.HiddenParts}");
+    Line($"cameras persp yaw {scene.Persp.Yaw:0.00} d {scene.Persp.Distance:0} close yaw {scene.Close.Yaw:0.00} d {scene.Close.Distance:0}; timing {scene.Timing}");
     Line($"camera centre {scene.Centre} spread(10-90%) {scene.Spread:0.0} m");
     var w = 1600; var h = 1000;
     var settings = new PreviewSettings
@@ -58,12 +61,7 @@ internal static class LevelBench
     return 0;
   }
 
-  public static (string, OrbitCamera)[] Views(LevelScene s) => new[]
-  {
-    ("top", new OrbitCamera { Yaw = 0f, Pitch = 1.2f, Target = s.Centre, Distance = s.Spread * 1.4f }),
-    ("persp", new OrbitCamera { Yaw = 0.7f, Pitch = 0.45f, Target = s.Centre, Distance = s.Spread * 1.1f }),
-    ("close", new OrbitCamera { Yaw = 2.3f, Pitch = 0.3f, Target = s.Centre, Distance = s.Spread * 0.35f }),
-  };
+  public static (string, OrbitCamera)[] Views(LevelScene s) => new[] { ("top", s.Top), ("persp", s.Persp), ("close", s.Close) };
 
   static void WriteUe(LevelScene s, string output, Action<string> line)
   {
