@@ -53,6 +53,14 @@ public sealed record PreviewSettings
   public int Threads { get; init; }
   /// <summary>Run the class's cloth and jiggle physics (<see cref="ExportedMesh.Physics"/>) on the posed skeleton.</summary>
   public bool Physics { get; init; }
+  /// <summary>
+  ///   R75 (t157u) orbit physics: the model's world frame for the simulation (row-vector, model -> sim world). The
+  ///   viewer passes the inverse orbit yaw so turning the model gives cloth / jiggle inertial lag; drawing stays in
+  ///   model space (results are mapped back with the inverse). Null = identity (old behaviour).
+  /// </summary>
+  public System.Numerics.Matrix4x4? PhysicsFrame { get; init; }
+  /// <summary>R75: wall-clock seconds for the physics step (sim keeps running while the clip is paused). Null = clip time.</summary>
+  public float? PhysicsClock { get; init; }
 }
 /// <summary>
 ///   CPU preview renderer. Every frame it skins (only when a clip is active), projects each vertex once,

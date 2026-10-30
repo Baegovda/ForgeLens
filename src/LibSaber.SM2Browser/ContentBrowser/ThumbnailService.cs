@@ -57,7 +57,8 @@ public sealed class Thumb
 ///   ui-43: Content-Browser thumbnails. Rendered on two low-priority worker threads (newest request first, so the tiles
 ///   on screen win), kept in a byte-capped LRU in memory and as PNGs on disk under
 ///   <c>%LOCALAPPDATA%/LibSaber/SM2Browser/thumbs</c> (key = path + archive + size + kind + renderer version).
-///   Textures: a small mip. Models: CPU clay render (MeshPreview, no textures: speed). Animations: the clip played on a
+///   Textures: a small mip. Models: CPU render with the model's albedo / normal / spec maps (R75, t159u; was untextured
+///   clay since ui-43, which is why the grid showed blue-grey silhouettes) (same resolver as the viewer). Animations: the clip played on a
 ///   model whose class uses a Morpheme bundle that links the clip (<see cref="CategoryTree.OwnerModel"/>), 10 frames.
 ///   Effects: a CPU sprite splat of the simulated particles (approximation of the GPU view; no lights, meshes, distortion), 10 frames.
 /// </summary>
@@ -66,7 +67,7 @@ public sealed class ThumbnailService : IDisposable
   public const int StillSize = 192;
   public const int StripSize = 160;
   public const int StripFrames = 10;
-  private const string Version = "ui43-3";
+  private const string Version = "r75-tex1"; // R75 (t159u): models now textured (old clay PNGs are simply not matched any more)
   private const long MemoryCap = 320L * 1024 * 1024;
 
   private readonly GameCatalog _catalog;
@@ -342,12 +343,22 @@ public sealed class ThumbnailService : IDisposable
   private static readonly PreviewSettings ThumbSettings = new() { Supersample = 2, MaxEdge = 512, Threads = 2 };
 
   private List<byte[]>? Model(int index)
+    => RenderModel(_catalog, _store, index, textured: true) is { } px ? new List<byte[]> { px } : null;
+
+  /// <summary>R75: one model still (BGRA StillSize²). textured=false = the old ui-43 clay render (bench before/after).</summary>
+  internal static byte[]? RenderModel(GameCatalog catalog, ArchiveStore store, int index, bool textured)
   {
-    var mesh = TemplateMeshReader.Load(_catalog, _store, index);
+    var mesh = TemplateMeshReader.Load(catalog, store, index);
     if (!mesh.HasTriangles)
       return null;
-    var pixels = MeshPreview.Render(mesh, StillSize, StillSize, new OrbitCamera { Yaw = 0.7f, Pitch = 0.18f }, false, 0, out _, ThumbSettings);
-    return new List<byte[]> { pixels };
+    var settings = ThumbSettings;
+    if (textured)
+    {
+      // R75: textured like the viewer (same resolver).
+      var maps = MainWindow.ResolvePreview(catalog, store, mesh, index);
+      settings = ThumbSettings with { Albedo = maps.Albedo, Normals = maps.Normals, Specular = maps.Specular };
+    }
+    return MeshPreview.Render(mesh, StillSize, StillSize, new OrbitCamera { Yaw = 0.7f, Pitch = 0.18f }, false, 0, out _, settings);
   }
 
   private List<byte[]>? Animation(int index)

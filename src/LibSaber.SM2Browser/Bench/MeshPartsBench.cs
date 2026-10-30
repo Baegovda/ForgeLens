@@ -28,6 +28,7 @@ internal static class MeshPartsBench
       if (file.Kind is not AssetKind.Model || !rx.IsMatch(file.Path))
         continue;
       done++;
+      if (done % 20 == 0) File.WriteAllText(output, sb.ToString()); // R75: partial output survives a crash
       try
       {
         var mesh = TemplateMeshReader.Load(catalog, store, i);

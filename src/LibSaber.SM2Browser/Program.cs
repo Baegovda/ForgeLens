@@ -30,6 +30,8 @@ internal static class Program
       return Bench.FxPartsBench.Run(args);
     if (args.Length > 0 && args[0] == "--propbench")
       return Bench.PropAnimBench.Run(args);
+    if (args.Length > 0 && args[0] == "--thumbbench")
+      return Bench.ThumbBench.Run(args);
     if (args.Length > 0 && args[0] == "--meshparts")
       return Bench.MeshPartsBench.Run(args);
     if (args.Length > 0 && args[0] == "--glbench")

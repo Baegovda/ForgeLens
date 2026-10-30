@@ -52,6 +52,9 @@ internal sealed unsafe class GlPreview : IDisposable
   public string Info { get; private set; } = "";
   /// <summary>True when a texture upload was deferred to keep the frame short; render again.</summary>
   public bool Pending { get; private set; }
+
+  /// <summary>R75: parts to outline this frame (hover / selection), drawn as a stencil silhouette ring of Px pixels.</summary>
+  public IReadOnlyList<(MeshPart Part, Vector3 Colour, float Px)> Highlights { get; set; } = Array.Empty<(MeshPart, Vector3, float)>();
   public double LastUploadMs { get; private set; }
 
   private sealed class GpuBatch
@@ -590,6 +593,7 @@ internal sealed unsafe class GlPreview : IDisposable
     // Overlays: flat colour, no depth test (as the CPU preview draws them on top).
     _gl.Disable(EnableCap.DepthTest);
     _gl.Uniform1(U("uMode"), 1);
+    DrawOutlines(scene, skin, width, height);
     if (wireframe)
     {
       SetVec3("uColor", new Vector3(230, 220, 210) / 255f);
@@ -639,6 +643,63 @@ internal sealed unsafe class GlPreview : IDisposable
     _gl.BlitFramebuffer(0, 0, width, height, 0, 0, width, height, ClearBufferMask.ColorBufferBit, BlitFramebufferFilter.Nearest);
     _gl.BindFramebuffer(FramebufferTarget.Framebuffer, (uint)targetFb);
     _gl.ActiveTexture(TextureUnit.Texture0);
+  }
+
+  /// <summary>
+  ///   R75: UE-style outline: pass 1 writes the part's silhouette into the stencil (no colour), pass 2 draws the same
+  ///   triangles pushed outward along the screen-space normal by Px pixels where the stencil is clear = a ring.
+  ///   No depth test, so the outline also shows where the part is hidden behind others (as UE's selection outline).
+  /// </summary>
+  private void DrawOutlines(PreviewScene scene, Matrix4x4[]? skin, int width, int height)
+  {
+    if (Highlights.Count == 0)
+      return;
+    _gl.Uniform2(U("uViewport"), (float)width, (float)height);
+    _gl.Enable(EnableCap.StencilTest);
+    foreach (var (target, colour, px) in Highlights)
+    {
+      _gl.ClearStencil(0);
+      _gl.Clear(ClearBufferMask.StencilBufferBit);
+      for (var pass = 0; pass < 2; pass++)
+      {
+        if (pass == 0)
+        {
+          _gl.ColorMask(false, false, false, false);
+          _gl.StencilFunc(StencilFunction.Always, 1, 0xFF);
+          _gl.StencilOp(StencilOp.Keep, StencilOp.Keep, StencilOp.Replace);
+          _gl.Uniform1(U("uInflate"), 0f);
+        }
+        else
+        {
+          _gl.ColorMask(true, true, true, true);
+          _gl.StencilFunc(StencilFunction.Notequal, 1, 0xFF);
+          _gl.StencilOp(StencilOp.Keep, StencilOp.Keep, StencilOp.Keep);
+          _gl.Uniform1(U("uInflate"), px);
+          SetVec3("uColor", colour);
+        }
+
+        foreach (var batch in scene.Batches)
+        {
+          GpuBatch? gpu = null;
+          foreach (var part in batch.Parts)
+          {
+            if (!ReferenceEquals(part.Source, target) || part.IndexCount < 3)
+              continue;
+            if (gpu is null)
+            {
+              gpu = Upload(batch);
+              _gl.Uniform1(U("uSkin"), skin is { Length: > 0 } && gpu.Skinned ? 1 : 0);
+              _gl.BindVertexArray(gpu.Vao);
+              _gl.BindBuffer(BufferTargetARB.ElementArrayBuffer, gpu.Ibo);
+            }
+            _gl.DrawElements(PrimitiveType.Triangles, (uint)part.IndexCount, DrawElementsType.UnsignedInt, (void*)(part.IndexStart * 4L));
+          }
+        }
+      }
+    }
+    _gl.Uniform1(U("uInflate"), 0f);
+    _gl.ColorMask(true, true, true, true);
+    _gl.Disable(EnableCap.StencilTest);
   }
 
   /// <summary>Effect-only frame (VFX standalone view): ground grid, lights and particles, no mesh.</summary>
@@ -832,6 +893,8 @@ internal sealed unsafe class GlPreview : IDisposable
     uniform sampler2D uBones;
     uniform int uBoneCount;
     uniform int uSkin;
+    uniform float uInflate;
+    uniform vec2 uViewport;
     out vec3 vPos;
     out vec3 vNrm;
     out vec2 vUv;
@@ -874,6 +937,14 @@ internal sealed unsafe class GlPreview : IDisposable
       vNrm = n;
       vUv = aUv;
       gl_Position = uVP * vec4(p, 1.0);
+      if (uInflate > 0.0)
+      {
+        vec4 cn = uVP * vec4(p + n * 0.01, 1.0);
+        vec2 dir = cn.xy / cn.w - gl_Position.xy / gl_Position.w;
+        float len = length(dir);
+        if (len > 1e-7)
+          gl_Position.xy += dir / len * uInflate * 2.0 / uViewport * gl_Position.w;
+      }
     }
     """;
 

@@ -56,15 +56,17 @@ public partial class MainWindow
       ShowKitbashTab(true, save: false);
   }
 
-  private void MeshesTabClicked(object? sender, RoutedEventArgs e) => ShowKitbashTab(false);
-  private void KitbashTabClicked(object? sender, RoutedEventArgs e) => ShowKitbashTab(true);
+  // R75 (t159u): the Kitbash header toggles its section; the Meshes tree below always stays visible.
+  private void KitbashTabClicked(object? sender, RoutedEventArgs e) => ShowKitbashTab(!_kitOpen);
 
   private void ShowKitbashTab(bool open, bool save = true)
   {
     _kitOpen = open;
     KitbashPanel.IsVisible = open;
-    MeshList.IsVisible = !open;
-    MeshesTab.Classes.Set("active", !open);
+    KitbashSplitter.IsVisible = open;
+    RightPanel.RowDefinitions[0].Height = open ? new GridLength(3, GridUnitType.Star) : new GridLength(0);
+    RightPanel.RowDefinitions[1].Height = open ? GridLength.Auto : new GridLength(0);
+    KitbashTab.Content = open ? "▾ ⚒ Kitbash" : "▸ ⚒ Kitbash";
     KitbashTab.Classes.Set("active", open);
     var column = ViewerColumns.ColumnDefinitions[2];
     if (open)

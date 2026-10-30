@@ -23,6 +23,8 @@ public enum PreviewBlend
 public sealed class PreviewPartDraw
 {
   public string Name { get; init; } = "";
+  /// <summary>R75: the mesh part this draw came from (picking / highlight identity); null for the no-parts fallback.</summary>
+  public MeshPart? Source { get; init; }
   public PreviewBlend Blend { get; init; }
   /// <summary>The albedo's alpha is coverage (<c>AKill(a)</c> or <c>Transp(a)</c> in the diffuse format).</summary>
   public bool AlphaFromAlbedo { get; init; }
@@ -132,7 +134,22 @@ public static partial class MeshPreview
     // (ClothInstance positions, drawn as-is) stayed in root-motion space, so with In place on the tabard and purity seals
     // slid away from the body as the clip's ROOT travelled (cc_titus + titus_radar_intro_intercessor). The sim also no
     // longer reacts to locomotion the preview has removed.
-    physics?.Step(worlds!, timeSeconds, mesh.Clip?.Duration ?? 0);
+    // R75: orbit physics: step in the rotated sim world, map jiggle results back to model space.
+    var frame = physics is not null && settings?.PhysicsFrame is { } pf ? pf : Matrix4x4.Identity;
+    Matrix4x4.Invert(frame, out var frameInv);
+    if (physics is not null)
+    {
+      var simTime = settings?.PhysicsClock ?? timeSeconds;
+      var simDuration = settings?.PhysicsClock is null ? mesh.Clip?.Duration ?? 0 : 0;
+      if (frame.IsIdentity)
+        physics.Step(worlds!, simTime, simDuration);
+      else
+      {
+        for (var i = 0; i < worlds!.Length; i++) worlds[i] *= frame;
+        physics.Step(worlds, simTime, simDuration);
+        for (var i = 0; i < worlds.Length; i++) worlds[i] *= frameInv;
+      }
+    }
 
     var batches = new List<PreviewBatch>(slices.Count);
     var visibilityKey = new System.Text.StringBuilder();
@@ -164,6 +181,7 @@ public static partial class MeshPreview
           AoInBlue = channels.Contains("AO(b)", StringComparison.OrdinalIgnoreCase) || channels.Length == 0,
           Solid = new Vector3(Math.Clamp(156 + shift, 48, 230), Math.Clamp(118 + shift / 2, 48, 210), Math.Clamp(96 + shift / 3, 48, 200)) / 255f,
           Name = part.Name,
+          Source = part,
           Blend = BlendOf(part),
           AlphaFromAlbedo = AlphaChannel(part),
           Tint = part.Sfx ? (part.SfxTint is { Length: >= 3 } st ? new Vector3(st[0], st[1], st[2]) : Vector3.One)
@@ -243,7 +261,7 @@ public static partial class MeshPreview
     if (physics is not null && skinMatrices is not null)
     {
       foreach (var batch in batches)
-        if (physics.Override(batch, skinMatrices, rebase) is { } over)
+        if (physics.Override(batch, skinMatrices, frameInv * rebase) is { } over)
           overrides.Add(over);
     }
 

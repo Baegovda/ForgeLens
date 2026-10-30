@@ -530,6 +530,7 @@ public partial class MainWindow : Window
         _yaw = 0.7f;
         _pitch = 0.18f;
         FlyReset(false);
+        ClearPick(); // R75
         FillModelControls(mesh);
         KitbashModelLoaded(mesh, index);
         SkeletonToggle.IsVisible = mesh.Bones.Count > 0;
@@ -1072,6 +1073,7 @@ public partial class MainWindow : Window
 
     var playing = _playTimer.IsEnabled && _clip is not null;
     var clip = _clip;
+    var orbitPhys = OrbitPhysicsFrame(); // R75
     var request = new GpuFrameRequest(
       _mesh,
       new OrbitCamera { Yaw = _yaw, Pitch = _pitch, Distance = _distance, Target = _pivot },
@@ -1086,6 +1088,8 @@ public partial class MainWindow : Window
         Albedo = _albedo, Normals = _normals, Specular = _specular,
         MaxEdge = 4096, Supersample = 1, InPlace = InPlaceToggle.IsChecked == true,
         Physics = PhysicsToggle.IsChecked == true,
+        PhysicsFrame = orbitPhys.Frame,
+        PhysicsClock = orbitPhys.Clock,
       },
       // While playing, each presented frame samples the clip at its own time (not at the 16 ms timer's).
       playing ? () =>
@@ -1483,6 +1487,8 @@ public partial class MainWindow : Window
   {
     if (FlyPressed(e))
       return;
+    PickPressed(e); // R75
+    OrbitStop(); // R75: any press stops the inertia
     _dragging = true;
     _lastPoint = e.GetPosition(ViewBorder);
   }
@@ -1491,9 +1497,11 @@ public partial class MainWindow : Window
   {
     if (FlyReleased(e))
       return;
+    PickReleased(e); // R75
     if (!_dragging)
       return;
     _dragging = false;
+    OrbitReleased(); // R75
     DrawMesh(false);
   }
 
@@ -1510,13 +1518,19 @@ public partial class MainWindow : Window
     }
 
     if (!_dragging || _mesh is null)
+    {
+      PickHover(e); // R75
       return;
+    }
     var point = e.GetPosition(ViewBorder);
     _yaw += (float)(point.X - _lastPoint.X) * 0.01f;
     _pitch += (float)(point.Y - _lastPoint.Y) * 0.01f;
+    OrbitDragged((float)(point.X - _lastPoint.X) * 0.01f, (float)(point.Y - _lastPoint.Y) * 0.01f); // R75
     _lastPoint = point;
     DrawMesh(true);
   }
+
+  private void ViewExited(object? sender, PointerEventArgs e) => PickLeave(); // R75
 
   private void ViewWheel(object? sender, PointerWheelEventArgs e)
   {

@@ -17,11 +17,14 @@ public sealed class MeshToggle : INotifyPropertyChanged
   ///   Conservative: an unflagged part is always treated as visible geometry.
   /// </summary>
   public static bool IsNonRender(MeshPart part)
-    => part.HideReason is "volume" or "clothSim" or "sfxSource";
+    => part.HideReason is "volume" or "clothSim" or "sfxSource"
+       // R75 HEURISTIC (name only, R71 inventory): navigation helpers nav_silhouette / navmesh_floor (still drawn by default)
+       || part.Name.StartsWith("nav_", StringComparison.OrdinalIgnoreCase) || part.Name.StartsWith("navmesh", StringComparison.OrdinalIgnoreCase);
 
   public const string HelperGroupTitle = "Collision / Helpers";
 
   public bool IsGroup => _part is null;
+  public MeshPart? Part => _part;
   public bool NonRender => _part is not null && IsNonRender(_part);
 
   private readonly string? _label;

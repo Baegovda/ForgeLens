@@ -233,6 +233,8 @@
                     ToolTip.Tip="Rebase the clip so its first frame stands where the bind pose does (cinematic clips stay in view)" />
           <CheckBox x:Name="PhysicsToggle" Content="Physics" IsChecked="True" Click="ViewChanged" IsVisible="False"
                     ToolTip.Tip="Cloth (purity seals, tabards) and jiggle bones from the character class, simulated on the playing clip (GPU preview)" />
+          <CheckBox x:Name="OrbitPhysicsToggle" Content="Orbit physics" IsChecked="True" Click="ViewChanged"
+                    ToolTip.Tip="Orbit mode: turning the model swings cloth / jiggle bones (inertial lag, settles after you stop) and a released drag keeps spinning with damping (SM2_ORBIT_DAMPING, default 4/s). Any click stops the spin. Fly camera unchanged." />
         </WrapPanel>
         <WrapPanel x:Name="HostVfxBar" DockPanel.Dock="Top" Orientation="Horizontal" Margin="0,2,0,0" IsVisible="False">
           <WrapPanel.Styles>
@@ -314,7 +316,7 @@
           <TextBlock x:Name="PreviewNote" TextWrapping="Wrap" MaxLines="5" TextTrimming="CharacterEllipsis" Foreground="{DynamicResource FL.TextDim}" FontSize="12" />
         </DockPanel>
         <Border x:Name="ViewBorder" Background="{DynamicResource FL.Viewport}" CornerRadius="4" BorderBrush="{DynamicResource FL.Border}" BorderThickness="1" ClipToBounds="True"
-                PointerPressed="ViewPressed" PointerMoved="ViewMoved" PointerReleased="ViewReleased" PointerWheelChanged="ViewWheel">
+                PointerPressed="ViewPressed" PointerMoved="ViewMoved" PointerReleased="ViewReleased" PointerWheelChanged="ViewWheel" PointerExited="ViewExited">
           <Grid>
             <gpu:GpuPreviewControl x:Name="GpuView" IsVisible="False" />
             <Image x:Name="PreviewImage" Stretch="Uniform" />
@@ -326,6 +328,12 @@
                 <TextBlock x:Name="HudMode" FontSize="11" FontWeight="SemiBold" Foreground="#E8E8E8" />
                 <TextBlock x:Name="HudCam" FontSize="11" FontFamily="Consolas,Courier New,monospace" Foreground="#C8C8C8" />
                 <TextBlock x:Name="HudKeys" FontSize="10" Foreground="#909090" />
+              </StackPanel>
+            </Border>
+            <Border x:Name="PickInfo" IsVisible="False" IsHitTestVisible="False" HorizontalAlignment="Left" VerticalAlignment="Bottom" Margin="8" Padding="8,5" CornerRadius="4" Background="#CC101216" BorderBrush="#FF8C0D" BorderThickness="1,0,0,0">
+              <StackPanel Spacing="1">
+                <TextBlock x:Name="PickName" FontSize="12" FontWeight="SemiBold" Foreground="#FFB060" />
+                <TextBlock x:Name="PickDetail" FontSize="10" Foreground="#C8C8C8" />
               </StackPanel>
             </Border>
             <Border x:Name="HudSpeed" IsVisible="False" IsHitTestVisible="False" HorizontalAlignment="Right" VerticalAlignment="Top" Margin="8" Padding="8,5" CornerRadius="4" Background="#99101216">
@@ -376,14 +384,14 @@
       <DockPanel Grid.Column="2" Margin="4,8,8,8">
         <!-- ui-44: MESHES | KITBASH tabs share the right column. -->
         <StackPanel DockPanel.Dock="Top" Orientation="Horizontal" Spacing="2" Margin="0,0,0,4">
-          <Button x:Name="MeshesTab" Classes="tab active" Content="Meshes" Click="MeshesTabClicked" ToolTip.Tip="Objects of the previewed model (check to show)" />
-          <Button x:Name="KitbashTab" Classes="tab" Content="⚒ Kitbash" Click="KitbashTabClicked"
+          <!-- R75 (t159u): one panel: Kitbash section (collapsible) on top, Meshes tree below. -->
+          <Button x:Name="KitbashTab" Classes="tab" Content="▸ ⚒ Kitbash" Click="KitbashTabClicked"
                   ToolTip.Tip="Kitbasher: pick a faction, class and preset, then one armor part per slot from the character customization library. Only the chosen parts show and export." />
           <CheckBox x:Name="SfxPartsBox" Content="FX parts" IsVisible="False" Margin="8,0,0,0" Click="SfxPartsClicked"
                     ToolTip.Tip="Effect geometry inside the model: sfx-shader cards (td preset &quot;sfx&quot;, e.g. chainsword sfx_chainsword_attack_*, power sword glow) and placeholder-material sfx helpers (sfx_trail, exaust_source). The game only shows them while an attack / power effect drives them, so they start hidden. On: drawn with their sfx blend (additive unless the td says otherwise)." />
         </StackPanel>
-        <Grid>
-        <ScrollViewer x:Name="KitbashPanel" IsVisible="False" HorizontalScrollBarVisibility="Disabled" Background="{DynamicResource FL.PanelDeep}">
+        <Grid x:Name="RightPanel" RowDefinitions="0,0,Auto,2*">
+        <ScrollViewer x:Name="KitbashPanel" Grid.Row="0" IsVisible="False" HorizontalScrollBarVisibility="Disabled" Background="{DynamicResource FL.PanelDeep}">
           <StackPanel Margin="8,6,10,10" Spacing="6">
             <TextBlock Text="KITBASHER" Classes="header" />
             <TextBlock x:Name="KitbashIntro" FontSize="11" TextWrapping="Wrap" Foreground="{DynamicResource FL.TextDim}"
@@ -440,7 +448,9 @@
             <TextBlock x:Name="KitbashNotes" FontSize="11" TextWrapping="Wrap" Foreground="#E0B060" />
           </StackPanel>
         </ScrollViewer>
-        <TreeView x:Name="MeshList" Background="{DynamicResource FL.PanelDeep}">
+        <GridSplitter x:Name="KitbashSplitter" Grid.Row="1" Height="4" IsVisible="False" Background="{DynamicResource FL.Border}" ResizeDirection="Rows" />
+        <TextBlock Grid.Row="2" Text="MESHES" Classes="section" Margin="4,6,0,2" ToolTip.Tip="Objects of the previewed model (check to show); click a row to select it in 3D" />
+        <TreeView x:Name="MeshList" Grid.Row="3" Background="{DynamicResource FL.PanelDeep}" SelectionChanged="MeshListSelectionChanged">
           <TreeView.ItemTemplate>
             <TreeDataTemplate x:DataType="local:MeshToggle" ItemsSource="{Binding Children}">
               <CheckBox IsChecked="{Binding Visible}" ToolTip.Tip="{Binding Tip}" Margin="2,1">

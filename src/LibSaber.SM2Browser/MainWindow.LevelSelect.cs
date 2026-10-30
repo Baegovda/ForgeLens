@@ -67,14 +67,14 @@ public partial class MainWindow
       File.WriteAllText(shot + ".txt", $"selected {selected}\nlevel {(_level is null ? "(none)" : _level.Stats)}\nmesh {_mesh?.Name} summary {_mesh?.Summary.Replace("\n", " | ")}\nhud {HudSnapshot()}\nselect_to_level_shown {open:0.0}s gpu {UseGpu()} from_disk_cache {_level?.FromDiskCache}\ntiming {_level?.Timing}\n");
     }
     catch (Exception e) { File.WriteAllText(shot + ".txt", "winshot failed: " + e); }
+    if (Environment.GetEnvironmentVariable("SM2_KITBASH") is "0" or "1")
+    { ShowKitbashTab(Environment.GetEnvironmentVariable("SM2_KITBASH") == "1", save: false); await Task.Delay(1500); try { await SaveWindowAsync(Path.ChangeExtension(shot, null) + "_kitbash.png"); } catch { } }
     // R71: mesh tree dump (+ collapsed / expanded shots of the "Collision / Helpers" group).
     try { File.AppendAllText(shot + ".txt", $"note_runs {PreviewNote.Inlines?.Count ?? 0} note_text {(PreviewNote.Inlines is { Count: > 0 } il ? string.Concat(il.OfType<Avalonia.Controls.Documents.Run>().Select(r => r.Text)) : PreviewNote.Text)?.Replace("\n", " | ")}\n"); } catch { }
     try { File.WriteAllText(shot + ".meshes.txt", MeshTreeDump()); } catch { /* best effort */ }
     if (Environment.GetEnvironmentVariable("SM2_MESHGROUP_SHOT") == "1" && MeshList.ItemsSource is IEnumerable<MeshToggle> roots
         && roots.FirstOrDefault(r => r.IsGroup) is { } group)
     {
-      var kit = _kitOpen;
-      if (kit) ShowKitbashTab(false, save: false);
       MeshList.ScrollIntoView(group);
       await Task.Delay(1500);
       try { await SaveWindowAsync(Path.ChangeExtension(shot, null) + "_collapsed.png"); } catch { /* best effort */ }
@@ -90,8 +90,11 @@ public partial class MainWindow
         tvi.IsExpanded = false;
       }
       else File.AppendAllText(shot + ".txt", "group container not found\n");
-      if (kit) ShowKitbashTab(true, save: false);
     }
+    if (Environment.GetEnvironmentVariable("SM2_ORBITTEST") == "1")
+      await OrbitTestAsync(shot);
+    if (Environment.GetEnvironmentVariable("SM2_PICKTEST") == "1")
+      await PickTestAsync(shot);
     if (Environment.GetEnvironmentVariable("SM2_FLYTEST") == "1")
       await FlyTestAsync(shot, SaveWindowAsync);
     if (Environment.GetEnvironmentVariable("SM2_WINSHOT_EXIT") == "1")

@@ -61,6 +61,25 @@ internal sealed class GpuPreviewControl : OpenGlControlBase
     RequestNextFrameRendering();
   }
 
+  /// <summary>R75: the scene of the last drawn frame (exact camera / visibility / pose) for picking.</summary>
+  public PreviewScene? LastScene { get; private set; }
+
+  /// <summary>R75: outlined parts (hover / selection); applied on the next frame.</summary>
+  public IReadOnlyList<(MeshPart Part, System.Numerics.Vector3 Colour, float Px)> Highlights { get; set; } = Array.Empty<(MeshPart, System.Numerics.Vector3, float)>();
+
+  public void Redraw() => RequestNextFrameRendering();
+
+  private (string Path, TaskCompletionSource Done)? _capture;
+
+  /// <summary>R75 test hook: save the next rendered viewport frame (GPU pixels, incl. outlines) as PNG.</summary>
+  public Task CaptureNextAsync(string path)
+  {
+    var tcs = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+    _capture = (path, tcs);
+    RequestNextFrameRendering();
+    return tcs.Task;
+  }
+
   public void Show(GpuFrameRequest request)
   {
     Effect = null;
@@ -170,8 +189,16 @@ internal sealed class GpuPreviewControl : OpenGlControlBase
       var scene = MeshPreview.BuildScene(request.Mesh, width, height, request.Camera, request.Skeleton, time, request.Settings);
       // Effects on the model (sockets / anim events): drawn by GlPreview after the translucent pass, depth-tested.
       renderer.Effect = request.Overlay?.Invoke(request.Mesh, scene, time);
+      LastScene = scene;
+      renderer.Highlights = Highlights;
       renderer.Render(request.Mesh, scene, width, height, request.Wireframe, fb);
       var cpu = _clock.Elapsed.TotalMilliseconds - start;
+      if (_capture is { } cap)
+      {
+        _capture = null;
+        try { Bench.PreviewBench.Png(cap.Path, renderer.ReadPixels(), renderer.Width, renderer.Height); } catch { /* best effort */ }
+        cap.Done.TrySetResult();
+      }
       FramesRendered++;
       Tick();
 
