@@ -287,10 +287,14 @@ def spec_layers(material, albedo, metal, rough, normal, emissive, albedo_raw=Non
     rough_a, aniso_a = aniso_remap(material, rough, amount, x + 200, y + 450)
     base = expr(material, unreal.MaterialExpressionSubstrateSlabBSDF, x + 1400, y)
     link(diffuse, "", base, "Diffuse Albedo")
-    link(mul(material, switch(material, "UseAnisoSpec", f0, f0_i, x + 1200, y + 200), occ, x + 1300, y + 200), "", base, "F0")
-    link(mul(material, switch(material, "UseAnisoSpec", one, f90_i, x + 1200, y + 300), occ, x + 1300, y + 300), "", base, "F90")
-    link(switch(material, "UseAnisoSpec", rough, rough_a, x + 1200, y + 400), "", base, "Roughness")
-    link(switch(material, "UseAnisoSpec", zero, aniso_a, x + 1200, y + 500), "", base, "Anisotropy")
+    base_f0 = mul(material, switch(material, "UseAnisoSpec", f0, f0_i, x + 1200, y + 200), occ, x + 1300, y + 200)
+    base_f90 = mul(material, switch(material, "UseAnisoSpec", one, f90_i, x + 1200, y + 300), occ, x + 1300, y + 300)
+    base_rough = switch(material, "UseAnisoSpec", rough, rough_a, x + 1200, y + 400)
+    base_aniso = switch(material, "UseAnisoSpec", zero, aniso_a, x + 1200, y + 500)
+    link(base_f0, "", base, "F0")
+    link(base_f90, "", base, "F90")
+    link(base_rough, "", base, "Roughness")
+    link(base_aniso, "", base, "Anisotropy")
     link(normal, "", base, "Normal")
     link(tangent, "", base, "Tangent")
     link(emissive, "", base, "Emissive Color")
@@ -331,7 +335,29 @@ def spec_layers(material, albedo, metal, rough, normal, emissive, albedo_raw=Non
     both = expr(material, unreal.MaterialExpressionSubstrateAdd, x + 1700, y - 600)
     link(base, "", both, "A")
     link(second, "", both, "B")
-    return switch(material, "UseSecondSpec", base, both, x + 1900, y - 300)
+    # R96: the two-slab Substrate Add rendered the whole surface ~0.55x darker than the base slab alone in
+    # UE 5.7 (hormagaunt head: lit 43,28,28 vs 74,56,54 with the second lobe zeroed; base colour 76,54,44),
+    # although the second slab has black diffuse and the game lobe is purely additive specular. Default now:
+    # ONE slab, second lobe folded in: F0 = saturate(F0 + F0_2), F90 = max(F90, F90_2), haziness lobe
+    # (Second Roughness = r2, weight = F0_2 share). Loses the second lobe's own anisotropy/tangent shift
+    # (HEURISTIC). Static switch SecondSpecAdd = true restores the old two-slab Add.
+    f0_2o = mul(material, f0_2g, occ, x + 1300, y2 + 900)
+    f90_2o = mul(material, f90_2g, occ, x + 1300, y2 + 980)
+    merged = expr(material, unreal.MaterialExpressionSubstrateSlabBSDF, x + 1600, y + 700)
+    link(diffuse, "", merged, "Diffuse Albedo")
+    link(unary(material, unreal.MaterialExpressionSaturate, add(material, base_f0, f0_2o, x + 1440, y + 700), x + 1520, y + 700), "", merged, "F0")
+    link(op(material, unreal.MaterialExpressionMax, base_f90, f90_2o, x + 1440, y + 780), "", merged, "F90")
+    link(base_rough, "", merged, "Roughness")
+    link(base_aniso, "", merged, "Anisotropy")
+    link(normal, "", merged, "Normal")
+    link(tangent, "", merged, "Tangent")
+    link(emissive, "", merged, "Emissive Color")
+    link(r2, "", merged, "Second Roughness")
+    l0 = mask(material, base_f0, "g", x + 1300, y + 1060); l2 = mask(material, f0_2o, "g", x + 1300, y + 1120)
+    share = unary(material, unreal.MaterialExpressionSaturate, op(material, unreal.MaterialExpressionDivide, l2, add(material, add(material, l0, l2, x + 1400, y + 1100), const(material, 0.0001, x + 1400, y + 1160), x + 1460, y + 1100), x + 1520, y + 1100), x + 1580, y + 1100)
+    link(share, "", merged, "Second Roughness Weight")
+    on = switch(material, "SecondSpecAdd", merged, both, x + 1800, y - 400)
+    return switch(material, "UseSecondSpec", base, on, x + 1900, y - 300)
 
 
 
