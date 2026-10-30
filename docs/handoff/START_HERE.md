@@ -27,7 +27,7 @@
 Full list with dates and status: **HANDOFF.md → "사용자 요청 대장" A (R01–R32)**. Essentials:
 - **Reply in Korean 해요체, short**; interim reports with progress % and ETA "(추정)", times in KST (R01). Translate each request into **industry terms + a short Korean explanation** (R02).
 - **Evidence first (R32, WORKFLOW §0):** game data → exe (REA) → shader/RenderDoc. Label every conclusion **PROVEN / INFERRED / HEURISTIC**; HEURISTIC only as a last resort and clearly marked. **Never ask the user for in-game captures** (R13). Consult `docs/SYMBOL_DB` before re-running RE (R15/R16).
-- **Assets:** never delete user assets; back up as `.bakN` (UE `_bakN`), never overwrite an existing `.bakN` (next free number, never reused) (R03). Obvious test assets / unneeded backups may be deleted in **one batch cleanup pass** (R04).
+- **Assets:** delete anything useless (test folders, stale `_bakN`, scratch) after a 0-reference check; log it in `docs/handoff/CLEANUP_DELETED.tsv` with how to undo. Keep `/Game/SM2_Work/Original/*`, `/Game/Work/*`, `Lightning_01` and the sole backup of anything edited today. Back up as `.bakN` (UE `_bakN`), never overwrite an existing `.bakN` (next free number, never reused) (R03). Obvious test assets / unneeded backups may be deleted in **one batch cleanup pass** (R04).
 - **Scope:** never touch `/Game/SM2_Work/Original/*` or `/Game/Work/*`, never save `Lightning_01` (R05); work only in `Desktop\SM2_Work` and `/Game/SM2_Work` (R06).
 - **Autonomy:** act first, report decisions later, pending questions at the end (R07). Editor restarts are pre-authorised (save first) (R08). On a UE crash: close the crash reporter, read the report, relaunch visibly with `-AutoDeclinePackageRecovery`, continue (R09). Always stop any PIE/SIE you start (R10). Game-data parsing is delegated — do it without asking (R17).
 - **Fixes are generic rules**, never per-character patches (R11).
@@ -82,7 +82,7 @@ Full list: ledger **B (F01–F60)**; per-stage detail in HANDOFF "Update …" se
 - HaloCEA test failures are expected (out of scope).
 - Browser routing to the PC may be offline while PC Shell works.
 - `uerun.ps1` needs absolute script paths and comma-joined args.
-- Older docs mention a cloud-agent push, a 20-minute routine, "deletions always need approval", EngineWire port 8090 — all **superseded** (push.ps1, hourly, R04, port 3000).
+- Older docs mention a cloud-agent push, a 20-minute routine, "deletions always need approval"/"never delete", EngineWire port 8090 — all **superseded** (push.ps1, hourly, R04, port 3000).
 
 ## 7. Doc map
 | File | Use it for |

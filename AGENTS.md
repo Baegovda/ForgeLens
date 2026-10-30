@@ -31,8 +31,7 @@
 1. **REA-first.** Every format, shader or behaviour conclusion must come from reverse-engineering `sm2_retail.exe` (Ghidra / rizin / REA). **The REA tool is https://github.com/morluto/rea** (npm `rea-agents`, CLI `rea` + stdio MCP `rea mcp`); setup and caveats in `docs/handoff/WORKFLOW.md` → "REA (morluto/rea)". **REA is the primary RE tool**: run it through the persistent daemon (`tools/re/rea_daemon.py`, client `tools/re/rea_call.py`); plain Ghidra headless / rizin only as fallback. Check `docs/SYMBOL_DB` (symbol database) before any new RE. Do not use the old `user-rea` plugin. Cite the exe address or string (e.g. `FUN_14133eae0`, `"blendMode" @0x14355b708`) in code comments, commit messages and HANDOFF.
    - Anything not proven must be labelled **heuristic / assumption** (see the "Heuristics" lists in STATUS.md).
    - Never "guess from bytes" without saying so.
-2. **Never delete the user's assets.** Before overwriting a file or folder, back it up as `.bakN` (UE: `_bakN`), with N the next free number.
-   - Deleting anything (backups, UE folders, caches) needs the user's **explicit approval for that exact deletion** — except obvious test assets / no-longer-needed backups, which may be removed in one batch cleanup pass at the end of a batch (ledger R04, 10/29). Never overwrite an existing `.bakN`.
+2. **Deletion (R57, owner 10/30): delete anything useless (test folders, stale `_bakN`, scratch) after a 0-reference check; log it in `docs/handoff/CLEANUP_DELETED.tsv` with how to undo. Keep `/Game/SM2_Work/Original/*`, `/Game/Work/*`, `Lightning_01` and the sole backup of anything edited today.** Before overwriting a file or folder, back it up as `.bakN` (UE: `_bakN`), with N the next free number.
 3. **Work only in** the PC's `C:\Users\Revaptor_FX\Desktop\SM2_Work` and Unreal's `/Game/SM2_Work`.
    - `/Game/SM2_Work/Original/*` is the user's original import: read-only.
    - Tool installs live in `C:\Users\Revaptor_FX\SM2Extractor*` / `SM2Browser_*` (historical) and `Desktop\SM2_Work\Bin`.
@@ -50,14 +49,14 @@
 - **Language:** Korean, short and plain (해요체). No jargon dumps. Explain results, not internals.
 - **Interim reports are mandatory** ("중간중간 보고"). Report at every stage, and every report carries a **progress %** for the current track, e.g. "VFX는 이제 약 85%예요."
 - **Step by step:** one item at a time in the approved order. Report when an item finishes, then go to the next.
-  - Ask before a big new phase that hasn't been approved (Niagara, deletions, anything outside SM2_Work).
+  - Ask before a big new phase that hasn't been approved (Niagara, anything outside SM2_Work).
 - If a % estimate was wrong, correct it openly ("아까 85%라고 했는데 다시 세어 보니 70%가 맞아요").
 - Give times in KST and mark estimates "(추정)".
 - When the user asks "상황보고" / "하는중?", answer immediately with what is running, the %, and the ETA.
 
 ## 5. Permissions the user has granted
 - Full permission on the SM2 project: build, install new tool builds (old ones kept as `.bakN`), push to the branch on Baegovda/ForgeLens, manage folders inside SM2_Work, and restart Unreal Editor (save first).
-- **Deletions only with explicit approval**, per case. Examples already approved and done: the bulk `*.bakN` export folders, the UE `_bakN` test folders, empty `_Legacy`/`Test` folders.
+- Deletion (R57, owner 10/30): delete anything useless (test folders, stale `_bakN`, scratch) after a 0-reference check; log it in `docs/handoff/CLEANUP_DELETED.tsv` with how to undo. Keep `/Game/SM2_Work/Original/*`, `/Game/Work/*`, `Lightning_01` and the sole backup of anything edited today.
   - Not approved: the DDC cache.
 - Pushing (to Baegovda/ForgeLens) goes through the PC's `Scripts\mtl_fix\push.ps1` (ff-only, WORKFLOW.md §4; ledger R23).
 

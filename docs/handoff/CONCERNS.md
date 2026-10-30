@@ -20,7 +20,7 @@ Status: **done** (built and run once) · **done-untested** (built, not run for r
 | 13 | Over-trust in PROVEN | `VISUAL_CHECKS.md` V1–V3 | rule-only | owner's visual comparison **not yet done** |
 | 14 | Game patch | `patch_watch.ps1` daily → alerts.txt `[patch]`; relocate procedure in exe_check.py | done | R41 run: MATCH; mismatch path not exercised |
 | 15 | Usage limit | check on request (CheckSubscriptionUsage) | none | — |
-| 16 | Wrong autonomous judgment while owner away | ff-only pushes, never delete, `.bakN` never overwritten | rule-only | — |
+| 16 | Wrong autonomous judgment while owner away | ff-only pushes, 0-ref check + delete log (R57), `.bakN` never overwritten | rule-only | — |
 | 17 | GitHub access loss | pushes go through the PC (`gh` logged in) | none | unmeasured |
 | 18 | Disk space | `disk_watch.ps1` every 10 min (C: <100 GB, others <50 GB) | done | R41 run: C:302 D:649 E:2867 J:119 K:784 GB free |
 | 19 | Security | game data read-only; servers loopback + token; no untrusted exes | rule-only | not audited |

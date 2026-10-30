@@ -27,7 +27,7 @@ Source of detail: BOT_TRANSFER §0/§5, HANDOFF ledger R01–R43. Newest dated o
   - Always state the route used in the report.
 - Protected: `/Game/SM2_Work/Original/*`, `/Game/Work/*`; never save `Lightning_01`.
 - Backups `.bakN` / `_bakN` (next free N), never overwritten or reused.
-- No asset deletion unless the owner explicitly authorises that specific cleanup.
+- Deletion (R57, owner 10/30): delete anything useless (test folders, stale `_bakN`, scratch) after a 0-reference check; log it in `docs/handoff/CLEANUP_DELETED.tsv` with how to undo. Keep `/Game/SM2_Work/Original/*`, `/Game/Work/*`, `Lightning_01` and the sole backup of anything edited today.
 - Editor restarts pre-authorised: save, quit, relaunch with `-AutoDeclinePackageRecovery`. Crash → read report, relaunch, resume. Stop any PIE you start.
 - Never print/commit the EngineWire token (`%USERPROFILE%\.enginewire_token`).
 

@@ -77,6 +77,8 @@
 | R54 | 10/30 | 폴리싱 8) 레벨·소품 배치 추출 | Level placement extraction | done (data) 10/30 KST: `tools/level/placement.py`, 5,898 objects; 10/30 11:40 KST follow-up (t110u): `placement_view.py` HTML (5,898 markers) + `ForgeLens --levelbench` real meshes (2,483 geom rows → 2,850 parts, 392 templates, 0 missing, 6 sky/backdrop >1000 m skipped, 14.6M tris, ~61 s on PC) + `ue_r54_level.py` (UE scratch map; import blocked: editor in PIE from another job) |
 | R55 | 10/30 | 폴리싱 9) `_bakN` 점검(삭제 없음) | Backup inventory | done: `docs/handoff/BAKN_LIST.tsv` |
 | R56 | 10/30 | 폴리싱 10) proj_sm2 백업 | Ghidra project backup | done: K:\SM2_Backup\proj_sm2, sha manifests equal |
+| R57 | 10/30 | "쓸 데 없는 건 지워도돼 ... 지울 수 있는 거 다 지워" | delete rule replaced + cleanup | done: rule text in RULES_CORE/AGENTS/BOT_TRANSFER/START_HERE; deleted 198 Tests/chars_cloth `.uasset.bak1` file copies (4,123,868,528 B) + r49_scheme M_SM2 (0 refs, fixpoint); K: free +4,124,577,792 B; kept Original/Work/Lightning_01, shared pre_step3/chars_phys skeletons, VfxUe_bak3 (referenced), R52 `_bak1` (sole backups). Undo: re-run extractor/ue_r53_cloth (files were unloadable copies) | `docs/handoff/CLEANUP_DELETED.tsv`, `tools/ue/ue_cleanup_refs.py` |
+| R58 | 10/30 | "왜 파이썬이 소켓 생성을 막는 거야?" | SM2_shootTip/tip/tip_gl sockets on wpn_bolt_rifle_01 | done PROVEN: UE5.7 Python SkeletalMeshSocket SocketName/BoneName read-only; EngineWire animation_physics create_socket works (skeleton sockets, saved 11:17 KST, list_sockets shows 3). Undo: delete sockets on the skeleton | `tools/ue/ew_socket.py`, `tools/ue/ew_schema.py` |
 
 ## B. 기능 요청 (Feature requests)
 
@@ -200,7 +202,7 @@ Check with GetMcpServerStatus / GetDynamicTools. Install missing ones with Searc
 - Reply in Korean, short and plain.
 - Report at each stage.
 - Do items one at a time, in order, and confirm before starting the next big step.
-- The owner granted full permission to build, install, push and manage folders. Never delete the owner's assets; move them instead.
+- The owner granted full permission to build, install, push and manage folders. Deletion (R57, owner 10/30): delete anything useless (test folders, stale `_bakN`, scratch) after a 0-reference check; log it in `docs/handoff/CLEANUP_DELETED.tsv` with how to undo. Keep `/Game/SM2_Work/Original/*`, `/Game/Work/*`, `Lightning_01` and the sole backup of anything edited today.
 - **REA first, always.** Base every format or shader conclusion on exe addresses or strings, and cite them.
 - Work only inside the PC's `Desktop\SM2_Work` and Unreal's `/Game/SM2_Work`.
 - **Next step at handoff:** step 3, second specular (gold metallicTint) plus anisotropic material layers. Then step 4, the `dotnet test` restore hang. Niagara (.sfx to Niagara) is deferred.
