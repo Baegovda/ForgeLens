@@ -8,6 +8,7 @@
 // shot and saves <png>_fly1/_fly2/_fly3.png + eye positions into <png>.txt.
 using System.Numerics;
 using LibSaber.SM2.Assets.Meshes;
+using Avalonia;
 using Avalonia.Input;
 using Avalonia.Interactivity;
 using Avalonia.Threading;
@@ -31,6 +32,12 @@ public partial class MainWindow
     AddHandler(KeyUpEvent, FlyKeyUp, RoutingStrategies.Tunnel);
     _flyTimer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(16) };
     _flyTimer.Tick += (_, _) => FlyTick();
+    // R70: never leave the cursor hidden/clipped: end mouse look on any focus/capture loss and on exit.
+    Deactivated += (_, _) => FlyEndLook("deactivated");
+    LostFocus += (_, _) => { if (!IsActive) FlyEndLook("lostfocus"); };
+    Closing += (_, _) => FlyEndLook("closing");
+    ViewBorder.PointerCaptureLost += (_, _) => FlyEndLook("capturelost");
+    AppDomain.CurrentDomain.ProcessExit += (_, _) => { try { CursorLock.Release(); } catch { } };
   }
 
   /// <summary>Called when a mesh or level is shown: pivot back to the renderer default, fly on for levels.</summary>
@@ -38,13 +45,13 @@ public partial class MainWindow
   {
     _pivot = null;
     _flyKeys.Clear();
-    _flyLooking = false;
+    FlyEndLook("reset");
     FlyToggle.IsVisible = true;
     FlyToggle.IsChecked = true; // R66: fly default for meshes too (owner t130u); LMB still orbits
     _flySpeed = Math.Clamp((level && _level is { } l ? l.Spread : Math.Max(0.5f, CurrentDistance())) * 0.25f, 0.2f, 200f);
   }
 
-  private void FlyToggleClicked(object? sender, RoutedEventArgs e) { _flyKeys.Clear(); UpdateHud(); }
+  private void FlyToggleClicked(object? sender, RoutedEventArgs e) { _flyKeys.Clear(); FlyEndLook("toggle"); UpdateHud(); }
 
   private float CurrentDistance()
   {
@@ -100,18 +107,39 @@ public partial class MainWindow
     _lastPoint = e.GetPosition(ViewBorder);
     _flyLast = DateTime.UtcNow;
     e.Pointer.Capture(ViewBorder);
+    FlyBeginCursorLock();
     _flyTimer?.Start();
     e.Handled = true;
     return true;
   }
 
+  /// <summary>R70 (owner t140u): UE-style RMB look: hide the cursor, clip it to the viewport, keep it at the press point.</summary>
+  private void FlyBeginCursorLock()
+  {
+    ViewBorder.Cursor = new Cursor(StandardCursorType.None);
+    var tl = ViewBorder.PointToScreen(new Avalonia.Point(0, 0));
+    var br = ViewBorder.PointToScreen(new Avalonia.Point(ViewBorder.Bounds.Width, ViewBorder.Bounds.Height));
+    CursorLock.Begin(tl.X, tl.Y, br.X, br.Y);
+  }
+
+  /// <summary>End mouse look (RMB up, focus/capture loss, toggle, reset, exit). Idempotent; restores cursor + position.</summary>
+  private void FlyEndLook(string why)
+  {
+    var was = _flyLooking || CursorLock.Active;
+    _flyLooking = false;
+    _flyKeys.Clear();
+    _flyTimer?.Stop();
+    ViewBorder.Cursor = null;
+    CursorLock.Release();
+    if (was) _flyEndReason = why;
+  }
+  private string _flyEndReason = "";
+
   private bool FlyReleased(PointerReleasedEventArgs e)
   {
     if (!_flyLooking || e.InitialPressMouseButton != MouseButton.Right)
       return false;
-    _flyLooking = false;
-    _flyKeys.Clear();
-    _flyTimer?.Stop();
+    FlyEndLook("rmb-up");
     e.Pointer.Capture(null);
     DrawMesh(false);
     return true;
@@ -121,9 +149,20 @@ public partial class MainWindow
   {
     if (!_flyLooking)
       return false;
-    var p = e.GetPosition(ViewBorder);
-    FlyLook(p.X - _lastPoint.X, p.Y - _lastPoint.Y);
-    _lastPoint = p;
+    if (CursorLock.Active)
+    {
+      // Physical-pixel delta from the anchor, then warp back. The anchor never leaves the viewport (same monitor), so
+      // physical / RenderScaling = the old DIP delta on 100% and 125% monitors alike; the warp's own move event reads 0.
+      if (!CursorLock.TakeDelta(out var px, out var py)) return true;
+      var sc = Math.Max(0.5, RenderScaling);
+      FlyLook(px / sc, py / sc);
+    }
+    else
+    {
+      var p = e.GetPosition(ViewBorder);
+      FlyLook(p.X - _lastPoint.X, p.Y - _lastPoint.Y);
+      _lastPoint = p;
+    }
     DrawMesh(true);
     return true;
   }
@@ -184,6 +223,7 @@ public partial class MainWindow
     var now = DateTime.UtcNow;
     var dt = (float)Math.Clamp((now - _flyLast).TotalSeconds, 0, 0.1);
     _flyLast = now;
+    if (_flyLooking && !FlyOn) { FlyEndLook("flyoff"); return; }
     if (!_flyLooking || _flyKeys.Count == 0)
       return;
     float K(Key k) => _flyKeys.Contains(k) ? 1f : 0f;
@@ -218,6 +258,96 @@ public partial class MainWindow
     if (NoteDetails.IsVisible) { NoteDetails.IsChecked = true; NoteDetailsClicked(null, new RoutedEventArgs()); await Task.Delay(1500); await save(shot.Replace(".png", "_details.png")); NoteDetails.IsChecked = false; NoteDetailsClicked(null, new RoutedEventArgs()); }
     HudToggle.IsChecked = false; UpdateHud(); await Task.Delay(1500); await save(shot.Replace(".png", "_nohud.png")); HudToggle.IsChecked = true; UpdateHud();
     log.Append("details/nohud shots saved\n");
+    await FlyCursorTestAsync(log, shot, save);
     File.AppendAllText(shot + ".txt", log.ToString());
+  }
+
+  /// <summary>R70 hook: begin/warp/end the cursor lock through the same code as RMB, log GetCursorInfo + ShowCursor state.</summary>
+  private async Task FlyCursorTestAsync(System.Text.StringBuilder log, string shot, Func<string, Task> save)
+  {
+    if (!OperatingSystem.IsWindows()) { log.Append("cursor: not windows\n"); return; }
+    log.Append($"cursor before: {CursorLock.Describe()} scaling {RenderScaling:0.###}\n");
+    _flyLooking = true; FlyBeginCursorLock();
+    await Task.Delay(300);
+    log.Append($"cursor looking: {CursorLock.Describe()}\n");
+    var y0 = _yaw; var p0 = _pitch;
+    CursorLock.Nudge(50, -20);
+    if (CursorLock.TakeDelta(out var dx, out var dy)) { var sc = Math.Max(0.5, RenderScaling); FlyLook(dx / sc, dy / sc); }
+    log.Append($"cursor warp: delta ({dx},{dy}) phys, yaw {y0:0.0000}->{_yaw:0.0000} pitch {p0:0.0000}->{_pitch:0.0000}, after warp {CursorLock.Describe()}\n");
+    var y1 = _yaw; CursorLock.TakeDelta(out var dx2, out var dy2);
+    log.Append($"cursor second read (no move): delta ({dx2},{dy2}) yaw change {_yaw - y1:0.0000}\n");
+    DrawMesh(false); await Task.Delay(3000); await save(shot.Replace(".png", "_cursor_look.png"));
+    FlyEndLook("test-rmb-up");
+    log.Append($"cursor released ({_flyEndReason}): {CursorLock.Describe()}\n");
+    _flyLooking = true; FlyBeginCursorLock(); await Task.Delay(200);
+    log.Append($"cursor relock: {CursorLock.Describe()}\n");
+    FlyEndLook("deactivated"); // same handler body as Window.Deactivated
+    log.Append($"cursor after deactivate ({_flyEndReason}): {CursorLock.Describe()}\n");
+    _flyLooking = true; FlyBeginCursorLock(); FlyToggle.IsChecked = false; FlyTick();
+    log.Append($"cursor after fly toggle off ({_flyEndReason}): {CursorLock.Describe()}\n");
+    FlyToggle.IsChecked = true;
+    await Task.Delay(500); await save(shot.Replace(".png", "_cursor_released.png"));
+  }
+}
+
+/// <summary>R70: Win32 cursor hide/clip/warp for fly look. Physical pixels throughout (Avalonia is per-monitor-v2 aware).</summary>
+internal static class CursorLock
+{
+  [System.Runtime.InteropServices.StructLayout(System.Runtime.InteropServices.LayoutKind.Sequential)] private struct POINT { public int X, Y; }
+  [System.Runtime.InteropServices.StructLayout(System.Runtime.InteropServices.LayoutKind.Sequential)] private struct RECT { public int L, T, R, B; }
+  [System.Runtime.InteropServices.StructLayout(System.Runtime.InteropServices.LayoutKind.Sequential)] private struct CURSORINFO { public int cbSize, flags; public IntPtr hCursor; public POINT pt; }
+  [System.Runtime.InteropServices.DllImport("user32.dll", SetLastError = true)] private static extern bool GetCursorPos(out POINT p);
+  [System.Runtime.InteropServices.DllImport("user32.dll")] private static extern bool SetCursorPos(int x, int y);
+  [System.Runtime.InteropServices.DllImport("user32.dll")] private static extern int ShowCursor(bool show);
+  [System.Runtime.InteropServices.DllImport("user32.dll")] private static extern bool ClipCursor(ref RECT r);
+  [System.Runtime.InteropServices.DllImport("user32.dll", EntryPoint = "ClipCursor")] private static extern bool ClipCursorNull(IntPtr r);
+  [System.Runtime.InteropServices.DllImport("user32.dll")] private static extern bool GetCursorInfo(ref CURSORINFO ci);
+  [System.Runtime.InteropServices.DllImport("user32.dll")] private static extern bool GetClipCursor(out RECT r);
+
+  private static POINT _anchor, _saved;
+  private static bool _hidden;
+  public static bool Active { get; private set; }
+  public static int LastShowCount { get; private set; }
+  public static string LastError { get; private set; } = "";
+
+  public static void Begin(int l, int t, int r, int b)
+  {
+    LastError = "";
+    if (!OperatingSystem.IsWindows() || Active) { LastError = "skip(active)"; return; }
+    if (!GetCursorPos(out _saved)) { LastError = $"GetCursorPos err {System.Runtime.InteropServices.Marshal.GetLastWin32Error()}"; return; }
+    // anchor = press point, kept 2 px inside the viewport so the clip rect never blocks the warp
+    _anchor = new POINT { X = Math.Clamp(_saved.X, l + 2, Math.Max(l + 2, r - 3)), Y = Math.Clamp(_saved.Y, t + 2, Math.Max(t + 2, b - 3)) };
+    var rc = new RECT { L = l, T = t, R = r, B = b };
+    ClipCursor(ref rc);
+    SetCursorPos(_anchor.X, _anchor.Y);
+    if (!_hidden) { LastShowCount = ShowCursor(false); _hidden = true; }
+    Active = true;
+  }
+
+  /// <summary>Physical delta since the anchor; warps back when non-zero.</summary>
+  public static bool TakeDelta(out int dx, out int dy)
+  {
+    dx = dy = 0;
+    if (!Active || !GetCursorPos(out var c)) return false;
+    dx = c.X - _anchor.X; dy = c.Y - _anchor.Y;
+    if (dx == 0 && dy == 0) return false;
+    SetCursorPos(_anchor.X, _anchor.Y);
+    return true;
+  }
+
+  public static void Nudge(int dx, int dy) { if (Active) SetCursorPos(_anchor.X + dx, _anchor.Y + dy); }
+
+  public static void Release()
+  {
+    if (!OperatingSystem.IsWindows()) return;
+    if (Active) { ClipCursorNull(IntPtr.Zero); SetCursorPos(_saved.X, _saved.Y); Active = false; }
+    if (_hidden) { LastShowCount = ShowCursor(true); _hidden = false; }
+  }
+
+  public static string Describe()
+  {
+    var ci = new CURSORINFO { cbSize = System.Runtime.InteropServices.Marshal.SizeOf<CURSORINFO>() };
+    GetCursorInfo(ref ci); GetClipCursor(out var cr);
+    return $"GetCursorInfo flags {ci.flags} (1=SHOWING) hCursor 0x{ci.hCursor.ToInt64():X} pos ({ci.pt.X},{ci.pt.Y}) clip [{cr.L},{cr.T},{cr.R},{cr.B}] ourShowCount {LastShowCount} hidden {_hidden} active {Active} err '{LastError}'";
   }
 }
