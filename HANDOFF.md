@@ -2756,3 +2756,11 @@ Parent agent use: tail events.jsonl (text, cheap) and check heartbeat.txt age < 
   (translucent, T_ThickSplatter_Diffuse), NE_Sparks uses Niagara DefaultSpriteMaterial. Likely an over-bright translucent card; needs a
   fixed-exposure render + per-emitter check next.
 - Editor-only sequence scrub + SceneCapture does not show spawnables/particles (spawnables not in level actor list, no ticks) -> MRQ needed.
+
+## R97n 03:50 ensure (AnimNode_RigidBody.cpp:1156 SkeletonBoneIndex>=0, then :1915) - cause pinned (name-table level, no runtime bone log)
+- Fires in every editor start (logs 13:22..20:02 UTC) right after 1034x 'LoadErrors: The Skeleton cc_chaplain_Skeleton is missing bones that SkeletalMesh cc_chaplain needs ... Please save the Skeleton!'.
+- tools/ue/ue_r97_pabones.py (764 mesh/PA/skeleton pairs): our test meshes /Game/ForgeLens/SM2/Tests/chars_phys/cc_chaplain and chars_cloth2/cc_chaplain
+  use the USER's original skeleton /Game/Characters/Humanoids/40K_Chaplain/cc_chaplain_Skeleton (365 bones, saved 2025-05-23, never re-saved by us).
+  Their PA_cc_chaplain_SM2 bodies sit on bones that skeleton lacks: Foot_L_jiggle, Scarf_cloth_SIM_phys00..08 -> the RigidBody node's
+  FindBoneIndex returns -1 = the ensure. Also Tests/chars_phys/cc_titus_assault/PA_cc_titus_assault_SM2_7 has Foot_L_jiggle (not in its skeleton).
+- Not fixed: would need saving the user's skeleton (not ours) or re-importing our chaplain test meshes onto their own skeleton under /Game/ForgeLens. Recommended: the latter.
