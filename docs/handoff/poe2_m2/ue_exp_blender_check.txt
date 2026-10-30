@@ -1,0 +1,8 @@
+basicskeleton.fbx	meshes 1 verts 2986 faces 4322 bones 49 actions [('Armature|approach_sword_sword_01', (1.0, 41.0))] dims [(0.868, 1.1, 1.754)] images 17
+basicskeleton.glb	meshes 2 verts 3028 faces 4402 bones 49 actions [('approach_sword_sword_01', (0.0, 32.0))] dims [(0.953, 0.836, 1.753), (1.902, 2.0, 2.0)] images 2
+bellcrow.fbx	meshes 1 verts 75490 faces 57494 bones 86 actions [('Armature|attack_01', (1.0, 56.0))] dims [(2.966, 2.114, 5.594)] images 10
+bellcrow.glb	meshes 2 verts 75532 faces 57574 bones 86 actions [('attack_01', (0.0, 44.0))] dims [(2.961, 2.117, 5.599), (1.902, 2.0, 2.0)] images 6
+wingedrhoa.fbx	meshes 1 verts 5230 faces 5862 bones 52 actions [('Armature|death_01', (1.0, 31.0))] dims [(1.256, 2.855, 0.545)] images 4
+wingedrhoa.glb	meshes 2 verts 5272 faces 5942 bones 52 actions [('death_01', (0.0, 24.0))] dims [(1.902, 2.0, 2.0), (1.256, 2.855, 0.545)] images 2
+wolfremake.fbx	meshes 1 verts 5481 faces 6996 bones 40 actions [('Armature|attack_01', (1.0, 91.0))] dims [(1.119, 2.664, 1.155)] images 7
+wolfremake.glb	meshes 2 verts 5523 faces 7076 bones 40 actions [('attack_01', (0.0, 36.0))] dims [(1.902, 2.0, 2.0), (1.125, 2.656, 1.137)] images 3

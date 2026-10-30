@@ -103,3 +103,11 @@ handoff/poe2_m2/monsters6_sheet.png shows bind pose and the first clip at t=0.5 
 - Stormblast explosion: the grey octagon in the first frames is also in the older step-D sheet, so it is not a regression. It is OPEN (probably a flash/glow card without a soft mask).
 - All six benches are deterministic. Firebolt, impact and wind spear are unchanged.
 
+
+### Step E.5: Unreal import (prepared)
+
+- tools/poe2/ue_poe2_import.py runs inside the editor through Scripts/uerun.ps1 (EngineWire). It imports the PNG textures (normal maps as TC_NORMALMAP, linear) to <dest>/<name>/Textures, then the FBX with the legacy automated FBX pipeline: skeletal mesh, skeleton and animation, materials from the FBX texture references, no physics asset. It writes a per-folder asset-class report.
+- tools/poe2/ue_poe2_run.ps1 -Dirs <export dirs> [-Dest /Game/ForgeLens/POE] [-WaitMin 60]: polls ue_editor_busy.txt every 30 s and gives up after WaitMin. It refuses if NEEDS_ACTION.txt exists, if a game runs, or if UE_VFX_57 is not open (it never launches the editor). It writes 'poe2m2 <ts>' to the lock and always writes editor-free back.
+- Inputs on the PC: PoE2\ue_exp\{bellcrow, wolfremake, basicskeleton, wingedrhoa} (--poe2export, one clip each). Blender 5.0 imports every FBX and GLB with the right bone count, the clip and the images (handoff/poe2_m2/ue_exp_blender_check.txt).
+- Note: RULES_CORE says UE work only under /Game/SM2_Work; the owner's M2 brief names /Game/ForgeLens/POE/. The script is restricted to /Game/ForgeLens/POE.
+
