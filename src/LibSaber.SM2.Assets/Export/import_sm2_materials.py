@@ -552,6 +552,12 @@ def td_scalar_tags(slot):
 def apply_td_scalars(instance, slot):
     for k, v in td_scalar_tags(slot).items():
         unreal.EditorAssetLibrary.set_metadata_tag(instance, k, v)
+    nm = (slot.get("tdScalars") or {}).get("nmScale")
+    if nm is not None:  # R97 / F43 wired: normal strength (HEURISTIC meaning, PROVEN value from the .td glt block)
+        unreal.MaterialEditingLibrary.set_material_instance_scalar_parameter_value(instance, "NormalScale", float(nm))
+    ei = (slot.get("tdScalars") or {}).get("emissiveIntensity")
+    if ei is not None and first_map(slot, "emissive") is not None:  # R97: glt.emissive.intensity -> EmissiveStrength (units HEURISTIC; vortex orb ring 9)
+        unreal.MaterialEditingLibrary.set_material_instance_scalar_parameter_value(instance, "EmissiveStrength", float(ei))
 
 
 def find_scheme(sidecar_path):
@@ -693,8 +699,10 @@ def make_master(folder, asset_name="M_SM2", translucent=False):
     mask_g.set_editor_property("b", False)
     mask_g.set_editor_property("a", False)
     link(detail_mask, "", mask_g, "")
+    # R97 / F43: glt.nmScale -> NormalScale (HEURISTIC: strength = lerp(flat, n, scale), renormalised; 1 = unchanged).
+    normal_s = unary(material, unreal.MaterialExpressionNormalize, lerp(material, vec3(material, (0.0, 0.0, 1.0), -760, 200), mask(material, normal, "rgb", -760, 140, "RGB"), scalar(material, "NormalScale", 1.0, -760, 260), -620, 160), -500, 160)
     detail_lerp = expr(material, unreal.MaterialExpressionLinearInterpolate, -280, 900)
-    link(normal, "RGB", detail_lerp, "A")
+    link(normal_s, "", detail_lerp, "A")
     link(detail, "RGB", detail_lerp, "B")
     # glt.detail {density, scale} (HEURISTIC): detail UV = UV0 * DetailDensity, blend = saturate(mask.g * DetailScale).
     detail_uv0 = expr(material, unreal.MaterialExpressionTextureCoordinate, -1300, 900)
@@ -711,7 +719,7 @@ def make_master(folder, asset_name="M_SM2", translucent=False):
     detail_switch = expr(material, unreal.MaterialExpressionStaticSwitchParameter, -40, 120)
     detail_switch.set_editor_property("parameter_name", "HasDetail")
     detail_switch.set_editor_property("default_value", False)
-    link(normal, "RGB", detail_switch, "False")
+    link(normal_s, "", detail_switch, "False")
     link(detail_lerp, "", detail_switch, "True")
 
     height_scale = expr(material, unreal.MaterialExpressionScalarParameter, -500, 1280)

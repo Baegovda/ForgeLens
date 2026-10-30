@@ -24,8 +24,12 @@ if OV:
     for i in range(len(mesh.get_editor_property("materials"))):
         mid = smc.create_dynamic_material_instance(i)
         if not mid: continue
+        sname = str(mesh.get_editor_property("materials")[i].get_editor_property("material_slot_name"))
         for kv in OV.split(";"):
             k, v = kv.split("=")
+            if "@" in v:  # Name=val@slot -> only that slot
+                v, only = v.split("@")
+                if only != sname: continue
             if v == "flat": mid.set_texture_parameter_value(k, unreal.load_asset("/Engine/EngineMaterials/FlatNormal"))
             else: mid.set_scalar_parameter_value(k, float(v))
 b = mesh.get_bounds(); h = b.box_extent.z * 2; w = max(b.box_extent.x, b.box_extent.y); c = L + b.origin
