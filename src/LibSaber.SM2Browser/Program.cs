@@ -8,6 +8,7 @@ internal static class Program
   [STAThread]
   public static int Main(string[] args)
   {
+    ApplyThreadCap();
     if (args.Length > 0 && args[0] == "--levelbench")
       return Bench.LevelBench.Run(args);
     if (args.Length > 0 && args[0] == "--bench")
@@ -41,6 +42,23 @@ internal static class Program
     if (args.Length > 0 && args[0] == "--glbench")
       return Bench.GpuBench.Run(args);
     return BuildAvaloniaApp().StartWithClassicDesktopLifetime(args);
+  }
+
+  /// <summary>
+  ///   R94: caps the .NET thread pool (Parallel.For, Task.Run) at SM2_THREADS workers (default cores - 2, at least 2) so a
+  ///   model open or level build leaves cores for the game / editor. SM2_THREADS=0 = no cap. Native threads (GPU driver,
+  ///   ANGLE, audio) are not affected.
+  /// </summary>
+  internal static int ThreadCap { get; private set; }
+
+  private static void ApplyThreadCap()
+  {
+    var cap = int.TryParse(Environment.GetEnvironmentVariable("SM2_THREADS"), out var t) ? t : Math.Max(2, Environment.ProcessorCount - 2);
+    if (cap <= 0) return;
+    ThreadPool.GetMinThreads(out _, out var minIo);
+    ThreadPool.GetMaxThreads(out _, out var maxIo);
+    ThreadPool.SetMinThreads(Math.Min(cap, Environment.ProcessorCount), minIo);
+    if (ThreadPool.SetMaxThreads(cap, maxIo)) ThreadCap = cap;
   }
 
   public static AppBuilder BuildAvaloniaApp()
