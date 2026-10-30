@@ -23,10 +23,10 @@ public partial class MainWindow
     if (Environment.GetEnvironmentVariable("SM2_WINSHOT") is not { Length: > 0 } shot)
       return;
     // wait for the level build and the first rendered frame
-    for (var i = 0; i < 6000 && (_level is null || !PreviewImage.IsVisible); i++)
+    for (var i = 0; i < 6000 && _level is null; i++)
       await Task.Delay(100);
     var open = sw.Elapsed.TotalSeconds;
-    await Task.Delay(4000);
+    await Task.Delay(6000); // first frame (CPU or GPU path)
     var selected = (FileList.SelectedItem as FileRow) is { } row && _catalog is { } c ? c.GetFile(row.Index).Path : "(none)";
     try
     {
@@ -35,7 +35,7 @@ public partial class MainWindow
       bmp.Render(this);
       Directory.CreateDirectory(Path.GetDirectoryName(Path.GetFullPath(shot))!);
       bmp.Save(shot);
-      File.WriteAllText(shot + ".txt", $"selected {selected}\nlevel {(_level is null ? "(none)" : _level.Stats)}\nopen_to_first_frame {open:0.0}s from_disk_cache {_level?.FromDiskCache}\ntiming {_level?.Timing}\n");
+      File.WriteAllText(shot + ".txt", $"selected {selected}\nlevel {(_level is null ? "(none)" : _level.Stats)}\nselect_to_level_shown {open:0.0}s gpu {UseGpu()} from_disk_cache {_level?.FromDiskCache}\ntiming {_level?.Timing}\n");
     }
     catch (Exception e) { File.WriteAllText(shot + ".txt", "winshot failed: " + e); }
     if (Environment.GetEnvironmentVariable("SM2_WINSHOT_EXIT") == "1")
