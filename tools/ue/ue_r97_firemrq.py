@@ -3,7 +3,7 @@
 import sys, unreal
 a = sys.argv[1:]; a = a[0].split(",") if len(a) == 1 else a
 out, s, e = a[0], int(a[1]), int(a[2]); ev = float(a[3]) if len(a) > 3 else 0.0
-LS = "/Game/ForgeLens/SM2/Sequences/BoltRifleFire_r97/LS_arifle_bolt_rifle"
+LS = a[5] if len(a) > 5 and a[5] else "/Game/ForgeLens/SM2/Sequences/BoltRifleFire_r97/LS_arifle_bolt_rifle"
 sub = unreal.get_editor_subsystem(unreal.MoviePipelineQueueSubsystem)
 q = sub.get_queue(); q.delete_all_jobs()
 j = q.allocate_new_job(unreal.MoviePipelineExecutorJob)
@@ -18,8 +18,13 @@ o.output_resolution = unreal.IntPoint(1280, 720)
 c.find_or_add_setting_by_class(unreal.MoviePipelineDeferredPassBase)
 c.find_or_add_setting_by_class(unreal.MoviePipelineImageSequenceOutput_PNG)
 aa = c.find_or_add_setting_by_class(unreal.MoviePipelineAntiAliasingSetting); aa.engine_warm_up_count = 32; aa.use_camera_cut_for_warm_up = False
+cvs = c.find_or_add_setting_by_class(unreal.MoviePipelineConsoleVariableSetting)
+for kv in (a[4].split(";") if len(a) > 4 else []):
+    k, v = kv.split("="); cvs.add_or_update_console_variable(k, float(v))
 if ev:
     cv = c.find_or_add_setting_by_class(unreal.MoviePipelineConsoleVariableSetting); cv.add_or_update_console_variable("r.ExposureOffset", ev)
 ex = sub.render_queue_with_executor(unreal.MoviePipelinePIEExecutor)
 print("R97M MRQ started", out, s, e, ex)
+
+
 

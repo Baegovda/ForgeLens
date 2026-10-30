@@ -2764,3 +2764,12 @@ Parent agent use: tail events.jsonl (text, cheap) and check heartbeat.txt age < 
   Their PA_cc_chaplain_SM2 bodies sit on bones that skeleton lacks: Foot_L_jiggle, Scarf_cloth_SIM_phys00..08 -> the RigidBody node's
   FindBoneIndex returns -1 = the ensure. Also Tests/chars_phys/cc_titus_assault/PA_cc_titus_assault_SM2_7 has Foot_L_jiggle (not in its skeleton).
 - Not fixed: would need saving the user's skeleton (not ours) or re-importing our chaplain test meshes onto their own skeleton under /Game/ForgeLens. Recommended: the latter.
+
+## R97o muzzle flash fixed (MRQ, fixed exposure r.EyeAdaptationQuality=0, frames 14-22)
+- Emitter isolation (copies of the sequence with one user SpriteSize=0 each; tools/ue/ue_r97_mfparam.py): the hard WHITE CARD is NE_Haze
+  (M_HeatHaze, DefaultLit translucent heat-haze sprite) - it disappears only when 'Haze SpriteSize'=0; flame/smoke/sparks/tracer off leave it.
+  (Disabling emitters on asset copies via EngineWire set_emitter_properties killed the whole system -> not used.)
+- Fix: LS_arifle_bolt_rifle MuzzleFlash bindings get component override 'Haze SpriteSize'=0 (tools/ue/ue_r97_hazeoff.py; backup
+  /Game/ForgeLens/SM2/Tests/_bak_r97/LS_arifle_bolt_rifle_preHaze). Third-party pack untouched.
+- Result: frame 16 soft orange textured flame burst + sparks at the muzzle, 17 fading embers, 18+ clear (docs/handoff/r97/fire_final_sheet.jpg).
+- Test copies: /Game/ForgeLens/SM2/VFX/MuzzleFlash/NS_MF_*, Sequences/BoltRifleFire_r97/LS_mf_*.
