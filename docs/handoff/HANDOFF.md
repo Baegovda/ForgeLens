@@ -32,3 +32,12 @@
 - tools/ue/ue_r97_orb.py: imports the lwis mesh + texture into /Game/ForgeLens/SM2/VFX/vortex_orb, builds M_vortex_orb (additive unlit, rotator 0.15, OrbColor 1,0.35,1, OrbIntensity 20; colour/intensity HEURISTIC) and attaches R97_vortex_orb to bone DISK of R92_vortex in Map_Floor. ue_r97_orbxf.py sets the relative transform: roll 90, scale 0.3 (HEURISTIC, fitted to the ring).
 - docs/handoff/r97/vortex_orb_sbs.jpg: the swirl now fills the ring like the game. The game's bright magenta-white core (inner_glow sprites) is still missing.
 - NOT Niagara: UE 5.7 Python has no emitter/module authoring API, so the sprite emitters are not reproduced.
+
+## R97 (d)(e)(f) 04:24 KST
+- (d) Physics, from game data (SM2Extractor export log/physics.json):
+  * Titus (pc_marine_pve_story_titus_assault_client.cls): 6 cloths, 34 jiggle bones. ue_sm2_physics.py physasset created /Game/ForgeLens/SM2/Tests/physics/PA_cc_titus_assault_sm2 and assigned it (was None).
+  * The imported Titus lacks the cloth helper bones (*_physNN), so baked cloth needs a re-import of the physics-on FBX (not done).
+  * Hormagaunt: the export writes no physics.json and the log has no physics line, so the game data has no cloth/jiggle for cc_swarm_hormagaunt. Nothing to set up.
+  * Vortex, Calgar and Sorcerer already had PAs.
+- (e) Level/props: the R54 levelbench hub_battle_barge level (map still /Game/SM2_Work/Tests/r54_level/L_hub_battle_barge) survives the migration: 1441 actors, 1401 static mesh components, 0 missing meshes, 1390 unique meshes under /Game/ForgeLens/SM2/Tests.
+- (f) Sky/env from game data is already applied on that level (tools/level/sky_env.py state): SkyLight = game cubemap T_buttle_barge_sky_1 (now /Game/ForgeLens/SM2/Tests/r54_level/Sky), angle -44.33, intensity 6; fog colour (0.039,0.049,0.081) = game hbbm_fog_v2 (40,50,83); atmosphere hidden. Game-unit to UE mapping is HEURISTIC. Not re-captured this session.
