@@ -5,3 +5,5 @@ Polls visible top-level windows every 1 s (EnumWindows, no screen streaming) for
 - `heartbeat.txt` every 10 s, `watcher.log` rotated at 1 MB.
 start.ps1 (hidden, single instance, Startup-folder shortcut for logon), stop.ps1 [-Unregister], status.ps1. Test: start with -ProcNames powershell -NoTask and run test_dummy.ps1.
 Parent agent use: read events.jsonl tail (text, cheap); only CopyToBox the `shot` PNG when a new event appears. Check heartbeat age < 30 s to know the watcher is alive.
+
+Deploy (fixed copy): the watcher runs from `%USERPROFILE%\window_watch\bin`, never from a git worktree (push.ps1 rewrites `ls_push`). This repo folder stays the source of truth. To update: edit here, commit, then `bin\stop.ps1` and `<repo>\tools\watch\start.ps1` (start.ps1 copies *.ps1 + README into bin, rewrites the Startup shortcut to bin\watcher.ps1, starts it). start.ps1 run from bin itself just starts it.
