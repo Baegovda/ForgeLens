@@ -589,6 +589,32 @@ internal sealed unsafe class GlPreview : IDisposable
     return dst;
   }
 
+  // R94: BC1/BC3 blocks (+ CPU mips) prepared on the model-open worker threads (ResolvePreview), so the UI-thread upload
+  // only calls CompressedTexImage2D. Same swizzle / cap / encoder / mip chain as the inline path below; dropped after upload.
+  private sealed record BcPrep(int W, int H, bool Alpha, byte[][] Mips, int Capped);
+  private static readonly System.Runtime.CompilerServices.ConditionalWeakTable<PreviewImage, BcPrep> Prepped = new();
+  internal static bool PrepEnabled = Environment.GetEnvironmentVariable("SM2_TEXPREP") != "0";
+
+  internal static void Prepare(PreviewImage image)
+  {
+    if (!PrepEnabled || !TexBc || TexBc7 || !(BcSrgb || BcLinear) || image.Bgra is null || image.Width * image.Height < 16)
+      return;
+    var w = image.Width; var h = image.Height; var src = image.Bgra;
+    var rgba = new byte[w * h * 4];
+    for (var i = 0; i < rgba.Length; i += 4) { rgba[i] = src[i + 2]; rgba[i + 1] = src[i + 1]; rgba[i + 2] = src[i]; rgba[i + 3] = src[i + 3]; }
+    var capped = 0;
+    while (TexCap > 0 && Math.Max(w, h) > TexCap && w >= 2 && h >= 2) { rgba = Half(rgba, w, h); w /= 2; h /= 2; capped++; }
+    var levels = 1 + (int)Math.Floor(Math.Log2(Math.Max(w, h)));
+    var alpha = BcEncoder.HasAlpha(rgba);
+    var mips = new byte[levels][]; var lw = w; var lh = h; var level = rgba;
+    for (var l = 0; l < levels; l++)
+    {
+      mips[l] = BcEncoder.Encode(level, lw, lh, alpha);
+      if (l + 1 < levels) { level = Down(level, lw, lh); lw = Math.Max(1, lw / 2); lh = Math.Max(1, lh / 2); }
+    }
+    Prepped.AddOrUpdate(image, new BcPrep(w, h, alpha, mips, capped));
+  }
+
   private uint Texture(PreviewImage? image, bool srgb, Stopwatch budget)
   {
     if (image is null)
@@ -602,6 +628,24 @@ internal sealed unsafe class GlPreview : IDisposable
     }
 
     var start = budget.Elapsed.TotalMilliseconds;
+    if (Prepped.TryGetValue(image, out var prep) && TexBc && !TexBc7 && (srgb ? BcSrgb : BcLinear))
+    {
+      Prepped.Remove(image);
+      id = _gl.GenTexture();
+      _gl.BindTexture(TextureTarget.Texture2D, id);
+      _gl.PixelStore(PixelStoreParameter.UnpackAlignment, 1);
+      var pfmt = (InternalFormat)(prep.Alpha ? (srgb ? 0x8C4F : 0x83F3) : (srgb ? 0x8C4C : 0x83F0));
+      int pw = prep.W, ph = prep.H;
+      for (var l = 0; l < prep.Mips.Length; l++)
+      {
+        fixed (byte* p = prep.Mips[l]) _gl.CompressedTexImage2D(TextureTarget.Texture2D, l, pfmt, (uint)pw, (uint)ph, 0, (uint)prep.Mips[l].Length, p);
+        TexBytes += prep.Mips[l].Length;
+        pw = Math.Max(1, pw / 2); ph = Math.Max(1, ph / 2);
+      }
+      _gl.TexParameter(TextureTarget.Texture2D, TextureParameterName.TextureMaxLevel, prep.Mips.Length - 1);
+      TexBcCount++; TexCapped += prep.Capped;
+      return FinishTexture(image, id, budget, start);
+    }
     var w = image.Width;
     var h = image.Height;
     var rgba = new byte[w * h * 4];
@@ -666,6 +710,11 @@ internal sealed unsafe class GlPreview : IDisposable
       _gl.TexSubImage2D<byte>(TextureTarget.Texture2D, 0, 0, 0, (uint)w, (uint)h, PixelFormat.Rgba, PixelType.UnsignedByte, rgba);
       _gl.GenerateMipmap(TextureTarget.Texture2D);
     }
+    return FinishTexture(image, id, budget, start);
+  }
+
+  private uint FinishTexture(PreviewImage image, uint id, Stopwatch budget, double start)
+  {
     _gl.TexParameter(TextureTarget.Texture2D, TextureParameterName.TextureMinFilter, (int)GLEnum.LinearMipmapLinear);
     _gl.TexParameter(TextureTarget.Texture2D, TextureParameterName.TextureMagFilter, (int)GLEnum.Linear);
     _gl.TexParameter(TextureTarget.Texture2D, TextureParameterName.TextureWrapS, (int)GLEnum.Repeat);
