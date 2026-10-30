@@ -81,12 +81,77 @@ internal static class LevelBench
     using var inst = new StreamWriter(Path.Combine(output, "instances_ue.tsv"));
     inst.WriteLine("template\tidx\tue_matrix16 (row-major, cm, UE Z-up = game (x,z,y)*100)");
     var written = new HashSet<string>();
+    var mats = new Dictionary<string, MeshPart>(StringComparer.Ordinal);
     foreach (var (tpl, idx, world) in s.Placed)
     {
-      if (written.Add(tpl)) WriteUeObj(s, tpl, Path.Combine(dir, tpl + ".obj"));
+      if (written.Add(tpl)) WriteUeObj(s, tpl, Path.Combine(dir, tpl + ".obj"), mats);
       inst.WriteLine($"{tpl}\t{idx}\t{string.Join(' ', Flat(ToUe(world)).Select(v => v.ToString("0.######", CultureInfo.InvariantCulture)))}");
     }
     line($"ue: {written.Count} template obj, {s.Placed.Count} instances");
+    WriteUeMaterials(s, output, mats, line);
+  }
+
+  /// <summary>R66: material slot name of a part (OBJ usemtl) = albedo + blend + tint, so equal looks share one UE material instance.</summary>
+  public static string SlotName(MeshPart p)
+  {
+    var t = p.AlbedoTint is { Length: >= 3 } a ? string.Join("_", a.Take(3).Select(v => ((int)Math.Round(Math.Clamp(v, 0, 4) * 100)).ToString(CultureInfo.InvariantCulture))) : "w";
+    var b = p.Blend == "masked" ? "k" : p.Blend == "translucent" ? "t" : "o";
+    var raw = $"{p.Texture ?? "none"}_{b}_{t}";
+    return "MI_" + new string(raw.Select(ch => char.IsAsciiLetterOrDigit(ch) ? ch : '_').ToArray());
+  }
+
+  /// <summary>R66: textures/*.png (RGBA, the viewer's decoded albedo/normal at its preview size) + materials_ue.tsv for ue_r66_level.py.</summary>
+  static void WriteUeMaterials(LevelScene s, string output, Dictionary<string, MeshPart> mats, Action<string> line)
+  {
+    var tdir = Path.Combine(output, "textures"); Directory.CreateDirectory(tdir);
+    var ci = CultureInfo.InvariantCulture; var pngs = new HashSet<string>(StringComparer.OrdinalIgnoreCase); var noTex = 0;
+    string? Tex(Dictionary<string, PreviewImage> d, string? name, string pre)
+    {
+      if (name is null || !d.TryGetValue(name, out var im)) return null;
+      var f = pre + new string(name.Select(ch => char.IsAsciiLetterOrDigit(ch) ? ch : '_').ToArray());
+      if (pngs.Add(f)) PngRgba(Path.Combine(tdir, f + ".png"), im.Bgra, im.Width, im.Height);
+      return f;
+    }
+    using var w = new StreamWriter(Path.Combine(output, "materials_ue.tsv"));
+    w.WriteLine("slot	albedo_png	normal_png	blend	tint_r	tint_g	tint_b	texture");
+    foreach (var (slot, p) in mats)
+    {
+      var a = Tex(s.Albedo, p.Texture, "T_"); var n = Tex(s.Normals, p.Normal, "TN_");
+      if (a is null) noTex++;
+      var t = p.AlbedoTint is { Length: >= 3 } x ? x : new[] { 1f, 1f, 1f };
+      w.WriteLine(string.Join('\t', slot, a ?? "", n ?? "", p.Blend, t[0].ToString(ci), t[1].ToString(ci), t[2].ToString(ci), p.Texture ?? ""));
+    }
+    line($"ue materials: {mats.Count} slots, {pngs.Count} png, {noTex} slots without albedo");
+  }
+
+  static void PngRgba(string path, byte[] bgra, int width, int height)
+  {
+    using var raw = new MemoryStream();
+    for (var y = 0; y < height; y++)
+    {
+      raw.WriteByte(0);
+      for (var x = 0; x < width; x++) { var i = (y * width + x) * 4; raw.WriteByte(bgra[i + 2]); raw.WriteByte(bgra[i + 1]); raw.WriteByte(bgra[i]); raw.WriteByte(bgra[i + 3]); }
+    }
+    using var file = File.Create(path);
+    file.Write(new byte[] { 137, 80, 78, 71, 13, 10, 26, 10 });
+    var h = new byte[13];
+    void Be(int o, int v) { h[o] = (byte)(v >> 24); h[o + 1] = (byte)(v >> 16); h[o + 2] = (byte)(v >> 8); h[o + 3] = (byte)v; }
+    Be(0, width); Be(4, height); h[8] = 8; h[9] = 6;
+    Chunk(file, "IHDR", h);
+    using var comp = new MemoryStream();
+    using (var z = new System.IO.Compression.ZLibStream(comp, System.IO.Compression.CompressionLevel.Fastest, leaveOpen: true)) raw.WriteTo(z);
+    Chunk(file, "IDAT", comp.ToArray()); Chunk(file, "IEND", Array.Empty<byte>());
+  }
+
+  static void Chunk(Stream f, string type, byte[] data)
+  {
+    var len = new byte[] { (byte)(data.Length >> 24), (byte)(data.Length >> 16), (byte)(data.Length >> 8), (byte)data.Length };
+    var td = Encoding.ASCII.GetBytes(type).Concat(data).ToArray();
+    f.Write(len); f.Write(td);
+    var c = 0xFFFFFFFFu;
+    foreach (var b in td) { c ^= b; for (var k = 0; k < 8; k++) c = (c & 1) != 0 ? (c >> 1) ^ 0xEDB88320u : c >> 1; }
+    c = ~c;
+    f.Write(new byte[] { (byte)(c >> 24), (byte)(c >> 16), (byte)(c >> 8), (byte)c });
   }
 
   static readonly Matrix4x4 Swap = new(1, 0, 0, 0, 0, 0, 1, 0, 0, 1, 0, 0, 0, 0, 0, 1);
@@ -98,7 +163,7 @@ internal static class LevelBench
 
   /// <summary>Re-reads the template's model-space geometry from the merged mesh is not possible, so it reloads via the parts:
   /// the first placed copy is un-transformed with the inverse of its world matrix.</summary>
-  static void WriteUeObj(LevelScene s, string tpl, string path)
+  static void WriteUeObj(LevelScene s, string tpl, string path, Dictionary<string, MeshPart> mats)
   {
     var first = s.Placed.First(p => p.Template == tpl);
     Matrix4x4.Invert(first.World, out var inv);
@@ -109,6 +174,9 @@ internal static class LevelBench
     using var w = new StreamWriter(path); var ci = CultureInfo.InvariantCulture;
     var map = new Dictionary<int, int>(); var n = 0; var faces = new StringBuilder();
     foreach (var part in firstParts)
+    {
+      var slot = SlotName(part); mats.TryAdd(slot, part);
+      faces.AppendLine("usemtl " + slot);
       for (var i = part.IndexStart; i < part.IndexStart + part.IndexCount; i += 3)
       {
         var f = new int[3];
@@ -129,6 +197,7 @@ internal static class LevelBench
         if (first.World.GetDeterminant() < 0) (f[1], f[2]) = (f[2], f[1]);
         faces.AppendLine($"f {f[0]}/{f[0]}/{f[0]} {f[1]}/{f[1]}/{f[1]} {f[2]}/{f[2]}/{f[2]}");
       }
+    }
     w.Write(faces);
   }
 }
