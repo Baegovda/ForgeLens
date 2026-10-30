@@ -117,6 +117,9 @@ public partial class MainWindow
     var settingsBtn = new Button { Content = "Settings", FontSize = 11, Height = 26, Padding = new Thickness(8, 0) }; // R95
     ToolTip.SetTip(settingsBtn, "Settings: worker threads, max working memory");
     settingsBtn.Click += (_, _) => new SettingsWindow(_settings).ShowDialog(this);
+    var poe2Btn = new Button { Content = "PoE2", FontSize = 11, Height = 26, Padding = new Thickness(8, 0) }; // POE2 M2
+    ToolTip.SetTip(poe2Btn, "Path of Exile 2: browse the GGPK, skills and effects");
+    poe2Btn.Click += (_, _) => OpenPoe2();
     var help = new Button { Content = "?", FontSize = 11, Height = 26, Width = 26, Padding = new Thickness(0) };
     ToolTip.SetTip(help, "Shortcuts (F1)");
     help.Click += (_, _) => UeToggleHelp();
@@ -124,7 +127,7 @@ public partial class MainWindow
     {
       Background = new SolidColorBrush(Color.Parse("#99101216")), CornerRadius = new CornerRadius(4), Padding = new Thickness(4), Margin = new Thickness(8),
       HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Top,
-      Child = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 4, Children = { _ueViewBox, show, BuildUePanelsButton(), settingsBtn, help } },
+      Child = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 4, Children = { _ueViewBox, show, BuildUePanelsButton(), settingsBtn, poe2Btn, help } },
     };
     bar.AddHandler(PointerPressedEvent, (_, e) => e.Handled = true, RoutingStrategies.Bubble);
     bar.Bind(IsVisibleProperty, HudInfo.GetObservable(IsVisibleProperty));

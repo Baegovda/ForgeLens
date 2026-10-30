@@ -26,3 +26,11 @@ Chain (PROVEN by row values for Firebolt):
 - Independent check in Blender 5.0 (headless, `tools/poe2/bl_check.py`): basicskeleton1.fbx imports 2480 verts / 3625 faces / 49 bones / action attack_01 frames 1-46,
   height 1.903 m; basicskeleton1.gltf same mesh + 49 bones + action attack_01; crudeclaw fbx/gltf 796 verts / 651 faces. glTF carries no images (writer limitation, same as SM2).
   (These exports were made before the orientation fix.)
+
+## Step C - viewer UI (PoE2 source)
+- New: Games/Poe2/Poe2Source.cs (wraps poe_data_tools: cached file list, Prepare() follows referenced files, skill tables), Poe2Window.cs (GGPK path + Open GGPK, Files tab with search, Skills tab with effect list and Animation combo; English strings only), MainWindow.Poe2.cs (ShowPoe2 reuses the SM2 Model display path). "PoE2" button added to the viewport toolbar.
+- Tools are looked up in <exe>\poe2tools; cache in %LOCALAPPDATA%\ForgeLens\poe2cache.
+- Test hooks: FL_OPEN_POE2=1, FL_POE2_AUTOOPEN=1, FL_POE2_GGPK, FL_POE2_SKILL=<id>, FL_POE2_SELECT=<path>, FL_POE2_AUTOPLAY=1.
+- Verified on the PC (no clicks, env hooks only): Open GGPK -> Skills -> fireball -> 4 effects listed; greater.ao loaded into the main viewport with 4 emitter parts (254 verts, 13 bones, 1.00 s clip), about 21 s including extraction. Screenshots: handoff/poe2_m2/ui_poe2_window.png, ui_main_fireball.png.
+- Not verified: manual clicking through the Files tab; the effect still renders as untextured flat meshes (particle sim is step D).
+- Side finding: mp_halfsphere_LOD1_FF.fmt reports 2 LODs (380/190 tris), the first multi-LOD asset seen.

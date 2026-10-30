@@ -120,6 +120,7 @@ public partial class MainWindow : Window
     InitUeViewport(); // R79 (before InitFly: F with a selection frames the part)
     InitFly();
     InitHud();
+    if (Environment.GetEnvironmentVariable("FL_OPEN_POE2") == "1") Opened += (_, _) => Avalonia.Threading.Dispatcher.UIThread.Post(OpenPoe2);
     if (Environment.GetEnvironmentVariable("SM2_OPEN_SETTINGS") == "1") Opened += (_, _) => Avalonia.Threading.Dispatcher.UIThread.Post(() => new SettingsWindow(_settings).Show(this), Avalonia.Threading.DispatcherPriority.Background); // R95 test hook
     Opened += async (_, _) =>
     {
