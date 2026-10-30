@@ -15,7 +15,55 @@ namespace LibSaber.SM2Browser.Gpu;
 /// </summary>
 internal sealed unsafe class GlPreview : IDisposable
 {
-  private const int Stride = 16; // pos3 nrm3 uv2 joint4 weight4
+  private const int Stride = 16; // pos3 nrm3 uv2 joint4 weight4 (float staging layout)
+  // R85: VBO layout. Packed (default): pos f32x3 | nrm snorm16x3 + pad | uv f32x2 | joint u16x4 | weight unorm16x4 = 44 bytes
+  // (was 64 = the float staging layout, still used with SM2_VTX64=1). The shader is unchanged (attributes convert to float).
+  internal static readonly bool Packed = Environment.GetEnvironmentVariable("SM2_VTX64") != "1";
+  private static readonly int VBytes = Packed ? 44 : Stride * 4;
+  // R85: textures larger than this are box-filtered down before upload (SM2_TEXCAP=0 off, default 2048).
+  internal static readonly int TexCap = int.TryParse(Environment.GetEnvironmentVariable("SM2_TEXCAP"), out var tc) ? tc : 2048;
+  // R85: SM2_IDX32=1 forces 32-bit index buffers (A/B for the R82 16-bit change).
+  private static readonly bool Idx32 = Environment.GetEnvironmentVariable("SM2_IDX32") == "1";
+  internal static long VboBytes, TexBytes, TexCapped;
+  internal static string BcExt = "?";
+  internal static string? ShotPath;
+  // R85: BC1/BC3 preview textures (SM2_TEXBC=0 off). Needs the s3tc (linear) / s3tc_srgb extensions.
+  internal static readonly bool TexBc = Environment.GetEnvironmentVariable("SM2_TEXBC") != "0";
+  internal static bool BcLinear, BcSrgb; internal static long TexBcCount;
+
+  /// <summary>R85: float staging vertices (Stride floats each) to the VBO byte layout.</summary>
+  private static byte[] PackVerts(float[] f, int count)
+  {
+    var b = new byte[count * VBytes];
+    if (!Packed) { System.Buffer.BlockCopy(f, 0, b, 0, count * Stride * 4); return b; }
+    static short Sn(float v) => (short)Math.Round(Math.Clamp(v, -1f, 1f) * 32767f);
+    static ushort Un(float v) => (ushort)Math.Round(Math.Clamp(v, 0f, 1f) * 65535f);
+    static ushort Jn(float v) => v < 0 || v > 65534.5f ? (ushort)65535 : (ushort)Math.Round(v);
+    Parallel.For(0, (count + 8191) / 8192, chunk =>
+    {
+      var span = b.AsSpan();
+      var end = Math.Min(count, (chunk + 1) * 8192);
+      for (var i = chunk * 8192; i < end; i++)
+      {
+        var o = i * Stride; var d = i * 44;
+        var s = span.Slice(d, 44);
+        System.Buffers.Binary.BinaryPrimitives.WriteSingleLittleEndian(s, f[o]);
+        System.Buffers.Binary.BinaryPrimitives.WriteSingleLittleEndian(s[4..], f[o + 1]);
+        System.Buffers.Binary.BinaryPrimitives.WriteSingleLittleEndian(s[8..], f[o + 2]);
+        System.Buffers.Binary.BinaryPrimitives.WriteInt16LittleEndian(s[12..], Sn(f[o + 3]));
+        System.Buffers.Binary.BinaryPrimitives.WriteInt16LittleEndian(s[14..], Sn(f[o + 4]));
+        System.Buffers.Binary.BinaryPrimitives.WriteInt16LittleEndian(s[16..], Sn(f[o + 5]));
+        System.Buffers.Binary.BinaryPrimitives.WriteSingleLittleEndian(s[20..], f[o + 6]);
+        System.Buffers.Binary.BinaryPrimitives.WriteSingleLittleEndian(s[24..], f[o + 7]);
+        for (var k = 0; k < 4; k++)
+        {
+          System.Buffers.Binary.BinaryPrimitives.WriteUInt16LittleEndian(s[(28 + k * 2)..], Jn(f[o + 8 + k]));
+          System.Buffers.Binary.BinaryPrimitives.WriteUInt16LittleEndian(s[(36 + k * 2)..], Un(f[o + 12 + k]));
+        }
+      }
+    });
+    return b;
+  }
   private const GLEnum MaxAnisotropy = (GLEnum)0x84FE;
   private const GLEnum MaxAnisotropyLimit = (GLEnum)0x84FF;
 
@@ -123,6 +171,8 @@ internal sealed unsafe class GlPreview : IDisposable
     var renderer = Marshal.PtrToStringAnsi((nint)_gl.GetString(StringName.Renderer)) ?? "?";
     var version = Marshal.PtrToStringAnsi((nint)_gl.GetString(StringName.Version)) ?? "?";
     Info = $"{renderer} | {version} | MSAA {Samples}x | aniso {Anisotropy:0}x";
+    try { var ext = Marshal.PtrToStringAnsi((nint)_gl.GetString(StringName.Extensions)) ?? ""; BcExt = string.Join(",", ext.Split(' ').Where(e => e.Contains("s3tc") || e.Contains("dxt") || e.Contains("rgtc") || e.Contains("bptc")));
+      BcSrgb = ext.Contains("GL_EXT_texture_compression_s3tc_srgb"); BcLinear = ext.Contains("GL_EXT_texture_compression_s3tc ") || ext.EndsWith("GL_EXT_texture_compression_s3tc") || (ext.Contains("GL_EXT_texture_compression_dxt1") && ext.Contains("GL_ANGLE_texture_compression_dxt5")); } catch { }
   }
 
   private uint Link(string vs, string fs)
@@ -302,9 +352,11 @@ internal sealed unsafe class GlPreview : IDisposable
     gpu.Ibo = _gl.GenBuffer();
     _gl.BindVertexArray(gpu.Vao);
     _gl.BindBuffer(BufferTargetARB.ArrayBuffer, gpu.Vbo);
-    _gl.BufferData<float>(BufferTargetARB.ArrayBuffer, data, BufferUsageARB.StaticDraw);
+    var packed = PackVerts(data, count);
+    _gl.BufferData<byte>(BufferTargetARB.ArrayBuffer, packed, BufferUsageARB.StaticDraw);
+    VboBytes += packed.Length;
     _gl.BindBuffer(BufferTargetARB.ElementArrayBuffer, gpu.Ibo);
-    if (count <= 65536)
+    if (count <= 65536 && !Idx32)
     {
       var shorts = new ushort[indices.Length];
       for (var i = 0; i < shorts.Length; i++) shorts[i] = (ushort)indices[i];
@@ -314,17 +366,27 @@ internal sealed unsafe class GlPreview : IDisposable
     else
       _gl.BufferData<uint>(BufferTargetARB.ElementArrayBuffer, indices, BufferUsageARB.StaticDraw);
     IboBytes += indices.Length * (gpu.Short ? 2L : 4L);
-    uint stride = Stride * 4;
+    var stride = (uint)VBytes;
     _gl.EnableVertexAttribArray(0);
     _gl.VertexAttribPointer(0, 3, VertexAttribPointerType.Float, false, stride, (void*)0);
     _gl.EnableVertexAttribArray(1);
-    _gl.VertexAttribPointer(1, 3, VertexAttribPointerType.Float, false, stride, (void*)12);
     _gl.EnableVertexAttribArray(2);
-    _gl.VertexAttribPointer(2, 2, VertexAttribPointerType.Float, false, stride, (void*)24);
     _gl.EnableVertexAttribArray(3);
-    _gl.VertexAttribPointer(3, 4, VertexAttribPointerType.Float, false, stride, (void*)32);
     _gl.EnableVertexAttribArray(4);
-    _gl.VertexAttribPointer(4, 4, VertexAttribPointerType.Float, false, stride, (void*)48);
+    if (Packed)
+    {
+      _gl.VertexAttribPointer(1, 3, VertexAttribPointerType.Short, true, stride, (void*)12);
+      _gl.VertexAttribPointer(2, 2, VertexAttribPointerType.Float, false, stride, (void*)20);
+      _gl.VertexAttribPointer(3, 4, VertexAttribPointerType.UnsignedShort, false, stride, (void*)28);
+      _gl.VertexAttribPointer(4, 4, VertexAttribPointerType.UnsignedShort, true, stride, (void*)36);
+    }
+    else
+    {
+      _gl.VertexAttribPointer(1, 3, VertexAttribPointerType.Float, false, stride, (void*)12);
+      _gl.VertexAttribPointer(2, 2, VertexAttribPointerType.Float, false, stride, (void*)24);
+      _gl.VertexAttribPointer(3, 4, VertexAttribPointerType.Float, false, stride, (void*)32);
+      _gl.VertexAttribPointer(4, 4, VertexAttribPointerType.Float, false, stride, (void*)48);
+    }
     _gl.BindVertexArray(0);
     _batches[batch.Key] = gpu;
     return gpu;
@@ -381,8 +443,9 @@ internal sealed unsafe class GlPreview : IDisposable
           data[o + 12] = 1; data[o + 13] = 0; data[o + 14] = 0; data[o + 15] = 0;
         }
 
-        fixed (float* pointer = data)
-          _gl.BufferSubData(BufferTargetARB.ArrayBuffer, (nint)(start * Stride * 4), (nuint)(data.Length * 4), pointer);
+        var bytes = PackVerts(data, count);
+        fixed (byte* pointer = bytes)
+          _gl.BufferSubData(BufferTargetARB.ArrayBuffer, (nint)(start * VBytes), (nuint)bytes.Length, pointer);
       }
     }
 
@@ -400,9 +463,9 @@ internal sealed unsafe class GlPreview : IDisposable
       _gl.BindBuffer(BufferTargetARB.ArrayBuffer, gpu.Vbo);
       foreach (var (start, count) in gpu.OverrideRuns)
       {
-        var data = Vertices(gpu.Source, start, count);
-        fixed (float* pointer = data)
-          _gl.BufferSubData(BufferTargetARB.ArrayBuffer, (nint)(start * Stride * 4), (nuint)(data.Length * 4), pointer);
+        var bytes = PackVerts(Vertices(gpu.Source, start, count), count);
+        fixed (byte* pointer = bytes)
+          _gl.BufferSubData(BufferTargetARB.ArrayBuffer, (nint)(start * VBytes), (nuint)bytes.Length, pointer);
       }
     }
 
@@ -489,6 +552,39 @@ internal sealed unsafe class GlPreview : IDisposable
     gpu.LineCount = lines.Count;
   }
 
+  /// <summary>R85: 2x2 box filter (top-left aligned; an odd last row/column is dropped).</summary>
+  private static byte[] Down(byte[] src, int w, int h)
+  {
+    int nw = Math.Max(1, w / 2), nh = Math.Max(1, h / 2);
+    if (nw * 2 == w && nh * 2 == h) return Half(src, w, h);
+    var dst = new byte[nw * nh * 4];
+    for (var y = 0; y < nh; y++)
+      for (var x = 0; x < nw; x++)
+      {
+        int x0 = Math.Min(w - 1, 2 * x), x1 = Math.Min(w - 1, 2 * x + 1), y0 = Math.Min(h - 1, 2 * y), y1 = Math.Min(h - 1, 2 * y + 1);
+        for (var c = 0; c < 4; c++)
+          dst[(y * nw + x) * 4 + c] = (byte)((src[(y0 * w + x0) * 4 + c] + src[(y0 * w + x1) * 4 + c] + src[(y1 * w + x0) * 4 + c] + src[(y1 * w + x1) * 4 + c] + 2) >> 2);
+      }
+    return dst;
+  }
+
+  private static byte[] Half(byte[] src, int w, int h)
+  {
+    int nw = w / 2, nh = h / 2;
+    var dst = new byte[nw * nh * 4];
+    Parallel.For(0, nh, y =>
+    {
+      int r0 = 2 * y * w * 4, r1 = r0 + w * 4, d = y * nw * 4;
+      for (var x = 0; x < nw; x++)
+        for (var c = 0; c < 4; c++)
+        {
+          int a = r0 + x * 8 + c, b = r1 + x * 8 + c;
+          dst[d + x * 4 + c] = (byte)((src[a] + src[a + 4] + src[b] + src[b + 4] + 2) >> 2);
+        }
+    });
+    return dst;
+  }
+
   private uint Texture(PreviewImage? image, bool srgb, Stopwatch budget)
   {
     if (image is null)
@@ -517,13 +613,37 @@ internal sealed unsafe class GlPreview : IDisposable
         rgba[row + x + 3] = src[row + x + 3];
       }
     });
+    while (TexCap > 0 && Math.Max(w, h) > TexCap && w >= 2 && h >= 2)
+    {
+      rgba = Half(rgba, w, h); w /= 2; h /= 2; TexCapped++;
+    }
     var levels = 1 + (int)Math.Floor(Math.Log2(Math.Max(w, h)));
     id = _gl.GenTexture();
     _gl.BindTexture(TextureTarget.Texture2D, id);
     _gl.PixelStore(PixelStoreParameter.UnpackAlignment, 1);
-    _gl.TexStorage2D(TextureTarget.Texture2D, (uint)levels, srgb ? SizedInternalFormat.Srgb8Alpha8 : SizedInternalFormat.Rgba8, (uint)w, (uint)h);
-    _gl.TexSubImage2D<byte>(TextureTarget.Texture2D, 0, 0, 0, (uint)w, (uint)h, PixelFormat.Rgba, PixelType.UnsignedByte, rgba);
-    _gl.GenerateMipmap(TextureTarget.Texture2D);
+    if (TexBc && (srgb ? BcSrgb : BcLinear))
+    {
+      // R85: BC1 (opaque) / BC3 (alpha) with CPU mips (GenerateMipmap does not work on compressed textures).
+      var alpha = BcEncoder.HasAlpha(rgba);
+      var fmt = (InternalFormat)(alpha ? (srgb ? 0x8C4F : 0x83F3) : (srgb ? 0x8C4C : 0x83F0));
+      var lw = w; var lh = h; var level = rgba;
+      for (var l = 0; l < levels; l++)
+      {
+        var blocks = BcEncoder.Encode(level, lw, lh, alpha);
+        fixed (byte* p = blocks) _gl.CompressedTexImage2D(TextureTarget.Texture2D, l, fmt, (uint)lw, (uint)lh, 0, (uint)blocks.Length, p);
+        TexBytes += blocks.Length;
+        if (l + 1 < levels) { level = Down(level, lw, lh); lw = Math.Max(1, lw / 2); lh = Math.Max(1, lh / 2); }
+      }
+      _gl.TexParameter(TextureTarget.Texture2D, TextureParameterName.TextureMaxLevel, levels - 1);
+      TexBcCount++;
+    }
+    else
+    {
+      TexBytes += (long)w * h * 4 * 4 / 3;
+      _gl.TexStorage2D(TextureTarget.Texture2D, (uint)levels, srgb ? SizedInternalFormat.Srgb8Alpha8 : SizedInternalFormat.Rgba8, (uint)w, (uint)h);
+      _gl.TexSubImage2D<byte>(TextureTarget.Texture2D, 0, 0, 0, (uint)w, (uint)h, PixelFormat.Rgba, PixelType.UnsignedByte, rgba);
+      _gl.GenerateMipmap(TextureTarget.Texture2D);
+    }
     _gl.TexParameter(TextureTarget.Texture2D, TextureParameterName.TextureMinFilter, (int)GLEnum.LinearMipmapLinear);
     _gl.TexParameter(TextureTarget.Texture2D, TextureParameterName.TextureMagFilter, (int)GLEnum.Linear);
     _gl.TexParameter(TextureTarget.Texture2D, TextureParameterName.TextureWrapS, (int)GLEnum.Repeat);
@@ -708,6 +828,16 @@ internal sealed unsafe class GlPreview : IDisposable
     _gl.BindFramebuffer(FramebufferTarget.DrawFramebuffer, _rsFbo);
     _gl.BlitFramebuffer(0, 0, width, height, 0, 0, width, height, ClearBufferMask.ColorBufferBit, BlitFramebufferFilter.Nearest);
     _gl.BindFramebuffer(FramebufferTarget.ReadFramebuffer, _rsFbo);
+    if (Interlocked.Exchange(ref ShotPath, null) is { } shotPath) // R85: GPU frame readback for pixel A/B (raw: "w h\n" + RGBA rows, bottom-up)
+    {
+      try
+      {
+        var px = new byte[width * height * 4];
+        fixed (byte* p = px) _gl.ReadPixels(0, 0, (uint)width, (uint)height, PixelFormat.Rgba, PixelType.UnsignedByte, p);
+        using var fs = File.Create(shotPath); var head = System.Text.Encoding.ASCII.GetBytes($"{width} {height}\n"); fs.Write(head); fs.Write(px);
+      }
+      catch { /* best effort */ }
+    }
     _gl.BindFramebuffer(FramebufferTarget.DrawFramebuffer, (uint)targetFb);
     _gl.BlitFramebuffer(0, 0, width, height, 0, 0, width, height, ClearBufferMask.ColorBufferBit, BlitFramebufferFilter.Nearest);
     _gl.BindFramebuffer(FramebufferTarget.Framebuffer, (uint)targetFb);
