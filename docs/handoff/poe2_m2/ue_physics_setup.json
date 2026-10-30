@@ -1,0 +1,46 @@
+{
+ "/Game/ForgeLens/POE/bellcrow/bellcrow": {
+  "phys_bones": [
+   "phys_L_hanging_bell_jntBnd_1",
+   "phys_L_hanging_bell_jntBnd_2",
+   "phys_R_hanging_bell_jntBnd_1",
+   "phys_R_hanging_bell_jntBnd_2",
+   "phys_chain_jntBnd_1",
+   "phys_chain_jntBnd_2",
+   "phys_chain_jntBnd_3",
+   "phys_L_hip_bell_jntBnd_1",
+   "phys_L_hip_bell_jntBnd_2",
+   "phys_R_hip_bell_jntBnd_1",
+   "phys_R_hip_bell_jntBnd_2",
+   "phys_L_skirt_jntBnd_1",
+   "phys_L_skirt_jntBnd_2",
+   "phys_M_skirt_jntBnd_1",
+   "phys_M_skirt_jntBnd_2",
+   "phys_M_skirt_jntBnd_3",
+   "phys_R_skirt_jntBnd_1",
+   "phys_R_skirt_jntBnd_2",
+   "phys_R_skirt_jntBnd_3",
+   "phys_bell_jntBnd"
+  ],
+  "ok": true,
+  "report": "PA=/Game/ForgeLens/POE/bellcrow/Physics/PA_bellcrow_SM2_1.PA_bellcrow_SM2_1 ABP=/Game/ForgeLens/POE/bellcrow/Physics/ABP_bellcrow_SM2Phys_1.ABP_bellcrow_SM2Phys_1 simulated=20 kinematic=7 constraints=20 missingBones=0 linked=1 compiled=1 jiggles=20 jiggleMissing=0 jiggleFromKinematic=0 damperPA=none damperBodies=0 damperSkipped=0 damperCapsules=0 damperGravity=0.00",
+  "physics_asset": "/Game/ForgeLens/POE/bellcrow/Physics/PA_bellcrow_SM2_1.PA_bellcrow_SM2_1"
+ },
+ "/Game/ForgeLens/POE/lichboss/lichboss": {
+  "phys_bones": [
+   "phys_skinned_tail_jntBnd_01",
+   "phys_skinned_tail_jntBnd_02",
+   "phys_skinned_tail_jntBnd_03",
+   "phys_skinned_tail_jntBnd_04",
+   "phys_skinned_tail_jntBnd_05",
+   "phys_skinned_tail_jntBnd_06",
+   "phys_skinned_tail_jntBnd_07"
+  ],
+  "ok": true,
+  "report": "PA=/Game/ForgeLens/POE/lichboss/Physics/PA_lichboss_SM2.PA_lichboss_SM2 ABP=/Game/ForgeLens/POE/lichboss/Physics/ABP_lichboss_SM2Phys.ABP_lichboss_SM2Phys simulated=7 kinematic=1 constraints=7 missingBones=0 linked=1 compiled=1 jiggles=7 jiggleMissing=0 jiggleFromKinematic=0 damperPA=none damperBodies=0 damperSkipped=0 damperCapsules=0 damperGravity=0.00",
+  "physics_asset": "/Game/ForgeLens/POE/lichboss/Physics/PA_lichboss_SM2.PA_lichboss_SM2"
+ },
+ "/Game/ForgeLens/POE/wolfremake/wolfremake": {
+  "phys_bones": []
+ }
+}

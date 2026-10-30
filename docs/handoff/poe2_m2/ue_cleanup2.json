@@ -1,0 +1,12 @@
+{
+ "/Game/ForgeLens/POE/bellcrow/Physics/ABP_bellcrow_SM2Phys.ABP_bellcrow_SM2Phys": [],
+ "/Game/ForgeLens/POE/bellcrow/Physics/ABP_bellcrow_SM2Phys.ABP_bellcrow_SM2Phys deleted": true,
+ "/Game/ForgeLens/POE/bellcrow/Physics/ABP_bellcrow_SM2Phys_1.ABP_bellcrow_SM2Phys_1": [],
+ "/Game/ForgeLens/POE/bellcrow/Physics/PA_bellcrow_SM2.PA_bellcrow_SM2": [],
+ "/Game/ForgeLens/POE/bellcrow/Physics/PA_bellcrow_SM2.PA_bellcrow_SM2 deleted": true,
+ "/Game/ForgeLens/POE/bellcrow/Physics/PA_bellcrow_SM2_1.PA_bellcrow_SM2_1": [
+  "/Game/ForgeLens/POE/bellcrow/Physics/ABP_bellcrow_SM2Phys_1"
+ ],
+ "/Game/ForgeLens/POE/_Shared/M_Poe2Lit": [],
+ "/Game/ForgeLens/POE/_Shared/M_Poe2Lit deleted": true
+}

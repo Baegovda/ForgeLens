@@ -148,3 +148,16 @@ handoff/poe2_m2/monsters6_sheet.png shows bind pose and the first clip at t=0.5 
 - tools/poe2/ue_poe2_vfx_frame.py is a copy of Scripts/mtl_fix/ue_vfx_frame.py limited to /Game/ForgeLens/POE/ (the original only allows /Game/SM2_Work/, and it is not modified). Calls: `import <dir> /Game/ForgeLens/POE/VFX fresh`, `render <frame.json> /Game/ForgeLens/POE/VFX 512`, `export <png>`.
 - Imported: Firebolt projectile 0.2-1.0 s, Firebolt impact 0.1-0.9 s, arc impact 0.05-0.35 s, stormblast 0.1-1.1 s (19 frames) into /Game/ForgeLens/POE/VFX. The UE renders of one frame each match the viewer, and the stormblast octagon card does not appear in UE.
 - Limits: frozen frames (one ProceduralMesh per batch per time), not a playing Niagara system. A Niagara port would need an emitter template per EmitterDef (not done).
+
+## F.4 Physics / jiggle (2026-10-31)
+- PoE2 has no cloth solver data in the files we read (.clt = critters). Secondary motion is marked by bone name: `phys_*` / `phys_skinned_*` in the rig (.ast). Counts: BellCrow 20 (bell + chains), cart rhoa 17, lich 7 (tail); wolf, harpy, ramgiant, skeleton 0. `collision_ellipsoid_*_meshShape` shapes exist only in cartrhoa .smd.header (not used yet). No per-bone stiffness/damping found -> HEURISTIC defaults.
+- `tools/poe2/ue_poe2_physics.py <out.json> <mesh>...`: collects phys_ bones from the imported skeleton, writes an SM2-format physics.json (`jiggles` only) and calls `unreal.SM2PhysicsSetupLibrary.setup_from_json` exactly like SM2.
+- Result (handoff/poe2_m2/ue_physics_setup.json): bellcrow -> Physics/PA_bellcrow_SM2_1 + ABP_bellcrow_SM2Phys_1 (simulated 20, constraints 20, missing 0, compiled 1); lichboss -> PA_lichboss_SM2 + ABP_lichboss_SM2Phys (simulated 7, compiled 1). Wolf: none (correct).
+  First bellcrow call crashed after setup (Python tuple unpack in our script), so a duplicate PA/ABP without _1 was created; deleted (ours, unreferenced). Also deleted unreferenced v1 `_Shared/M_Poe2Lit` (ours). See ue_cleanup2.json.
+- NOT verified: behaviour in PIE/sim (no capture of the swinging motion). Values are plugin defaults, not game values.
+
+## F.5 Levels / areas
+- Chain: `.arm` (room layout: grid size, edges, corners -> `.gt` ground, `.et` edges, placed `.ao` objects/doodads) -> `.tdt`/`.tgt` (tile: `tile_mesh` .tgm + ground mask + .mat list) -> `.tgm` (terrain geometry). Also .tsi/.tst (tile set), .gft, .rs, .dgr (graph), .env.
+- Tool: `poe_data_tools -p 2 --ggpk <Content.ggpk> translate <out> <glob>` decodes arm/tgt/tdt/gt/et/mat to JSON. For .tgm it only returns version + bbox (geometry NOT decoded).
+- Done: space hideout (`metadata/terrain/missions/hideouts/space/rooms/hideout.arm`, 19x19 grid, 4 placed .ao: waypoint, map device, chest, stash) translated (70 JSON in PC `m6lvl/`, 153 raw files incl. 24 .tgm, 12 .sm/.smd in PC `m6raw/`). Sample: handoff/poe2_m2/space_hideout.arm.json.
+- NOT done: .tgm geometry decoder and level assembly in UE. Next steps: write a .tgm reader (same family as .smd: header + vertex/index buffers), place tiles from the .arm grid (250 units/tile per tgm bbox), spawn .ao via our existing monster/prop route (.sm/.smd).
