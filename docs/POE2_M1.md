@@ -45,3 +45,38 @@ Reader: `src/LibSaber.SM2.Assets/Games/Poe2/Poe2Reader.cs`. Viewer hooks: `src/L
 ### Resume
 Rebuild: `dotnet build src\LibSaber.SM2Browser -c Release -o Desktop\SM2_Work\PoE2\bin_m1`.
 Prepared folder used: `Desktop\SM2_Work\PoE2\m1` (raw + json + rig.ast.anim.bin).
+
+## Step 2 (2026-10-31 ~04:50-05:00 KST) - skills: list + effect preview (first cut) - DONE (proxy quality)
+Code: `src/LibSaber.SM2.Assets/Games/Poe2/Poe2Effect.cs` (`ReadAo`, `LoadEffect`), `Poe2Bench.Skills` (`--poe2skills <prepared> <out.tsv>`),
+effect preview through the same viewer path: `--glbench poe2:<prepared> "<effect.ao>||<animation>" <out>`, export `--poe2export <prepared> <out> <effect.ao> - <animation>`.
+Prepared folder used: `Desktop\SM2_Work\PoE2\m1s` (fire_fireball effects + art/particles/fire_fireball + normalized_prtcls + 20 particle textures + tables).
+
+### Data chain (PROVEN on Firebolt / fire_fireball)
+- `data/balance/activeskills.datc64` (dump-tables JSON via dat-schema, 1,147 rows): Id, DisplayedName, GrantedEffect, ActionType, ActiveSkillTypes, Icon.
+- `data/balance/projectiles.datc64` (2,103 rows, all with AOFiles): `Metadata/Projectiles/Fireball` -> AOFiles `Metadata/Effects/Spells/fire_fireball/ao/rig.ao`,
+  LoopAnimationIds `projectile`, ImpactAnimationIds `impact`, MiscAnimatedFlash, speed 1040.
+- Skill -> projectile link: HEURISTIC name match of ActionType/Id to the projectile id (firebolt ActionType `Fireball` -> Projectiles/Fireball). 89 of 1,147 skills matched.
+  The real link (GrantedEffect -> .ot/.ais projectile spawn) is NOT decoded yet. Other effect tables dumped: miscanimated (11,324 rows: Id -> AOFile),
+  miscobjects (1,160), skillartvariations (737), miscanimatedartvariations, grantedeffects.
+- `.ao` (text, JSON via translate): ClientAnimationController skeleton `.ast`, default_animation, BoneGroups, ParticleEffects / TrailsEffects per animation
+  (embedded JSON: events {time, filename .pet/.trl, bone_group}), SkinMesh, socket/parent/translation.
+- `.pet` v4: `payload.gpu_emitters[]` {particle_mesh .fmt (optional), update_material .mat (behaviour = fxgraphs), render_passes[].render_material, durations, emit_burst, particles_count}.
+- `.trl`: emitters with curve strings ("2 0 1 Linear 1 1 Linear"), material, segment lengths - parsed by poe_data_tools, not used yet.
+- Effect rig `.ast` v12 decodes with the same track code (projectileRIG: 13 bones, clips impact/projectile 1.00 s).
+
+### Verified (viewer GL render, docs/handoff/poe2_m1/fx_sheet.png)
+- rig.ao `projectile`: rig + clip load, 4 emitters (halfsphere mesh particle + 3 sprite proxies) placed on bone group `head` -> `aux_tip_attach_01`; renders and plays.
+- impact.ao `once`: 1-bone rig, 9 emitters -> 8 drawn (mp_sphere mesh + sprites); `cleaveGeo01.fmt` not found under normalized_prtcls (path to resolve).
+- `--poe2skills` writes `docs/handoff/poe2_m1/skills.tsv`.
+
+### NOT done / NOT verified (honest state)
+- It does NOT look like the game: no particle simulation (rate, lifetime, velocity, size/colour curves are in the update fxgraphs), mesh particles
+  without a colour texture draw flat white additive, sprites use a fixed 40 cm cross (size not from data). Colour gradients of render mats not applied.
+- Trails (.trl) not drawn. Character cast animation + projectile flight path not combined. No in-game comparison (game must not be launched).
+- Interactive viewer UI list of skills not added (CLI/bench only). Unreal import of effects not done.
+
+### Resume (next)
+1. Decode fxgraph colour/size params of render/update mats (Texture Remap curves, colour gradients) -> MeshPart tint/size; then a CPU particle sim reusing the SM2 EffectRenderer.
+2. Real skill->effect link: GrantedEffects -> Metadata/Projectiles/*.ot (extract .ot/.otc; text) -> AOFiles.
+3. Viewer UI: "PoE2" source in the content browser (prepared folder picker), skill list from skills.tsv, clip dropdown.
+4. Unreal import under /Game/ForgeLens/POE/ (FBX already writes; needs editor lock rules).

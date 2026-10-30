@@ -1,0 +1,1148 @@
+skill_id	name	granted_effect	action_type	types	projectile	ao	loop_anim	impact_anim
+ground_slam	Ground Slam	GroundSlamPlayer	GroundSlam	Attack,Area,Melee,Slam,Totemable,AttackInPlace				
+distance_scaled_ground_slam	Ground Slam	DistanceScaledGroundSlam	DistanceScaledGroundSlam	Attack,Area,Melee,Slam,Totemable,AttackInPlace				
+vaal_ground_slam_spiked	[DNT-UNUSED] Vaal Ground Slam	VaalDistanceScaledGroundSlam	DoNothing	Attack,Area,Melee,Vaal,Slam,Totemable,AttackInPlace				
+cleave	[DNT-UNUSED] Cleave	CleavePlayer	DoNothing	Attack,Area,Melee,ThresholdJewelArea,Physical,AttackInPlace				
+table_charge	Table Charge	TableCharge	TableCharge	Attack,Melee,MeleeSingleTarget,Movement,Travel,AttackInPlace				
+shield_charge	Shield Charge	ShieldCharge	ShieldCharge	Attack,Melee,MeleeSingleTarget,Movement,Travel,AttackInPlace				
+channel_shield_charge	Shield Charge		ChannelShieldCharge	Attack,RequiresShield,Melee,Area,Physical,Channel,Travel,NonWeaponAttack,ActiveBlock				
+inspiring_cry	Rallying Cry	RallyingCry	InspiringCry	Buff,Area,Duration,Warcry,Cooldown,AttackInPlace				
+leap_slam	Leap Slam	LeapSlamPlayer	LeapSlam	Attack,Area,Melee,Slam,Totemable,Travel,Jumping,ConsumesFullyBrokenArmour				
+leap_slam_cooldown	Leap Slam	LeapSlamPlayer	LeapSlam	Attack,Area,Melee,Movement,Travel,Slam,Totemable,Cooldown,AttackInPlace				
+leap_slam_behind	Leap Slam		LeapSlam	Attack,Area,Melee,Movement,Travel,Slam,Totemable,AttackInPlace				
+molten_crash	Molten Crash	MoltenCrashPlayer	MoltenCrash	Attack,Area,Melee,Slam,Totemable,Travel,Movement,Jumping,Shapeshift,Bear,CreatesFissure,ConsumesRage				
+double_strike	Double Strike	DoubleStrikePlayer	DoubleStrike	Attack,MeleeSingleTarget,Melee,Physical,AttackInPlace				
+vaal_double_strike_two	[DNT-UNUSED] Vaal Double Strike	VaalDoubleStrikeTwo	DoNothing	Attack,MeleeSingleTarget,Melee,Duration,Vaal,Physical,AttackInPlace				
+elemental_hit	[DNT-UNUSED] Elemental Hit	ElementalHitPlayer	DoNothing	Attack,Projectile,ProjectilesFromUser,Totemable,Trappable,Mineable,MeleeSingleTarget,Melee,Fire,Cold,Lightning,RangedAttack,MirageArcherCanUse,Area,Triggerable,RandomElement,AttackInPlace				
+dual_strike	Dual Strike	DualStrikePlayer	DualStrike	Attack,DualWieldOnly,MeleeSingleTarget,Melee,ThresholdJewelArea,AttackInPlace				
+blade_flurry	Whirling Blades	WhirlingBladesPlayer	BladeFlurry	Attack,Melee,Movement,Travel,AttackInPlace				
+blade_flurry_cooldown	Whirling Blades	WhirlingBladesPlayer	BladeFlurry	Attack,Melee,Movement,Travel,Cooldown,AttackInPlace				
+frenzy	Frenzy	FrenzyPlayer	Frenzy	Attack,RangedAttack,MirageArcherCanUse,Projectile,ProjectilesFromUser,Totemable,Trappable,Mineable,MeleeSingleTarget,Melee,Triggerable,AttackInPlace				
+caustic_arrow	Caustic Arrow	CausticArrowPlayer	CausticArrow	Attack,RangedAttack,MirageArcherCanUse,Projectile,ProjectilesFromUser,Area,Duration,Trappable,Mineable,Totemable,DamageOverTime,Chaos,Triggerable,Bow,AttackInPlace	Metadata/Projectiles/CausticArrow	Metadata/Effects/Spells/caustic_arrow_02/causticarrow.ao		
+vaal_caustic_arrow	Vaal Caustic Arrow	VaalCausticArrowPlayer	VaalCausticArrow	Attack,RangedAttack,Projectile,ProjectilesFromUser,Area,Duration,Trappable,Mineable,Totemable,DamageOverTime,Chaos,Vaal,Bow,AttackInPlace	Metadata/Projectiles/VaalCausticArrow	Metadata/Effects/Spells/caustic_arrow_02/VaalCausticArrow/large_projectile.ao	idle	end
+backstab	Backstab		Backstab	Attack,MeleeSingleTarget,Melee,AttackInPlace				
+detonate_dead	Detonate Dead	DetonateDeadPlayer	DetonateDeadNew	Spell,Damage,Area,Trappable,Totemable,Mineable,Multicastable,Triggerable,Fire,Cascadable,TargetsDestructibleCorpses,Unleashable,AreaSpell,Physical,UsableWhileMoving,Detonator				
+vaal_detonate_dead	Vaal Detonate Dead		DetonateDead	Spell,Damage,Area,Trappable,Totemable,Mineable,Vaal,Fire,AreaSpell,AttackInPlace				
+flicker_strike	Flicker Strike	FlickerStrikePlayer	FlickerStrike	Attack,Melee,MeleeSingleTarget,Area,ConsumesCharges,SkillConsumesPowerChargesOnUse				
+vaal_flicker_strike	Vaal Flicker Strike		FlickerStrike	Attack,Melee,MeleeSingleTarget,Movement,Vaal				
+blood_rage	Blood Rage	BloodRagePlayer	BloodRage	Spell,Buff,Duration,Totemable,Triggerable,Instant,Physical,Cooldown,AttackInPlace				
+split_arrow	Split Arrow	SplitArrowPlayer	SplitArrow	Attack,RangedAttack,MirageArcherCanUse,Projectile,ProjectilesFromUser,Totemable,Trappable,Mineable,Triggerable,Physical,Bow,AttackInPlace				
+vaal_split_arrow	Vaal Split Arrow		SplitArrow	Attack,RangedAttack,Projectile,ProjectilesFromUser,Totemable,Trappable,Mineable,Physical,Vaal,Bow,AttackInPlace				
+new_cold_snap	Cold Snap	NewColdSnap	NewColdSnap	Spell,Damage,Area,Trappable,Totemable,Mineable,Multicastable,Triggerable,Cold,Cascadable,Duration,ChillingArea,AreaSpell,Cooldown,SkillConsumesFrenzyChargesOnUse,AttackInPlace				
+new_vaal_cold_snap	Vaal Cold Snap	NewColdSnap	NewColdSnap	Spell,Damage,Area,Trappable,Totemable,Mineable,Duration,Vaal,Cold,ChillingArea,AreaSpell,AttackInPlace				
+ice_nova	Ice Nova	IceNovaPlayer	IceNova	Spell,Damage,Area,Trappable,Totemable,Mineable,Multicastable,Triggerable,Cold,Unleashable,AreaSpell,Nova,Invokable,UsableWhileMoving,Cascadable,Duration,CreatesGroundEffect				
+firebolt	Firebolt	FireballPlayer	Fireball	Projectile,ProjectilesFromUser,Spell,Damage,Area,Trappable,Totemable,Mineable,Multicastable,Triggerable,Fire,Unleashable,AreaSpell,Invokable,UsableWhileMoving	Metadata/Projectiles/Fireball	Metadata/Effects/Spells/fire_fireball/ao/rig.ao	projectile	impact
+vaal_fireball	Vaal Fireball		Fireball	Projectile,ProjectilesFromUser,ProjectileSpiral,Spell,Damage,Area,Trappable,Totemable,Mineable,Vaal,Fire,AreaSpell,AttackInPlace	Metadata/Projectiles/Fireball	Metadata/Effects/Spells/fire_fireball/ao/rig.ao	projectile	impact
+valakos_charge	Valako's Charge	ValakosChargePlayer	ValakosLuck	Spell,Damage,Chains,Triggerable,Lightning,UsableWhileMoving,Area,AreaSpell,Cooldown,InbuiltTrigger,Triggered,NoAttackOrCastTime				
+arc	Arc	ArcPlayer	Arc	Spell,Damage,Trappable,Totemable,Mineable,Chains,Multicastable,Triggerable,Lightning,Unleashable,Invokable,UsableWhileMoving,Area,AreaSpell				
+vaal_arc	Vaal Arc		Arc	Spell,Damage,Trappable,Totemable,Mineable,Chains,Vaal,Lightning,Duration,AttackInPlace				
+raise_zombie	Raise Zombie	RaiseZombiePlayer	RaiseZombie	Minion,MinionsCanExplode,Totemable,CreatesMinion,UsableWhileMoving,Duration,TargetsDestructibleCorpses,Physical,ConsumesCharges,Limit,SkillConsumesPowerChargesOnUse				
+righteous_fire	Righteous Fire	RighteousFirePlayer	RighteousFire	Spell,Buff,Area,CausesBurning,DamageOverTime,Fire,Totemable,Triggerable,Instant,AreaSpell,InstantNoRepeatWhenHeld,InstantShiftAttackForLeftMouse,Cooldown,AttackInPlace				
+vaal_righteous_fire_duration	Vaal Righteous Fire		VaalRighteousFireDuration	Spell,Buff,Area,CausesBurning,DamageOverTime,Fire,Totemable,Vaal,Duration,AreaSpell,Instant,InstantNoRepeatWhenHeld,InstantShiftAttackForLeftMouse,Cooldown,AttackInPlace				
+melee	Basic Attack		Melee	Attack,RangedAttack,MirageArcherCanUse,Projectile,MeleeSingleTarget,Melee,ProjectilesFromUser,AttackInPlace				
+melee_triggered			Melee	Attack,RangedAttack,MirageArcherCanUse,Projectile,MeleeSingleTarget,Melee,ProjectilesFromUser,Triggerable,AttackInPlace				
+monster_projectile_weapon			MonsterProjectileWeapon	Attack,RangedAttack,MirageArcherCanUse,Projectile,ProjectilesFromUser,Damage,Triggerable,AttackInPlace				
+monster_projectile_weapon_no_los			MonsterProjectileWeapon	Attack,RangedAttack,MirageArcherCanUse,Projectile,ProjectilesFromUser,Damage,Triggerable,AttackInPlace				
+cobra_lash	Cobra Lash		CobraLash	Attack,RangedAttack,Projectile,ProjectilesFromUser,Damage,Triggerable,Chaos,AttackInPlace	Metadata/Projectiles/CobraLash	Metadata/Effects/Spells/cobra_lash/cobra_lash_dagger.ao	dagger	impact
+bloodchieftain_summonmonkeys			BloodChieftainSummonMonkeys	Spell,Damage,Area,AreaSpell,AttackInPlace				
+skeleton_projectile_fire			SkeletonProjectileFire	Spell,Damage,Multicastable,Projectile,ProjectilesFromUser,Triggerable,AttackInPlace	Metadata/Projectiles/SkeletonProjectileFire	Metadata/Effects/Spells/raise_skeleton_02/skeleproj_fire.ao	loop	end
+skeleton_projectile_cold			SkeletonProjectileCold	Spell,Damage,Multicastable,Projectile,ProjectilesFromUser,Triggerable,AttackInPlace	Metadata/Projectiles/SkeletonProjectileCold	Metadata/Effects/Spells/raise_skeleton_02/skeleproj_ice.ao	loop	end
+skeleton_projectile_lightning			SkeletonProjectileLightning	Spell,Damage,Multicastable,Projectile,ProjectilesFromUser,Triggerable,AttackInPlace	Metadata/Projectiles/SkeletonProjectileLightning	Metadata/Effects/Spells/raise_skeleton_02/skeleproj_lightning.ao	loop	end
+spark	Spark	SparkPlayer	Spark	Spell,Projectile,ProjectilesFromUser,Damage,Duration,Trappable,Totemable,Mineable,Multicastable,Triggerable,Lightning,Unleashable,Invokable,UsableWhileMoving	Metadata/Projectiles/Spark	Metadata/Effects/Spells/lightning_spark/spark_projectile.ao	projectile_01	impact_01
+unique_earthbound_triggered_spark	Spark	SparkPlayer	Spark	Spell,Projectile,ProjectilesFromUser,Damage,Duration,Trappable,Totemable,Mineable,Multicastable,Triggerable,Triggered,InbuiltTrigger,Lightning,Unleashable,Invokable,UsableWhileMoving,Cold	Metadata/Projectiles/Spark	Metadata/Effects/Spells/lightning_spark/spark_projectile.ao	projectile_01	impact_01
+vaal_spark	Vaal Spark		Spark	Spell,Projectile,ProjectilesFromUser,ProjectileSpiral,Damage,Duration,Trappable,Totemable,Mineable,Vaal,Lightning,AttackInPlace	Metadata/Projectiles/Spark	Metadata/Effects/Spells/lightning_spark/spark_projectile.ao	projectile_01	impact_01
+monster_spark		SparkPlayer	Spark	Spell,Projectile,ProjectilesFromUser,Damage,Duration,Trappable,Totemable,Mineable,Multicastable,Triggerable,Lightning,Unleashable,Invokable,AttackInPlace	Metadata/Projectiles/Spark	Metadata/Effects/Spells/lightning_spark/spark_projectile.ao	projectile_01	impact_01
+ice_spear	Ice Spear	IceSpearPlayer	IceSpear	Spell,Projectile,ProjectilesFromUser,Damage,Trappable,Totemable,Mineable,Multicastable,Triggerable,Cold,Unleashable,AttackInPlace	Metadata/Projectiles/IceSpear	Metadata/Effects/Spells/spear_wind_spear/projectile.ao	projectile_idle	impact
+summon_spectre	Spectre: {0} 	SummonSpectrePlayer	RaiseSpectre	Minion,MinionsCanExplode,Trappable,Totemable,Mineable,Multicastable,Triggerable,CreatesMinion,CreatesUndeadMinion,HasReservation,Persistent,MultipleReservation,AttackInPlace				
+infernal_blow_new	Infernal Blow	InfernalBlowNew	InfernalBlowNew	Attack,Area,MeleeSingleTarget,Melee,Fire,Duration,AttackInPlace				
+glacial_hammer	Glacial Hammer	GlacialHammerPlayer	GlacialHammer	Attack,MeleeSingleTarget,Melee,Cold,ThresholdJewelArea,AttackInPlace				
+frost_wall	Frost Wall	FrostWallPlayer	FrostWall	Spell,Damage,Duration,Trappable,Totemable,Mineable,Multicastable,Triggerable,Cold,Cascadable,Cooldown,AttackInPlace				
+frost_wall_new	Frost Wall	FrostWallPlayer	FrostWallNew	Spell,Damage,Duration,Trappable,Totemable,Mineable,Multicastable,Triggerable,Cold,Cascadable,Cooldown,Invokable,Area,Wall,UsableWhileMoving,IceCrystal,ToggleSpawnedObjectTargetable_DefaultOff				
+freezing_pulse	Freezing Pulse	FreezingPulsePlayer	FreezingPulse	Spell,Projectile,ProjectilesFromUser,Damage,Trappable,Totemable,Mineable,Multicastable,Triggerable,Cold,Unleashable,AttackInPlace	Metadata/Projectiles/FreezingPulse	Metadata/Effects/Spells/freezing_pulse/rig.ao	freezing_tide	freezing_tide_end
+viper_strike	Viper Strike	ViperStrikePlayer	GenericMelee	Attack,Duration,Melee,MeleeSingleTarget,DamageOverTime,Chaos,AttackInPlace				
+explosive_arrow	Explosive Arrow	ExplosiveArrowPlayer	FuseArrow	Attack,RangedAttack,MirageArcherCanUse,Projectile,ProjectilesFromUser,Damage,Area,Duration,Totemable,Trappable,Mineable,Fire,Triggerable,Bow,AttackInPlace	Metadata/Projectiles/FuseArrow	Metadata/Effects/Spells/explosivearrow_2/projectile/basearrow.ao	explodingarrow	
+temporal_chains	Temporal Chains	TemporalChainsPlayer	TemporalChains	Spell,Area,Duration,Trappable,Totemable,Mineable,Multicastable,Triggerable,Cascadable,AppliesCurse,Unleashable,AreaSpell,UsableWhileMoving				
+elemental_weakness	Elemental Weakness	ElementalWeaknessPlayer	ElementalWeakness	Spell,Area,Duration,Trappable,Totemable,Mineable,Multicastable,Triggerable,Cold,Fire,Lightning,Cascadable,AppliesCurse,Unleashable,AreaSpell,UsableWhileMoving				
+enfeeble	Enfeeble	EnfeeblePlayer	Enfeeble	Spell,Area,Duration,Trappable,Totemable,Mineable,Multicastable,Triggerable,Cascadable,AppliesCurse,Unleashable,AreaSpell,UsableWhileMoving,Necrotic				
+snipers_mark	Sniper's Mark	SnipersMarkPlayer	SnipersMark	Trappable,Totemable,Mineable,Multicastable,Triggerable,Duration,UsableWhileMoving,GeneratesCharges,Mark,Cooldown,Limit,UsableWhileMounted				
+vulnerability	Vulnerability	VulnerabilityPlayer	Vulnerability	Spell,Area,Duration,Trappable,Totemable,Mineable,Multicastable,Triggerable,Cascadable,AppliesCurse,Unleashable,AreaSpell,Physical,UsableWhileMoving				
+inevitable_agony	Inevitable Agony		PainSynchronisation	Spell,Area,Duration,Trappable,Totemable,Mineable,Multicastable,Triggerable,Cascadable,Unleashable,AreaSpell,UsableWhileMoving,Cooldown				
+inca_minion_projectile			IncaMinionProjectile	Spell,Damage,Triggerable,AttackInPlace	Metadata/Projectiles/IncaMinionProjectile	Metadata/Effects/Spells/monsters_effects/incasummon_projectile_poison/rig.ao	projectile	projectileexplode
+lightning_warp	Lightning Warp	LightningWarpPlayer	LightningWarpPreemptive	Spell,Damage,Area,Duration,Trappable,Totemable,Mineable,Triggerable,Lightning,AreaSpell,Multicastable,Unleashable,UsableWhileMoving,CreatesGroundEffect,GeneratesInfusion,Movement,GeneratesRemnants,GamepadDoNotForceSkillAtLocation				
+vile_disruption	His Vile Intrusion	LightningWarpPlayer	LightningWarpPreemptive	Spell,Damage,Area,Duration,Trappable,Totemable,Mineable,Triggerable,Physical,AreaSpell,Multicastable,Unleashable,UsableWhileMoving,CreatesGroundEffect,Necrotic				
+summon_skeletons	Summon Skeletons	SummonSkeletonsPlayer	RaiseSkeleton	Spell,Minion,Duration,MinionsCanExplode,Trappable,Totemable,Mineable,Multicastable,Triggerable,Unleashable,CreatesMinion,Cooldown,AttackInPlace				
+armour_breaker	Armour Breaker	ArmourBreakerPlayer	HeavyStrike	Attack,MeleeSingleTarget,Melee,Area,Physical,AttackInPlace,Totemable				
+dominating_blow	Dominating Blow	DominatingBlowPlayer	DoNothing	Attack,Minion,Duration,MinionsCanExplode,MeleeSingleTarget,Melee,CreatesMinion,AttackInPlace				
+rain_of_arrows	Rain of Arrows	RainOfArrowsPlayer	RainOfArrows	Attack,RangedAttack,MirageArcherCanUse,Area,ProjectileSpeed,Totemable,Trappable,Mineable,Triggerable,Rain,Barrageable,Sustained,UsableWhileMoving,SkillConsumesFrenzyChargesOnUse,Bow,GroundTargetedProjectile	Metadata/Projectiles/RainOfArrows	Metadata/Effects/Spells/bow_rain_of_arrows/projectile_01.ao		
+expanding_rain_of_arrows	Rain of Arrows	ExpandingRainOfArrows	ExpandingRainOfArrows	Attack,RangedAttack,MirageArcherCanUse,Area,ProjectileSpeed,ProjectileNumber,Totemable,Trappable,Mineable,Triggerable,Rain,Bow,GroundTargetedProjectile,AttackInPlace				
+triggered_expanding_rain_of_arrows	Rain of Arrows	ExpandingRainOfArrows	ExpandingRainOfArrows	Attack,RangedAttack,MirageArcherCanUse,Area,ProjectileSpeed,ProjectileNumber,Totemable,Trappable,Mineable,Triggerable,Rain,Triggered,InbuiltTrigger,Bow,GroundTargetedProjectile,AttackInPlace				
+vaal_expanding_rain_of_arrows	Vaal Rain of Arrows	VaalExpandingRainOfArrows	ExpandingRainOfArrows	Attack,RangedAttack,Area,ProjectileSpeed,ProjectileNumber,Totemable,Trappable,Mineable,Vaal,Rain,Bow,GroundTargetedProjectile,AttackInPlace				
+firestorm	Firestorm	FirestormPlayer	FirestormPlayer	Spell,Damage,Area,Duration,Trappable,Totemable,Mineable,Multicastable,Triggerable,Fire,Cascadable,Unleashable,AreaSpell,UsableWhileMoving,Limit,Sustained,Storm				
+firestorm_monster	Firestorm	FirestormPlayer	FireStorm	Spell,Damage,Area,Duration,Trappable,Totemable,Mineable,Multicastable,Triggerable,Fire,Cascadable,Unleashable,AreaSpell,UsableWhileMoving,Limit,Sustained,Storm				
+fire_storm_ignore_los			FireStorm	Spell,Damage,Area,Duration,Trappable,Totemable,Mineable,Multicastable,Triggerable,Fire,AreaSpell,AttackInPlace				
+vaal_fire_storm	Vaal Firestorm		FireStorm	Spell,Damage,Trappable,Totemable,Mineable,Area,Duration,Fire,AreaSpell,Vaal,AttackInPlace				
+icestorm	Icestorm		FirestormPlayer	Spell,Damage,Area,Duration,Trappable,Totemable,Mineable,Multicastable,Triggerable,Cold,Cascadable,Unleashable,AreaSpell,UsableWhileMoving,Limit,Sustained,SkillConsumesFreeze,Storm				
+vaal_new_lightning_strike	[DNT-UNUSED] Vaal Lightning Strike		DoNothing	Attack,MeleeSingleTarget,Melee,Duration,Vaal,Lightning,Projectile,RangedAttack,ProjectilesNotFromUser,AttackInPlace				
+tempest_shield	Tempest Shield	TempestShieldPlayer	LightningShield	Spell,Damage,RequiresShield,TotemCastsAlone,Lightning,Chains,Buff,HasReservation,Totemable,Triggerable,Persistent,AttackInPlace				
+molten_shell	Molten Shell	MoltenShellPlayer	FireShield	Spell,Damage,Area,Duration,Totemable,TotemCastsWhenNotDetached,Triggerable,Fire,Instant,AreaSpell,Physical,Cooldown,AttackInPlace				
+molten_shell_barrier	Molten Shell	MoltenShellPlayer	FireShield	Spell,Area,Duration,Totemable,TotemCastsWhenNotDetached,Fire,Instant,AreaSpell,Physical,Triggerable,Guard,Cooldown,AttackInPlace				
+vaal_molten_shell	Vaal Molten Shell		FireShield	Spell,Area,Duration,Totemable,TotemCastsWhenNotDetached,Fire,Instant,AreaSpell,Physical,Vaal,InstantShiftAttackForLeftMouse,InstantNoRepeatWhenHeld,Cooldown,Guard,AttackInPlace				
+monster_vaal_molten_shell	Vaal Molten Shell		FireShield	Spell,Damage,Area,Duration,Totemable,TotemCastsWhenNotDetached,Vaal,Fire,Triggerable,AreaSpell,Physical,AttackInPlace				
+power_siphon	Power Siphon	PowerSiphonPlayer	PowerSiphon	Spell,Totemable,Trappable,Mineable,UsableWhileMoving,Damage,GeneratesCharges,Physical				
+puncture	Puncture	PuncturePlayer	Puncture	Attack,RangedAttack,MirageArcherCanUse,Projectile,ProjectilesFromUser,Duration,Trappable,Mineable,Totemable,MeleeSingleTarget,Melee,DamageOverTime,Triggerable,Physical,Bow,AttackInPlace				
+lightning_arrow	Lightning Arrow	LightningArrowPlayer	LightningArrow	Attack,RangedAttack,MirageArcherCanUse,Area,Projectile,ProjectilesFromUser,Totemable,Trappable,Mineable,Lightning,Triggerable,Barrageable,UsableWhileMoving,CanBecomeArrowRain,Chains,Bow	Metadata/Projectiles/LightningArrow	Metadata/Effects/Spells/bow_lightning_arrow/projectile_01.ao	projectile_01	impact_01
+vaal_lightning_arrow	Vaal Lightning Arrow		VaalLightningArrow	Attack,RangedAttack,Area,Projectile,ProjectilesFromUser,Totemable,Trappable,Mineable,Lightning,Vaal,Bow,AttackInPlace	Metadata/Projectiles/VaalLightningArrow	Metadata/Effects/Spells/vaal_skills/lightning_arrow/vaal_lightning_arrow.ao	flight	end
+haste	Haste	HastePlayer	CastAuraSpeed	Spell,Area,Buff,HasReservation,TotemCastsAlone,Totemable,Aura,AreaSpell,CanHaveBlessing,OngoingSkill,Persistent,AttackInPlace				
+purity	Purity of Elements	PurityOfElementsPlayer	CastAuraElementalResistances	Spell,Area,Buff,HasReservation,TotemCastsAlone,Totemable,Aura,AreaSpell,CanHaveBlessing,OngoingSkill,Persistent,AttackInPlace				
+vitality	Vitality	VitalityPlayer	CastAuraLifeRegen	Spell,Area,Buff,HasReservation,TotemCastsAlone,Totemable,Aura,AreaSpell,CanHaveBlessing,OngoingSkill,Persistent,AttackInPlace				
+discipline	Discipline	DisciplinePlayer	CastAuraEnergyShield	Buff,HasReservation,Aura,OngoingSkill,Persistent,AffectsPresence,AttackInPlace				
+aura_accuracy_and_crits	Precision		CastAuraAccuracyAndCrit	Spell,Area,Buff,HasReservation,TotemCastsAlone,Totemable,Aura,AreaSpell,CanHaveBlessing,DualWieldOnly,Persistent,AttackInPlace				
+grace	Grace	GracePlayer	CastAuraEvasion	Spell,Area,Buff,HasReservation,TotemCastsAlone,Totemable,Aura,AreaSpell,CanHaveBlessing,DualWieldOnly,Persistent,AttackInPlace				
+determination	Determination	DeterminationPlayer	CastAuraArmour	Spell,Area,Buff,HasReservation,TotemCastsAlone,Totemable,Aura,AreaSpell,Physical,CanHaveBlessing,DualWieldOnly,Persistent,AttackInPlace				
+anger	Anger	AngerPlayer	CastAuraFireDamage	Spell,Area,Buff,HasReservation,TotemCastsAlone,Totemable,Aura,Fire,AreaSpell,CanHaveBlessing,OngoingSkill,Persistent,AttackInPlace				
+hatred	Hatred	HatredPlayer	CastAuraColdDamage	Spell,Area,Buff,HasReservation,TotemCastsAlone,Totemable,Aura,Cold,AreaSpell,CanHaveBlessing,OngoingSkill,Persistent,AttackInPlace				
+monster_hatred		HatredPlayer	CastAuraColdDamage	Spell,Area,Buff,HasReservation,TotemCastsAlone,Totemable,Aura,Cold,Triggerable,AreaSpell,Persistent,AttackInPlace				
+wrath	Wrath	WrathPlayer	CastAuraLightningDamage	Spell,Area,Buff,HasReservation,TotemCastsAlone,Totemable,Aura,Lightning,AreaSpell,CanHaveBlessing,OngoingSkill,Persistent,AttackInPlace				
+burning_arrow	Burning Arrow	BurningArrowPlayer	BurningArrow	Attack,RangedAttack,MirageArcherCanUse,Projectile,ProjectilesFromUser,Totemable,Trappable,Mineable,Fire,ThresholdJewelArea,Triggerable,Bow,AttackInPlace	Metadata/Projectiles/BurningArrow	Metadata/Effects/Spells/firearrow_02/burning_arrow.ao		
+vaal_burning_arrow	Vaal Burning Arrow		BurningArrow	Attack,RangedAttack,Projectile,ProjectilesFromUser,Totemable,Trappable,Mineable,Area,Vaal,Fire,ThresholdJewelDuration,Bow,AttackInPlace	Metadata/Projectiles/BurningArrow	Metadata/Effects/Spells/firearrow_02/burning_arrow.ao		
+clarity	Clarity	ClarityPlayer	CastAuraManaRegen	Spell,Area,Buff,HasReservation,TotemCastsAlone,Totemable,Aura,AreaSpell,CanHaveBlessing,OngoingSkill,Persistent,Buff,AttackInPlace				
+trap_ground_fire	Fire Trap	FireTrapPlayer	TrapGroundFire	Spell,Duration,Damage,Mineable,Area,CausesBurning,Trapped,DamageOverTime,Fire,AreaSpell,AttackInPlace				
+ground_fire_self	Fire Trap	FireTrap	TrapGroundFire	Spell,Duration,Nova,Damage,Area,CausesBurning,DamageOverTime,Fire,AreaSpell,Cascadable,AttackInPlace				
+vaal_fire_trap	Vaal Fire Trap		TrapGroundFire	Spell,Duration,Damage,Mineable,Area,CausesBurning,Trapped,DamageOverTime,Vaal,Fire,AreaSpell,AttackInPlace				
+necromancer_revive_skeleton		NecromancerReviveSkeleton	ReviveSkeleton	Spell,Triggerable,AttackInPlace				
+suicide_explosion		SpawnSuicideExplosion	SuicideExplosion	Spell,Area,Damage,AreaSpell,Triggerable,AttackInPlace				
+suicide_explosion_self		DominusDemonSuicideExplosionSelf	SuicideExplosionSelf	Spell,Damage,Area,AreaSpell,AttackInPlace				
+shadow_projectiles	Ethereal Knives	EtherealKnivesPlayer	ShadowProjectiles	Spell,Damage,Projectile,ProjectilesFromUser,Totemable,Trappable,Mineable,Multicastable,Triggerable,Unleashable,Physical,Duration,AttackInPlace				
+ice_shot	Ice Shot	IceShotPlayer	IceShot	Attack,RangedAttack,Projectile,ProjectilesFromUser,Cold,Triggerable,MirageArcherCanUse,Totemable,Trappable,Mineable,UsableWhileMoving,Barrageable,Bow	Metadata/Projectiles/IceShot	Metadata/Effects/Spells/bow_ice_shot/main_projectile.ao	projectile	impact
+vaal_ice_shot	Vaal Ice Shot		VaalIceShot	Attack,RangedAttack,Projectile,ProjectilesFromUser,Area,Cold,Vaal,Duration,ProjectilesNumberModifiersNotApplied,Bow,AttackInPlace				
+piety_ice_shot		IceShot	IceShot	Attack,RangedAttack,MirageArcherCanUse,Projectile,ProjectilesFromUser,Area,Totemable,Trappable,Mineable,Cold,ChillingArea,AttackInPlace	Metadata/Projectiles/IceShot	Metadata/Effects/Spells/bow_ice_shot/main_projectile.ao	projectile	impact
+arctic_breath	Creeping Frost	CreepingFrostPlayer	ArcticBreath	Spell,Projectile,ProjectilesFromUser,Damage,Trappable,Totemable,Mineable,Duration,Area,Multicastable,Triggerable,Cold,ChillingArea,Unleashable,AreaSpell,AttackInPlace	Metadata/Projectiles/ArcticBreath	Metadata/Effects/Spells/arcticbreath/rig.ao	articbreath	articbreath_end
+brutus_hook		BrutusHook	DoNothing	Triggerable,AttackInPlace				
+flammability	Flammability	FlammabilityPlayer	FireWeakness	Spell,Area,Duration,Trappable,Totemable,Mineable,Multicastable,Triggerable,Fire,Cascadable,AppliesCurse,Unleashable,AreaSpell,UsableWhileMoving				
+hypothermia	Hypothermia	HypothermiaPlayer	ColdWeakness	Spell,Area,Duration,Trappable,Totemable,Mineable,Multicastable,Triggerable,Cold,Cascadable,AppliesCurse,Unleashable,AreaSpell,UsableWhileMoving				
+conductivity	Conductivity	ConductivityPlayer	LightningWeakness	Spell,Area,Duration,Trappable,Totemable,Mineable,Multicastable,Triggerable,Lightning,Cascadable,AppliesCurse,Unleashable,AreaSpell,UsableWhileMoving				
+ball_lightning	Ball Lightning	PietyBallLightning	BallLightning	Spell,Damage,Projectile,ProjectilesFromUser,Area,Totemable,Trappable,Mineable,Multicastable,Triggerable,Lightning,Unleashable,AreaSpell,UsableWhileMoving,Sustained,CreatesGroundEffect,Duration	Metadata/Projectiles/BallLightning	Metadata/Effects/Spells/lightning_balllightning/ball_Lightning.ao	projectile_01	impact_01
+ball_lightning_self_location			BallLightning	Spell,Damage,Projectile,ProjectilesFromUser,Area,Totemable,Trappable,Mineable,Multicastable,Triggerable,TotemCastsAlone,Lightning,AreaSpell,AttackInPlace	Metadata/Projectiles/BallLightning	Metadata/Effects/Spells/lightning_balllightning/ball_Lightning.ao	projectile_01	impact_01
+expanding_fire_cone	[DNT-UNUSED] Incinerate	ExpandingFireCone	DoNothing	Spell,Damage,Totemable,Fire,Channel,Area,AreaSpell,Cooldown,GainsStages,AttackInPlace				
+vaal_cyclone	Vaal Cyclone		VaalCyclone	Attack,Area,Melee,Duration,Vaal,AttackInPlace				
+cyclone_channelled	Cyclone	CyclonePlayer	CycloneChannelled	Attack,Area,Melee,Movement,Channel,Physical,AttackInPlace				
+birdman_consume_corpse		BirdmanConsumeCorpse	BirdmanConsumeCorpse	Spell,AttackInPlace				
+root_spider_burrow			RootSpiderBurrow					
+root_spider_emerge		RootSpiderEmerge	RootSpiderEmerge	Attack,AttackInPlace				
+reave	[DNT-UNUSED] Reave	ReavePlayer	DoNothing	Attack,Area,Melee,AttackInPlace				
+vaal_reave	[DNT-UNUSED] Vaal Reave		DoNothing	Attack,Area,Melee,Vaal,AttackInPlace				
+delayed_blast		DelayedBlast	DelayedBlast	Spell,Damage,Area,Triggerable,AreaSpell,AttackInPlace				
+delayed_blast_location		DelayedBlast	DelayedBlast	Spell,Damage,Area,Triggerable,AreaSpell,AttackInPlace				
+smoke_mine	Smoke Mine	SmokeMinePlayer	SmokeMine	Spell,Area,Duration,Movement,RemoteMined,AreaSpell,Travel,HasReservation,Blink,Cooldown,AttackInPlace				
+proximity_shield		MonsterProximityShield	ProximityShield	Spell,Area,Duration,Triggerable,AreaSpell,AttackInPlace				
+spectral_throw	Spectral Throw	ThrownWeapon	ThrownWeaponProjectile	Attack,RangedAttack,Projectile,ProjectilesFromUser,AttackInPlace				
+vaal_thrown_weapon	Vaal Spectral Throw		VaalThrownWeapon	Attack,RangedAttack,Projectile,ProjectilesFromUser,Vaal,AttackInPlace				
+purity_of_fire	Purity of Fire	FireResistAura	CastAuraFireResistance	Buff,HasReservation,Aura,OngoingSkill,Persistent,Fire,AffectsPresence,AttackInPlace				
+purity_of_ice	Purity of Ice	ColdResistAura	CastAuraColdResistance	Buff,HasReservation,Aura,OngoingSkill,Persistent,Cold,AffectsPresence,AttackInPlace				
+purity_of_lightning	Purity of Lightning	LightningResistAura	CastAuraLightningResistance	Buff,HasReservation,Aura,OngoingSkill,Persistent,Lightning,AffectsPresence,AttackInPlace				
+impurity	Impurity	ChaosResistAura	CastAuraChaosResistance	Buff,HasReservation,Aura,OngoingSkill,Persistent,Chaos,AffectsPresence,AttackInPlace				
+storm_call	Storm Call	StormCallPlayer	StormCall	Spell,Damage,Area,Duration,Trappable,Totemable,Mineable,Triggerable,Multicastable,Lightning,Cascadable,Unleashable,AreaSpell,AttackInPlace				
+storm_call_self	Storm Call	StormCall	StormCall	Spell,Damage,Area,Duration,Trappable,Totemable,Mineable,Triggerable,Multicastable,Lightning,Cascadable,AreaSpell,AttackInPlace				
+storm_call_attached	Storm Call		AttachedStormCall	Spell,Damage,Area,Duration,Trappable,Totemable,Mineable,Triggerable,Multicastable,Lightning,AreaSpell,AttackInPlace				
+vaal_storm_call	Vaal Storm Call	VaalStormCall	VaalStormCall	Spell,Damage,Area,Duration,Trappable,Totemable,Mineable,Vaal,Lightning,AreaSpell,AttackInPlace				
+charged_blast	Flameblast	Flameblast	ChargedBlast	Spell,Damage,Area,Totemable,Fire,AreaSpell,GainsStages,AttackInPlace				
+flameblast	Flameblast	FlameblastPlayer	FlameblastChannelled	Spell,Damage,Area,Totemable,Fire,Channel,AreaSpell,Nova,UsableWhileMoving,GainsStages,Cooldown				
+reserving_nova_physicalblast	Blood Sacrament		FlameblastChannelled	Spell,Damage,Area,Channel,AreaSpell,HasReservation,Physical,Nova,Cooldown,AttackInPlace				
+repeating_vaal_charged_blast	Vaal Flameblast		RepeatingVaalChargedBlast	Spell,Damage,Area,Totemable,Vaal,Fire,AreaSpell,AttackInPlace				
+vaal_charged_blast	Vaal Flameblast		VaalChargedBlast	Spell,Damage,Area,Totemable,Vaal,Fire,AreaSpell,AttackInPlace				
+vaal_charged_blast_triggerable	Vaal Flameblast		VaalChargedBlast	Spell,Damage,Area,Totemable,Triggerable,Fire,AreaSpell,AttackInPlace				
+atziri_unique_staff_flameblast	Flames of Judgement		VaalChargedBlast	Spell,Damage,Duration,Area,AreaSpell,Triggerable,Triggered,InbuiltTrigger,Fire				
+barrage	Barrage	BarragePlayer	Barrage	Attack,RangedAttack,MirageArcherCanUse,Projectile,ProjectilesFromUser,Totemable,Trappable,Mineable,AttackInPlace				
+empower_barrage	Barrage	BarragePlayer	EmpowerBarrage	Spell,Duration,ModifiesNextSkill,Cooldown,ConsumesCharges,UsableWhileMoving,Buff,EmpowersOtherSkill,SkillConsumesFrenzyChargesOnUse,UsableWhileMounted				
+summon_raging_spirit	Summon Raging Spirit	SummonRagingSpiritPlayer	SummonElemental	Spell,Minion,Duration,MinionsCanExplode,Trappable,Totemable,Mineable,Multicastable,Triggerable,Fire,Unleashable,CreatesMinion,UsableWhileMoving				
+summon_raging_spirit_triggered	Summon Raging Spirit	SummonRagingSpirit	SummonElemental	Spell,Minion,Duration,MinionsCanExplode,Trappable,Totemable,Mineable,Multicastable,Triggerable,Fire,InbuiltTrigger,CreatesMinion,Triggered,AttackInPlace				
+monster_summon_raging_spirit			SummonElemental	Spell,Minion,Duration,MinionsCanExplode,Trappable,Totemable,Mineable,Multicastable,Triggerable,Fire,CreatesMinion,AttackInPlace				
+flame_whip	Flame Surge	FlameWhip	FlameWhip	Spell,Damage,Trappable,Totemable,Mineable,Multicastable,Triggerable,Area,Fire,Unleashable,AreaSpell,Duration,AttackInPlace				
+desecrate	Desecrate	DesecratePlayer	Desecrate	Spell,Area,Duration,Trappable,Totemable,Mineable,Triggerable,DamageOverTime,Multicastable,Chaos,Cascadable,AreaSpell,AttackInPlace				
+bone_offering	Bone Offering	BoneOfferingPlayer	BoneOffering	Offering,Minion,Buff,Duration,Triggerable,Trappable,Mineable,Totemable,Area,Physical,UsableWhileMoving,CreatesMinion,Limit				
+glacial_cascade	Glacial Cascade	GlacialCascadePlayer	Upheaval	Spell,Damage,Area,Trappable,Totemable,Mineable,Multicastable,Triggerable,Cold,Physical,Unleashable,AreaSpell,AttackInPlace				
+storm_cascade_player	Storm Cascade		Upheaval	Spell,Damage,Area,Trappable,Totemable,Mineable,Multicastable,Triggerable,Lightning,Physical,InbuiltTrigger,AreaSpell,Cooldown,Triggered,AttackInPlace				
+atziri_flameblast			AtziriFlameblast	Spell,AttackInPlace				
+atziri_flameblast_empowered			AtziriFlameblastEmpowered	Spell,AttackInPlace				
+summon_monsters			SummonMonsters	Spell,Minion,CreatesMinion,AttackInPlace				
+molten_strike	Molten Strike		MoltenStrike	Attack,Projectile,Area,Melee,MeleeSingleTarget,Fire,RangedAttack,ProjectilesNotFromUser,ThresholdJewelChaining				
+vaal_molten_strike	Vaal Molten Strike		MoltenStrike	Attack,Projectile,Area,Melee,MeleeSingleTarget,Fire,RangedAttack,ProjectilesNotFromUser,Chains,Vaal				
+brutus_spiked_ground			DoNothing	Spell,Triggerable,AttackInPlace				
+tornado_shot	Tornado Shot	TornadoShotPlayer	TornadoShotNew	Attack,RangedAttack,MirageArcherCanUse,Area,ProjectileSpeed,ProjectileNumber,Totemable,Trappable,Mineable,Triggerable,Rain,Barrageable,Physical,DamageOverTime,Duration,Limit,UsableWhileMoving,ProjectileNoCollision,CannotChain,Bow,ObjectDurability,Wind				
+brutus_ground_slam			BrutusGroundSlam	Attack,AttackInPlace				
+monster_projectile_spell			MonsterProjectileSpell	Spell,Projectile,ProjectilesFromUser,Triggerable,Damage,AttackInPlace				
+heal			Heal	Spell,Duration,AttackInPlace				
+herald_of_ash	Herald of Ash	HeraldOfAsh	HeraldOfAsh	Buff,HasReservation,CausesBurning,Area,DamageOverTime,Fire,Herald,Duration,OngoingSkill,Persistent,AttackInPlace				
+herald_of_ice	Herald of Ice	HeraldOfIce	HeraldOfIce	Buff,HasReservation,Area,Cold,Attack,Herald,OngoingSkill,Persistent,NoAttackOrCastTime,AttackInPlace				
+herald_of_thunder	Herald of Thunder	HeraldOfThunder	HeraldOfThunder	Buff,HasReservation,Area,Lightning,Herald,Attack,OngoingSkill,Persistent,NoAttackOrCastTime,AttackInPlace				
+herald_of_light	Herald of Purity	HeraldOfLight	HeraldOfLight	Spell,Buff,HasReservation,Herald,Minion,Duration,Physical,CreatesMinion,OngoingSkill,Persistent,AttackInPlace				
+consecrate	Consecrate		Consecrate	Spell,Duration,Triggerable,Area,AreaSpell,Nova,Cascadable,UsableWhileMoving,CreatesGroundEffect				
+triggered_consecrate	Consecrate		Consecrate	Spell,Duration,Triggerable,Area,AreaSpell,Cooldown,Triggered,InbuiltTrigger,CreatesGroundEffect,AttackInPlace				
+summon_specific_monsters_on_self			SummonSpecificMonsters	Spell,Multicastable,Triggerable,Trappable,Totemable,Mineable,AttackInPlace				
+summon_specific_monsters_on_target			SummonSpecificMonsters	Spell,Multicastable,Triggerable,AttackInPlace				
+summon_specific_monsters_on_target_no_los			SummonSpecificMonsters	Spell,Multicastable,Triggerable,AttackInPlace				
+lightning_tendrils_channelled	[DNT-UNUSED] Lightning Tendrils		DoNothing	Spell,Damage,Area,Totemable,Lightning,Channel,AreaSpell,AttackInPlace				
+bat_screech			BatScreech	Spell,Multicastable,Triggerable,AttackInPlace				
+voll_charge			VollCharge	Attack,AttackInPlace				
+voll_slam			VollSlam	Attack,Area,AttackInPlace				
+water_vortex			WaterVortex	Projectile,ProjectilesFromUser,Spell,Damage,Area,Trappable,Totemable,Mineable,Multicastable,Triggerable,AreaSpell,AttackInPlace	Metadata/Projectiles/WaterVortex	Metadata/Effects/Spells/monsters_effects/act4/water_elemental/whirlpool/whirlpool_attack.ao	whirlpool_loop	whirlpool_end
+monster_dodge			MonsterDodge					
+monster_dodge_target			MonsterDodge					
+monster_mortar			MonsterMortar	Projectile,ProjectilesFromUser,Spell,Damage,Area,Trappable,Totemable,Mineable,Multicastable,Triggerable,AreaSpell,AttackInPlace				
+monster_mortar_attack			MonsterMortarAttack	Projectile,ProjectilesFromUser,Attack,Damage,Area,Trappable,Totemable,Mineable,Multicastable,Triggerable,AttackInPlace				
+kinetic_blast	Kinetic Blast	ClusterBurst	ClusterBurst	Attack,RangedAttack,Projectile,ProjectilesFromUser,Area,Trappable,Mineable,Totemable,AttackInPlace				
+summon_chaos_elemental	Summon Chaos Golem		SummonChaosElemental	Triggerable,Chaos,Mineable,Minion,MinionsCanExplode,Multicastable,Spell,Totemable,Trappable,Golem,CreatesMinion,Cooldown,AttackInPlace				
+summon_ice_elemental	Summon Ice Golem		SummonIceElemental	Triggerable,Cold,Mineable,Minion,MinionsCanExplode,Multicastable,Spell,Totemable,Trappable,Golem,CreatesMinion,Cooldown,AttackInPlace				
+summon_fire_elemental	Summon Flame Golem		SummonFireElemental	Triggerable,Fire,Mineable,Minion,MinionsCanExplode,Multicastable,Spell,Totemable,Trappable,Golem,CreatesMinion,Cooldown,AttackInPlace				
+ice_crash	Ice Crash		IceCrash_	Attack,Area,Melee,Cold,Slam,Totemable,AttackInPlace				
+death_explode			DeathExplode	Spell,Triggerable,AttackInPlace				
+miner_excavate_elemental			MinerExcavateElemental					
+wait			Wait					
+enervating_nova	Enervating Nova	NewShockNova	NewShockNova	Spell,Damage,Area,Trappable,Totemable,Mineable,Multicastable,Triggerable,Lightning,Unleashable,AreaSpell,Nova,Cascadable,UsableWhileMoving,Duration				
+flame_dash	Flame Dash	FlameDash	FlameDash	Spell,Movement,Damage,DamageOverTime,Duration,Totemable,Triggerable,Fire,Trappable,Mineable,Travel,Blink,Cooldown,AttackInPlace				
+piety_corrupted_lightning_beam			PietyCorruptedLightningBeam					
+vigilant_strike	Vigilant Strike	VigilantStrike	Fortify	Attack,Buff,Melee,MeleeSingleTarget,ThresholdJewelArea,Cooldown,SkillConsumesEnduranceChargesOnUse,AttackInPlace				
+frost_blades	Frost Blades		IceStrike	Attack,Projectile,MeleeSingleTarget,Melee,Cold,RangedAttack,ProjectilesNotFromUser,AttackInPlace				
+vulture_leap_slam	Leap Slam	LeapSlam	LeapSlam	Attack,Area,Melee,Movement,Travel,Slam,Totemable,AttackInPlace				
+rolling_magma	Rolling Magma		RollingMagma	Attack,Damage,Area,Fire,Projectile,ProjectilesFromUser,UsableWhileMoving,Shapeshift,Wyvern,Detonator,Triggerable,RangedAttack				
+fire_mortar_monster	Rolling Magma		FireMortar	Spell,Damage,Area,Trappable,Mineable,Totemable,Triggerable,Fire,Projectile,ProjectilesFromUser,Multicastable,Unleashable,AreaSpell,UsableWhileMoving	Metadata/Projectiles/FireMortar	Metadata/Effects/Spells/fire_rolling_magma/magma_projectile.ao	mortar	impact
+new_punishment	Punishment	NewPunishment	NewPunishment	Spell,Area,Duration,Trappable,Totemable,Mineable,Multicastable,Triggerable,Cascadable,AppliesCurse,Unleashable,AreaSpell,AttackInPlace				
+vaal_arctic_armour	Vaal Arctic Armour	VaalArcticArmour	VaalArcticArmour	Spell,Buff,Duration,Cold,Vaal,AttackInPlace				
+wild_strike	Wild Strike		ElementalStrike	Attack,MeleeSingleTarget,Melee,Lightning,Cold,Fire,Projectile,Area,Chains,RangedAttack,ProjectilesNotFromUser,RandomElement,AttackInPlace				
+invisible_fire			InvisibleFire	Spell,Buff,Area,Totemable,CausesBurning,Triggerable,DamageOverTime,Fire,AreaSpell,AttackInPlace				
+mortar_with_ground_effects	Mortar		MortarWithGroundEffects	Projectile,ProjectilesFromUser,Spell,Damage,Area,Trappable,Totemable,Mineable,Multicastable,Triggerable,AreaSpell,AttackInPlace				
+piety_reverse_cleave	[DNT-UNUSED] Piety Reverse Cleave	PietyReverseCleave	DoNothing	Attack,Area,Melee,DamageOverTime,AttackInPlace				
+bladefall	Bladefall	Bladefall	RainOfBlades	Spell,Area,Trappable,Mineable,Totemable,Damage,Triggerable,Multicastable,Cascadable,Unleashable,AreaSpell,Physical,Duration,AttackInPlace				
+labyrinth_boss_rain_of_blades	Rain of Blades		RainOfBlades	Spell,Area,Trappable,Mineable,Totemable,Damage,Triggerable,AreaSpell,AttackInPlace				
+frost_bomb	Frost Bomb	FrostBomb	FrostBomb	Spell,Area,Duration,Cold,Damage,Multicastable,Totemable,Trappable,Mineable,Triggerable,Cascadable,AreaSpell,Cooldown,Orb,Invokable,UsableWhileMoving,GeneratesInfusion,GeneratesRemnants,DetonatesAfterTime,Limit				
+unique_animate_weapon_1h	Manifest Dancing Dervish	UniqueAnimateWeapon	UniqueAnimateWeapon	Spell,Minion,MinionsCanExplode,Triggerable,InbuiltTrigger,MinionsPersistWhenSkillRemoved,CreatesMinion,Cooldown,Triggered				
+unique_animate_weapon	Manifest Dancing Dervishes	UniqueAnimateWeapon	UniqueAnimateWeapon	Spell,Minion,MinionsCanExplode,Triggerable,InbuiltTrigger,MinionsPersistWhenSkillRemoved,CreatesMinion,Cooldown,Triggered				
+orb_of_storms	Orb of Storms	OrbOfStorms	StormCloud	Spell,Damage,Lightning,Area,Chains,Triggerable,Trappable,Mineable,Totemable,AreaSpell,Orb,UsableWhileMoving,Limit,Duration,Sustained,GeneratesInfusion,GeneratesRemnants,Unleashable				
+lb_retractable_trap			LbRetractableTrap					
+summon_rock_golem	Summon Stone Golem	SummonRockGolem	SummonRockGolem	Triggerable,Mineable,Minion,MinionsCanExplode,Multicastable,Spell,Totemable,Trappable,Golem,Physical,CreatesMinion,CreatesMinion,Cooldown,AttackInPlace				
+whirling_leap	Whirling Leap	WhirlingLeap	WhirlingLeap	Attack,Area,Melee,Movement,AttackInPlace				
+earthquake	Earthquake	Earthquake	QuakeSlam	Attack,Area,Melee,Duration,Slam,Triggerable,Totemable,CreatesGroundEffect,AttackInPlace,Limit				
+vaal_earthquake	[DNT-UNUSED] Vaal Earthquake	VaalEarthquake	DoNothing	Attack,Area,Melee,Duration,Vaal,Slam,Totemable,AttackInPlace				
+vaal_earthquake_footstep	[DNT-UNUSED] Vaal Earthquake	VaalEarthquakeFootstep	DoNothing	Attack,Area,Melee,Duration,Vaal,Slam,Totemable,AttackInPlace				
+earthquake_triggered			QuakeSlam	Attack,Area,Melee,Duration,Triggered,InbuiltTrigger,Triggerable,Slam,AttackInPlace				
+contagion	Contagion	Contagion	Contagion	Spell,Area,Duration,Trappable,Totemable,DamageOverTime,Chaos,Multicastable,Triggerable,Mineable,DegenOnlySpellDamage,Unleashable,AreaSpell,UsableWhileMoving				
+wither	Wither	Wither	Wither	Spell,Area,Duration,Totemable,Chaos,AreaSpell,AttackInPlace				
+wither_channel	Wither	Wither	WitherChannelled	Spell,Area,Duration,Totemable,Chaos,Channel,AreaSpell				
+essence_drain	Essence Drain	EssenceDrain	Siphon	Spell,Projectile,ProjectilesFromUser,Duration,Totemable,Multicastable,DamageOverTime,Chaos,Damage,Triggerable,Unleashable,Trappable,Mineable,UsableWhileMoving	Metadata/Projectiles/Siphon	Metadata/Effects/Spells/chaos_essencedrain/essenceDrain_Projectile.ao		impact_01
+revive_after_duration			ReviveAfterDuration	Spell,Triggerable,AttackInPlace				
+summon_specific_monsters_in_front			SummonSpecificMonstersInFront	Spell,Multicastable,Triggerable,AttackInPlace				
+rigwald_wolf_barrage			RigwaldWolfBarrage	Attack,Projectile,Damage,RangedAttack,ProjectilesFromUser,AttackInPlace	Metadata/Projectiles/RigwaldWolfBarrage	Metadata/Effects/Spells/monsters_effects/talisman/rigwald/wolf/rig.ao	emerge_run	end
+sunder	Sunder		ShockwaveSlam	Attack,Area,Melee,Slam,Totemable,AttackInPlace				
+new_sunder	Sunder		NewSunder	Attack,Area,Melee,Slam,Totemable,ConsumesFullyBrokenArmour,CreatesFissure,Duration				
+monster_cast_ground_effect			CastGroundEffect	Spell,Area,Damage,Triggerable,Duration,AreaSpell,AttackInPlace				
+monster_cast_ground_effect_location			CastGroundEffect	Spell,Area,Damage,Triggerable,Duration,AreaSpell,AttackInPlace				
+frost_bolt	Frostbolt		FrostBolt	Spell,Projectile,ProjectilesFromUser,Damage,Trappable,Totemable,Mineable,Multicastable,Cold,Triggerable,Unleashable,Area,UsableWhileMoving	Metadata/Projectiles/FrostBolt	Metadata/Effects/Spells/frost_bolt/projectile.ao	projectile_loop	projectile_end
+frost_bolt_nova	Vortex		FrostBoltNova	Spell,Damage,Area,Trappable,Totemable,Mineable,Multicastable,Cold,Triggerable,Duration,ChillingArea,AreaSpell,Instant,Nova,Cooldown,AttackInPlace				
+blight_channel	[DNT-UNUSED] Blight		DoNothing	Spell,Chaos,Area,Totemable,Channel,Duration,DamageOverTime,DegenOnlySpellDamage,AreaSpell,AttackInPlace				
+vaal_blight	[DNT-UNUSED] Vaal Blight	VaalBlight	DoNothing	Spell,Chaos,Area,Totemable,Duration,DamageOverTime,DegenOnlySpellDamage,Vaal,AreaSpell,Nova,AttackInPlace				
+charged_attack_channel	[DNT-UNUSED] Blade Flurry	ChargedAttack	DoNothing	Attack,Area,Channel,Melee,Physical,AttackInPlace				
+vaal_charged_attack	[DNT-UNUSED] Vaal Blade Flurry	ChargedAttack	DoNothing	Attack,Area,Channel,Melee,Physical,Vaal,Cooldown,AttackInPlace				
+face_last_target	Face Last Target		FaceLastTarget	Spell				
+summon_lightning_golem	Summon Lightning Golem		SummonLightningElemental	Triggerable,Lightning,Mineable,Minion,MinionsCanExplode,Multicastable,Spell,Totemable,Trappable,Golem,CreatesMinion,Cooldown,AttackInPlace				
+izaro_warp	Izaro Warp		IzaroWarp	Spell,Area,AreaSpell,AttackInPlace				
+double_slash	Lacerate	DoubleSlash	DoubleSlash	Attack,Area,Melee,Physical,AttackInPlace				
+walking_double_slash		DoubleSlash	DoNothing	Attack,Area,Melee,AttackInPlace				
+dark_pact	Dark Pact	SkeletalChains	SkeletalChains	Spell,Damage,Mineable,Totemable,Area,Trappable,Triggerable,Multicastable,Chaos,Minion,Unleashable,AreaSpell,Nova,UsableWhileMoving				
+abyssal_pact	Abyssal Pact	SkeletalChains	SkeletalChains	Spell,Damage,Mineable,Totemable,Area,Trappable,Triggerable,Multicastable,Physical,Minion,Unleashable,AreaSpell,UsableWhileMoving				
+fire_orbs			FireOrbs	Damage,Area,Fire,Spell,Triggerable,AreaSpell,AttackInPlace				
+hydra_turret_projectile			HydraTurretProjectile	Spell,Projectile,Damage,AttackInPlace	Metadata/Projectiles/HydraTurretProjectile	Metadata/Effects/Spells/monsters_effects/Hydra/frost_bolt/projectile.ao	projectile_loop	projectile_end
+fire_beam	Scorching Ray		FireBeam	Spell,Totemable,DamageOverTime,Fire,CausesBurning,Duration,Channel,DegenOnlySpellDamage,AttackInPlace				
+marker_warp			MarkerWarp	Spell,AttackInPlace				
+minotaur_burrow			MinotaurBurrow	Attack,Area,AttackInPlace				
+summon_specific_barrels			SummonSpecificBarrels	Spell,Multicastable,Triggerable,AttackInPlace				
+bone_prison			BonePrison	Spell,Triggerable,AttackInPlace				
+new_blade_vortex	Blade Vortex	BladeVortex	BladeVortex	Spell,Damage,Area,Duration,Totemable,Multicastable,Triggerable,TotemCastsAlone,Unleashable,AreaSpell,Physical,AttackInPlace				
+change_to_stance1			ChangeToStance1					
+change_to_stance2			ChangeToStance2					
+change_to_stance3			ChangeToStance3					
+change_to_stance4			ChangeToStance4					
+change_to_stance5			ChangeToStance5					
+change_to_stance1_immediate			ChangeToStance1Immediate					
+change_to_stance2_immediate			ChangeToStance2Immediate					
+change_to_stance3_immediate			ChangeToStance3Immediate					
+atlas_growing_maelstrom_location			AtlasGrowingMaelstrom	Spell,Area,Damage,Triggerable,AreaSpell,AttackInPlace				
+atlas_spider_web			AtlasSpiderWeb	Spell,Area,AreaSpell,Triggerable,AttackInPlace				
+revive_specific_monsters			ReviveSpecificMonsters	Spell,Area,Triggerable,AreaSpell,AttackInPlace				
+hotdog_upheaval			HotdogUpheaval	Spell,Damage,Fire,Duration,Area,Triggerable,AreaSpell,AttackInPlace				
+breach_bone_mortar	Bone Mortar		MortarInCone	Projectile,Spell,Damage,Area,Trappable,Totemable,Mineable,Multicastable,Triggerable,AreaSpell,AttackInPlace				
+breach_bone_nova			BreachBoneNova	Attack,Area,Damage,Triggerable,AttackInPlace				
+maligaro_blade_flurry			MaligaroBarrage	Attack,Melee,Movement,AttackInPlace				
+triggered_lightning_spell	Lightning Bolt		LightningSpell	Spell,Triggered,Lightning,Area,Damage,InbuiltTrigger,AreaSpell,Triggerable,AttackInPlace				
+triggered_summon_spider	Raise Spiders		SummonSpider	Spell,Minion,Triggerable,Triggered,InbuiltTrigger,CreatesMinion,AttackInPlace				
+melee_thrust_attack			MeleeThrustAttack	Attack,Damage,Triggerable,AttackInPlace				
+lunaris_glaive_projectile			LunarisGlaiveProjectile	Attack,RangedAttack,Projectile,Triggerable,AttackInPlace	Metadata/Projectiles/LunarisGlaiveProjectile	Metadata/Effects/Spells/monsters_effects/Solaris_and_Lunaris/Lunaris_e/glaive_projectile.ao	loop	end
+avarius_divine_beam			AvariusDivineBeam	Spell,Area,Fire,Channel,AreaSpell,AttackInPlace				
+purge_hound_whirling_blades			PurgeHoundWhirlingBlades	Attack,Melee,Movement,AttackInPlace				
+summon_skeleton_warrior	Skeletal Warrior Minion	SummonSkeletonsChannelled	SummonSkeleton	Minion,MinionsCanExplode,CreatesMinion,CreatesUndeadMinion,CreatesSkeletonMinion,HasReservation,Persistent,MultipleReservation,Physical				
+summon_skeleton_reaver	Skeletal Reaver Minion	SummonSkeletonsChannelled	SummonSkeleton	Minion,MinionsCanExplode,CreatesMinion,CreatesUndeadMinion,CreatesSkeletonMinion,HasReservation,Persistent,MultipleReservation,Physical,CommandableMinion				
+summon_skeleton_brute	Skeletal Brute Minion	SummonSkeletonsChannelled	SummonSkeleton	Minion,MinionsCanExplode,CreatesMinion,CreatesUndeadMinion,CreatesSkeletonMinion,HasReservation,Persistent,MultipleReservation,Physical,CommandableMinion				
+summon_skeletal_sniper	Skeletal Sniper Minion	SummonSkeletonsChannelled	SummonSkeleton	Minion,MinionsCanExplode,CreatesMinion,CreatesUndeadMinion,CreatesSkeletonMinion,HasReservation,Persistent,MultipleReservation,Physical,Chaos,Fire,CommandableMinion				
+summon_skeleton_frost_mage	Skeletal Frost Mage Minion	SummonSkeletonsChannelled	SummonSkeleton	Minion,MinionsCanExplode,CreatesMinion,CreatesUndeadMinion,CreatesSkeletonMinion,HasReservation,Persistent,MultipleReservation,Cold,CommandableMinion				
+summon_skeleton_storm_mage	Skeletal Storm Mage Minion	SummonSkeletonsChannelled	SummonSkeleton	Minion,MinionsCanExplode,CreatesMinion,CreatesUndeadMinion,CreatesSkeletonMinion,HasReservation,Persistent,MultipleReservation,Lightning,CommandableMinion				
+summon_skeleton_arsonist	Skeletal Arsonist Minion	SummonSkeletonsChannelled	SummonSkeleton	Minion,MinionsCanExplode,CreatesMinion,CreatesUndeadMinion,CreatesSkeletonMinion,HasReservation,Persistent,MultipleReservation,Fire,CommandableMinion,Detonator				
+summon_skeleton_cleric	Skeletal Cleric Minion	SummonSkeletonsChannelled	SummonSkeleton	Minion,MinionsCanExplode,CreatesMinion,CreatesUndeadMinion,CreatesSkeletonMinion,HasReservation,Persistent,MultipleReservation				
+summon_azmerian_wolf	Azmerian Wolf		SummonPackleaderCompanion	Minion,CreatesMinion,HasReservation,Persistent,Physical,Companion,CreatesCompanion,CommandableMinion				
+summon_mist_raven	Mist Raven		SummonMistRaven	Minion,CreatesMinion,HasReservation,Persistent,Physical,Chaos,CommandableMinion,Companion,MinionsAreUndamagable,CreatesCompanion,GeneratesCharges				
+summon_spiraling_conspiracy	Spiraling Conspiracy		SummonTangmazuDaemon	Minion,CreatesMinion,HasReservation,Persistent,CommandableMinion,MinionsAreUndamagable,Physical,Chaos,Duration,Area				
+abberath_meteor_upheaval			AbberathMeteorUpheaval	Spell,Damage,Fire,Triggerable,AttackInPlace				
+charged_dash_aim	[DNT-UNUSED] Charged Dash		DoNothing	Movement,Area,Damage,Channel,Attack,Melee,Lightning,AttackInPlace				
+utula_remote_slam			UtulaRemoteSlam	Attack,Area,Damage,AttackInPlace				
+teleport			Teleport	Spell,Movement,AttackInPlace				
+teleport_no_los			Teleport	Spell,Movement,AttackInPlace				
+add_buff_to_target			AddBuffToTarget	Buff,Duration,Spell,AttackInPlace				
+add_buff_to_target_triggered			AddBuffToTarget	Buff,Duration,Spell,Triggerable,AttackInPlace				
+add_buff_to_target_triggered_support			AddBuffToTarget	Buff,Duration,Spell,Triggerable,AttackInPlace,SkillGrantedBySupport				
+triggered_corrupting_cry	Corrupted Cry		AddBuffToTarget	Duration,Triggerable,Triggered,InbuiltTrigger,AttackInPlace,SkillGrantedBySupport,Physical,DamageOverTime				
+triggered_paquates_pact	Twisted Pact		AddBuffToTarget	Duration,Triggerable,Triggered,InbuiltTrigger,AttackInPlace,SkillGrantedBySupport,Physical,DamageOverTime				
+triggered_decaying_hex	Profane Decay		AddBuffToTarget	Duration,Spell,Triggerable,Triggered,InbuiltTrigger,AttackInPlace,SkillGrantedBySupport,Chaos,Damage,DamageOverTime				
+delayed_skill_trigger			DelayedSkillTrigger	Spell,Triggerable,AttackInPlace				
+empty_action_spell			EmptyActionSpell	Spell				
+empty_action_spell_ally			EmptyActionSpell	Spell				
+empty_action_spell_no_los			EmptyActionSpell	Spell				
+trigger_cascade			TriggerCascade	Triggerable,AttackInPlace				
+special_beam_cannon			SpecialBeamCannon	Spell,Damage,AttackInPlace				
+move_daemon			MoveDaemon	Multicastable,Triggerable,AttackInPlace,Spell				
+rotate_object			RotateObject	Multicastable,AttackInPlace				
+doedre_screech			DoedreScreech	Spell,Damage,AttackInPlace				
+iguana_flamethrower			IguanaFlamethrower	Spell,Fire,Damage,AttackInPlace				
+volatile_dead	Volatile Dead		VolatileDead	Spell,Damage,Area,Trappable,Totemable,Mineable,Multicastable,Triggerable,Fire,Cascadable,Unleashable,AreaSpell,UsableWhileMoving,TargetsDestructibleCorpses				
+volatile_dead_chaos	Stalking Pustule		VolatileDead	Spell,Damage,Area,Trappable,Totemable,Mineable,Multicastable,Triggerable,Chaos,Cascadable,Unleashable,AreaSpell,Cooldown,InbuiltTrigger,Triggered,AttackInPlace				
+invoke_owner_skill			InvokeOwnerSkill					
+walk_emerge			WalkEmerge					
+cremation	Cremation		CorpseErruption	Spell,Area,Fire,Duration,Projectile,Multicastable,Trappable,Totemable,Mineable,Triggerable,Damage,Cascadable,Projectile,Unleashable,AreaSpell,AttackInPlace				
+corpse_erruption_monster	Cremation		CorpseErruption	Spell,Area,Fire,Duration,Projectile,Multicastable,Trappable,Totemable,Mineable,Triggerable,Damage,Cascadable,Projectile,AreaSpell,AttackInPlace				
+shakari_quicksand			ShakariQuicksand	Area,Triggerable,AttackInPlace				
+decelerating_projectile			DeceleratingProjectile	Spell,Projectile,Triggerable,Damage,Attack,AttackInPlace				
+endurance_charge_slam	Tectonic Slam		EnduranceChargeSlam	Attack,Area,Melee,Fire,Slam,Totemable,AttackInPlace				
+lightning_elder_bolt			LightningElderBolt	Triggerable,Damage,Spell,AttackInPlace				
+geometry_attack			GeometryAttack	Triggerable,Attack,AttackInPlace				
+geometry_spell			GeometrySpell	Triggerable,Spell,Damage,AttackInPlace				
+empty_action_spell_2			EmptyActionSpell2	Spell				
+empty_action_spell_3			EmptyActionSpell3	Spell				
+empty_action_spell_4			EmptyActionSpell4	Spell				
+empty_action_spell_5			EmptyActionSpell5	Spell				
+empty_action_spell_5_no_los			EmptyActionSpell5	Spell				
+despair	Despair		ChaosWeakness	Spell,Area,Duration,Trappable,Totemable,Mineable,Multicastable,Triggerable,Cascadable,Chaos,AppliesCurse,Unleashable,AreaSpell,UsableWhileMoving				
+summon_petrification_statue	Petrification Statue		SummonPetrificationStatue	Spell,Duration,Triggerable,Cooldown,AttackInPlace				
+temporal_anomaly	Glimpse of Eternity		TemporalAnomalySkill	Spell,Area,Triggerable,Triggered,InbuiltTrigger,Duration,AreaSpell,Nova,AttackInPlace				
+empty_action_spell_loop			EmptyActionSpellLoop	Spell				
+empty_action_spell_loop2			EmptyActionSpellLoop2	Spell				
+empty_action_spell_loop3			EmptyActionSpellLoop3	Spell				
+empty_action_spell_loop4			EmptyActionSpellLoop4	Spell				
+empty_action_spell_loop5			EmptyActionSpellLoop5	Spell				
+monster_detonate_dead_area			MonsterDetonateDeadArea	Area,Damage,Triggerable,AttackInPlace				
+avian_tornado	Twister		Spark	Spell,Projectile,ProjectilesFromUser,Damage,Duration,Triggerable,Triggered,InbuiltTrigger,Physical,AttackInPlace	Metadata/Projectiles/Spark	Metadata/Effects/Spells/lightning_spark/spark_projectile.ao	projectile_01	impact_01
+master_grant_buff			MasterGrantBuff					
+empty_action_attack			EmptyActionAttack	Attack				
+empty_action_attack_2			EmptyActionAttack2	Attack				
+empty_action_attack_3			EmptyActionAttack3	Attack				
+empty_action_attack_4			EmptyActionAttack4	Attack				
+empty_action_attack_5			EmptyActionAttack5	Attack				
+empty_action_attack_no_los			EmptyActionAttack	Attack				
+empty_action_loop_attack			EmptyActionAttackLoop	Attack				
+empty_action_loop_attack_2			EmptyActionAttackLoop2	Attack				
+empty_action_loop_attack_3			EmptyActionAttackLoop3	Attack				
+empty_action_loop_attack_4			EmptyActionAttackLoop4	Attack				
+empty_action_loop_attack_5			EmptyActionAttackLoop5	Attack				
+phys_cascade_trap	Seismic Trap		PhysCascadeTrap	Spell,Duration,Damage,Mineable,Area,Trapped,AreaSpell,Physical,Cooldown,AttackInPlace				
+expanding_pulse			ExpandingPulse	Triggerable,Spell,Damage,AttackInPlace				
+trigger_beam			TriggerBeam	Spell,Triggerable,Attack,Damage,AttackInPlace				
+architect_healing_beam			ArchitectHealingBeam	Buff,AttackInPlace				
+monster_tornado			MonsterTornado	Spell,Area,Duration,Triggerable,AreaSpell,AttackInPlace				
+architect_combo_stomp		ArchitectComboStomp	ArchitectComboStomp	Spell,Area,Triggerable,Damage,AreaSpell,AttackInPlace				
+architect_blood_explosion		ArchitectBloodExplosion	ArchitectBloodExplosion	Spell,Area,Triggerable,Damage,AreaSpell,AttackInPlace				
+architect_blood_beam		ArchitectBloodBeam	ArchitectBloodBeam	Spell,Area,Damage,AreaSpell,AttackInPlace				
+translate_rotate			TranslateRotate					
+holy_path	Consecrated Path		HolyPath	Melee,Attack,Area,Movement,Triggerable,Damage,Duration,Fire,Slam,Totemable				
+smite	[DNT-UNUSED] Smite		DoNothing	Melee,Attack,Area,Duration,Damage,MeleeSingleTarget,Aura,Buff,Lightning,AttackInPlace				
+vaal_smite	[DNT-UNUSED] Vaal Smite		DoNothing	Melee,Attack,Area,Duration,Damage,MeleeSingleTarget,Aura,Buff,Lightning,Vaal,AttackInPlace				
+execute_geal			ExecuteGEAL	Triggerable				
+execute_corpse_geal			ExecuteGEAL	Triggerable,AttackInPlace				
+virulent_arrow	[DNT-UNUSED] Scourge Arrow		DoNothing	Attack,RangedAttack,MirageArcherCanUse,Projectile,ProjectilesFromUser,Totemable,Damage,Channel,Chaos,Bow,AttackInPlace	Metadata/Projectiles/VirulentArrow	Metadata/Effects/Spells/virulent_arrow/virulent_arrow.ao	projectile	impact
+rain_of_spores	Toxic Rain		RainOfSpores	Attack,RangedAttack,MirageArcherCanUse,Area,ProjectileSpeed,Totemable,Trappable,Mineable,Damage,Chaos,Duration,DamageOverTime,ProjectileNumber,Chaos,Triggerable,Rain,Bow,GroundTargetedProjectile,AttackInPlace				
+triggered_rain_of_spores	Toxic Rain		RainOfSpores	Attack,RangedAttack,MirageArcherCanUse,Area,ProjectileSpeed,Totemable,Trappable,Mineable,Damage,Chaos,Duration,DamageOverTime,ProjectileNumber,Chaos,Triggerable,Rain,Triggered,InbuiltTrigger,Cooldown,Bow,GroundTargetedProjectile,AttackInPlace				
+summon_relic	Summon Holy Relic		SummonRelic	Triggerable,Mineable,Minion,MinionsCanExplode,Multicastable,Spell,Totemable,Trappable,CreatesMinion,Cooldown,AttackInPlace				
+proto_pizza_slam			ProtoPizzaSlam	Attack,Damage,Area,AttackInPlace				
+proto_abyss_slam			ProtoAbyssSlam	Attack,Damage,Area,Triggerable,AttackInPlace				
+spawn_object			SpawnObject	Triggerable,AttackInPlace,Spell				
+spawn_object_mtx_pale_boss	Summon an image of Beidat, Archangel of Death		SpawnObject	Triggerable,Spell,Microtransaction,Cooldown,AttackInPlace				
+spawn_object_mtx_pale_elite	Summon Pale Angel		SpawnObject	Triggerable,Spell,Microtransaction,Cooldown,AttackInPlace				
+spawn_object_mtx_pale_fodder_1	Summon Pale Cherubim		SpawnObject	Triggerable,Spell,Microtransaction,Cooldown,AttackInPlace				
+spawn_object_mtx_pale_fodder_2	Summon Pale Servitor		SpawnObject	Triggerable,Spell,Microtransaction,Cooldown,AttackInPlace				
+spawn_object_mtx_demon_boss	Summon an image of K'tash, the Hate Shepherd		SpawnObject	Triggerable,Spell,Microtransaction,Cooldown,AttackInPlace				
+spawn_object_mtx_demon_elite	Summon Demon Harpy		SpawnObject	Triggerable,Spell,Microtransaction,Cooldown,AttackInPlace				
+spawn_object_mtx_demon_fodder_1	Summon Demon Imp		SpawnObject	Triggerable,Spell,Microtransaction,Cooldown,AttackInPlace				
+spawn_object_mtx_demon_fodder_2	Summon Demon Beast		SpawnObject	Triggerable,Spell,Microtransaction,Cooldown,AttackInPlace				
+single_ground_laser			SingleGroundLaser	Spell,Damage,Triggerable,AttackInPlace				
+monster_haste			CastAuraSpeed	Spell,Area,Buff,HasReservation,TotemCastsAlone,Totemable,Aura,Instant,Triggerable,AreaSpell,AttackInPlace				
+monster_wrath			CastAuraLightningDamage	Spell,Area,Buff,HasReservation,TotemCastsAlone,Totemable,Aura,Lightning,Instant,Triggerable,AreaSpell,AttackInPlace				
+monster_fire_resist_aura			CastAuraFireResistance	Spell,Area,Buff,HasReservation,TotemCastsAlone,Totemable,Aura,Fire,Instant,Triggerable,AreaSpell,Cooldown,AttackInPlace				
+storm_brand	[DNT-UNUSED] Storm Brand		DoNothing	Spell,Damage,Area,Lightning,Chains,Duration,Totemable,Trappable,Mineable,Triggerable,Multicastable,Brand,AreaSpell,AttackInPlace				
+betrayal_siege_cannon			BetrayalSiegeCannon	Damage,Spell,Area,AreaSpell,AttackInPlace				
+feast_of_flesh	Feast of Flesh	FeastOfFlesh	FeastOfFlesh	Spell,Area,Triggerable,AreaSpell,Nova,Unleashable,Buff,TargetsDestructibleCorpses				
+donut_circle		DonutCircle	DonutCircle	Spell,AttackInPlace				
+revive_monsters_in_cone		ReviveMonstersInCone	ReviveMonstersInCone	Spell,AttackInPlace				
+create_monster_from_corpses		CreateMonsterFromCorpses	CreateMonsterFromCorpses	Spell,AttackInPlace				
+armageddon_brand	[DNT-UNUSED] Armageddon Brand		DoNothing	Spell,Damage,Area,Fire,Duration,Totemable,Trappable,Mineable,Triggerable,Multicastable,Brand,AreaSpell,AttackInPlace				
+geometry_projectiles_spell			GeometryProjectiles	Triggerable,Spell,Damage,AttackInPlace				
+geometry_projectiles_attack			GeometryProjectilesAttack	Triggerable,Attack,AttackInPlace				
+monkey_throw			MonkeyThrow	Spell,AttackInPlace				
+effect_driven_attack			EffectDrivenAttack	Triggerable,Attack,AttackInPlace				
+effect_driven_spell			EffectDrivenSpell	Triggerable,Spell,Damage,AttackInPlace				
+geometry_trigger			GeometryTrigger	Spell,Triggerable,AttackInPlace				
+geometry_trigger_attack			GeometryTrigger	Attack,Triggerable,AttackInPlace				
+rectangle_mortar_with_rotating_orbs			RectangleMortarWithRotatingOrbs	Spell,Projectile,Triggerable,Damage,AttackInPlace				
+soulrend	Soulrend		Soulrend	Spell,Duration,Projectile,DamageOverTime,Damage,Chaos,Multicastable,Triggerable,Trappable,Mineable,Totemable,Unleashable,ProjectilesFromUser,UsableWhileMoving	Metadata/Projectiles/Soulrend	Metadata/Effects/Spells/chaos_soulrend/ao/projectile.ao	projectile	impact
+dark_ritual	Bane		DarkRitual	Spell,Area,Duration,DamageOverTime,Chaos,Multicastable,Cascadable,Triggerable,DegenOnlySpellDamage,Unleashable,AreaSpell,Meta,AttackInPlace				
+wave_of_conviction	Wave of Conviction		Purge	Spell,Area,Damage,Duration,Trappable,Totemable,Mineable,Triggerable,Fire,Lightning,Unleashable,Multicastable,AreaSpell,Physical,AttackInPlace				
+spell_damage_aura	Zealotry	Spell Damage Aura	CastAuraSpellDamage	Spell,Area,Buff,HasReservation,TotemCastsAlone,Totemable,Aura,AreaSpell,CanHaveBlessing,OngoingSkill,Persistent,AttackInPlace				
+damage_over_time_aura	Malevolence	Spell Damage Aura	CastAuraDamageOverTime	Spell,Area,Buff,HasReservation,TotemCastsAlone,Totemable,Aura,AreaSpell,CanHaveBlessing,OngoingSkill,Persistent,AttackInPlace				
+dash_to_target			DashToTarget	Spell,Movement,AttackInPlace				
+monster_soulrend			MonsterSoulrend	Spell,Area,Duration,Projectile,DamageOverTime,Chaos,Multicastable,Triggerable,Trappable,Mineable,Totemable,DegenOnlySpellDamage,AreaSpell,AttackInPlace				
+shock_rifle_disco			ShockRifleDisco	Spell,Projectile,Damage,AttackInPlace				
+expanding_cone_waves			ExpandingConeWaves	Spell,Area,Damage,AreaSpell,AttackInPlace				
+steelskin	Steelskin		QuickGuard	Spell,Buff,Instant,Duration,Triggerable,Guard,Cooldown,AttackInPlace				
+quick_dodge	Dash		QuickDodge	Spell,Movement,Travel,Blink,Cooldown,FixedCastTime,AttackInPlace				
+bladestorm	Bladestorm		Bladestorm	Attack,Melee,Area,Duration,AttackInPlace				
+blood_sand_stance	[DNT-UNUSED] Blood and Sand		DoNothing	Spell,Buff,HasReservation,Stance,Persistent,AttackInPlace				
+blood_spears	Perforate		BloodSpears	Attack,Area,Damage,Melee,Slam,Totemable,AttackInPlace				
+chain_strike	Chain Hook		DoNothing	Attack,Area,Damage,Movement,Melee,AttackInPlace				
+support_blunt_shockwave	Shockwave		SupportBluntShockwave	Attack,Area,Damage,Triggerable,Triggered,InbuiltTrigger,Melee,AttackInPlace,SkillGrantedBySupport				
+gore_shockwave	Gore Shockwave		SupportBluntShockwave	Attack,Area,Damage,Triggerable,Triggered,InbuiltTrigger,Melee,AttackInPlace				
+blood_sand_armour	[DNT-UNUSED] Flesh and Stone		DoNothing	Spell,Buff,Aura,AuraAffectsEnemies,HasReservation,AppliesMaim,Area,Stance,Persistent,AttackInPlace				
+slice_and_dice	[UNUSED] Slice and Dice (NOT CURRENTLY USED)		DoNothing	Attack,MeleeSingleTarget,Melee,Physical,AttackInPlace				
+physical_damage_aura	Pride		CastAuraPhysicalDamage	Spell,Area,Buff,HasReservation,TotemCastsAlone,Totemable,Aura,AreaSpell,Physical,AuraAffectsEnemies,CanHaveBlessing,OngoingSkill,Persistent,AttackInPlace				
+multi_splitting_projectile			MultiSplittingProjectile	Attack,Projectile,AttackInPlace				
+summon_bone_golem	Summon Carrion Golem		SummonBoneGolem	Triggerable,Physical,Mineable,Minion,MinionsCanExplode,Multicastable,Spell,Totemable,Trappable,Golem,CreatesMinion,Cooldown,AttackInPlace				
+bone_golem_cascade			BoneGolemCascade	Attack,Area,Melee,AttackInPlace				
+bone_golem_multi_attack			BoneGolemMultiAttack	Attack,Melee,MeleeSingleTarget,AttackInPlace				
+slither	Withering Step		Slither	Travel,Buff,Instant,Area,Chaos,Movement,Blink,Spell,Triggerable,Duration,Cooldown,Totemable,AttackInPlace				
+serpent_strike	[UNUSED] DISCONTINUED		SerpentStrike	Attack,Melee,MeleeSingleTarget,Movement,AttackInPlace				
+coiling_assault	[UNUSED] DISCONTINUED		CoilingAssault	Attack,Melee,Movement,Projectile,RangedAttack,ProjectilesNotFromUser,AttackInPlace	Metadata/Projectiles/CoilingAssault	Metadata/Effects/Spells/cobra_lash/cobra_lash.ao	projectile01;projectile03	impact
+mortar_barrage_mine	Pyroclast Mine		MortarBarrageMine	Spell,Damage,Projectile,Fire,RemoteMined,Area,HasReservation,Aura,AuraAffectsEnemies,ProjectilesNotFromUser,Nova,AuraNotOnCaster,AttackInPlace	Metadata/Projectiles/MortarBarrageMine	Metadata/Effects/Spells/barrage_mine/mortar_01.ao;Metadata/Effects/Spells/barrage_mine/mortar_02.ao;Metadata/Effects/Spells/barrage_mine/mortar_03.ao;Metadata/Effects/Spells/barrage_mine/mortar_04.ao	animate	
+mine_lightning_explosion	Stormblast Mine		MineLightningExplosion	Spell,Damage,Area,RemoteMined,Lightning,AreaSpell,HasReservation,Aura,AuraAffectsEnemies,Nova,AuraNotOnCaster,AttackInPlace				
+cold_projectile_mine	Icicle Mine		ColdProjectileMine	Spell,Damage,Projectile,RemoteMined,Cold,HasReservation,ProjectilesFromUser,Aura,Area,AuraAffectsEnemies,AuraNotOnCaster,AttackInPlace	Metadata/Projectiles/ColdProjectileMine	Metadata/Effects/Spells/shattering_mine/shards.ao	shard_01	impact
+monster_quick_dodge			QuickDodge	Spell,Movement,Travel,Blink,AttackInPlace				
+snapping_adder	Venom Gyre		SnappingAdder	Attack,RangedAttack,Projectile,Chaos,Duration,ProjectilesFromUser,AttackInPlace	Metadata/Projectiles/SnappingAdder	Metadata/Effects/Spells/snapping_adder/projectile.ao	projectile_01;projectile_02;projectile_03;projectile_04;projectile_05	impact
+vaal_snapping_adder	Vaal Venom Gyre		SnappingAdder	Attack,RangedAttack,Projectile,Chaos,Duration,ProjectilesNumberModifiersNotApplied,Vaal,AttackInPlace	Metadata/Projectiles/SnappingAdder	Metadata/Effects/Spells/snapping_adder/projectile.ao	projectile_01;projectile_02;projectile_03;projectile_04;projectile_05	impact
+ensnaring_arrow	Ensnaring Arrow		TetheringArrow	Attack,RangedAttack,MirageArcherCanUse,Projectile,ProjectilesFromUser,Trappable,Mineable,Totemable,Triggerable,Area,Barrageable,Bow,AttackInPlace	Metadata/Projectiles/TetheringArrow	Metadata/Effects/Spells/ensnaring_shot/arrow_flying.ao		
+siege_ballista	Siege Ballista		GenericDeployTotem	ProjectilesFromUser,Trappable,Mineable,SummonsTotem,SummonsAttackTotem,TotemsAreBallistae,UsableWhileMoving,Limit,Duration				
+artillery_ballista_projectile			CrossbowSiegeCascade	Attack,RangedAttack,Projectile,Barrageable,AttackInPlaceIsDefault,Fire,Area,CannotChain,UsedByTotem,UsedByProxy,AttackInPlace,Sustained				
+eyrie_barrage			EyrieBarrage					
+transform			Transform	Triggerable,AttackInPlace				
+arcane_cloak	Arcane Cloak		ArcaneCloak	Spell,Buff,Instant,Duration,Triggerable,Guard,Lightning,Cooldown,Arcane,AttackInPlace				
+affliction_boss_final_grow_beam		AfflictionDemonBeam	AfflictionBossFinalGrowBeam	Spell,Area,Duration,Fire,Triggerable,AttackInPlace				
+snipe	Snipe		ChannelledSnipe	Attack,RangedAttack,MirageArcherCanUse,Projectile,ProjectilesFromUser,Channel,Barrageable,Area,PerfectTiming,Bow,Cold,SkillConsumesFreeze				
+pack_teleport			PackTeleport					
+teleport_explode_kill			TeleportExplodeKill	Spell,Area,AttackInPlace				
+affliction_daemon_destroy_corpse_projectile			AfflictionDaemonDestroyCorpseProjectileCascade	Spell,Area,Triggerable,AttackInPlace				
+affliction_daemon_destroy_corpse_spawn_monster			AfflictionDaemonDestroyCorpseSummonMonster	Spell,Area,Triggerable,AttackInPlace				
+arcanist_brand	[DNT-UNUSED] Arcanist Brand		DoNothing	Spell,Duration,Multicastable,Brand,AttackInPlace				
+infernal_cry	Infernal Cry	AbyssalCry	InfernalCry	Warcry,Area,Duration,Fire,Cooldown,ConsumesCharges,EmpowersOtherSkill,UsableWhileMoving,SkillConsumesEnduranceChargesOnUse,Nova				
+brandsurge	[DNT-UNUSED] Brandsurge		DoNothing	Spell,Triggerable,Physical,Damage,Area,AreaSpell,Multicastable,Trappable,Mineable,Totemable,Cooldown,AttackInPlace				
+seismic_cry	Seismic Cry		SeismicCry	Warcry,Area,Damage,ConsumesCharges,SkillConsumesEnduranceChargesOnUse,Cooldown,Physical,EmpowersOtherSkill,UsableWhileMoving,Nova				
+ancestral_cry	Ancestral Cry		AncestralCry	Buff,Area,Duration,Warcry,ConsumesCharges,HasUsageCondition,Nova,Fire,Triggers,SkillConsumesEnduranceChargesOnUse,EmpowersOtherSkill,UsableWhileMoving				
+ancestral_cry_shockwave	Volcanic Steps		AncestralCryShockwave	Area,Attack,Triggerable,Triggered,InbuiltTrigger,Fire,Slam,NoAttackOrCastTime,Melee,AttackInPlace				
+ancestral_cry_projectile	Volcanic Eruption		AncestralCryProjectile	Projectile,Area,Triggerable,Triggered,InbuiltTrigger,GroundTargetedProjectile,CannotChain,Fire,Attack,Projectile,NoAttackOrCastTime,Cooldown,AttackInPlace				
+penance_brand	[DNT-UNUSED] Penance Brand		DoNothing	Spell,Damage,Area,Physical,Lightning,Duration,Totemable,Trappable,Mineable,Triggerable,Multicastable,Brand,AreaSpell,AttackInPlace				
+winter_brand	[DNT-UNUSED] Wintertide Brand		DoNothing	Spell,Area,Cold,Duration,Totemable,Trappable,Mineable,Triggerable,Multicastable,Brand,AreaSpell,DamageOverTime,NonHitChill,ElementalStatus,DegenOnlySpellDamage,AttackInPlace				
+earthshatter	Earthshatter		SpikeSlam	Attack,Area,Melee,Slam,Duration,Totemable,CreatesFissure,CanCreateStoneElementals,Limit				
+oshabi_orb_projectile			OshabiOrbProjectile					
+do_nothing	???		DoNothing					
+crackling_lance	Crackling Lance		Disintegrate	Spell,Area,Damage,Lightning,Trappable,Mineable,Totemable,Triggerable,AreaSpell,Multicastable,Unleashable,AttackInPlace				
+sigil_of_life	Rite of Restoration		CircleOfPower	Spell,Area,Duration,Trappable,Mineable,Triggerable,AreaSpell,Cooldown,Totemable,UsableWhileMoving,Limit,GainsStages				
+sigil_of_power	Sigil of Power		CircleOfPower	Spell,Area,Duration,Trappable,Mineable,Triggerable,AreaSpell,Cooldown,Totemable,UsableWhileMoving,Limit,GainsStages				
+flame_wall	Flame Wall		Firewall	Spell,DamageOverTime,Area,Duration,Trappable,Mineable,Triggerable,AreaSpell,Totemable,Fire,Unleashable,Multicastable,Cascadable,CausesBurning,Wall,UsableWhileMoving,Damage				
+call_of_steel	[DNT-UNUSED] Call of Steel		DoNothing	Cooldown,Area,Steel,AttackInPlace				
+doom_blast	Doom Blast		ViciousHexExplosion	Spell,Area,Damage,Triggerable,Triggered,AreaSpell,Chaos,Cooldown,InbuiltTrigger,SkillGrantedBySupport				
+heist_bouncing_sawblade			HeistBouncingSawblade	Spell,Damage,Area,Trappable,Mineable,Totemable,Triggerable,Fire,Projectile,ProjectilesFromUser,Multicastable,Chains,Unleashable,AreaSpell,AttackInPlace				
+no_shield_charge			DoNothing	Attack,Melee,Area,Movement,Travel,AttackInPlace				
+player_glacial_cascade	Glacial Cascade	GlacialCascadePlayer	GlacialCascadeNew	Spell,Damage,Area,Trappable,Totemable,Mineable,Multicastable,Triggerable,Cold,Physical,Unleashable,AreaSpell,AttackInPlace				
+hexblast	Hexblast		DoomBlast	Spell,Damage,Area,Chaos,Trappable,Totemable,Mineable,Multicastable,Triggerable,Unleashable,AreaSpell,Cascadable,UsableWhileMoving				
+heist_attach_snipe			HeistAttachSnipe	Attack,Projectile,AttackInPlace				
+execute_geal_no_los			ExecuteGEAL	Triggerable,AttackInPlace				
+totem_taunt_triggered			TotemTaunt	Spell,Trappable,Mineable,Area,SummonsTotem,Multicastable,AreaSpell,Cooldown,Triggerable,Triggered,InbuiltTrigger,AttackInPlace				
+water_sphere	Hydrosphere		WaterSphere	Damage,Spell,Area,Duration,Trappable,Mineable,Triggerable,AreaSpell,Cold,Totemable,Orb,Multicastable,Unleashable,Lightning,Physical,AttackInPlace				
+water_sphere_triggered	Hydrosphere		WaterSphere	Damage,Spell,Area,Duration,Trappable,Mineable,Triggerable,Triggered,AreaSpell,Cold,Totemable,Orb,Multicastable,Unleashable,Lightning,Physical,Triggered,InbuiltTrigger,Cooldown,AttackInPlace				
+tracking_slam			TrackingSlam					
+generosity_aura_group	Generosity		CastAuraGroup	Spell,Instant,Meta,AttackInPlace				
+geometry_spell_channelled			GeometrySpell	Triggerable,Channel,Spell,Damage,AttackInPlace				
+geometry_attack_channelled			GeometryAttack	Triggerable,Channel,Attack,AttackInPlace				
+geometry_projectiles_attack_channelled			GeometryProjectilesAttack	Triggerable,Channel,Attack,Projectile,AttackInPlace				
+ancestral_warrior_totem	Ancestral Warrior Totem		MetaAncestralTotem	SummonsTotem,SummonsAttackTotem,Duration,Melee,Trappable,Mineable,Meta,Area,HasUsageCondition,RequiresCharges,ConsumesCharges,SkillConsumesEnduranceChargesOnUse				
+summon_meta_totem_axes	[DNT-UNUSED] Summon Slam Totem		MetaAncestralTotem	SummonsTotem,SummonsAttackTotem,Duration,Trappable,Mineable,Meta,Limit,AttackInPlace				
+summon_meta_totem_spell	Spell Totem		MetaSpellTotem	SummonsTotem,Duration,Trappable,Mineable,Meta,Limit,HasUsageCondition,RequiresCharges,ConsumesCharges,SkillConsumesEnduranceChargesOnUse,SkillConsumesPowerChargesOnUse,UsableWhileMoving				
+summon_meta_totem_ballista	Summon Ballista Totem		MetaTotemBase	SummonsTotem,SummonsAttackTotem,Duration,Trappable,Mineable,Meta,Limit,AttackInPlace				
+mortar_cannon	Mortar Cannon		MetaTotemBase	SummonsTotem,SummonsAttackTotem,Duration,Trappable,Mineable,Meta,Limit,Grenade,TotemsAreBallistae,SummonsAttackTotem,UsableWhileMoving				
+steelskin_ally	Steelskin		QuickGuard	Spell,Buff,Instant,Duration,Triggerable,Guard,Cooldown,AttackInPlace				
+exsanguinate	Exsanguinate		BloodTendrils	Spell,Damage,Trappable,Totemable,Mineable,Chains,Multicastable,Triggerable,Physical,Unleashable,DamageOverTime,Duration,UsableWhileMoving				
+corrupting_fever	Corrupting Fever		BloodSurge	Spell,Buff,Duration,Triggerable,Instant,Physical,Cooldown,DamageOverTime,Totemable,AttackInPlace				
+trialmaster_tether_spike			TrialmasterTetherSpike					
+trialmaster_chaos_shrine			TrialmasterChaosShrine					
+trialmaster_timestop			TrialmasterTimestop					
+reap	Reap		BloodScythe	Spell,Damage,Physical,Area,AreaSpell,Duration,Trappable,Totemable,Mineable,Multicastable,UsableWhileMoving				
+vaal_reap	Vaal Reap		VaalBloodScythe	Spell,Damage,Physical,DamageOverTime,Area,AreaSpell,Duration,Trappable,Totemable,Mineable,Vaal,AttackInPlace				
+his_winnowing_flame	His Winnowing Flame		BloodScythe	Spell,Damage,Fire,DamageOverTime,Area,AreaSpell,Trappable,Totemable,Mineable,Multicastable,SkillConsumesIgnite				
+petrified_blood	Petrified Blood		ToggleBuff	Spell,Buff,HasReservation,Persistent,AttackInPlace				
+add_corrupted_blood_to_target			AddSpecialBuffToTarget					
+geometry_mortars_spell			GeometryMortars	Triggerable,Spell,Damage,AttackInPlace				
+geometry_mortars_attack			GeometryMortarsAttack	Triggerable,Attack,AttackInPlace				
+voltaxic_burst	Voltaxic Burst		Voidburst	Spell,Damage,Area,Trappable,Totemable,Mineable,Multicastable,Triggerable,Chaos,Lightning,Unleashable,AreaSpell,Nova,Duration,AttackInPlace				
+rage_vortex	[DNT-UNUSED] Rage Vortex		DoNothing	Attack,Melee,Area,Duration,AttackInPlace				
+battlemages_cry	Battlemage's Cry		DivineCry	Buff,Area,Duration,Warcry,Cooldown,AttackInPlace				
+ambush_player	Ambush		VanishingAmbush	Spell,Movement,Duration,Travel,Triggerable,Cooldown,LateConsumeCooldown,AttackInPlace				
+blade_trap	Blade Trap		WeaponTrap	Attack,Damage,Mineable,Area,Trapped,Area,AttackInPlace				
+forbidden_rite	[DNT-UNUSED] Forbidden Rite		DoNothing	Spell,Damage,Area,Totemable,Chaos,Projectile,ProjectilesFromUser,AreaSpell,Channel,UsableWhileMoving				
+manabond	Manabond		ManaVoid	Spell,Area,Damage,AreaSpell,Lightning,Totemable,Mineable,Trappable,Cascadable,Multicastable,Unleashable,Triggerable,Arcane,AttackInPlace				
+storm_rain	Storm Rain		PrismaticRain	Attack,RangedAttack,MirageArcherCanUse,Area,ProjectileSpeed,Totemable,Trappable,Mineable,Triggerable,Rain,Lightning,ProjectileNumber,Damage,Barrageable,CanBecomeArrowRain,Bow,GroundTargetedProjectile,AttackInPlace				
+shield_crush	Shield Crush		ShieldWaves	Attack,RequiresShield,Melee,Area,Physical,AttackInPlace				
+spectral_helix	Spectral Helix		VaalThrownWeapon	Attack,RangedAttack,Projectile,ProjectilesFromUser,AttackInPlace				
+boneshatter	Boneshatter		TraumaStrike	Attack,MeleeSingleTarget,Melee,Area,Totemable				
+boneshatter_minion	Bonebreaker		TraumaStrike	Attack,MeleeSingleTarget,Melee,Area,Cooldown,AttackInPlace				
+ion_cannon_cage			IonCannonCage	Spell,Area,AreaSpell,Damage,Triggerable,AttackInPlace				
+eye_of_winter	Eye of Winter		FrozenSphere	Spell,Damage,Projectile,ProjectileSpiral,Damage,SingleMainProjectile,Cold,Totemable,Mineable,Trappable,Multicastable,Unleashable,Triggerable,AttackInPlace	Metadata/Projectiles/FrozenSphere	Metadata/Effects/Spells/cold_eye_of_winter/projectile.ao	FrozenBall_idle	FrozenBall_death
+eye_of_winter_new	Eye of Winter		EyeOfWinter	Spell,Damage,Projectile,ProjectileSpiral,Damage,SingleMainProjectile,Cold,Totemable,Mineable,Trappable,Triggerable,UsableWhileMoving,Cooldown,InteractsWithElementalGround				
+ground_searing_laser			GroundSearingLaser	Spell,Damage,Area,Triggerable,AttackInPlace				
+temporal_rift	Temporal Rift		Chronomancer	Spell,Cooldown,HasReservation,Buff,Persistent,OngoingSkill,PersistentShowsCastTime,FixedCastTime,AttackInPlace				
+tornado	Tornado		TornadoSuck	Spell,Duration,Trappable,Totemable,Triggerable,DegenOnlySpellDamage,Physical,Area,AreaSpell,UsableWhileMoving,DamageOverTime,Storm,Wind,Limit,InteractsWithElementalGround				
+elemental_storm	Elemental Storm		Tornado	Spell,Duration,Trappable,Totemable,Mineable,Triggerable,Damage,Area,Orb,AreaSpell,Triggered,InbuiltTrigger,Cooldown,Fire,Cold,Lightning				
+energy_blade	Energy Blade		StormBlade	Spell,Buff,Lightning,Cooldown,AttackInPlace				
+soul_link	Soul Link		SoulLink	Spell,Buff,Duration,Link				
+flame_link	Flame Link		FlameLink	Spell,Buff,Duration,Link,Fire				
+vampiric_link	Vampiric Link		RemoraLink	Spell,Buff,Duration,Link				
+bulwark_link	Protective Link		BulwarkLink	Spell,Buff,Duration,Link				
+intuitive_link	Intuitive Link		TriggerLink	Spell,Buff,Duration,Link				
+destructive_link	Destructive Link		CriticalLink	Spell,Buff,Duration,Link				
+hellscape_tentacle_grab			HellscapeTentacleGrab	Spell,Damage,Area,AreaSpell,AttackInPlace				
+tangled_minion_arc			Arc	Spell,Damage,Trappable,Totemable,Mineable,Chains,Multicastable,Triggerable,Lightning,Unleashable,AttackInPlace				
+bubble_shield			BubbleShield					
+black_star_laser_spears			BlackStarLaserSpears	Spell				
+sentinel_tag_beam			SentinelTagBeam	Spell,Attack				
+lightning_conduit	Lightning Conduit		ShockEnergyRelease	Spell,Damage,Area,Totemable,Trappable,Mineable,Triggerable,Multicastable,Lightning,AreaSpell,Cooldown				
+galvanic_field	Galvanic Field		TeslaSphere	Spell,Damage,Area,Buff,Duration,Lightning,Chains,Orb,Triggerable,UsableWhileMoving,Limit,Sustained				
+mtx_direct_line_of_ants	Direct Ants		DirectLineOfAnts	Microtransaction,Spell,Channel,AttackInPlace				
+mtx_polymorph_player	Polymorph		MTXPolymorphPlayer	Microtransaction,Spell,Cooldown,AttackInPlace				
+mtx_bestiary_stampede_quicksilver			MTXQuicksilverBestiaryStampede	Microtransaction,Triggerable,Cooldown,AttackInPlace				
+vaal_cleave	[DNT-UNUSED] Vaal Cleave		DoNothing	Attack,Area,Melee,ThresholdJewelArea,Physical,Vaal,Duration,Buff,AttackInPlace				
+rapid_assault	Rapid Assault		MultistabSpear	Attack,Melee,MeleeSingleTarget,Area,Spear,Physical,Duration,AttackInPlace				
+retreating_strike	Impale		DisengageSpearAttack	Attack,Melee,MeleeSingleTarget,Movement,Travel,Cooldown,Spear,CanCancelActions,AttackInPlace				
+blood_hunt	Blood Hunt		SpearDashStrike	Attack,Melee,MeleeSingleTarget,Movement,Physical,Area,Spear,CannotSpiritStrike,SkillConsumesBleeding,AttackInPlace				
+disengage	Disengage		DisengageSpearAttack	Attack,Melee,Area,Movement,Travel,MeleeSingleTarget,Jumping,Spear,CanCancelActions,Cooldown,CannotSpiritStrike,GeneratesCharges,SkillConsumesParried				
+drive_by_charge			DriveByCharge	Attack,Melee,Movement,Travel,AttackInPlace				
+whirling_slash	Whirling Slash		SandstormSwipe	Attack,Melee,Area,MeleeSingleTarget,GainsStages,Spear,AttackInPlace,Wind,InteractsWithElementalGround				
+whirlwind_spear	[DNT-UNUSED] Whirlwind Spear		DoNothing	Attack,Melee,Area,Physical,Spear,AttackInPlace				
+spearfield	Spearfield		SpearWall	Attack,Area,Melee,Sustained,Spear,Hazard,Duration,AttackInPlace				
+summon_demon_magus	Summon Demon Magus		SummonMetaDemonCaster	CreatesMinion,CreatesDemonMinion,Meta,HasReservation,Persistent,Companion,CreatesCompanion,AttackInPlace				
+lightning_spear	Lightning Spear		LightningBurst	Attack,RangedAttack,Projectile,ProjectileSpeed,ProjectilesFromUser,Lightning,Area,UsableWhileMoving,Barrageable,Spear,UsableWhileMounted,ConsumesCharges,SkillConsumesFrenzyChargesOnUse,MirageArcherCanUse	Metadata/Projectiles/LightningSpear	Metadata/Effects/Spells/monsters_effects/League_Legion/EternalEmpire/LightningSpearThrow/projectile/projectile.ao	loop	impact
+fire_wake_spear	Blazing Lance		FireWakeSpear	Attack,Projectile,ProjectilesFromUser,RangedAttack,Fire,Barrageable,Spear,UsableWhileMounted,AttackInPlace				
+summon_infernal_hound	Summon Infernal Hound		SummonInfernalFamiliar	Minion,CreatesMinion,Persistent,Fire,CreatesDemonMinion,MinionsCanExplode,HasReservation,Companion,CreatesCompanion,AttackInPlace				
+summon_water_djinn	Navira, the Last Mirage		SummonDjinn	Minion,CreatesMinion,Cold,Persistent,HasReservation,MinionsAreUndamagable,CommandableMinion,ReserveInAllSets				
+summon_fire_djinn	Ruzhan, the Blazing Sword		SummonDjinn	Minion,CreatesMinion,Fire,Persistent,HasReservation,MinionsAreUndamagable,CommandableMinion,ReserveInAllSets				
+summon_sand_djinn	Kelari, the Tainted Sands		SummonDjinn	Minion,CreatesMinion,Physical,Persistent,HasReservation,MinionsAreUndamagable,CommandableMinion,ReserveInAllSets				
+corpse_beetles	Kelari's Malediction		CorpseBeetles	Minion,CreatesMinion,Persistent,HasReservation,MinionsAreUndamagable,OngoingSkill,TargetsDestructibleCorpses,TargetsDestructibleRareCorpses,AttackInPlace,Duration				
+power_shot	Power Shot		CrossbowPowerShot	Attack,RangedAttack,Projectile,ProjectilesFromUser,CrossbowSkill,Trappable,Totemable,Mineable,AttackInPlace				
+explosive_shot	Explosive Shot		CrossbowPowerShot	Attack,RangedAttack,Projectile,ProjectilesFromUser,Area,CrossbowSkill,Trappable,Totemable,Mineable,Fire,UsableWhileMoving,Detonator,MirageArcherCanUse				
+explosive_shot_ammo	Load Explosive Shot		CrossbowAmmo	CrossbowAmmoSkill,ReservesManually,Attack,UsableWhileMoving,MirageArcherCanUse				
+high_velocity_rounds	High Velocity Rounds		CrossbowPowerShot	Attack,RangedAttack,Projectile,ProjectilesFromUser,CrossbowSkill,Trappable,Totemable,Mineable,Physical,UsableWhileMoving,ConsumesFullyBrokenArmour,Duration,MirageArcherCanUse				
+high_velocity_rounds_ammo	Load High Velocity Rounds		CrossbowAmmo	CrossbowAmmoSkill,ReservesManually,Attack,UsableWhileMoving,ConsumesFullyBrokenArmour,MirageArcherCanUse				
+glacial_bolt	Glacial Bolt		CrossbowGlacialBolt	Attack,RangedAttack,Projectile,ProjectilesFromUser,Area,CrossbowSkill,Trappable,Totemable,Mineable,Cold,Wall,UsableWhileMoving,IceCrystal,Duration,MirageArcherCanUse				
+glacial_bolt_ammo	Load Glacial Bolt		CrossbowAmmo	CrossbowAmmoSkill,ReservesManually,Attack,UsableWhileMoving,ToggleSpawnedObjectTargetable_DefaultOn,MirageArcherCanUse				
+plasma_blast	Plasma Blast		CrossbowPowerShot	Attack,RangedAttack,Projectile,ProjectilesFromUser,Area,CrossbowSkill,Totemable,Channel,Lightning,UsableWhileMoving,MirageArcherCanUse				
+plasma_blast_ammo	Load Plasma Blast		CrossbowAmmo	CrossbowAmmoSkill,ReservesManually,Attack,UsableWhileMoving,MirageArcherCanUse				
+siege_cascade	Siege Cascade		CrossbowSiegeCascade	Attack,RangedAttack,Area,ProjectileNumber,ProjectileSpeed,CrossbowSkill,Trappable,Totemable,Mineable,Sustained,UsableWhileMoving,ProjectileNoCollision,ProjectilesNumberModifiersNotApplied,MirageArcherCanUse				
+siege_cascade_ammo	Load Siege Cascade		CrossbowAmmo	CrossbowAmmoSkill,ReservesManually,Attack,UsableWhileMoving,MirageArcherCanUse				
+hailstorm_rounds	Hailstorm Rounds		CrossbowIceStorm	Attack,RangedAttack,Area,ProjectileNumber,ProjectileSpeed,CrossbowSkill,Trappable,Totemable,Mineable,Cold,Sustained,UsableWhileMoving,ProjectileNoCollision,Rain,MirageArcherCanUse				
+hailstorm_rounds_ammo	Load Hailstorm Rounds		CrossbowAmmo	CrossbowAmmoSkill,ReservesManually,Attack,UsableWhileMoving,MirageArcherCanUse				
+stormblast_bolts	Stormblast Bolts		CrossbowStormCascade	Attack,RangedAttack,Area,ProjectileNumber,ProjectileSpeed,CrossbowSkill,Trappable,Totemable,Mineable,Lightning,UsableWhileMoving,Duration,Rain,MirageArcherCanUse				
+stormblast_bolts_ammo	Load Stormblast Bolts		CrossbowAmmo	CrossbowAmmoSkill,ReservesManually,Attack,UsableWhileMoving,MirageArcherCanUse				
+axe_chop	[DNT-UNUSED] Axe Chop		GenericMelee	Attack,MeleeSingleTarget,Melee,AttackInPlace				
+axe_slash	[DNT-UNUSED] Axe Slash		GenericMelee	Attack,MeleeSingleTarget,Melee,AttackInPlace				
+whirling_assault	Whirling Assault		WhirlingAssault	Attack,MeleeSingleTarget,Melee,Area				
+rolling_slam	Rolling Slam		DoubleSlam	Attack,Melee,Slam,Area,Totemable				
+escape_shot	Escape Shot		EscapeShot	Attack,RangedAttack,Cold,Area,ProjectileSpeed,ProjectileNumber,ProjectilesNumberModifiersNotApplied,Jumping,ProjectileNoCollision,Bow,GroundTargetedProjectile,CanCancelActions,MirageArcherCanUse	Metadata/Projectiles/EscapeShot	Metadata/Effects/Spells/ranger_frostescape/frostEscape_Projectile.ao	projectile_01	impact_01
+energy_release	[DNT-UNUSED] Energy Release		ShockNova	Spell,Damage,Trappable,Totemable,Mineable,Chains,Multicastable,Triggerable,Lightning,Unleashable,AttackInPlace				
+supercharged_slam	Supercharged Slam		ChannelledSlam	Attack,Area,Channel,Melee,Slam,NoDualWield,GainsStages				
+wind_blast	Wind Blast	GaleStrike	WindBlast	Attack,Melee,Area,Wind				
+evasive_strike	[DNT-UNUSED] Evasive Strike		GenericMelee	Attack,MeleeSingleTarget,Melee,Slam,AttackInPlace				
+blade_dance	[DNT-UNUSED] Blade Dance		GenericMelee	Attack,MeleeSingleTarget,Melee,Slam,AttackInPlace				
+claw_rake	[DNT-UNUSED] Claw Rake		GenericMelee	Attack,MeleeSingleTarget,Melee,Slam,AttackInPlace				
+spinning_flail	[DNT-UNUSED] Spinning Flail		AdvancingWhirl	Attack,MeleeSingleTarget,Channel,Melee,AttackInPlace				
+volcanic_fissure	Volcanic Fissure		VolcanicSlam	Attack,Area,Melee,Slam,Fire,Duration,Sustained,CreatesFissure,Limit,AttackInPlace,Totemable				
+frozen_legion	Frozen Legion		RingOfIce	Spell,Cooldown,Cold,AttackInPlace				
+frozen_sweep	Frozen Sweep		RingOfIceSweep	Attack,Melee,Area,Cold,NonRepeatable,OwnerCannotUse,AttackInPlace				
+axe_execute	[DNT-UNUSED] Axe Execute		GenericMelee	Attack,MeleeSingleTarget,Melee,AttackInPlace				
+vaal_volcanic_fissure	Vaal Volcanic Fissure		VolcanicSlam	Attack,Projectile,Area,Melee,Slam,Fire,RangedAttack,ProjectilesNotFromUser,Totemable,Vaal,AttackInPlace				
+triggerbots	Summon Triggerbots		Triggerbots	Spell,Buff,Minion,CreatesMinion,Triggerable,Triggered,InbuiltTrigger,AttackInPlace				
+mtx_coin_flip	Flip a coin		MtxCoinFlip	Microtransaction,Spell,Cooldown,AttackInPlace				
+blood_sand_triggered	[DNT-UNUSED] Stance Swap		DoNothing	Spell,Buff,Instant,HasReservation,Instant,InstantNoRepeatWhenHeld,InstantShiftAttackForLeftMouse,Cooldown,Stance,Triggered,InbuiltTrigger,Cooldown,Triggerable,AttackInPlace				
+mtx_raccoon_trash	Summon Barrel		MtxRaccoonTrash	Microtransaction,Spell,Cooldown,Instant,AttackInPlace				
+slow_dodge	Quickstep		HardQuickDodge	Spell,Movement,Travel,Blink,Cooldown,FixedCastTime,AttackInPlace				
+axe_leaping_chop	[DNT-UNUSED] Axe Leaping Chop		GenericMelee	Attack,MeleeSingleTarget,Melee,AttackInPlace				
+axe_whirling_slash	[DNT-UNUSED] Axe Whirling Slash		GenericMelee	Attack,MeleeSingleTarget,Melee,AttackInPlace				
+axe_raised_chop	[DNT-UNUSED] Axe Raised Chop		GenericMelee	Attack,MeleeSingleTarget,Melee,Slam,AttackInPlace				
+axe_heavy_cleave	[DNT-UNUSED] Axe Heavy Cleave		GenericMelee	Attack,MeleeSingleTarget,Melee,AttackInPlace				
+weapon_granted_firebolt	Firebolt	WeaponGrantedFirebolt	GenericProjectileSpell	Projectile,ProjectilesFromUser,Spell,Damage,Trappable,Totemable,Mineable,Multicastable,Triggerable,Chaos,Unleashable,Invokable,UsableWhileMoving				
+weapon_granted_stormbolt	Lightning Bolt	WeaponGrantedStormbolt	GenericProjectileSpell	Projectile,ProjectilesFromUser,Spell,Damage,Trappable,Totemable,Mineable,Multicastable,Triggerable,Chaos,Unleashable,Invokable,UsableWhileMoving				
+weapon_granted_frostbolt	Freezing Shards	WeaponGrantedFrostbolt	GenericProjectileSpell	Projectile,ProjectilesFromUser,Spell,Damage,Trappable,Totemable,Mineable,Multicastable,Triggerable,Cold,Unleashable,Invokable,UsableWhileMoving				
+chaosbolt	Chaos Bolt	WeaponGrantedFrostbolt	GenericProjectileSpell	Projectile,ProjectilesFromUser,Spell,Damage,Trappable,Totemable,Mineable,Multicastable,Triggerable,Chaos,Unleashable,Invokable,UsableWhileMoving				
+coiling_bolts	Coiling Bolts		Witchbolt	Projectile,ProjectilesFromUser,Spell,Damage,Trappable,Totemable,Mineable,Multicastable,Triggerable,Chaos,Unleashable,Invokable,UsableWhileMoving				
+palm_strike_placeholder	[DNT-UNUSED] Palm Strike		GenericMelee	Attack,MeleeSingleTarget,Melee,AttackInPlace				
+glacial_cascade_attack	Glacial Cascade	GlacialCascadeAttack	GlacialCascadeAttack	Attack,Melee,Area,Cold,Area,UsableWhileMoving,SkillConsumesFreeze,CreatesFissure				
+storm_blade	[DNT-UNUSED] Storm Blade	GlacialCascadeAttack	GlacialCascadeAttack	Attack,Melee,Damage,Area,Cold,AttackInPlace				
+self_arcane_surge_placeholder	[DNT-UNUSED] A placeholder self-buff		AddBuffToTarget	Buff,Duration,Spell,AttackInPlace				
+wave_of_frost	Wave of Frost		QuarterstaffFrostWave	Attack,Melee,Area,Cold,AttackInPlaceIsDefault,Movement,Jumping,CanCancelActions				
+sword_lunge	[DNT-UNUSED] Sword Lunge		GenericMelee	Attack,MeleeSingleTarget,Melee,AttackInPlace				
+rapid_shot_default	Rapid Shot		CrossbowRapidShot	Attack,RangedAttack,Projectile,ProjectilesFromUser,Area,CrossbowSkill,Trappable,Totemable,Mineable,UsableWhileMoving,MirageArcherCanUse				
+rapid_shot	Rapid Shot		CrossbowRapidShot	Attack,RangedAttack,Projectile,ProjectilesFromUser,CrossbowSkill,Trappable,Totemable,Mineable,UsableWhileMoving,Fire,MirageArcherCanUse				
+rapid_shot_ammo	Load Rapid Shot		CrossbowAmmo	CrossbowAmmoSkill,ReservesManually,Attack,UsableWhileMoving,MirageArcherCanUse				
+armour_piercing_rounds	Armour Piercing Rounds		CrossbowRapidShot	Attack,RangedAttack,Projectile,ProjectilesFromUser,CrossbowSkill,Trappable,Totemable,Mineable,UsableWhileMoving,Physical,MirageArcherCanUse				
+armour_piercing_rounds_ammo	Load Armour Piercing Rounds		CrossbowAmmo	CrossbowAmmoSkill,ReservesManually,Attack,UsableWhileMoving				
+ice_shards	Ice Shards		PermaFrostRapidShot	Attack,RangedAttack,Projectile,ProjectilesFromUser,Area,CrossbowSkill,Trappable,Totemable,Mineable,UsableWhileMoving,Cold,Sustained,Hazard,CannotChain,MirageArcherCanUse				
+ice_shards_ammo	Load Ice Shards		CrossbowAmmo	CrossbowAmmoSkill,ReservesManually,Attack,UsableWhileMoving				
+shockburst_rounds	Shockburst Rounds		CrossbowStormBurst	Attack,RangedAttack,Projectile,ProjectilesFromUser,Area,CrossbowSkill,Trappable,Totemable,Mineable,UsableWhileMoving,Lightning,MirageArcherCanUse				
+shockburst_rounds_ammo	Load Shockburst Rounds		CrossbowAmmo	CrossbowAmmoSkill,ReservesManually,Attack,UsableWhileMoving				
+burst_shot_default	Burst Shot		CrossbowBurstShot	Attack,RangedAttack,Projectile,ProjectilesFromUser,Area,CrossbowSkill,Trappable,Totemable,Mineable				
+incendiary_shot	Incendiary Shot		CrossbowBurstShot	Attack,RangedAttack,Projectile,ProjectilesFromUser,Area,CrossbowSkill,Trappable,Totemable,Mineable,Fire,UsableWhileMoving,MirageArcherCanUse				
+incendiary_shot_ammo	Load Incendiary Shot		CrossbowAmmo	CrossbowAmmoSkill,ReservesManually,Attack,UsableWhileMoving				
+fragmentation_rounds	Fragmentation Rounds		CrossbowBurstShot	Attack,RangedAttack,Projectile,ProjectilesFromUser,CrossbowSkill,Trappable,Totemable,Mineable,UsableWhileMoving,SkillConsumesFreeze,Area,MirageArcherCanUse				
+fragmentation_rounds_ammo	Load Fragmentation Rounds		CrossbowAmmo	CrossbowAmmoSkill,ReservesManually,Attack,UsableWhileMoving				
+permafrost_bolts	Permafrost Bolts		CrossbowBurstShot	Attack,RangedAttack,Projectile,ProjectilesFromUser,Area,CrossbowSkill,Trappable,Totemable,Mineable,Cold,UsableWhileMoving,MirageArcherCanUse				
+permafrost_bolts_ammo	Load Permafrost Bolts		CrossbowAmmo	CrossbowAmmoSkill,ReservesManually,Attack,UsableWhileMoving,MirageArcherCanUse				
+galvanic_shards	Galvanic Shards		CrossbowGalvanicShards	Attack,RangedAttack,Projectile,ProjectilesFromUser,CrossbowSkill,Trappable,Totemable,Mineable,Lightning,Chains,UsableWhileMoving,MirageArcherCanUse				
+galvanic_shards_ammo	Load Galvanic Shards		CrossbowAmmo	CrossbowAmmoSkill,ReservesManually,Attack,UsableWhileMoving				
+quarterstaff_storm_strike	[DNT-UNUSED] Storm Strike		GenericMelee	Attack,MeleeSingleTarget,Melee,AttackInPlace				
+ice_strike	Ice Strike		QuarterstaffComboAttack	Attack,Melee,MeleeSingleTarget,Area,Cold,PerformsFinalStrike,AttackInPlace				
+comet	Comet	CometPlayer	Comet	Spell,Damage,Area,Trappable,Totemable,Mineable,Multicastable,Triggerable,Cold,Cascadable,Unleashable,AreaSpell,Invokable				
+his_foul_emergence	His Foul Emergence	CometPlayer	Comet	Spell,Damage,Area,Trappable,Totemable,Mineable,Multicastable,Triggerable,Physical,Chaos,Cascadable,Unleashable,AreaSpell,Invokable,Cooldown,Duration,CreatesGroundEffect				
+crushing_earth	[DNT] Crushing Earth	CometPlayer	CrushingEarth	Spell,Damage,Area,Trappable,Totemable,Mineable,Multicastable,Triggerable,Physical,Cascadable,Unleashable,AreaSpell,Invokable,Duration				
+fungal_terrain	[DNT] Fungal Terrain		FungalTerrain	Spell,Damage,Area,Hazard,DamageOverTime,Physical,Chaos,AreaSpell,Duration				
+flame_slice	[DNT-UNUSED] Flame Slice		GenericMelee	Attack,MeleeSingleTarget,Melee,AttackInPlace				
+ring_of_blades	[DNT-UNUSED] Ring of Blades	RingOfBlades	RingOfBlades	Projectile,Totemable,Spell,TotemCastsAlone,Unleashable,Multicastable,AttackInPlace				
+triple_slash	[DNT-UNUSED] Triple Slash Combo		GenericMelee	Attack,MeleeSingleTarget,Melee,AttackInPlace				
+combo_knife_throw	[DNT-UNUSED] Combo Knife Throw	ComboKnifeThrow	ComboKnifeThrow	Spell,Damage,Projectile,ProjectilesFromUser,Totemable,Trappable,Mineable,Triggerable,Unleashable,Physical,Duration,AttackInPlace				
+hyper_slash	[DNT-UNUSED] Hyper Slash		GenericMelee	Attack,MeleeSingleTarget,Melee,AttackInPlace				
+shadow_dash	[DNT-UNUSED] Shadow Dash		ShadowDash	Attack,MeleeSingleTarget,Melee,AttackInPlace				
+shadow_ambush	[DNT-UNUSED] Shadow Ambush		FlickerStrike	Attack,MeleeSingleTarget,Melee,Cooldown,AttackInPlace				
+staff_burning_nova	BurningNova	FireTrap	TrapGroundFire	Spell,Duration,Damage,Area,CausesBurning,DamageOverTime,Fire,AreaSpell,Nova,CreatesGroundEffect,Cascadable,AttackInPlace				
+artillery_ballista	Artillery Ballista	RipwireBallistaPlayer	GenericDeployTotem	ProjectilesFromUser,Trappable,Mineable,SummonsTotem,SummonsAttackTotem,TotemsAreBallistae,UsableWhileMoving,Limit,Duration				
+shield_bash	[DNT-UNUSED] Shield Bash		GenericMelee	Attack,RequiresShield,Melee,Area,Physical,AttackInPlace				
+mana_tempest	Mana Tempest	ManaTempest	ManaTempest	Spell,Buff,Cooldown,Lightning,InstantNoRepeatWhenHeld,InstantShiftAttackForLeftMouse,UsableWhileMoving,EmpowersOtherSkill,Storm,IndeterminateEmpowermentAmount				
+dark_tempest	His Dark Horizon	DarkTempestPlayer	ManaTempest	Spell,Buff,Cooldown,Cold,InstantNoRepeatWhenHeld,InstantShiftAttackForLeftMouse,UsableWhileMoving,EmpowersOtherSkill,Area,Storm				
+new_new_arctic_armour	Arctic Armour	NewArcticArmour	NewNewArcticArmour	Spell,Buff,HasReservation,Cold,OngoingSkill,Persistent,Damage,Sustained,GainsStages,Cooldown,AttackInPlace				
+channelled_lightning	[DNT-UNUSED] Lightning Tendrils		DoNothing	Spell,Damage,Area,Totemable,Lightning,Channel,AreaSpell,AttackInPlace				
+meditate	Meditate		Meditate	Spell,Channel,Cooldown				
+killing_palm	Killing Palm		KillingPalm	Attack,Melee,Area,Physical,MeleeSingleTarget,GeneratesCharges,Palm				
+falling_thunder	Falling Thunder	FallingThunderPlayer	FallingThunder	Attack,Melee,Area,Slam,Projectile,RangedAttack,ProjectilesNotFromUser,Lightning,ConsumesCharges,SkillConsumesPowerChargesOnUse,AttackInPlace				
+volcano	Volcano		Volcano	Spell,Area,Fire,Duration,Projectile,Trappable,Totemable,Mineable,Damage,Channel,Projectile,AreaSpell,UsableWhileMoving,Limit,Sustained,GamepadDeflectable				
+wolf_pack	Wolf Pack		SummonWolfCompanion	Minion,HasReservation,Persistent,Physical,Companion,CreatesCompanion,CreatesMinion,AttackInPlace				
+hyena_cackle	Cackling Companions		SummonWolfCompanion	Minion,HasReservation,Persistent,Physical,Companion,CreatesCompanion,CreatesMinion,AttackInPlace				
+new_blood_rage	[DNT-UNUSED] Blood Rage	NewBloodRage	NewBloodRage	Spell,Buff,Duration,Totemable,Triggerable,Physical,AttackInPlace				
+spinning_throw	[DNT-UNUSED] Spinning Throw	SpinningThrow	SpinningThrow	Attack,RangedAttack,Projectile,ProjectilesFromUser,AttackInPlace				
+shattering_palm	Shattering Palm		ShatteringPalm	Attack,Melee,Area,Cold,MeleeSingleTarget				
+spiral_volley	Spiral Volley		SpiralVolley	Attack,RangedAttack,MirageArcherCanUse,Projectile,ProjectilesFromUser,Totemable,Trappable,Mineable,Triggerable,SkillConsumesFrenzyChargesOnUse,Sustained,ConsumesCharges,Bow	Metadata/Projectiles/SpiralVolley	Metadata/Effects/Spells/bow_spiralvolley/projectile.ao	projectile_01	impact_01
+pestilent_slash	[DNT-UNUSED] Pestilent Slash		PestilentSlash	Attack,Melee,MeleeSingleTarget,Area,Duration,Chaos,AttackInPlace				
+mist_raven_dive_bomb	Mirror Breaker		MistRavenCompanionSwoop	Attack,Area,Melee,Cooldown				
+bear_maul	Maul		BearMaul	Attack,Melee,MeleeSingleTarget,Shapeshift,Bear,AttackInPlace,Area				
+companion_bear_maul	Maul		BearMaul	Attack,Melee,MeleeSingleTarget,AttackInPlace				
+ice_path	[DNT-UNUSED] Ice Path		IcePath	Attack,RangedAttack,Cold,Area,ProjectileSpeed,ProjectileNumber,Cooldown,Bow,AttackInPlace	Metadata/Projectiles/IcePath	Metadata/Effects/Spells/icearrow_02/arrow_ice.ao		
+dodge_roll			DodgeRoll	AttackInPlace,UsableWhileShapeshifted,HasNoCost				
+shadow_thief_slash	[DNT-UNUSED] Shadow Thief Slash		ShadowThiefSlash	Attack,Melee,AttackInPlace				
+leaping_axe_catch	[DNT-UNUSED] Leaping Axe Catch	LeapingAxeCatch	LeapingAxeCatch	Attack,MeleeSingleTarget,Melee,AttackInPlace				
+plunging_blade	[DNT-UNUSED] Plunging Blade		PlungingBlade	Attack,Melee,AttackInPlace				
+wolf_howl	[DNT-UNUSED] Howl		WolfHowl	Spell,Cooldown,Triggerable,Shapeshift,Wolf,AttackInPlace				
+spiral_throw	[DNT-UNUSED] Spiral Throw	SpiralThrow	SpiralThrow	Attack,RangedAttack,Projectile,ProjectilesFromUser,AttackInPlace				
+heat_seeking_arrow	[DNT-UNUSED] Heat Seeking Arrow		DoNothing	Attack,RangedAttack,MirageArcherCanUse,Projectile,ProjectilesFromUser,Damage,Channel,Barrageable,CanBecomeArrowRain,Bow,AttackInPlace	Metadata/Projectiles/HeatSeekingArrow	Metadata/Effects/Spells/firearrow/rig.ao		
+wolf_pounce	Pounce		WolfLeapAttack	Shapeshift,Wolf,Attack,Area,Melee,Slam,Travel,Jumping,Cooldown,Meta				
+lightning_bolt	Lightning Bolt		LightningSpell	Spell,Damage,Trappable,Totemable,Mineable,Multicastable,Triggerable,Lightning,Unleashable,Area,AreaSpell,Cascadable,UsableWhileMoving				
+unique_breach_lightning_bolt	Lightning Bolt		LightningSpell	Spell,Damage,Trappable,Totemable,Mineable,Multicastable,Triggerable,Lightning,Unleashable,Area,AreaSpell,Cascadable,UsableWhileMoving,Cooldown,Triggerable,Triggered,InbuiltTrigger				
+player_melee	Default Attack		Melee	Attack,RangedAttack,MirageArcherCanUse,Projectile,MeleeSingleTarget,Melee,ProjectilesFromUser,Barrageable,AttackInPlace,HasNoCost				
+electric_fence_arrow	[DNT-UNUSED] Electric Fence Arrow		ElectricFenceArrow	Attack,RangedAttack,MirageArcherCanUse,Area,Projectile,ProjectilesFromUser,Totemable,Trappable,Mineable,Lightning,Triggerable,Cooldown,Bow,AttackInPlace	Metadata/Projectiles/ElectricFenceArrow	Metadata/Effects/Spells/lightning_arrows_02/lightning_arrow.ao		
+bear_rampage	Rampage		BearRampage	Attack,Melee,Area,Channel,Shapeshift,Bear,Slam,Travel,CreatesGroundEffect,ConsumesRage,Sustained				
+player_ranged_spear	Spear Throw		SpearRangedAttack	Attack,Projectile,ProjectilesFromUser,ProjectileSpeed,RangedAttack,UsableWhileMoving,Barrageable,Spear,UsableWhileMounted,ConsumesCharges,SkillConsumesFrenzyChargesOnUse,Area				
+unleash	Unleash		StaffUnleash	Spell,Cooldown,Buff,ModifiesNextSkill,Duration,EmpowersOtherSkill,UsableWhileMoving				
+thunderstorm	Thunderstorm		LightningStorm	Spell,Damage,Area,Duration,Cascadable,AreaSpell,Trappable,Totemable,Triggerable,Lightning,UsableWhileMoving,Limit,Sustained,Storm				
+infernal_cry_corpse_explosion	Combust		InfernalCryExplosion	Fire,Triggered,Area,Triggerable,InbuiltTrigger,NoAttackOrCastTime,Damage,AttackInPlace				
+detach_dash_to_target			DetachDashToTarget	Spell,Movement,AttackInPlace				
+furious_slam	Furious Slam		BearSlam	Attack,Area,Melee,Slam,Shapeshift,Bear,ConsumesRage,Triggerable				
+ferocious_roar	Ferocious Roar		BearWarcryMeta	Warcry,Area,Meta,Shapeshift,Bear,Nova,Cooldown				
+cast_on_shock	Cast on Shock		CastOnShock	HasReservation,OngoingSkill,Meta,Persistent,Buff,Lightning,CanHaveMultipleOngoingSkillInstances,GeneratesEnergy,Triggers				
+cast_on_freeze	Cast on Freeze		CastOnFreeze	HasReservation,OngoingSkill,Meta,Persistent,Buff,Cold,CanHaveMultipleOngoingSkillInstances,GeneratesEnergy,Triggers				
+cast_on_ignite	Cast on Ignite		CastOnIgnite	HasReservation,OngoingSkill,Meta,Persistent,Buff,Fire,CanHaveMultipleOngoingSkillInstances,GeneratesEnergy,Triggers				
+cast_on_elemental_ailment	Cast on Elemental Ailment		CastOnAilments	HasReservation,OngoingSkill,Meta,Persistent,Buff,Fire,Cold,Lightning,CanHaveMultipleOngoingSkillInstances,GeneratesEnergy,Triggers				
+cast_on_melee_kill	Cast on Melee Kill		CastOnMeleeKill	HasReservation,OngoingSkill,Meta,Persistent,Buff,CanHaveMultipleOngoingSkillInstances,GeneratesEnergy,Triggers				
+cast_on_death	Cast on Death		CastOnDeath	HasReservation,OngoingSkill,Meta,Persistent,Buff,CanHaveMultipleOngoingSkillInstances,GeneratesEnergy,Triggers				
+cast_when_stunned	Cast when Stunned		CastWhenStunned	HasReservation,OngoingSkill,Meta,Persistent,Buff,CanHaveMultipleOngoingSkillInstances				
+cast_when_damage_taken	Cast when Damage Taken		CastOnDamageTaken	HasReservation,OngoingSkill,Meta,Persistent,Buff,CanHaveMultipleOngoingSkillInstances,Triggers				
+cast_on_critical_strike	Cast on Critical		CastOnCrit	HasReservation,OngoingSkill,Meta,Persistent,Buff,CanHaveMultipleOngoingSkillInstances,GeneratesEnergy,Triggers				
+barrier_invocation	Barrier Invocation		BarrierInvocation	HasReservation,OngoingSkill,Meta,Persistent,Buff,CanHaveMultipleOngoingSkillInstances,Invocation,GeneratesEnergy,Triggers,Cooldown				
+cast_on_dodge	Cast on Dodge		CastOnDodgeRoll	HasReservation,OngoingSkill,Meta,Persistent,Buff,CanHaveMultipleOngoingSkillInstances,GeneratesEnergy,Triggers				
+cast_while_channelling	Cast while Channelling		CastWhileChannelling	HasReservation,OngoingSkill,Meta,Persistent,Buff,CanHaveMultipleOngoingSkillInstances				
+cast_on_melee_stun	Cast on Melee Stun		CastOnMeleeStun	HasReservation,OngoingSkill,Meta,Persistent,Buff,CanHaveMultipleOngoingSkillInstances,GeneratesEnergy,Triggers				
+lingering_illusion	Lingering Illusion		LingeringIllusion	HasReservation,OngoingSkill,Persistent,Buff,GeneratesCharges,Duration,GeneratesRemnants				
+create_illusion			CreateIllusion	OngoingSkill,Buff,Duration,AttackInPlace,GeneratesRemnants,GeneratesCharges				
+void_illusion	Void Illusion		VoidIllusion	HasReservation,OngoingSkill,Persistent,Buff,Duration				
+create_void_illusion			CreateVoidIllusion	OngoingSkill,Buff,Duration,Attack,Area,Triggered,InbuiltTrigger,Triggerable,Cooldown,AttackInPlace,UsedByClone,UsedByProxy				
+ghost_dance	Ghost Dance		GhostDanceSkill	HasReservation,OngoingSkill,Persistent,Buff,AffectedByCooldownRate				
+bind_spectre	Bind Spectre		BindSpectre	Minion				
+shield_phalanx	[DNT-UNUSED] Shield Phalanx		ShieldPhalanx	Attack,RequiresShield,AttackInPlace				
+shield_phalanx_bash	[DNT-UNUSED] Shield Phalanx Bash		GenericMelee	Attack,RequiresShield,Melee,Area,Physical,AttackInPlace				
+dominating_aura	[DNT-UNUSED] Dominating Aura		CastAuraDominatingAura	Minion,Aura,Spell,Area,Duration,OngoingSkill,HasReservation,Persistent,AttackInPlace				
+shroud	[DNT-UNUSED] Shroud		Shroud	Spell,Buff,HasReservation,OngoingSkill,Persistent,AttackInPlace				
+unload_ammo	Basic Bolt		CrossbowAmmo	CrossbowAmmoSkill,Attack,UsableWhileMoving				
+summon_mercenary_companion	Summon Companion		SummonMercenaryCompanion	Minion,MinionsCanExplode,CreatesMinion,HasReservation,Meta,Persistent,Singlular,Companion,CreatesCompanion,AttackInPlace				
+explosive_grenade	Explosive Grenade		Grenade	Attack,RangedAttack,Area,ProjectileNumber,ProjectileSpeed,Cooldown,Grenade,Fire,UsableWhileMoving,DetonatesAfterTime,Projectile,Detonator,MirageArcherCanUse	Metadata/Projectiles/ExplosiveGrenade	Metadata/Effects/Spells/crossbow_explosivegrenade/explosive_grenade.ao	grenadeTimer	end_01
+explosive_grenade_triggered	Explosive Grenade		Grenade	Attack,RangedAttack,Area,ProjectileNumber,ProjectileSpeed,Cooldown,Triggerable,Triggered,InbuiltTrigger,Duration,Grenade,Fire,DetonatesAfterTime,Projectile,NoAttackOrCastTime				
+flash_grenade	Flash Grenade		Grenade	Attack,RangedAttack,Area,ProjectileNumber,ProjectileSpeed,Cooldown,Grenade,UsableWhileMoving,DetonatesAfterTime,Projectile,MirageArcherCanUse	Metadata/Projectiles/FlashGrenade	Metadata/Effects/Spells/crossbow_stungrenade/flash_grenade.ao	grenadeTimer	end_01
+toxic_grenade	Gas Grenade		Grenade	Attack,RangedAttack,Area,ProjectileNumber,ProjectileSpeed,Cooldown,Duration,Grenade,Chaos,Fire,UsableWhileMoving,CreatesGroundEffect,Limit,Projectile,DetonatesAfterTime,MirageArcherCanUse	Metadata/Projectiles/ToxicGrenade	Metadata/Effects/Spells/crossbow_toxic_grenade/toxic_grenade.ao	projectile	end
+oil_grenade	Oil Grenade		Grenade	Attack,RangedAttack,Area,ProjectileNumber,ProjectileSpeed,Cooldown,Duration,Grenade,Fire,UsableWhileMoving,CreatesGroundEffect,DetonatesAfterTime,Projectile,MirageArcherCanUse	Metadata/Projectiles/OilGrenade	Metadata/Effects/Spells/crossbow_oilgrenade/oil_grenade.ao	grenadeTimer	end_01
+oil_grenade_triggered	Oil Grenade		Grenade	Attack,RangedAttack,Area,ProjectileNumber,ProjectileSpeed,Cooldown,Triggerable,Triggered,InbuiltTrigger,Duration,Grenade,Fire,CreatesGroundEffect,DetonatesAfterTime,Projectile,NoAttackOrCastTime,AttackInPlace				
+fire_grenade	Fire Bomb		Grenade	Attack,RangedAttack,Area,ProjectileNumber,ProjectileSpeed,Duration,Grenade,CreatesGroundEffect,DetonatesAfterTime,Projectile,AttackInPlace	Metadata/Projectiles/FireGrenade	Metadata/Effects/Spells/undead_summon_skeletons/skeleton_grenade.ao	grenadeTimer	end_01
+shock_grenade	Voltaic Grenade		Grenade	Attack,RangedAttack,Area,ProjectileNumber,ProjectileSpeed,Cooldown,Triggerable,Grenade,Lightning,UsableWhileMoving,DetonatesAfterTime,Projectile,Duration,MirageArcherCanUse	Metadata/Projectiles/ShockGrenade	Metadata/Effects/Spells/crossbow_shock_grenade/shock_grenade.ao	grenadeTimer	end_01
+revive_minion	Revive Skeleton		ReviveMinion	Spell,CanTargetUnusableCorpse,Cooldown,AttackInPlace				
+pain_offering	Pain Offering		BoneOffering	Offering,Minion,Buff,Duration,UsableWhileMoving,CreatesMinion,Limit,Area,Triggerable				
+dark_offering	[DNT-UNUSED] Dark Offering		BoneOffering	Offering,Spell,Minion,Area,CreatesMinion,Limit,AttackInPlace				
+grave_offering	[DNT-UNUSED] Grave Offering		BoneOffering	Offering,Spell,Buff,Duration,Minion,CreatesMinion,Limit,AttackInPlace				
+command_minion	Command: {0} 		CommandMinion	CommandsMinions,UsableWhileMoving,UsableWhileShapeshifted				
+resonating_slam	Resonating Slam		ResonatingSlam	Attack,Slam,Area				
+reaver_add_enrage_buff	Enrage		AddBuffToTarget	Buff,Cooldown				
+sniper_gas_shot	Gas Arrow		SniperGasShot	Attack,RangedAttack,Area,ProjectileNumber,ProjectileSpeed,Rain,DamageOverTime,Cooldown,Duration,GroundTargetedProjectile,CreatesGroundEffect,MirageArcherCanUse				
+packleader_great_hunt	Eternal Hunt		PackleaderGreatHunt	Attack,Area,Damage,Cooldown,Duration,Physical				
+death_storm	Death Storm		DeathStorm	Spell,Lightning,Area,Cooldown,CreatesGroundEffect				
+ice_bind			IceBind	Spell,Duration,Cold,Minion,Damage,Trappable,Totemable,Mineable,Multicastable,Triggerable,Area,AreaSpell,AttackInPlace				
+bombadier_destructive_link	Explosive Demise		BombadierDestructiveLink	Attack,Cooldown,Area,Fire,Damage				
+djinn_force_recharge	Navira's Well		WaterDjinnRecharge	Spell,Cooldown,AttackInPlace				
+djinn_triggered_wave	Navira's Calming		DjinnManaWave	Spell,Area,Buff,Duration,Triggerable,Triggered,InbuiltTrigger,NoAttackOrCastTime,AttackInPlace				
+tempest_flurry	Tempest Flurry		TempestFlurry	Attack,MeleeSingleTarget,Melee,Lightning,Area,PerformsFinalStrike				
+staggering_palm	Staggering Palm		WindPalm	Attack,Area,Physical,MeleeSingleTarget,Duration,Palm,Buff,Melee				
+wind_palm_projectile	Projectile		WindPalmProjectile	RangedAttack,Physical,Attack,Triggerable,Projectile,AttackInPlace,Wind	Metadata/Projectiles/WindPalmProjectile	Metadata/Effects/Spells/monk_windpalm/soundWave_projectile.ao	projectile_01	impact_01
+charged_staff	Charged Staff		ChargedStaff	Spell,Duration,Buff,ConsumesCharges,SkillConsumesPowerChargesOnUse,HasUsageCondition,RequiresCharges,Lightning				
+charged_staff_shockwave	Charged Shockwave		ChargedStaffShockwave	Attack,Area,AttackInPlace,Lightning				
+siphoning_strike	Siphoning Strike		ChargedStrike	Attack,Melee,Area,Lightning,MeleeSingleTarget,SkillConsumesShock,GeneratesCharges,CannotSpiritStrike				
+tempest_bell	Tempest Bell		TempestBell	ComboStacking,Melee,RangedAttack,Attack,Area,Cooldown,ManualCooldownConsumption,Duration,Limit,Sustained,HasUsageCondition,ToggleSpawnedObjectTargetable_DefaultOn,ObjectDurability,AttackInPlace,SpecialAncestralBoost				
+generic_minion_command	Direct Minions		GenericMinionCommand	Cooldown,Instant,UsableWhileMoving				
+frozen_locus	Frozen Locus		IceAmbush	Melee,Attack,Duration,Cold,CreatesGroundEffect,IceCrystal,CanCancelActions,Area,AttackInPlace,ToggleSpawnedObjectTargetable_DefaultOn,Limit				
+bonestorm	Bonestorm		BoneSpear	Spell,Channel,Projectile,Physical,UsableWhileMoving,Area,ConsumesCharges,Damage,SkillConsumesPowerChargesOnUse,Necrotic,Totemable	Metadata/Projectiles/BoneSpear	Metadata/Effects/Spells/monsters_effects/AtlasofWorldsBosses/bone_effects/bone_spear/rig.ao	bonespear	bonespearimpact
+bone_cage	Bone Cage		RingOfBone	Spell,Duration,Area,Physical,Unleashable,Nova,UsableWhileMoving,Damage,Triggerable,Cascadable,Necrotic,Totemable				
+consume_corpse	Consume Corpse		ConsumeCorpse	Spell,Area,UsableWhileMoving				
+unearth	Unearth		BoneCone	Spell,Physical,Duration,Area,Minion,Unleashable,UsableWhileMoving,CreatesMinion,Damage,TargetsDestructibleCorpses,Limit,Triggerable,Necrotic,Totemable				
+detonating_arrow	Detonating Arrow		DetonatingArrow	Attack,RangedAttack,Projectile,ProjectilesFromUser,Fire,Channel,Barrageable,Area,Bow,GainsStages,Detonator,MirageArcherCanUse				
+poison_burst_arrow	Poisonburst Arrow		PoisonBurstArrow	Attack,RangedAttack,Projectile,Barrageable,UsableWhileMoving,CanBecomeArrowRain,Area,Chaos,Duration,Bow,MirageArcherCanUse	Metadata/Projectiles/PoisonBurstArrow	Metadata/Effects/Spells/bow_poison_burst/projectile.ao	projectile	impact
+toxic_growth	Toxic Growth		ToxicGrowth	Attack,RangedAttack,Projectile,Area,Chaos,Bow,Limit,DetonatesAfterTime,Rain,GroundTargetedProjectile,Barrageable,AttackInPlace,Plant,MirageArcherCanUse				
+stormcaller_arrow	Stormcaller Arrow		ShockingArrow	Attack,RangedAttack,Projectile,Barrageable,Duration,UsableWhileMoving,CanBecomeArrowRain,Area,Lightning,Bow,MirageArcherCanUse	Metadata/Projectiles/ShockingArrow	Metadata/Effects/Spells/bow_shocking_arrow/projectile.ao	projectile	impact
+phantasmal_arrow	Phantasmal Arrow		ShockingArrow	Attack,RangedAttack,Projectile,Barrageable,Duration,UsableWhileMoving,CanBecomeArrowRain,Area,Fire,Bow	Metadata/Projectiles/ShockingArrow	Metadata/Effects/Spells/bow_shocking_arrow/projectile.ao	projectile	impact
+ripwire_arrow			RipwireArrow	Attack,RangedAttack,Rain,Area,ProjectileSpeed,ProjectileNumber,ProjectileNoCollision,Sustained,Bow,GroundTargetedProjectile,AttackInPlaceIsDefault,UsedByTotem,UsedByProxy,AttackInPlace				
+lightning_rod	Lightning Rod		LightningRodRain	Attack,RangedAttack,Rain,Area,Barrageable,ProjectileSpeed,ProjectileNumber,Duration,UsableWhileMoving,Lightning,Sustained,ProjectileNoCollision,Bow,GroundTargetedProjectile,ObjectDurability,MirageArcherCanUse				
+gas_arrow	Gas Arrow		GasCloudArrow	Attack,RangedAttack,Projectile,ProjectilesFromUser,Barrageable,Duration,UsableWhileMoving,CanBecomeArrowRain,Area,Chaos,Fire,Bow,GroundTargetedProjectile,CreatesGroundEffect,Limit,MirageArcherCanUse	Metadata/Projectiles/GasCloudArrow	Metadata/Effects/Spells/bow_gas_cloud_arrow/projectile.ao	projectile	impact
+rain_of_arrows_new	Rain of Arrows		RainOfArrowsNew	Attack,RangedAttack,Rain,Area,ProjectileSpeed,ProjectileNumber,ConsumesCharges,UsableWhileMoving,SkillConsumesFrenzyChargesOnUse,ProjectileNoCollision,Sustained,Bow,GroundTargetedProjectile,MirageArcherCanUse				
+solar_orb	Solar Orb		SolarOrb	Spell,Damage,Fire,Area,Triggerable,Trappable,Mineable,Totemable,AreaSpell,Orb,Duration,UsableWhileMoving,Limit,Sustained,Unleashable				
+fireball	Fireball		GreaterFireball	Spell,Projectile,ProjectilesFromUser,Damage,Area,Trappable,Totemable,Mineable,Multicastable,Triggerable,Fire,Unleashable,AreaSpell,Invokable,UsableWhileMoving	Metadata/Projectiles/Fireball	Metadata/Effects/Spells/fire_fireball/ao/rig.ao	projectile	impact
+plague_bearer	Plague Bearer		PlagueBearer	Buff,OngoingSkill,HasReservation,Persistent,AttackInPlace				
+plague_bearer_nova	Plague Bearer		PlagueBearerNova	Area,UsableWhileMoving,Nova,Physical,Chaos,Damage,UsableWhileShapeshifted				
+electrocuting_arrow	Electrocuting Arrow		ElectrocutingArrow	Attack,RangedAttack,Projectile,Lightning,Duration,CannotChain,ProjectileNoCollision,Bow,GroundTargetedProjectile,Area,UsableWhileMoving,Barrageable,CanBecomeArrowRain,MirageArcherCanUse	Metadata/Projectiles/ElectrocutingArrow	Metadata/Effects/Spells/bow_electrocuting_rod/projectile_01.ao	projectile_01	impact_01
+snap	Snap		Shatter	Spell,Damage,Area,Trappable,Totemable,Mineable,Multicastable,Triggerable,Cold,Fire,Lightning,Cascadable,AreaSpell,SkillConsumesFreeze,SkillConsumesIgnite,SkillConsumesShock,UsableWhileMoving,Unleashable,GeneratesRemnants,GeneratesInfusion,Cooldown,ManualCooldownConsumption				
+perfect_strike	Perfect Strike		PerfectStrike	Attack,Melee,Channel,Fire,Area,MeleeSingleTarget,PerfectTiming				
+shield_block	Raise Shield		ShieldBlock	Channel,RequiresShield,UsableWhileMoving,Attack,Area,Physical,Melee,ActiveBlock				
+hazardous_holdout	Kinetic Bash		ShieldBlock	Channel,UsableWhileMoving,Attack,Area,Physical,Melee				
+resonating_shield	Resonating Shield		ShieldDrum	Attack,Melee,Physical,Channel,RequiresShield,UsableWhileMoving,Area,Sustained,NonWeaponAttack,ActiveBlock				
+mana_remnants	Mana Remnants		ManaRemnants	Buff,HasReservation,TotemCastsAlone,OngoingSkill,Persistent,GeneratesRemnants,AttackInPlace				
+sanguine_revelry	Sanguine Revelry		SanguineRevelry	Buff,HasReservation,TotemCastsAlone,OngoingSkill,Persistent,GeneratesRemnants,AttackInPlace				
+magma_barrier	Magma Barrier		IgneousShield	Buff,OngoingSkill,HasReservation,Fire,Persistent,GeneratesCharges				
+magma_barrier_explosion	Magma Spray		IgneousShieldExplosion	Attack,Melee,Area,Fire,Triggered,Triggerable,InbuiltTrigger,NonWeaponAttack,NoAttackOrCastTime				
+player_melee_unarmed	Punch		Melee	Attack,MeleeSingleTarget,Melee,Area,AttackInPlace				
+player_melee_quarterstaff	Quarterstaff Strike		Melee	Attack,MeleeSingleTarget,Melee,Area,AttackInPlace				
+player_melee_flail	Flail Strike		Melee	Attack,MeleeSingleTarget,Melee,Area,AttackInPlace				
+player_melee_1hsword	Sword Slash		Melee	Attack,MeleeSingleTarget,Melee,Area,AttackInPlace				
+player_melee_sword_sword	Sword Slash		Melee	Attack,MeleeSingleTarget,Melee,Area,DualWieldOnly,AttackInPlace				
+player_melee_2hsword	Sword Slash		Melee	Attack,MeleeSingleTarget,Melee,Area,AttackInPlace				
+player_melee_1haxe	Axe Slash		Melee	Attack,MeleeSingleTarget,Melee,Area,AttackInPlace				
+player_melee_axe_axe	Axe Slash		Melee	Attack,MeleeSingleTarget,Melee,Area,DualWieldOnly,AttackInPlace				
+player_melee_2haxe	Axe Slash		Melee	Attack,MeleeSingleTarget,Melee,Area,AttackInPlace				
+player_melee_1hmace	Mace Strike		Melee	Attack,MeleeSingleTarget,Melee,Area,AttackInPlace				
+player_melee_mace_mace	Mace Strike		Melee	Attack,MeleeSingleTarget,Melee,Area,DualWieldOnly,AttackInPlace				
+player_melee_2hmace	Mace Strike		Melee	Attack,MeleeSingleTarget,Melee,Area,AttackInPlace				
+player_melee_claw	Claw Stab		Melee	Attack,MeleeSingleTarget,Melee,Area,AttackInPlace				
+player_melee_claw_claw	Claw Stab		Melee	Attack,MeleeSingleTarget,Melee,Area,DualWieldOnly,AttackInPlace				
+player_melee_dagger	Dagger Stab		Melee	Attack,MeleeSingleTarget,Melee,Area,DualWieldOnly,AttackInPlace				
+player_melee_dagger_dagger	Dagger Stab		Melee	Attack,MeleeSingleTarget,Melee,Area,DualWieldOnly,AttackInPlace				
+player_melee_spear	Spear Stab		Melee	Attack,MeleeSingleTarget,Melee,Area,Spear,AttackInPlace				
+player_melee_spear_no_offhand	Spear Stab		Melee	Attack,MeleeSingleTarget,Melee,Area,Spear,AttackInPlace				
+player_melee_bow	Bow Shot		Melee	Attack,RangedAttack,MirageArcherCanUse,Projectile,ProjectilesFromUser,Barrageable,UsableWhileMoving,Bow				
+player_melee_crossbow	Crossbow Shot		Melee	Attack,RangedAttack,Projectile,ProjectilesFromUser,CrossbowSkill,Trappable,Totemable,Mineable,UsableWhileMoving				
+player_melee_grenade_launcher	Grenade		Grenade	Attack,RangedAttack,Area,ProjectileNumber,ProjectileSpeed,Cooldown,Triggerable,Grenade,UsableWhileMoving,DetonatesAfterTime,Projectile,Duration,MirageArcherCanUse,Physical				
+playtest_attack	Playtest Attack		Melee	Attack,MeleeSingleTarget,Melee,Area,AttackInPlace				
+playtest_slam	Playtest Slam		LeapSlam	Attack,Area,Melee,Slam,Totemable,Travel,AttackInPlace				
+playtest_spell	Playtest Spell		Fireball	Projectile,ProjectilesFromUser,Spell,Damage,Area,Trappable,Totemable,Mineable,Multicastable,Triggerable,Fire,Unleashable,AreaSpell,Invokable,UsableWhileMoving	Metadata/Projectiles/Fireball	Metadata/Effects/Spells/fire_fireball/ao/rig.ao	projectile	impact
+shockwave_totem	Shockwave Totem	ShockwaveTotemPlayer	ShockwaveTotem	SummonsTotem,SummonsAttackTotem,Trappable,Mineable,Limit,Duration,CannotCreateJaggedGround,UsableWhileShapeshifted				
+freezing_shards	Freezing Shards		FreezingShards	Projectile,ProjectilesFromUser,Spell,Damage,Trappable,Totemable,Mineable,Multicastable,Triggerable,AreaSpell,Invokable,Cold,Unleashable,UsableWhileMoving	Metadata/Projectiles/FreezingShards	Metadata/Effects/Spells/cold_freezing_shard/freezing_shard_proj.ao	projectile	impact
+totem_shockwave_quake	Shockwave Slam		ShockwaveTotemQuake	Area,Attack,Melee,Nova,Slam,UsedByTotem,UsedByProxy,CannotCreateJaggedGround,AttackInPlace,UsableWhileShapeshifted				
+vine_arrow	Vine Arrow		PoisonVineArrow	Attack,RangedAttack,Rain,Area,Barrageable,ProjectileSpeed,ProjectileNumber,Duration,UsableWhileMoving,Chaos,ProjectileNoCollision,Bow,DamageOverTime,Limit,ToggleSpawnedObjectTargetable_DefaultOff,Plant,MirageArcherCanUse	Metadata/Projectiles/PoisonVineArrow	Metadata/Effects/Spells/bow_poison_bloom/projectile_02.ao		
+summon_rhoa_mount	Rhoa Mount		SummonRhoaMount	Minion,CreatesMinion,HasReservation,Persistent,Buff,Companion,CreatesCompanion,AttackInPlace				
+plague_burst	Plague Burst		PlagueBurst	Triggerable,Triggered,InbuiltTrigger,Damage,SkillGrantedBySupport,Area,Physical,Chaos,AttackInPlace,Cooldown				
+corpse_cloud	Decompose		CorpseCloud	Spell,Damage,Area,Trappable,Totemable,Mineable,AreaSpell,Chaos,UsableWhileMoving,Duration,CreatesGroundEffect,Limit,TargetsDestructibleCorpses,Fire,Triggerable				
+corpse_cloud_triggered	Decompose		CorpseCloud	Spell,Damage,Area,Trappable,Totemable,Mineable,AreaSpell,Chaos,UsableWhileMoving,Duration,CreatesGroundEffect,Limit,TargetsDestructibleCorpses,Fire,Triggerable,Triggered,InbuiltTrigger				
+raging_spirits	Raging Spirits		RagingSpirits	Buff,Minion,Fire,CreatesMinion,HasReservation,OngoingSkill,Duration,Persistent,Limit,AttackInPlace				
+skeleton_mage_minion_frostbolt	Ice Shard	WeaponGrantedFrostbolt	Fireball	Projectile,ProjectilesFromUser,Spell,Damage,Multicastable,Cold,Unleashable,Area,AttackInPlace	Metadata/Projectiles/Fireball	Metadata/Effects/Spells/fire_fireball/ao/rig.ao	projectile	impact
+triggered_elemental_discharge	Elemental Discharge		TriggeredElementalDischarge	Spell,Damage,SkillGrantedBySupport,Triggerable,Cooldown,Triggered,InbuiltTrigger,Area,AttackInPlace,Cold,Fire,Lightning				
+triggered_catalysing_discharge	Catalysing Discharge		TriggeredElementalDischarge	Spell,Damage,SkillGrantedBySupport,Triggerable,Cooldown,Triggered,InbuiltTrigger,Area,AttackInPlace,Cold,Fire,Lightning				
+triggered_fiery_death	Fiery Death		TriggeredFieryDeath	Spell,Damage,SkillGrantedBySupport,Triggerable,Triggered,InbuiltTrigger,Fire,TargetsDestructibleCorpses,Area,AttackInPlace				
+enforced_walking	[DNT-UNUSED] enforced_walking		EnforcedWalking					
+twister	Twister		Twister	Attack,Area,Duration,Spear,Projectile,Barrageable,UsableWhileMoving,RangedAttack,CannotTerrainChain,Wind,InteractsWithElementalGround,MirageArcherCanUse	Metadata/Projectiles/Twister	Metadata/Effects/Spells/spear_tornadoes/mini_tornado.ao		tornado_end
+explosive_spear	Explosive Spear		ExplosiveSpear	Projectile,ProjectilesFromUser,Attack,Area,UsableWhileMoving,Spear,Barrageable,RangedAttack,Fire,UsableWhileMounted,CreatesGroundEffect,Duration,Limit,CannotChain,ConsumesCharges,SkillConsumesFrenzyChargesOnUse,DetonatesAfterTime,ProjectilesNumberModifiersNotApplied,Detonator,MirageArcherCanUse				
+knockback_wave	Wind Wave		KnockbackWave	Area,Triggered,Triggerable,InbuiltTrigger,SkillGrantedBySupport,AttackInPlace				
+spear_wind_vortex	[DNT-UNUSED] Spear Wind Vortex		SpearWindVortex	Attack,Area,Melee,Spear,AttackInPlace				
+elemental_siphon	Elemental Siphon		InfusingStrike	Attack,MeleeSingleTarget,Melee,Lightning,Cold,Fire,Spear,Cooldown,ManualCooldownConsumption,Duration,CannotSpiritStrike				
+thunderous_leap	Thunderous Leap		StormSurge	Attack,Area,Travel,Spear,Jumping,Slam,Lightning,Melee,Detonator				
+wind_dancer	Wind Dancer		WindDancer	Buff,HasReservation,OngoingSkill,Persistent,GainsStages,AttackInPlace				
+triggered_wind_dancer	Gale Force		TriggeredWindDancer	Attack,Triggered,InbuiltTrigger,Triggerable,Melee,Area,Cooldown,NoAttackOrCastTime,AttackInPlace				
+triggered_mana_flare	Mana Flare		TriggeredManaFlare	Spell,Damage,SkillGrantedBySupport,Triggerable,Cooldown,Triggered,InbuiltTrigger,Area,AttackInPlace				
+profane_ritual	Profane Ritual		RitualOfPower	Spell,Chaos,Duration,Area,DamageOverTime,Multicastable,Cascadable,Triggerable,DegenOnlySpellDamage,Unleashable,AreaSpell,UsableWhileMoving,TargetsDestructibleCorpses,Limit,GeneratesCharges,CreatesGroundRune				
+soul_offering	Soul Offering		BoneOffering	Offering,Minion,Duration,UsableWhileMoving,Triggerable,CreatesMinion,Limit,Buff				
+dark_effigy	Dark Effigy		GenericDeployTotem	SummonsTotem,Trappable,Mineable,Multicastable,Duration,UsableWhileMoving,Chaos,Limit	Metadata/Projectiles/DarkEffigy	Metadata/Effects/Spells/chaos_dark_effigy/darkEffigy_projectile.ao	mortar_01	impact_01
+dark_effigy_projectile	Vile Effusion		DarkEffigyProjectile	Spell,Damage,Projectile,Chaos,Area,AreaSpell,ProjectilesNumberModifiersNotApplied,ProjectileNoCollision,UsedByTotem,UsedByProxy,AttackInPlace				
+instant_spell			InstantSpell	Spell,Triggerable,AttackInPlace				
+ice_bomb	Ice Bomb		IceBomb	Spell,Duration,Cold,Minion,Damage,Trappable,Totemable,Mineable,Multicastable,Triggerable,Area,AreaSpell,Cascadable,AttackInPlace,Cooldown				
+grim_feast	Grim Feast		GrimFeast	Buff,HasReservation,OngoingSkill,Persistent,GeneratesRemnants,AffectsPresence,RemnantCannotBeShared,AttackInPlace,Minion				
+blasphemy	Blasphemy		Blasphemy	Area,Buff,HasReservation,Aura,AreaSpell,OngoingSkill,Persistent,Meta,CanHaveMultipleOngoingSkillInstances,IsBlasphemy,AttackInPlace				
+cast_on_minion_death	Cast on Minion Death		CastOnMinionDeath	HasReservation,OngoingSkill,Meta,Persistent,Buff,Minion,CanHaveMultipleOngoingSkillInstances,GeneratesEnergy,Triggers,AttackInPlace,Minion				
+scavenged_plating	Scavenged Plating		ScavengedPlating	Buff,OngoingSkill,HasReservation,Duration,Persistent,Physical,AttackInPlace				
+dash_attack_to_target	Dash		DashAttackToTarget	Attack,Movement,AttackInPlace				
+spinning_inferno	Spinning Inferno		WhirlingAssault	Attack,MeleeSingleTarget,Melee,Area,Fire,AttackInPlace				
+mana_drain	Mana Drain		ManaDrain	Spell,Totemable,Trappable,Mineable,UsableWhileMoving				
+bone_blast	Bone Blast		BoneBlast	Spell,Duration,Area,Physical,Unleashable,UsableWhileMoving,Damage,Cascadable,CreatesGroundRune,Necrotic				
+blink_reservation	Blink		BlinkReservation	OngoingSkill,HasReservation,Buff,Persistent,DodgeReplacement,ReserveInAllSets,AttackInPlace				
+blink	Blink		Blink	UsableWhileMoving,Spell,Cooldown,Travel,CanCancelActions,UsableWhileShapeshifted				
+black_powder_blitz_reservation	Black Powder Blitz		BlackPowderBlitzReservation	OngoingSkill,HasReservation,Buff,Persistent,DodgeReplacement,Detonator,AttackInPlace				
+black_powder_blitz	Black Powder Blitz		BlackPowderBlitz	UsableWhileMoving,Cooldown,Travel,CanCancelActions,Area,Damage,Physical,Fire,Jumping,AttackInPlace				
+incinerate_player	Incinerate	ExpandingFireCone	Incinerate	Spell,Damage,Totemable,Fire,Channel,Area,AreaSpell,Duration,UsableWhileMoving,Sustained,CreatesGroundEffect,DamageOverTime				
+molten_blast	Molten Blast		MoltenBlast	Attack,Projectile,ProjectilesFromUser,Damage,Area,Trappable,Totemable,Triggerable,Fire,AttackInPlace,RangedAttack	Metadata/Projectiles/MoltenBlast	Metadata/Effects/Spells/warrior_molten_blast/molten_projectile.ao	projectile	impact
+malice	Malice		CastAuraCritAgainstEnemy	Buff,HasReservation,Aura,OngoingSkill,Persistent,Duration,AffectsPresence,AttackInPlace				
+hydra	Hydra Familiar		Hydra	HasReservation,Persistent,Buff,Meta,CreatesMinion,Minion,AttackInPlace				
+hammer_of_the_gods	Hammer of the Gods		HammerOfTheGods	Attack,Area,Melee,Slam,Duration,Totemable,UsableWhileMoving,HasUsageCondition				
+hammer_of_ngamahu	[DNT] Hammer of Ngamahu		HammerOfTheGods	Attack,Area,Melee,Slam,Duration,Totemable,UsableWhileMoving,HasUsageCondition				
+living_bomb_player	Living Bomb		LivingBombPlayer	Spell,Damage,Area,Trappable,Totemable,Mineable,AreaSpell,Limit,Fire,UsableWhileMoving,Duration,GeneratesInfusion,GeneratesRemnants,Triggerable				
+abyssal_living_bomb	Untether		LivingBombPlayer	Spell,Damage,Area,Trappable,Totemable,Mineable,AreaSpell,Limit,Physical,UsableWhileMoving,Duration,Triggerable				
+stampede	Stampede		Stampede	Attack,Melee,Area,Slam,Travel,CreatesGroundEffect,Duration,Jumping,Totemable				
+shield_wall	Shield Wall		ShieldBarricade	Attack,Wall,Duration,RequiresShield,Physical,Area,NonWeaponAttack,Melee,CanCreateStoneElementals,Limit				
+fortifying_cry	Fortifying Cry		ShieldingCry	Warcry,Area,Duration,Damage,ConsumesCharges,Cooldown,Physical,EmpowersOtherSkill,UsableWhileMoving,SkillConsumesEnduranceChargesOnUse,Nova				
+fortifying_cry_shockwave	Shield Wave		ShieldingCryShockwave	Attack,Melee,Area,Physical,Triggered,Triggerable,InbuiltTrigger,NonWeaponAttack,NoAttackOrCastTime,AttackInPlace				
+ember_fusillade	Ember Fusillade		BlazingCluster	Spell,Damage,Fire,Projectile,Duration,Unleashable,UsableWhileMoving,Area,AreaSpell,Triggerable,Totemable	Metadata/Projectiles/BlazingCluster	Metadata/Effects/Spells/fire_blazingcluster/projectile.ao	projectile_01	impact_01
+scattering_calamity	His Scattering Calamity		BlazingCluster	Spell,Damage,Lightning,Projectile,Duration,Unleashable,UsableWhileMoving,Area,AreaSpell,Triggerable	Metadata/Projectiles/BlazingCluster	Metadata/Effects/Spells/fire_blazingcluster/projectile.ao	projectile_01	impact_01
+unique_dusk_vigil_triggered_blazing_cluster	Ember Fusillade		BlazingCluster	Spell,Damage,Fire,Projectile,Duration,Unleashable,UsableWhileMoving,Area,AreaSpell,Triggerable,Triggered,InbuiltTrigger	Metadata/Projectiles/BlazingCluster	Metadata/Effects/Spells/fire_blazingcluster/projectile.ao	projectile_01	impact_01
+armour_explosion			ArmourExplosion	Attack,Area,Damage,Triggered,InbuiltTrigger,Triggerable,SkillGrantedBySupport,NoAttackOrCastTime,AttackInPlace,Fire				
+sorcery_ward	Sorcery Ward		Aegis	Spell,Aegis,Fire,Cold,Lightning,Buff,OngoingSkill,Persistent,HasReservation,AttackInPlace				
+stomping_ground_shockwave	Stomping Ground Shockwave		StompingGroundShockwave	Attack,Area,Damage,Triggered,InbuiltTrigger,Triggerable,SkillGrantedBySupport,NoAttackOrCastTime,AttackInPlace				
+life_remnants	Life Remnants		LifeRemnants	Buff,HasReservation,OngoingSkill,Persistent,GeneratesRemnants,AttackInPlace				
+shockchain_arrow	Shockchain Arrow		ShockchainArrow	Attack,RangedAttack,MirageArcherCanUse,Area,Projectile,ProjectilesFromUser,Totemable,Trappable,Mineable,Lightning,Triggerable,Barrageable,UsableWhileMoving,CanBecomeArrowRain,Chains,SkillConsumesShock,Bow,ObjectDurability				
+vaulting_impact	Vaulting Impact		VaultingImpact	Attack,Melee,Slam,Area,Jumping,Travel,Physical,Duration				
+storm_wave	Storm Wave		StormWave	Attack,Melee,Area,Lightning,UsableWhileMoving,CreatesFissure				
+mantra_of_destruction	Mantra of Destruction		MantraOfDestruction	ComboStacking,Buff,Duration,UsableWhileMoving,EmpowersOtherSkill,Chaos,HasUsageCondition				
+bone_offering_explosion	Bone Explosion		GeometrySpell	Offering,Triggerable,Spell,Damage,Area,Physical,AttackInPlace				
+soulbreaker	Soulbreaker		TriggeredSoulbreaker	Triggerable,Damage,Area,Chaos,SkillGrantedBySupport,AttackInPlace				
+explosive_concoction	Explosive Concoction		ExplosiveConcoction	Attack,ProjectilesFromUser,Triggerable,Area,Projectile,Fire,UsableWhileMoving,ProjectileNoCollision,GroundTargetedProjectile				
+fulminating_concoction	Fulminating Concoction		FulminatingConcoction	Attack,ProjectilesFromUser,Triggerable,Area,Projectile,Lightning,UsableWhileMoving,ProjectileNoCollision,GroundTargetedProjectile				
+shattering_concoction	Shattering Concoction		ShatteringConcoction	Attack,ProjectilesFromUser,Triggerable,Area,Projectile,Cold,UsableWhileMoving,ProjectileNoCollision,GroundTargetedProjectile				
+acidic_concoction	Acidic Concoction		PoisonousConcoction	Attack,ProjectilesFromUser,Triggerable,Area,Projectile,UsableWhileMoving,ProjectileNoCollision,Physical,GroundTargetedProjectile	Metadata/Projectiles/PoisonousConcoction	Metadata/Effects/Spells/flask_throw_poison/mortar.ao	mortar_01	
+bleeding_concoction	Bleeding Concoction		BleedingConcoction	Attack,ProjectilesFromUser,Triggerable,Area,Projectile,Physical,UsableWhileMoving,ProjectileNoCollision,GroundTargetedProjectile				
+elemental_expression	Elemental Expression		ElementalStrike	Damage,Triggerable,Spell,Cooldown,Triggered,InbuiltTrigger,Lightning,Cold,Fire,Projectile,Area,Chains,AttackInPlace				
+viper_napuatzi_lightning_spear			ViperNapuatziLightningSpear	Attack,Projectile,Lightning,AttackInPlace	Metadata/Projectiles/ViperNapuatziLightningSpear	Metadata/Effects/Spells/monsters_effects/Act3_FOUR/ViperNapuatzi/ao/spear_throw/spear_proj.ao	fly	impact
+war_banner	War Banner		PlaceBanner	Banner,Area,Duration,UsableWhileMoving,Buff,Aura,HasUsageCondition,UsableWhileShapeshifted				
+defiance_banner	Defiance Banner		PlaceBanner	Banner,Area,Duration,UsableWhileMoving,Buff,Aura,HasUsageCondition,UsableWhileShapeshifted				
+dread_banner	Dread Banner		PlaceBanner	Banner,Area,Duration,UsableWhileMoving,Buff,Aura,HasUsageCondition,UsableWhileShapeshifted				
+freezing_mark	Freezing Mark		FreezingMark	Trappable,Totemable,Mineable,Multicastable,Triggerable,Duration,UsableWhileMoving,Mark,Cold,Limit,UsableWhileMounted,Cooldown,Buff				
+voltaic_mark	Voltaic Mark		ThaumaturgistMark	Trappable,Totemable,Mineable,Multicastable,Triggerable,Duration,UsableWhileMoving,Mark,Lightning,Limit,UsableWhileMounted,Cooldown,Buff				
+witch_hunter_mark	[DNT-UNUSED] Witch Hunter Mark	WitchHunterMarkPlayer	WitchHunterMark	Trappable,Totemable,Mineable,Multicastable,Triggerable,Duration,UsableWhileMoving,Mark,Limit,UsableWhileMounted,GeneratesRemnants,Cooldown				
+unbound_avatar	Unbound Avatar		AilmentBearer	Buff,Cooldown,Instant,Fire,Cold,Lightning,InstantNoRepeatWhenHeld,InstantShiftAttackForLeftMouse,Duration,HasUsageCondition				
+hand_of_chayula	Hand of Chayula		HandOfChayula	Meta,Attack,Melee,Area,Chaos,MeleeSingleTarget,Palm				
+freezing_word	[DNT-UNUSED] Freezing Word		FreezingWord	Area,Cold,UsableWhileMoving,Attack,NonWeaponAttack				
+triggered_freezing_word_explosion	Freezing Explosion		FreezingWordExplosion	Attack,Area,Triggerable,Cold,Triggered,InbuiltTrigger,AttackInPlace				
+time_snap	Time Snap		ResetCooldowns	Spell,Cooldown,AttackInPlace				
+time_freeze	Time Freeze		TimeStop	Spell,Cooldown,Area,Duration,AttackInPlace				
+demon_form	Demon Form		DemonTransformation	Buff,Cooldown,Shapeshift,ManualCooldownConsumption				
+war_banner_reservation	War Banner		BannerReservation	OngoingSkill,HasReservation,Buff,Persistent,CanHaveMultipleOngoingSkillInstances,Area,Duration,Banner				
+defiance_banner_reservation	Defiance Banner		BannerReservation	OngoingSkill,HasReservation,Buff,Persistent,CanHaveMultipleOngoingSkillInstances,Area,Duration,Banner				
+dread_banner_reservation	Dread Banner		BannerReservation	OngoingSkill,HasReservation,Buff,Persistent,CanHaveMultipleOngoingSkillInstances,Area,Duration,Banner				
+time_of_need	Time of Need		TimeOfNeed	OngoingSkill,HasReservation,Buff,Persistent,AttackInPlace,AffectedByCooldownRate				
+encase_in_jade	Encase in Jade		EncaseInJade	Spell,Buff,Guard,Duration,Physical				
+align_fate	Align Fate		SpellFlux	Buff,OngoingSkill,HasReservation,Persistent,AttackInPlace,EmpowersOtherSkill,ReserveInAllSets,AffectedByCooldownRate				
+moment_of_vulnerability	Moment of Vulnerability		RipFromTime	Spell,Nova,Area,UsableWhileMoving,Damage,Cooldown				
+ancestral_spirits	Ancestral Spirits		SummonTotemDefender	Minion,Duration,Triggerable,InbuiltTrigger,CreatesMinion,Triggered,AttackInPlace				
+elemental_invocation	Elemental Invocation		ElementalInvocation	HasReservation,OngoingSkill,Meta,Persistent,Buff,CanHaveMultipleOngoingSkillInstances,Invocation,Fire,Cold,Lightning,GeneratesEnergy,Triggers,AttackInPlace,Cooldown				
+into_the_breach	Into the Breach		BreachWalk	Buff,Persistent,OngoingSkill,HasReservation,GeneratesRemnants,AttackInPlace				
+attrition	Attrition		Attrition	OngoingSkill,HasReservation,Buff,Persistent,AttackInPlace				
+elemental_conflux	Elemental Conflux		ElementalConflux	OngoingSkill,HasReservation,Buff,Persistent,Duration,Lightning,Cold,Fire,AttackInPlace				
+emergency_reload	Emergency Reload		EmergencyReload	Instant,InstantNoRepeatWhenHeld,Cooldown,Duration,ModifiesNextSkill,Buff,EmpowersOtherSkill,IndeterminateEmpowermentAmount				
+cluster_grenade	Cluster Grenade		Grenade	Attack,RangedAttack,Area,ProjectileNumber,ProjectileSpeed,Cooldown,Grenade,Fire,UsableWhileMoving,ProjectileNoCollision,DetonatesAfterTime,Projectile,MirageArcherCanUse	Metadata/Projectiles/ClusterGrenade	Metadata/Effects/Spells/crossbow_cluster_grenade/main_grenade.ao	grenadeTimer	end_01
+cluster_grenade_mini			Grenade	Attack,RangedAttack,Area,ProjectileNumber,ProjectileSpeed,Cooldown,Grenade,DetonatesAfterTime,Projectile,AttackInPlace	Metadata/Projectiles/ClusterGrenadeMini	Metadata/Effects/Spells/crossbow_cluster_grenade/secondary_grenade.ao	grenadeTimer	end_01
+lightning_clone_retaliation	Lightning Clone Retaliation	LightningCloneRetaliation	LightningCloneRetaliation	Spell,Projectile,ProjectilesFromUser,Triggerable,Cooldown,AttackInPlace				
+pilot_row_boat			PilotRowBoat	Channel,AttackInPlace,GamepadForceAllowInteraction				
+charge_regulation	Charge Regulation		ChargeMastery	OngoingSkill,HasReservation,Buff,Persistent,AttackInPlace				
+shard_scavenger	Shard Scavenger		ShardDespoiler	OngoingSkill,HasReservation,Buff,Persistent,Cold,Lightning,Physical,Fire,Duration,AttackInPlace				
+affliction_split			AfflictionSplit					
+trigger_ignite_oil_ground			TriggerOilGround	Triggerable,AttackInPlace				
+mtx_sit_on_the_throne			MtxSitOnTheThrone	Microtransaction,AttackInPlace				
+overwhelming_presence	Overwhelming Presence		OverwhelmingPressure	Buff,HasReservation,Aura,OngoingSkill,Persistent,AffectsPresence,AttackInPlace				
+alchemists_boon	Alchemist's Boon		AlchemistBoon	OngoingSkill,HasReservation,Buff,Persistent,Aura,AttackInPlace				
+reapers_invocation	Reaper's Invocation		MeleeKillInvocation	HasReservation,OngoingSkill,Meta,Persistent,Buff,CanHaveMultipleOngoingSkillInstances,Invocation,GeneratesEnergy,Triggers,AttackInPlace,Cooldown				
+sacrifice	Sacrifice		Harvester	OngoingSkill,HasReservation,Buff,Persistent,Minion,ReserveInAllSets,AttackInPlace				
+archmage	Archmage		Archmage	OngoingSkill,HasReservation,Buff,Persistent,Lightning,AttackInPlace				
+burning_runes	Burning Inscription		TriggeredBurningRunes	Triggerable,Triggered,InbuiltTrigger,Damage,Area,Fire,SkillGrantedBySupport,AttackInPlace				
+magnetic_salvo	Magnetic Salvo		MagneticSalvo	Damage,Area,Projectile,ProjectilesFromUser,Attack,RangedAttack,Lightning,ProjectileNoCollision,Bow,GroundTargetedProjectile,MirageArcherCanUse	Metadata/Projectiles/MagneticSalvo	Metadata/Effects/Spells/bow_magnetic_salvo/magnetic_projectile.ao	projectile_01;projectile_010;projectile_011;projectile_012;projectile_02;projectile_03;projectile_04;projectile_05;projectile_06;projectile_07;projectile_08;projectile_09	impact_01
+freezing_salvo	Freezing Salvo		FreezingSalvo	Damage,Area,Cold,Projectile,ProjectilesFromUser,Attack,RangedAttack,CannotChain,ProjectileNoCollision,Bow,HasSeals,GroundTargetedProjectile,UsableWhileMoving,MirageArcherCanUse,HasSeals,Barrageable	Metadata/Projectiles/FreezingSalvo	Metadata/Effects/Spells/bow_freezingsalvo/projectile.ao	projectile_01;projectile_02;projectile_03;projectile_04;projectile_05;projectile_06;projectile_07;projectile_08;projectile_09;projectile_010;projectile_011;projectile_012	impact_01
+triggered_gas_cloud	[DNT-UNUSED] Gas Cloud		TriggeredGasCloud	Triggerable,Triggered,InbuiltTrigger,Area,DamageOverTime,Duration,CreatesGroundEffect,AttackInPlace				
+triggered_detonation	[DNT-UNUSED] Detonation		TriggeredDetonation	Triggerable,Triggered,InbuiltTrigger,Area,AttackInPlace				
+berserk	Berserk		Berserk	OngoingSkill,HasReservation,Buff,Persistent,AttackInPlace				
+herald_of_plague	Herald of Plague		HeraldOfAgony	OngoingSkill,HasReservation,Buff,Persistent,Herald,Chaos,AttackInPlace				
+herald_of_blood	Herald of Blood		HeraldOfBlood	OngoingSkill,HasReservation,Buff,Persistent,Herald,UseGlobalStats,Area,Attack,Physical,SkillConsumesBleeding,NoAttackOrCastTime,AttackInPlace,NonWeaponAttack				
+withering_presence	Withering Presence		WitheringPresence	Buff,HasReservation,Aura,OngoingSkill,Persistent,AffectsPresence,Chaos,Duration,AttackInPlace				
+ravenous_swarm	Ravenous Swarm		RavenousSwarm	Buff,HasReservation,OngoingSkill,Persistent,Limit,Duration,Minion,CreatesMinion,Physical,Chaos,AttackInPlace,AffectedByCooldownRate				
+mirage_deadeye	Mirage Deadeye		LingeringMirageDeadeye	Buff,Meta,HasReservation,OngoingSkill,Persistent,AttackInPlace				
+mirage_archer	Mirage Archer		LingeringMirage	Buff,Meta,HasReservation,OngoingSkill,Persistent,AttackInPlace				
+create_mirage			CreateMirage	OngoingSkill,Persistent,Buff,Duration,AttackInPlace,Cooldown,UsedByProxy				
+create_mirage_deadeye			CreateMirageDeadeye	OngoingSkill,Persistent,Buff,Duration,AttackInPlace,Cooldown,UsedByProxy				
+combat_frenzy	Combat Frenzy		CombatFrenzy	OngoingSkill,HasReservation,Buff,Persistent,GeneratesCharges,AttackInPlace				
+cast_on_block	Cast on Block		CastOnBlock	HasReservation,OngoingSkill,Meta,Persistent,Buff,CanHaveMultipleOngoingSkillInstances,GeneratesEnergy,Triggers,AttackInPlace				
+cast_curse_on_block	Curse on Block		CastOnBlock	HasReservation,OngoingSkill,Meta,Persistent,Buff,CanHaveMultipleOngoingSkillInstances,GeneratesEnergy,Triggers,AttackInPlace				
+gathering_storm	Gathering Storm		GatheringStorm	Attack,Channel,Travel,PerfectTiming,Lightning,Area,Melee,CreatesGroundEffect,Duration,CannotSpiritStrike				
+ritual_sacrifice	Ritual Sacrifice		HeadHunt	Buff,Duration,TargetsDestructibleRareCorpses				
+blood_boil	Blood Boil		BloodBoil	HasReservation,OngoingSkill,Buff,Persistent,Duration,Physical,DamageOverTime,Area,AttackInPlace				
+shattering_spite	Shattering Spite		ShatteringSpite	Area,Attack,Physical,Lightning,Fire,Damage,Spear				
+vivid_stampede	Vivid Stampede		VividStagsCascade	Area,Lightning,Attack,Triggered,InbuiltTrigger,Triggerable,Instant,AttackInPlace,Cooldown,CreatesGroundEffect,Duration				
+wild_protector	Wild Protector		SummonBearCompanion	Companion,Minion,CreatesMinion,HasReservation,Persistent,CreatesCompanion,AttackInPlace,Physical				
+hollow_form	Hollow Form		MantraOfIllusions	Meta,Attack,ConsumesCharges,SkillConsumesPowerChargesOnUse,AttackInPlace,Channel,Melee,Sustained,UsableWhileMoving,GamepadDoNotChannelSkillAtLocation,UsableWhileShapeshifted				
+hollow_focus	Hollow Focus		SpectralBells	OngoingSkill,HasReservation,Attack,Area,Persistent,Buff,Duration,Limit,ToggleSpawnedObjectTargetable_DefaultOff,AffectedByCooldownRate				
+hollow_resonance	Hollow Resonance		TriggeredCarriedSpectralBellShockwave	Attack,Area,Cooldown,Triggerable,Triggered,InbuiltTrigger,AttackInPlace				
+meta_ranged_attack_on_ignite	[DNT] Ranged Attack on Ignite		DoNothing	OngoingSkill,Meta,Persistent,Buff,CanHaveMultipleOngoingSkillInstances,Triggers,Fire,AttackInPlace				
+meta_ranged_attack_on_shock	[DNT] Ranged Attack on Shock		DoNothing	OngoingSkill,Meta,Persistent,Buff,CanHaveMultipleOngoingSkillInstances,Triggers,Lightning,AttackInPlace				
+meta_ranged_attack_on_freeze	[DNT] Ranged Attack on Freeze		DoNothing	OngoingSkill,Meta,Persistent,Buff,CanHaveMultipleOngoingSkillInstances,Triggers,Cold,AttackInPlace				
+meta_arcane_archery	[DNT-UNUSED] Arcane Archery		DoNothing	OngoingSkill,Meta,Persistent,Buff,CanHaveMultipleOngoingSkillInstances,Triggers,AttackInPlace				
+meta_deadeye_marks	Called Shots		AscendancyDeadeyeMarks	OngoingSkill,Meta,Persistent,Buff,CanHaveMultipleOngoingSkillInstances,Triggers,Area,HasReservation,AttackInPlace				
+triggered_bone_shrapnel	Bone Shrapnel Explosion		TriggeredBoneShrapnel	Triggerable,Triggered,InbuiltTrigger,Damage,Area,Physical,SkillGrantedBySupport,AttackInPlace				
+triggered_battershout_explosion	Battershout		TriggeredBattershoutExplosion	Triggerable,Triggered,InbuiltTrigger,Damage,Area,Physical,SkillGrantedBySupport,AttackInPlace				
+triggered_caltrops	Caltrops		TriggeredCaltrops	Triggerable,Triggered,InbuiltTrigger,Damage,Area,Projectile,ProjectileNoCollision,SkillGrantedBySupport,Hazard,Duration,CannotChain,Attack,GroundTargetedProjectile,NoAttackOrCastTime,AttackInPlace				
+triggered_caltrops_on_dodge	Caltrops		TriggeredCaltrops	Triggerable,Triggered,InbuiltTrigger,Damage,Area,Physical,Projectile,ProjectileNoCollision,Hazard,Duration,CannotChain,Attack,GroundTargetedProjectile,NoAttackOrCastTime,AttackInPlace				
+triggered_haemocrystals	Haemocrystals		HaemocrystalExplosion	Triggerable,Triggered,InbuiltTrigger,Damage,Area,Physical,SkillGrantedBySupport,AttackInPlace				
+triggered_spiked_gauntlets	Quill Burst		TriggeredSpikedGauntlets	Triggerable,Triggered,InbuiltTrigger,Damage,Area,Physical,SkillGrantedBySupport,AttackInPlace,Cooldown				
+triggered_titanic_arrows	[DNT-UNUSED] Titanic Arrows		ArmourExplosion	Triggerable,Triggered,InbuiltTrigger,Damage,Area,Physical,SkillGrantedBySupport,AttackInPlace,Cooldown				
+triggered_volcanic_eruption	Volcanic Eruption		TriggeredVolcanicEruption	Triggerable,Triggered,InbuiltTrigger,Damage,Area,Fire,SkillGrantedBySupport,Attack,Projectile,ProjectileNoCollision,NoAttackOrCastTime,AttackInPlace,Cooldown				
+triggered_briar_patch	Brambles		TriggeredBriarpatch	Triggerable,Triggered,InbuiltTrigger,Damage,Area,Physical,Attack,NoAttackOrCastTime,SkillGrantedBySupport,Hazard,AttackInPlace,Cooldown,Plant				
+triggered_grounding_shocks	Static Shocks		GroundingShocks	Triggerable,Triggered,InbuiltTrigger,Damage,Area,SkillGrantedBySupport,Lightning,AttackInPlace,Cooldown,Sustained,Spell,Duration				
+triggered_splinter_explosion	Tawhoa's Vengeance		SplinterExplosion	Triggerable,Triggered,InbuiltTrigger,Damage,Area,SkillGrantedBySupport,Physical,AttackInPlace				
+whirlwind_lance	Whirlwind Lance		WindstormLance	Attack,RangedAttack,Projectile,ProjectileSpeed,ProjectilesFromUser,Area,UsableWhileMoving,Limit,Barrageable,Spear,UsableWhileMounted,Duration,ConsumesCharges,SkillConsumesFrenzyChargesOnUse,Wind,InteractsWithElementalGround,MirageArcherCanUse	Metadata/Projectiles/WindstormLance	Metadata/Effects/Spells/spear_windstorm_lance/projectile.ao	projectile_idle	impact
+wind_serpents_fury	Wind Serpent's Fury		SerpentSpear	Attack,Melee,Area,HasUsageCondition,Spear,Sustained,ConsumesCharges,SkillConsumesFrenzyChargesOnUse,RequiresCharges,Wind				
+rake	Rake		Rake	Attack,Melee,Area,MeleeSingleTarget,Spear,Physical,Movement				
+bloodhounds_mark	Bloodhound's Mark		HuntersMark	Trappable,Totemable,Mineable,Multicastable,Triggerable,Duration,UsableWhileMoving,Mark,Limit,Physical,UsableWhileMounted,Cooldown				
+bloodhounds_mark_explosion	Blood Explosion		HuntersMarkExplosion	Attack,Area,Triggerable,Triggered,InbuiltTrigger,Physical,UseGlobalStats,NoAttackOrCastTime,AttackInPlace,NonWeaponAttack				
+tame_beast	Tame Beast		TameBeast	Minion,Companion,Duration				
+spear_of_solaris	Spear of Solaris		SolarisSpear	Attack,Area,Projectile,Fire,RangedAttack,Spear,Sustained,ProjectilesNumberModifiersNotApplied,CreatesGroundEffect,GroundTargetedProjectile,CannotChain,Rain,HasUsageCondition				
+storm_lance	Storm Lance		OverchargedSpear	Projectile,ProjectilesFromUser,Lightning,Damage,Attack,Area,UsableWhileMoving,Spear,Barrageable,RangedAttack,UsableWhileMounted,Sustained,Limit,Duration,ConsumesCharges,SkillConsumesFrenzyChargesOnUse,CreatesGroundEffect,MirageArcherCanUse	Metadata/Projectiles/OverchargedSpear	Metadata/Effects/Spells/spear_overchargedspear/spearProjectile_01.ao	projectileThrow_01	projectileExplode_01
+parry	Parry		Parry	RequiresBuckler,UsableWhileMoving,Attack,Melee,Physical,Channel,Duration,ActiveBlock				
+red_queens_visage	[DNT] Red Queen's Visage		TriggeredRedQueensVisage	Damage,Lightning,AttackInPlace,Projectile,ProjectilesNotFromUser,Chains,Spell,HasReservation,OngoingSkill,Persistent				
+fangs_of_frost	Fangs of Frost		FangsOfFrost	Attack,MeleeSingleTarget,Melee,Area,Spear,Cold,SkillConsumesParried,CreatesGroundEffect,AttackInPlace				
+elemental_sundering	Elemental Sundering		ExtractElements	Attack,Area,Spear,Melee,Fire,Cold,Lightning,Nova,SkillConsumesFreeze,SkillConsumesIgnite,SkillConsumesShock				
+summon_beast	Companion: {0}	SummonBeastPlayer	SummonBeast	Minion,MinionsCanExplode,Trappable,Totemable,Mineable,Multicastable,Triggerable,CreatesMinion,HasReservation,Persistent,Companion,CreatesCompanion,AttackInPlace				
+triggered_frozen_vortex	[DNT-UNUSED] Frozen Vortex		FrostBoltNova	Damage,Area,Triggerable,Triggered,InbuiltTrigger,ChillingArea,Cold,Duration,Instant,SkillGrantedBySupport,AttackInPlace				
+cast_on_charm_use	Cast on Charm Use		CastOnUsingCharm	HasReservation,OngoingSkill,Meta,Persistent,Buff,CanHaveMultipleOngoingSkillInstances,GeneratesEnergy,Triggers,AttackInPlace				
+trinity	Trinity		Trinity	OngoingSkill,HasReservation,Buff,Persistent,Lightning,Cold,Fire,AttackInPlace				
+glacial_lance	Glacial Lance		GlacialLance	Attack,RangedAttack,Area,Cold,Projectile,Spear,ProjectileSpeed,ProjectilesFromUser,UsableWhileMoving,Barrageable,UsableWhileMounted,Duration,ConsumesCharges,SkillConsumesFrenzyChargesOnUse,ProjectilesNumberModifiersNotApplied,MirageArcherCanUse	Metadata/Projectiles/glacial_lance	Metadata/Effects/Spells/spear_glaciallance/glacial_Lance.ao	projectile_Throw_01	impact_01
+primal_strikes	Primal Strikes		PrimalStrikes	Attack,MeleeSingleTarget,Melee,Lightning,Area,PerformsFinalStrike,SkillConsumesShock,AttackInPlace				
+cull_the_weak	Cull the Weak		FrenziedLunge	Attack,MeleeSingleTarget,Melee,Area,GeneratesCharges				
+elemental_surge	Elemental Surge		Infusion	Attack,Area,Fire,Cold,Lightning,Triggered,InbuiltTrigger,Triggerable,NoAttackOrCastTime,CannotConsumeCharges,AttackInPlace				
+chaos_surge	Chaotic Surge		Infusion	Attack,Area,Chaos,Triggered,InbuiltTrigger,Triggerable,NoAttackOrCastTime,CannotConsumeCharges,AttackInPlace				
+haunt			Haunt					
+trail_of_caltrops	Trail of Caltrops		CaltropsOnDodge	HasReservation,OngoingSkill,Persistent,Buff,CanHaveMultipleOngoingSkillInstances,GeneratesEnergy,Triggers,AttackInPlace				
+cast_lightning_spell_on_hit	Thundergod's Wrath		CastLightningSpellOnHit	HasReservation,OngoingSkill,Meta,Persistent,Buff,Lightning,CanHaveMultipleOngoingSkillInstances,GeneratesEnergy,Triggers,AttackInPlace				
+cast_fire_spell_on_hit	Fire Spell on Melee Hit		CastFireSpellOnHit	HasReservation,OngoingSkill,Meta,Persistent,Buff,Fire,CanHaveMultipleOngoingSkillInstances,GeneratesEnergy,Triggers,AttackInPlace				
+triggered_hoarfrost	[DNT-UNUSED] triggered_hoarfrost		TriggeredHoarfrost	Spell,Duration,Trappable,Totemable,Mineable,Triggerable,Damage,Cold,Area,AreaSpell,UsableWhileMoving,DamageOverTime,Triggered,InbuiltTrigger,Triggerable,SkillGrantedBySupport				
+manifest_weapon	Manifest Weapon		AnimateWeapon	Minion,CreatesMinion,Persistent,HasReservation,Companion,MinionsAreUndamagable,CreatesCompanion				
+torment_burst			TormentBurst					
+supporting_fire	Supporting Fire		SummonDaemonMinion	Minion,CreatesMinion,HasReservation,Persistent,CommandableMinion,MinionsAreUndamagable				
+death_from_above	Death From Above		DeathFromAbove	Attack,RangedAttack,Rain,Area,Projectile,ProjectilesNumberModifiersNotApplied,AttackInPlace				
+tangmazu_mad_flight	Mad Flight		TangmazuMadFlight	Attack,Area,AttackInPlace,Cooldown				
+temper_weapon	Temper Weapon		ImbueWeapon	Buff,EmpowersOtherSkill,Channel,Cooldown				
+temper_weapon_combustion	Combust		ImbueWeaponCombustion	Fire,Triggered,Area,Triggerable,InbuiltTrigger,Attack,Melee,NoAttackOrCastTime,AttackInPlace				
+convalescence	Convalescence		Convalescence	Buff,OngoingSkill,HasReservation,Persistent,ReserveInAllSets,AttackInPlace				
+convalescence_active	Convalescence		ConvalescenceActive	Buff,Duration,Cooldown,Spell,AttackInPlace,UsableWhileShapeshifted				
+unusable			DoNothing					
+mtx_command_land_shark_pet	Set Shark Bait		MtxCommandLandShark	Microtransaction,Spell,Cooldown,Instant,AttackInPlace				
+mtx_land_shark_consume			MtxLandSharkConsume	Microtransaction,AttackInPlace				
+gemini_surge	Gemini Surge		Infusion	Attack,Area,Fire,Cold,Triggered,InbuiltTrigger,Triggerable,NoAttackOrCastTime,AttackInPlace				
+tree_whip	[DNT] Whip		Melee	Attack,MeleeSingleTarget,Melee,Area,AttackInPlace,Shapeshift				
+rend	Rend		WyvernSwipe	Attack,MeleeSingleTarget,Melee,Area,Shapeshift,Wyvern,ConsumesCharges,Duration				
+wing_blast	Wing Blast		WingBlast	Attack,Melee,Area,Shapeshift,Wyvern,CanCancelActions,GeneratesCharges,Wind,Triggerable				
+exploding_poison_toad	Bursting Fen Toad		ExplodingPoisonToad	Attack,Area,Chaos,Physical,Triggered,InbuiltTrigger,Triggerable,NonWeaponAttack,NoAttackOrCastTime,UseGlobalStats,AttackInPlace				
+djinn_bubble	Navira's Embrace		DjinnBubbleShield	Duration,Area,Spell,Cooldown,AttackInPlace				
+djinn_ground_burst	Navira's Fracturing		WaterDjinnChilledGroundBurst	Area,Spell,Cold,Damage,Cooldown,AttackInPlace				
+djinn_oasis	Navira's Oasis		WaterDjinnOasis	Area,Spell,Duration,Buff,Cooldown,AttackInPlace				
+djinn_knife_throw	Kelari's Brutality		DjinnKnifeThrow	Area,Spell,Physical,Damage,Cooldown,Projectile,CannotChain,GroundTargetedProjectile				
+djinn_explosive_teleport	Kelari's Deception		ExplosiveTeleport	Area,Spell,Physical,Damage,Cooldown				
+djinn_hand_slam	Kelari's Judgment		DjinnHandSlam	Area,Spell,Physical,Damage,Channel,Cooldown,GainsStages				
+corpse_beetle_explode	Sandblast		SuicideExplosion	Area,Spell,Physical,Damage,AttackInPlace				
+djinn_living_bomb	Ruzhan's Brand		LivingBombPlayer	Area,Spell,Fire,DetonatesAfterTime,Limit				
+djinn_fire_rune	Ruzhan's Trap		DjinnFireRune	Area,Hazard,Cooldown,Duration,Spell,Damage,Fire,Projectile,SingleMainProjectile,CannotChain,CannotTerrainChain,Limit				
+djinn_meteor	Ruzhan's Reckoning		DjinnFireDive	Area,Spell,Damage,Fire,Cooldown,Cascadable,Detonator				
+djinn_mass_fusillade	Ruzhan's Fury		DjinnMassFusillade	Area,Projectile,Spell,Fire,Damage,Cooldown				
+djinn_fire_slice	Ruzhan's Zealotry		DjinnFireSlice	Melee,Attack,Area,Fire,Cooldown,MeleeSingleTarget				
+companion_bear_slam	Slam		BearCompanionSlam	Area,Attack,Slam,Melee,Cooldown,AttackInPlace				
+companion_bear_warcry	Roar		BearCompanionCry	Area,Warcry,Cooldown,Duration,Buff,Nova,AttackInPlace				
+oil_barrage	Oil Barrage		ElectricSpit	Attack,Projectile,ProjectilesFromUser,Damage,Area,RangedAttack,Channel,Shapeshift,Wyvern,ConsumesCharges,SkillConsumesPowerChargesOnUse,CreatesGroundEffect,Sustained				
+iron_ward	Iron Ward		WardingSteel	Buff,OngoingSkill,HasReservation,Persistent,AttackInPlace				
+warding_steel_nova	Iron Ward		WardingSteelNova	Area,UsableWhileMoving,Nova,Physical,Damage,UsableWhileShapeshifted				
+wyvern_flame_breath	Flame Breath		WyvernFlameBreath	Damage,Shapeshift,Attack,Fire,Area,Duration,CreatesGroundEffect,UsableWhileMoving,Sustained,ConsumesRage,Shapeshift,Wyvern,Channel,Cooldown,ManualCooldownConsumption,SkillConsumesPowerChargesOnUse,ConsumesCharges,Detonator				
+detach_dash_to_target_with_height			DetachDashToTarget3d	Spell,Movement,AttackInPlace				
+entangle	Entangle		Entangle	Spell,Physical,Unleashable,Area,Duration,Limit,UsableWhileMoving,Sustained,CreatesFissure,Damage,Plant,Triggerable,Totemable,Trappable,Nature				
+ice_fragments	Ice Fragments		BallisticIceChunk	Triggered,InbuiltTrigger,Triggerable,RangedAttack,Projectile,Attack,DetonatesAfterTime,Area,Cold,AttackInPlace	Metadata/Projectiles/BallisticIceChunk	Metadata/Effects/Spells/druid_crystalrain/crystal_Object_01.ao	staticCrystal_01	
+ice_fragments_with_cooldown	Ice Fragments		BallisticIceChunk	Triggered,InbuiltTrigger,Triggerable,RangedAttack,Projectile,Attack,DetonatesAfterTime,Area,Cold,AttackInPlace,Cooldown	Metadata/Projectiles/BallisticIceChunk	Metadata/Effects/Spells/druid_crystalrain/crystal_Object_01.ao	staticCrystal_01	
+shred	Shred		WolfFrozenClaws	Attack,Melee,MeleeSingleTarget,Shapeshift,Wolf,PerformsFinalStrike				
+bear_fury_of_the_mountain	Fury of the Mountain		BearFuryOfTheMountain	Attack,Melee,Area,Slam,Channel,Duration,Shapeshift,Bear,ConsumesRage,CreatesFissure,Sustained				
+wolf_cross_slash_mark	Predator's Mark		WolfCrossSlashMark	Triggered,InbuiltTrigger,Triggerable,Mark,Limit,Duration,AttackInPlace,Wolf				
+wolf_cross_slash	Cross Slash		WolfCrossSlash	Attack,Melee,Shapeshift,Wolf,Cooldown,CanCancelActions,Area,Triggerable				
+pinnacle_of_power	Pinnacle of Power		ElementalPower	Spell,Duration,ConsumesCharges,SkillConsumesPowerChargesOnUse,Instant,Cooldown,Buff,Fire,Cold,Lightning,HasUsageCondition				
+requiem	Requiem		CrossbowRequiem	Damage,Area,Projectile,Cold,ProjectilesFromUser,Attack,RangedAttack,CannotChain,ProjectileNoCollision,GroundTargetedProjectile,CrossbowSkill,AttackInPlace				
+requiem_ammo	Compose Requiem		CrossbowAmmo	CrossbowAmmoSkill,Attack,UsableWhileMoving,HasUsageCondition				
+lunar_assault	Lunar Assault		LunarAssault	Attack,Melee,Area,MeleeSingleTarget,Shapeshift,Wolf,AttackInPlace,Cold,Triggerable				
+heart_of_ice	Heart of Ice		ChillingAura	Buff,HasReservation,Aura,OngoingSkill,Persistent,AffectsPresence,Cold,Spell,AttackInPlace				
+primal_avatar	Primal Avatar		PrimalAvatar	Duration				
+wyvern_devour	Devour		WyvernDevour	Attack,TargetsDestructibleCorpses,Melee,Area,Movement,Shapeshift,Wyvern,GeneratesCharges,Jumping,Slam,GamepadDoNotForceSkillAtLocation,Triggerable				
+thrashing_vines	Thrashing Vines		AwakenedForest	Spell,Damage,Area,Totemable,AreaSpell,Sustained,GamepadDeflectable,Cascadable,Plant,Physical,Duration,Limit,Triggerable,Trappable,Nature				
+triggered_caustic_cloud	Triggered Caustic Cloud		TriggeredCausticCloud	Damage,Area,Chaos,Duration,Triggerable,Triggered,InbuiltTrigger,AttackInPlace				
+wolf_lunar_blessing	Lunar Blessing		WolfLunarBlessing	Warcry,Shapeshift,Buff,Shapeshift,Wolf,Cold,Cooldown,Duration				
+arctic_howl	Arctic Howl		WolfWarcry	Warcry,Area,Duration,Cold,Damage,Cooldown,EmpowersOtherSkill,UsableWhileMoving,Nova,SkillConsumesEnduranceChargesOnUse,ConsumesCharges,Buff,Shapeshift,Wolf				
+triggered_living_lightning	Living Lightning		TriggeredLivingLightning	Triggerable,Triggered,InbuiltTrigger,Minion,Lightning,SkillGrantedBySupport,Limit,Duration,SingleLevelSkill,MinionsAreUndamagable,CreatesMinion,Cooldown,AttackInPlace				
+living_lightning_zap	Living Bolt		LivingLightningZap	Attack,Lightning,Chains,Melee,CannotTerrainChain,AttackInPlace				
+triggered_support_from_the_grave_ice_fragment	[DNT] From the Grave Ice Fragment		BallisticIceChunk	Triggerable,Triggered,InbuiltTrigger,Projectile,DetonatesAfterTime,Area,Cold,SkillGrantedBySupport,AttackInPlace	Metadata/Projectiles/BallisticIceChunk	Metadata/Effects/Spells/druid_crystalrain/crystal_Object_01.ao	staticCrystal_01	
+triggered_support_frozen_spite_ice_fragment	Ice Fragments		BallisticIceChunk	Triggerable,Triggered,InbuiltTrigger,Projectile,DetonatesAfterTime,Area,Cold,SkillGrantedBySupport,FrozenSpite,AttackInPlace	Metadata/Projectiles/BallisticIceChunk	Metadata/Effects/Spells/druid_crystalrain/crystal_Object_01.ao	staticCrystal_01	
+triggered_shocking_rift	Electromagnetism		TriggeredShockingRift	Triggerable,Triggered,InbuiltTrigger,SkillGrantedBySupport,Area,Sustained,Lightning,AttackInPlace,Damage,Spell				
+triggered_pillar_of_flame	Flame Pillar		PillarOfFlame	SkillGrantedBySupport,Triggerable,Triggered,InbuiltTrigger,Area,Fire,AttackInPlace				
+triggered_winnowing_flame_pillars	Grisly Pyre		PillarOfFlame	Triggerable,Triggered,InbuiltTrigger,Area,Fire,AttackInPlace				
+triggered_fissure_on_landing	Crater		TriggeredFissure	SkillGrantedBySupport,Area,Fire,CreatesFissure,Triggerable,Triggered,InbuiltTrigger,Attack,Duration,Melee,Limit,AttackInPlace				
+triggered_miniature_bell	[DNT] Small Bell		DoNothing	SkillGrantedBySupport,Area,Duration,Melee,Attack,Limit,Triggerable,Triggered,InbuiltTrigger,AttackInPlace				
+triggered_detonate_dead_on_landing	Fiery Reclamation		TriggeredDetonateDeadOnLanding	SkillGrantedBySupport,Area,Fire,Triggerable,Triggered,InbuiltTrigger,AttackInPlace,TargetsDestructibleCorpses				
+triggered_hatching_elementals	Skittering Stone		TriggeredHatchingElementals	SkillGrantedBySupport,CreatesMinion,Triggerable,Triggered,InbuiltTrigger,Duration,AttackInPlace				
+forge_hammer	Forge Hammer		ForgeHammer	Attack,Area,Melee,Slam,Fire,Duration,CreatesFissure,Limit,UsableWhileMoving,ManualCooldownConsumption,Cooldown,CanCreateStoneElementals				
+toggle_mount_minion	Toggle Mount Minion		ToggleMountMinion	UsableWhileMounted				
+fulmination	Fulmination		WrathAura	Buff,HasReservation,Aura,OngoingSkill,Persistent,AffectsPresence,Damage,NoAttackOrCastTime,Lightning				
+grim_remnant_resummon	Grim Resurrection		GrimRemnantResummon	Spell,AttackInPlace,UsableWhileMoving,UsableWhileShapeshifted,Minion,Cooldown				
+primal_bounty	Primal Bounty		EmpowerMultishot	Triggerable,Triggered,InbuiltTrigger,ModifiesNextSkill,Instant,EmpowersOtherSkill,Buff,AttackInPlace				
+command_minion_channelled	Command: {0} 		CommandMinion	CommandsMinions,UsableWhileMoving,Channel,GamepadDeflectable				
+lightless_stalker_gaze	[DNT] Dark Visions		LightlessStalkerGaze	Spell,Area,Channel,AttackInPlace				
+lightless_stalker	Lightless Stalker		LightlessStalker	Minion,CreatesMinion,Persistent,HasReservation,AttackInPlace				
+lightless_stalker_arc_beam	[DNT] Haunting Chain		Arc	Spell,Damage,Trappable,Totemable,Mineable,Chains,Multicastable,Triggerable,Physical,Unleashable,AttackInPlace				
+toxic_domain	Toxic Domain		ToxicDomain	Area,Duration,Chaos,DetonatesAfterTime,Buff,Cooldown,Attack,NoAttackOrCastTime,Physical,Plant				
+spellslinger_invocation	Spellslinger		SpellslingerInvocation	HasReservation,OngoingSkill,Meta,Persistent,Buff,CanHaveMultipleOngoingSkillInstances,Invocation,GeneratesEnergy,Triggers,AttackInPlace,Cooldown				
+ice_tipped_arrows	Ice-Tipped Arrows		ShearingBolts	Spell,Duration,ModifiesNextSkill,Cooldown,ConsumesCharges,UsableWhileMoving,Buff,EmpowersOtherSkill,SkillConsumesFrenzyChargesOnUse,UsableWhileMounted,Cooldown,CannotChain,CannotTerrainChain,GroundTargetedProjectile,ProjectileNoCollision				
+crackling_palm	Crackling Palm	Thunderfist	Thunderfist	Buff,HasReservation,Area,Lightning,Attack,OngoingSkill,Persistent,NoAttackOrCastTime,AttackInPlace				
+gelid_palm	Gelid Palm	Thunderfist	Thunderfist	Buff,HasReservation,Area,Cold,Attack,OngoingSkill,Persistent,NoAttackOrCastTime,AttackInPlace				
+mtx_command_cruelty_killer_bird	Mark as prey		MtxCommandCrueltyKillerBird	Microtransaction,Spell,Cooldown,Instant,AttackInPlace				
+future_past	Future-Past		Foresight	HasReservation,OngoingSkill,Persistent,Buff,Duration,AttackInPlace				
+mtx_cruelty_killer_bird_consume			MtxCrueltyKillerBirdConsume	Microtransaction,AttackInPlace				
+runic_tempering	Runic Tempering		RunicTempering	Channel,Cooldown,Damage				
+triggered_curse_zone_hazard_explosion	Doedre's Dark Design		TriggeredCurseZoneHazardExplosion	Triggered,InbuiltTrigger,Triggerable,SkillGrantedBySupport,Damage,Area,Chaos,Spell,AreaSpell,AttackInPlace				
+the_flawed_edict	[DNT-UNUSED] The Flawed Edict		TheFlawedEdict	Attack,Area,Channel,AttackInPlace				
+apply_rimeshield	Ice Armour		ApplyRimeshield	Buff,Area,Duration,Minion,AreaSpell,AttackInPlace,Spell				
+siphon_elements	Siphon Elements		InfusionRemnants	Buff,HasReservation,TotemCastsAlone,OngoingSkill,Persistent,GeneratesRemnants,GeneratesInfusion,Fire,Cold,Lightning,AttackInPlace				
+brute_warcry	Shattering Roar		BruteWarcry	Warcry,Area,Duration,Cold,Damage,Cooldown,UsableWhileMoving,Nova,Minion,AttackInPlace,SkillConsumesFreeze				
+frost_darts	Frost Darts		FrostDarts	Spell,Damage,Cold,Projectile,Unleashable,UsableWhileMoving,Triggerable,Area,Totemable	Metadata/Projectiles/FrostDarts	Metadata/Effects/Spells/cold_frostdarts/projectile_01.ao	projectile_01	impact_01
+ravenous_swarm_attack			RavenousSwarmAttack	Attack,Area,Melee,Chaos,AttackInPlace				
+projectile_arc	Arc	ArcPlayer	ProjectileArc	Spell,Projectile,Damage,Trappable,Totemable,Mineable,Chains,Multicastable,Triggerable,Lightning,Unleashable,Invokable,UsableWhileMoving				
+grave_command	His Grave Command		TameBeast	Minion,Companion,Duration				
+summon_undead_companion	[DNT] Companion: {0}	SummonUndeadCompanionPlayer	SummonBeast	Minion,MinionsCanExplode,Trappable,Totemable,Mineable,Multicastable,Triggerable,CreatesMinion,HasReservation,Persistent,Companion,CreatesCompanion,AttackInPlace				
+abyssal_apparition	Abyssal Apparition		TriggeredLichApparition	Spell,Triggerable,Triggered,InbuiltTrigger,AttackInPlace				
+bear_landslide	[DNT] Landslide		NewSunder	Attack,Area,Melee,Slam,Totemable,ConsumesFullyBrokenArmour,CreatesFissure,Duration,Shapeshift,Bear				
+primal_avatar_quadrilla_slam	[DNT] Primal Quadrilla Slam		PrimalAvatarQuadrillaSlam	Attack,Slam,Area,Shapeshift,Physical,Melee,CreatesFissure,AttackInPlace				
+triggered_creeping_chill	Creeping Chill		TriggeredCreepingChill	Triggerable,Triggered,InbuiltTrigger,Damage,Area,Cold,SkillGrantedBySupport,AttackInPlace,CreatesGroundEffect				
+triggered_atziris_call	[DNT] Atziri's Storm		DoNothing	Triggerable,Triggered,InbuiltTrigger,Damage,Area,SkillGrantedBySupport,AttackInPlace				
+mtx_severed_arm_slap	Arm Whack		MtxSeveredArmSlap	Microtransaction				
+briarpatch	Briarpatch		Briarpatch	Buff,OngoingSkill,HasReservation,Persistent,AttackInPlace,Physical,Limit,Plant,Spell,Area,AreaSpell,Duration,CreatesGroundEffect,Sustained,Damage				
+eternal_rage	Eternal Rage		CeaselessRage	Buff,OngoingSkill,HasReservation,Persistent,ReserveInAllSets				
+savage_fury_active	Savage Fury		WildBeastActive	Buff,Duration,AttackInPlace,UsableWhileMoving				
+savage_fury	Savage Fury		WildBeast	Buff,OngoingSkill,HasReservation,Persistent,AttackInPlace				
+wolf_warcry_wolf	Summon Wolf		WolfWarcryWolfMinion	Minion,CreatesMinion,Triggered,Triggerable,InbuiltTrigger,AttackInPlace				
+walking_calamity	Walking Calamity		WalkingCalamity	Attack,Buff,Duration,UsableWhileMoving,HasUsageCondition,Shapeshift,Bear,Area,Fire				
+walking_calamity_meteor	Meteors		WalkingCalamityMeteor	Attack,Triggered,Triggerable,InbuiltTrigger,Area,Fire				
+the_stars_answer	The Stars Answer		WalkingCalamity	Spell,Buff,Duration,UsableWhileMoving,Area,Cold,Physical,UsableWhileShapeshifted				
+the_stars_answer_comet	Starfall		WalkingCalamityMeteor	Spell,Triggered,Triggerable,InbuiltTrigger,Area,Cold,Physical,Damage				
+apocalypse	Apocalypse		UnleashTheElements	Triggers,Spell,Area,Buff,Duration,UsableWhileMoving,HasUsageCondition				
+apocalypse_fire	Meteor		UnleashMeteor	Triggered,Triggerable,Spell,Area,Damage,InbuiltTrigger,Fire				
+apocalypse_cold	Hailstorm		UnleashBlizzard	Triggered,Triggerable,Spell,Area,Damage,Duration,InbuiltTrigger,Cold,Storm				
+apocalypse_lightning	Crash Lightning		UnleashStaticField	Triggered,Triggerable,Spell,Area,Damage,InbuiltTrigger,Lightning				
+mtx_wayward_wolf_pet_move			AnimatedGoTo	Microtransaction				
+triggered_explosive_growth	Accelerated Growth		TriggeredExplosiveGrowth	Triggerable,Triggered,InbuiltTrigger,Damage,Area,SkillGrantedBySupport,AttackInPlace,Spell				
+triggered_fan_the_flames	Fan the Flames		TriggeredFanTheFlames	Triggerable,Triggered,InbuiltTrigger,Damage,Area,Fire,SkillGrantedBySupport,AttackInPlace,Attack,UseGlobalStats,Cooldown,NonWeaponAttack				
+triggered_deadly_current	Coursing Current		TriggeredDeadlyCurrent	Triggerable,Triggered,InbuiltTrigger,Damage,Lightning,SkillGrantedBySupport,AttackInPlace,Projectile,ProjectilesNotFromUser,Chains,Spell,Cooldown	Metadata/Projectiles/TriggeredDeadlyCurrent	Metadata/Effects/Spells/lightning_arc/projectile/arc_Projectile_01.ao	arc_Projectile_01;arc_Projectile__Infusion_01	impact_01
+mirror_of_refraction	Mirror of Refraction		MirrorOfRefraction	Buff,OngoingSkill,HasReservation,Persistent,Duration,Limit,AffectedByCooldownRate				
+barkskin	Barkskin		Barkskin	OngoingSkill,HasReservation,Buff,Persistent,Duration,AttackInPlace				
+feral_invocation	Feral Invocation		FeralInvocation	HasReservation,OngoingSkill,Meta,Persistent,Buff,CanHaveMultipleOngoingSkillInstances,Invocation,GeneratesEnergy,Triggers,AttackInPlace,Cooldown				
+mtx_afk_podium			MtxAfkPodium	Microtransaction				
+mtx_encase_in_crystal			MtxEncaseInCrystal	Microtransaction				
+poison_spore_support	Poison Spores		ToxicDomain	Area,Duration,Chaos,DetonatesAfterTime,Buff,Cooldown,Attack,NoAttackOrCastTime,Physical,Plant,SkillGrantedBySupport				
+annihilation	Annihilation		Annihilation	Spell,Area,Instant,Triggerable,Triggered,SkillGrantedBySupport,InbuiltTrigger,Damage,Physical,Chaos,Fire,Lightning,Cold				
+savage_snare	[DNT] Savage Snare		DoNothing	SkillGrantedBySupport				
+dangerous_resolve	Deadly Resolve		TriggeredDangerousResolve	Triggered,Area,SkillGrantedBySupport,InbuiltTrigger,Triggerable,Damage,Physical,Attack,AttackInPlace,UseGlobalStats,NonWeaponAttack				
+totemic_aegis	[DNT-UNUSED]  totemic aegis		ShieldBarricade	Attack,Wall,Duration,Physical,Area,NonWeaponAttack,Melee,CanCreateStoneElementals,SkillGrantedBySupport,Triggered,Triggerable,InbuiltTrigger				
+triggered_spark_empower	Empowered Sparks		TriggeredSparkEmpower	SkillGrantedBySupport				
+triggered_empowered_spark	Empowered Sparks		Spark	SkillGrantedBySupport,Lightning,Projectile,Triggered,Triggerable,Duration,InbuiltTrigger	Metadata/Projectiles/Spark	Metadata/Effects/Spells/lightning_spark/spark_projectile.ao	projectile_01	impact_01
+wolf_lunar_blessing_beam_attack	Moonbeam		WolfLunarBlessingBeamAttack	Attack,Triggered,Triggerable,InbuiltTrigger,Area,Cold,Cooldown				
+triggered_charged_mark			CastGroundEffect	Spell,Area,Damage,Triggered,Triggerable,InbuiltTrigger,Duration,AreaSpell,AttackInPlace,SkillGrantedBySupport				
+archon_of_chayula	Archon of Chayula		ArchonOfChayula	Buff,Duration,HasUsageCondition,UsableWhileMoving				
+ancient_gifts	Wildwood's Gifts		AncientGifts	Buff,Persistent,OngoingSkill,HasReservation,GeneratesRemnants,AttackInPlace				
+righteous_descent	Righteous Descent		ChallengersAscent	Attack,Physical,Lightning,Area,Movement,Cooldown,Spear,ManualCooldownConsumption,Slam,Travel				
+starborn_onslaught	Starborn Onslaught		EmpyreanDescent	Attack,Area,Slam,Cold,Physical,CreatesFissure,Duration				
+triggered_lightning_detonate_dead	Voltaic Fulmination		TriggeredLightningDetonateDead	SkillGrantedBySupport,Lightning,Area,Triggered,Triggerable,InbuiltTrigger,Spell,Cooldown				
+azmerian_swarm	Azmerian Swarms		AzmerianSwarm	Buff,HasReservation,OngoingSkill,Persistent,Limit,Duration,Minion,CreatesMinion,Fire,Cold,Lightning,Physical,AttackInPlace				
+mist_raven_companion_swoop	[DNT-UNUSED] mist_raven_companion_swoop		Melee	Attack,Physical,Lightning,Area,Movement,Spear				
+harbinger_of_madness	Harbinger of Madness		HarbingerOfMadness	Buff,HasReservation,OngoingSkill,Physical,Area,Damage,Persistent				
+apply_tangmazu_swarm_aura	Winged Entropy		ApplyTangmazuSwarmAura	Buff,HasReservation,Aura,OngoingSkill,Persistent,AffectsPresence,AttackInPlace				
+nightfall_soaring_midnight	Soaring Midnight		NightfallShieldThrow	ManualCooldownConsumption,Cooldown,Attack,Area,Projectile,RequiresShield,Travel,Physical,Cold,NonWeaponAttack				
+nightfall_embrace_the_fall	Embrace The Fall		NightfallShieldTeleport	Attack,Area,Projectile,Travel,Physical,Cold,NonWeaponAttack,Slam,Melee,RequiresOffHandNotWeapon				
+archon_of_chayula_tornado	Chayula's Will		ArchonOfChayulaTornado	Attack,Duration,Trappable,Totemable,Triggerable,Physical,Area,Storm,Chaos,Triggered,InbuiltTrigger				
+spirit_vessel_companion	Spirit Vessel		SpiritVessel	Companion,Minion,CreatesMinion,HasReservation,Persistent,CreatesCompanion,AttackInPlace,Meta,Persistent				
+mtx_command_pied_piper_pet	Mesmerize		MtxCommandPiedPiperPet	Microtransaction,Spell,Cooldown,Instant,AttackInPlace				
+mtx_pied_piper_pet_hypnotize			MtxPiedPiperPetHypnotize	Microtransaction,AttackInPlace				
+crushing_fear	Crushing Fear		KillingPalm	Attack,Melee,Area,Physical,Chaos,MeleeSingleTarget,GeneratesCharges,Palm				
+midnight_star	Midnight Zenith		MidnightStar	OngoingSkill,HasReservation,Buff,Persistent,Duration,AttackInPlace,Cold,IceCrystal,Area,Limit,Damage				
+virtuous_barrier	Virtuous Barrier		GemBarrier	Buff,HasReservation,OngoingSkill,Persistent,ReserveInAllSets				
+triggered_chaos_frog_explosion	Dark Consequences		TriggeredChaosFrogExplosion	Triggered,InbuiltTrigger,Triggerable,SkillGrantedBySupport,Area,Chaos,Spell,AreaSpell,AttackInPlace,Damage				
+concussive_runes	Concussive Runes		Pummel	Attack,Slam,Triggerable,Triggered,InbuiltTrigger,SkillGrantedBySupport,Area,Melee				
+leylines	Leylines		Leylines	OngoingSkill,HasReservation,Buff,Persistent,AttackInPlace,Area,Duration				
+frostflame_nova	Frostflame Nova		FrostfireNova	Spell,Damage,Area,Trappable,Totemable,Mineable,Multicastable,Triggerable,Cold,Unleashable,AreaSpell,Nova,Invokable,UsableWhileMoving,Cascadable,Fire				
+hollow_shell	Hollow Shell		HollowShell	Spell,Buff,Area,Cascadable,Nova,Triggerable				
+triggered_molten_shower	Molten Shower		TriggeredMoltenShower	Triggerable,Triggered,InbuiltTrigger,Damage,Area,Fire,Attack,Projectile,ProjectileNoCollision,NoAttackOrCastTime,AttackInPlace,Cooldown,Instant				
+triggered_rune_forged_blades	Runeforged Blades		TriggeredRuneforgedBlades	Attack,Projectile,Triggerable,Triggered,InbuiltTrigger,SkillGrantedBySupport				
+triggered_fist_of_kalguur	Fist of Kalguur		TriggeredFistOfKalguur	Triggerable,Triggered,InbuiltTrigger,Area,Attack,NoAttackOrCastTime,SkillGrantedBySupport,AttackInPlace,Cooldown,Melee,Slam,Duration,Limit				
+powered_by_verisium	Powered by Verisium		VerisiumInfusion	Spell,GeneratesInfusion,Multicastable,Triggerable,Unleashable,Cooldown				
+refutation	Refutation		RunicFortress	Spell,Buff,Duration,Triggerable,Unleashable,UsableWhileMoving,Cooldown				
+repulsion	Repulsion		Repulsion	Spell,Area,Duration,Trappable,Totemable,Mineable,Multicastable,Triggerable,UsableWhileMoving,AppliesCurse,Unleashable,Cascadable,AreaSpell,UsableWhileMounted				
+repulsion_shockwave	Repulsion Wave		RepulsionMarkShockwave	Attack,Area,Triggerable,Triggered,InbuiltTrigger,Physical,UseGlobalStats,NoAttackOrCastTime,AttackInPlace,NonWeaponAttack,Cooldown				
+triskelion_cascade	Triskelion Cascade		TriskelionCascade	Spell,Cooldown,Buff,ModifiesNextSkill,Duration,EmpowersOtherSkill,UsableWhileMoving				
+internecine_draw_reservation	[DNT] Internecine Draw		InternecineDrawReservation	OngoingSkill,Buff,Persistent,HasReservation				
+internecine_draw_cycle	[DNT] Cycle Conflict		InternecineDrawCycle	Cooldown,Instant				
+skyfall	Skyfall		VerisiumComet	Spell,Damage,Area,Trappable,Totemable,Mineable,Multicastable,Triggerable,Cold,Physical,Cascadable,Unleashable,AreaSpell,Invokable,HasUsageCondition,Minion,CreatesMinion				
+detonate_living	Detonate Living		DetonateLiving	Spell,Damage,Area,Trappable,Totemable,Mineable,Multicastable,Triggerable,Cascadable,Unleashable,AreaSpell,Physical,UsableWhileMoving				
+animus_exchange	Animus Exchange		AnimusExchange	Spell,UsableWhileMoving,Cooldown,Triggerable				
+bitter_dead	Bitter Dead		VolatileDead	Spell,Damage,Area,Trappable,Totemable,Mineable,Multicastable,Triggerable,Cold,Cascadable,Unleashable,AreaSpell,UsableWhileMoving,TargetsDestructibleCorpses				
+eternal_march	Eternal March		WardforgedMinions	Spell,Minion,AttackInPlace,Cooldown,Instant,Triggerable				
+grim_pillars	Grim Pillars		GrimPillars	Spell,Damage,Duration,Cold,CreatesGroundEffect,IceCrystal,Area,Nova,Cascadable,ToggleSpawnedObjectTargetable_DefaultOn,Limit,Totemable,Triggerable				
+verisium_manifestation	Verisium Manifestations		ManifestRune	UsableWhileMoving,OngoingSkill,HasReservation,Persistent,AttackInPlace,Buff,Minion,CreatesMinion,Duration,UnlimitedTotems				
+manifest_rune	Manifest Rune		ManifestRuneMinion	Minion,Duration,MinionsCanExplode,Trappable,Totemable,Mineable,Multicastable,Triggerable,CreatesMinion,UsableWhileMoving,OngoingSkill,AttackInPlace,Cooldown				
+remnants_of_kalguur	Remnants of Kalguur		WardRemnants	OngoingSkill,HasReservation,Buff,Persistent,AttackInPlace,GeneratesRemnants				
+wardbound_minions	Wardbound Minions		WardboundMinions	Spell,CreatesMinion,Duration,MinionsCanExplode,Trappable,Mineable,Multicastable,Triggerable,Unleashable,UsableWhileMoving,Minion				
+fragments_of_the_past	Fragments of the Past		IceVolcanoFragment	Attack,Area,Duration,Projectile,Trappable,Totemable,Mineable,Damage,Projectile,UsableWhileMoving,Limit,GamepadDeflectable,Cold,Sustained,UsableWhileShapeshifted				
+conductive_runes	Conductive Runes		RuneHazard	Area,Hazard,Duration,Attack,Damage,Limit,UseGlobalStats,NonWeaponAttack,Lightning,Totemable,UsableWhileShapeshifted				
+atziri_herald	Herald of the Royal Queen		HeraldOfAtziri	OngoingSkill,HasReservation,Buff,Persistent,Herald,UseGlobalStats,Area,Attack,Physical,SkillConsumesBleeding,NoAttackOrCastTime,AttackInPlace,NonWeaponAttack				
+triggered_morrigans_insight	Nature's Exchange		TriggeredMorriganWard	SkillGrantedBySupport,Triggerable,Triggered,InbuiltTrigger,Cold,Guard,Duration,Cooldown				
+animus_splinters	Animus Splinters		FalseLife	Meta,Instant,InstantNoRepeatWhenHeld,Cooldown,UsableWhileShapeshifted				
+runic_reprieve	Runic Reprieve		RuneWard	Channel,UsableWhileMoving,Spell,ActiveBlock,CanCancelActions				
+voltaic_barrier	Voltaic Barrier		VoltaicBarrier	Attack,Area,Wall,Lightning,UsableWhileMoving,Totemable				
+triggered_fractured_self	Fragment Self		TriggeredFracturedSelf	SkillGrantedBySupport,Triggerable,Triggered,InbuiltTrigger,Instant,Duration,Limit,Area				
+transmutation_reservation	Explosive Transmutation		TransmutationReservation	HasReservation,OngoingSkill,Persistent,Buff				
+explosive_transmutation	Transmutation Explosion		ExplosiveTransmutation	Spell,Area,Cascadable,Physical,Cold,Fire,Lightning,Chaos,Triggerable,Triggered,InbuiltTrigger,Cooldown,Damage				
+voltaic_barrier_triggered_chain_lightning			VoltaicBarrierTriggeredChainLightning	InbuiltTrigger,Triggerable,Triggered,Attack,Lightning,Chains				
+rain_of_blades	Rain of Blades		KalguuranBladeRain	Buff,Duration,Cooldown,EmpowersOtherSkill,IndeterminateEmpowermentAmount,UsableWhileMoving,UsableWhileShapeshifted				
+rain_of_blades_triggered_blade	Falling Blade		KalguuranBladeRainTriggered	InbuiltTrigger,Instant,Triggerable,Triggered,Attack,Area,Cooldown				
+smash_to_smithereens	Smash to Smithereens		ArmourExplosion	Attack,Area,Triggered,InbuiltTrigger,Triggerable,NoAttackOrCastTime,AttackInPlace,Fire,Cooldown				
+queens_procession_reservation	Queen's Procession		LocustDashReservation	OngoingSkill,HasReservation,Buff,Persistent,DodgeReplacement,AttackInPlace,Attack,Area,Physical,UseGlobalStats,NonWeaponAttack,NoAttackOrCastTime,AffectedByCooldownRate				

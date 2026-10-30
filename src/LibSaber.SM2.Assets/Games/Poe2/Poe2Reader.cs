@@ -15,7 +15,7 @@ namespace LibSaber.SM2.Assets.Games.Poe2;
 ///   Space: PoE stores centimetres with -Z up (BasicSkeleton1 bbox z -195.6..0.18). ForgeLens internal space is metres, Y-up:
 ///   (x, y, z) -> (x, -z, y) * 0.01 (a proper rotation, no mirror; handedness vs the game NOT verified in-game).
 /// </summary>
-public sealed class Poe2Reader
+public sealed partial class Poe2Reader
 {
   public string JsonRoot { get; }
   public string RawRoot { get; }
@@ -47,7 +47,7 @@ public sealed class Poe2Reader
     return Quaternion.Normalize(Quaternion.CreateFromRotationMatrix(m));
   }
 
-  private JsonDocument Json(string gamePath)
+  internal JsonDocument Json(string gamePath)
   {
     var p = Path.Combine(JsonRoot, gamePath.ToLowerInvariant().Replace('/', Path.DirectorySeparatorChar) + ".json");
     return JsonDocument.Parse(File.ReadAllBytes(p));
@@ -179,7 +179,7 @@ public sealed class Poe2Reader
     }
   }
 
-  private void ReadSkeleton(ExportedMesh mesh, string ast, string? clipName)
+  internal void ReadSkeleton(ExportedMesh mesh, string ast, string? clipName)
   {
     using var doc = Json(ast);
     var root = doc.RootElement;

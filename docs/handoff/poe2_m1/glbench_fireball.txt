@@ -1,0 +1,22 @@
+glbench 2026-10-31 04:49:29 cores=32 source=poe2:m1s model=metadata/effects/spells/fire_fireball/ao/rig.ao||projectile
+Art/particles/fire_fireball/mb/projectile/projectileRIG.ast: 13 bones, 2 animations
+event pet t=0 Metadata/Effects/Spells/fire_fireball/pet/proj.pet group head -> bone aux_tip_attach_01
+mat Art/particles/FXGraphs/general_mesh_particle_testc.mat: Could not find a part of the path 'C:\Users\Revaptor_FX\Desktop\SM2_Work\PoE2\m1s\json\art\particles\fxgraphs\general_mesh_particle_testc.mat.json'.
+Art/Models/Effects/template_models/normalized_prtcls/mp_halfsphere_LOD2_FF.fmt: 125 verts, 180 tris, 1 parts, 0 bones, clip - s
+event trl t=0 Metadata/Effects/Spells/fire_fireball/trl/trl_main.trl group trail -> bone aux_tip_attach_01
+effect metadata/effects/spells/fire_fireball/ao/rig.ao anim projectile: 4 emitter parts, 149 verts, 13 bones, clip 1.00s
+GL: ANGLE (NVIDIA, NVIDIA GeForce RTX 4090 (0x00002684) Direct3D11 vs_5_0 ps_5_0, D3D11-32.0.16.1088) | OpenGL ES 3.0.0 (ANGLE 2.1.22045 git hash: 4a177dd16290) | MSAA 8x | aniso 16x
+first frame incl. upload 70 ms
+
+-- vsync off (back-to-back frames, glFinish at the end) --
+uncapped static 1100x1000 MSAA 8x:   0.15 ms/frame (  6832 fps)  cpu-submit 0.09 ms
+uncapped play   1100x1000 MSAA 8x:   0.11 ms/frame (  9350 fps)  cpu-submit 0.07 ms
+uncapped static 1600x1200 MSAA 8x:   0.10 ms/frame (  9921 fps)  cpu-submit 0.03 ms
+uncapped play   1600x1200 MSAA 8x:   0.10 ms/frame (  9938 fps)  cpu-submit 0.05 ms
+uncapped static 1920x1080 MSAA 8x:   0.11 ms/frame (  9301 fps)  cpu-submit 0.03 ms
+uncapped play   1920x1080 MSAA 8x:   0.10 ms/frame ( 10231 fps)  cpu-submit 0.04 ms
+uncapped static 2560x1440 MSAA 8x:   0.12 ms/frame (  8050 fps)  cpu-submit 0.02 ms
+uncapped play   2560x1440 MSAA 8x:   0.13 ms/frame (  7564 fps)  cpu-submit 0.04 ms
+vsync on  static orbit 1280x800: 60.2 presented fps
+vsync on  playback    1280x800: 59.0 presented fps
+done
