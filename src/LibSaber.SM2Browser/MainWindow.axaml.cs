@@ -949,9 +949,15 @@ public partial class MainWindow : Window
         TakePart(part);
     }
 
-    foreach (var pair in wanted)
+    // R76: decode in parallel (was serial; mip-0 decode was 70-80 % of a character open). Same images, same insert order.
+    var pairs = wanted.ToArray();
+    var images = new PreviewImage?[pairs.Length];
+    Parallel.For(0, pairs.Length, new ParallelOptions { MaxDegreeOfParallelism = Math.Clamp(Environment.ProcessorCount / 2, 1, 8) },
+      i => images[i] = LoadPreviewImage(catalog, store, hint, pairs[i].Key, pairs[i].Value));
+    for (var i = 0; i < pairs.Length; i++)
     {
-      if (LoadPreviewImage(catalog, store, hint, pair.Key, pair.Value) is not { } image)
+      var pair = pairs[i];
+      if (images[i] is not { } image)
         continue;
       if (pair.Value.Contains("Normal", StringComparison.OrdinalIgnoreCase))
         normals[pair.Key] = image;

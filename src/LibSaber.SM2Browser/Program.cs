@@ -34,6 +34,8 @@ internal static class Program
       return Bench.ThumbBench.Run(args);
     if (args.Length > 0 && args[0] == "--meshparts")
       return Bench.MeshPartsBench.Run(args);
+    if (args.Length > 0 && args[0] == "--openbench")
+      return Bench.OpenBench.Run(args);
     if (args.Length > 0 && args[0] == "--glbench")
       return Bench.GpuBench.Run(args);
     return BuildAvaloniaApp().StartWithClassicDesktopLifetime(args);
