@@ -62,6 +62,9 @@ internal sealed unsafe class GlPreview : IDisposable
   /// <summary>R79 Show-menu overlay lines (bounds box, grid) in model space, each with its colour; drawn like the bone lines.</summary>
   public IReadOnlyList<(Vector3 A, Vector3 B, Vector3 Colour)> ExtraLines { get; set; } = Array.Empty<(Vector3, Vector3, Vector3)>();
 
+  /// <summary>R82: total triangle index bytes uploaded this process (log only).</summary>
+  internal static long IboBytes;
+
   private sealed class GpuBatch
   {
     public uint Vao, Vbo, Ibo, LineIbo;
@@ -69,6 +72,8 @@ internal sealed unsafe class GlPreview : IDisposable
     public int[] LineStart = Array.Empty<int>();
     public int[] LineLen = Array.Empty<int>();
     public bool Skinned;
+    /// <summary>R82: 16-bit index buffer (vertex pool <= 65,536): half the IBO bytes, same triangles.</summary>
+    public bool Short;
     public PreviewBatch? Source;
     /// <summary>Vertex runs currently replaced by cloth output (restored from <see cref="Source"/> when physics stops).</summary>
     public (int Start, int Count)[]? OverrideRuns;
@@ -294,7 +299,16 @@ internal sealed unsafe class GlPreview : IDisposable
     _gl.BindBuffer(BufferTargetARB.ArrayBuffer, gpu.Vbo);
     _gl.BufferData<float>(BufferTargetARB.ArrayBuffer, data, BufferUsageARB.StaticDraw);
     _gl.BindBuffer(BufferTargetARB.ElementArrayBuffer, gpu.Ibo);
-    _gl.BufferData<uint>(BufferTargetARB.ElementArrayBuffer, indices, BufferUsageARB.StaticDraw);
+    if (count <= 65536)
+    {
+      var shorts = new ushort[indices.Length];
+      for (var i = 0; i < shorts.Length; i++) shorts[i] = (ushort)indices[i];
+      _gl.BufferData<ushort>(BufferTargetARB.ElementArrayBuffer, shorts, BufferUsageARB.StaticDraw);
+      gpu.Short = true;
+    }
+    else
+      _gl.BufferData<uint>(BufferTargetARB.ElementArrayBuffer, indices, BufferUsageARB.StaticDraw);
+    IboBytes += indices.Length * (gpu.Short ? 2L : 4L);
     uint stride = Stride * 4;
     _gl.EnableVertexAttribArray(0);
     _gl.VertexAttribPointer(0, 3, VertexAttribPointerType.Float, false, stride, (void*)0);
@@ -718,7 +732,7 @@ internal sealed unsafe class GlPreview : IDisposable
               _gl.BindVertexArray(gpu.Vao);
               _gl.BindBuffer(BufferTargetARB.ElementArrayBuffer, gpu.Ibo);
             }
-            _gl.DrawElements(PrimitiveType.Triangles, (uint)part.IndexCount, DrawElementsType.UnsignedInt, (void*)(part.IndexStart * 4L));
+            _gl.DrawElements(PrimitiveType.Triangles, (uint)part.IndexCount, gpu.Short ? DrawElementsType.UnsignedShort : DrawElementsType.UnsignedInt, (void*)(part.IndexStart * (gpu.Short ? 2L : 4L)));
           }
         }
       }
@@ -823,7 +837,7 @@ internal sealed unsafe class GlPreview : IDisposable
       SetChameleon(LegacyOpaque ? null : part.Chameleon);
 
       _gl.DepthFunc(pass is PreviewBlend.Translucent or PreviewBlend.Sfx ? DepthFunction.Less : DepthFunction.Lequal);
-      _gl.DrawElements(PrimitiveType.Triangles, (uint)part.IndexCount, DrawElementsType.UnsignedInt, (void*)(part.IndexStart * 4L));
+      _gl.DrawElements(PrimitiveType.Triangles, (uint)part.IndexCount, gpu.Short ? DrawElementsType.UnsignedShort : DrawElementsType.UnsignedInt, (void*)(part.IndexStart * (gpu.Short ? 2L : 4L)));
     }
 
     _gl.DepthFunc(DepthFunction.Less);

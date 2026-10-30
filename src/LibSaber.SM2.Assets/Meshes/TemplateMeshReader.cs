@@ -116,7 +116,22 @@ public static class TemplateMeshReader
   {
     if (mesh.Positions.Count == 0)
       return mesh.Bones.Count > 0 ? $"Skeleton only · {mesh.Bones.Count:N0} bones · no geometry decoded" : "No geometry decoded";
-    var line1 = new List<string> { "LOD 0", $"{mesh.Positions.Count:N0} verts", $"{mesh.Indices.Count / 3:N0} tris", $"{mesh.Parts.Count:N0} parts" };
+    // R82: the counts are what the viewer draws (visible parts of every vertex pool, same rule as the stats overlay);
+    // calgar's Index-visible set lives in the LOD1 pool (342,768 tris) while the LOD 0 pool (171,201) is all hidden.
+    // No extra item for the pool: a longer line wraps and shrinks the viewport (measured 238 -> 218 px).
+    long shownTris = 0, shownVerts = 0; var shownParts = 0;
+    void Count(IReadOnlyCollection<Vector3> pos, IEnumerable<MeshPart> parts)
+    {
+      var any = false;
+      foreach (var p in parts) if (p.Visible) { shownTris += p.IndexCount / 3; shownParts++; any = true; }
+      if (any) shownVerts += pos.Count;
+    }
+    Count(mesh.Positions, mesh.Parts);
+    foreach (var level in mesh.Levels) Count(level.Positions, level.Parts);
+    var pooled = shownParts == 0 || shownTris == mesh.Indices.Count / 3 && shownVerts == mesh.Positions.Count;
+    var line1 = pooled
+      ? new List<string> { "LOD 0", $"{mesh.Positions.Count:N0} verts", $"{mesh.Indices.Count / 3:N0} tris", $"{mesh.Parts.Count:N0} parts" }
+      : new List<string> { "Shown", $"{shownVerts:N0} verts", $"{shownTris:N0} tris", $"{shownParts:N0} parts" };
     if (mesh.Bones.Count > 0) line1.Add($"{mesh.Bones.Count:N0} bones");
     var line2 = new List<string>();
     if (mesh.TexturesNamed > 0) line2.Add($"Textures {mesh.TexturesResolved}/{mesh.TexturesNamed}");
