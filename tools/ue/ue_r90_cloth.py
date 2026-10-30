@@ -10,10 +10,13 @@ SUB = {
                                 "melee": A+"cc_titus_assault/yaw180/cc_titus_assault__npc_assault_attack_melee_thunder_hammer_light_1_intercessor"}),
  "calgar": ("cc_calgar", {"run": "/Game/ForgeLens/SM2/Tests/r67_phys/anims/cc_calgar__calgar_run_fwd_calgar"}),
  "tech_priest": ("cc_tech_priest", {"death": "/Game/ForgeLens/SM2/Tests/chars_cloth2/cc_tech_priest/Anims/cc_tech_priest__tech_priest_hordemode_death_tech_priest", "walk": "/Game/ForgeLens/SM2/Tests/chars_cloth2/cc_tech_priest/Anims/cc_tech_priest__tech_priest_censer_walk_loop_tech_priest"}),
- "chaplain": ("cc_chaplain", {"turn": "/Game/ForgeLens/SM2/Tests/chars_cloth2/cc_chaplain/Anims/cc_chaplain__chaplain_turn_180_lwd_chaplain"}),
+ "chaplain": ("cc_chaplain", {"turn": "/Game/ForgeLens/SM2/Characters/cc_chaplain/Anims/cc_chaplain__chaplain_turn_180_lwd_chaplain"}),
  "commissar": ("cc_commissar", {"death": "/Game/ForgeLens/SM2/Tests/chars_cloth2/cc_commissar/Anims/cc_commissar__death_1_commissar", "run": "/Game/ForgeLens/SM2/Tests/chars_cloth2/cc_commissar/Anims/cc_commissar__trooper_run_start_fwd_v01_commissar", "melee": "/Game/ForgeLens/SM2/Tests/chars_cloth2/cc_commissar/Anims/cc_commissar__trooper_death_melee_front_v01_commissar"}),
  "vortex": ("cc_vortex_beast", {"melee": A+"cc_vortex_beast/cc_vortex_beast__vortex_beast_attack_melee_180_rwd_vortex_beast"}),
 }
+# R97q: titus re-exported with --include-cloth-sim (922 cloth helper bones) + own PA, test subject "titus_cloth"
+SRCMAP = {"titus_cloth": ("/Game/ForgeLens/SM2/Characters/cc_titus_cloth/cc_titus_assault", W + "/Exports/r97/titus_cloth/tpl/cc_titus_assault.tpl/cc_titus_assault.physics.json")}
+SUB["titus_cloth"] = ("cc_titus_assault", dict(SUB["titus"][1]))
 def pj(n):
     for d in ("chars_cloth2", "chars_cloth", "chars_phys52"):  # R91: chars_cloth2 = tech_priest/chaplain/commissar with _SIM
         p = W + "/Exports/%s/%s/tpl/%s.tpl/%s.physics.json" % (d, n, n, n)
@@ -28,14 +31,15 @@ def tagged(cls, pre):
         t = [str(x) for x in a.tags if str(x).startswith(pre)]
         if t: out[t[0]] = a
     return out
-def mesh_path(subj, tag): return "%s/%s_%s" % (F, SUB[subj][0], tag)
+def mesh_path(subj, tag): return "%s/%s_%s" % (F, SUB[subj][0] + ("_cl" if subj in SRCMAP else ""), tag)
 def prep(subj, tag):
     n = SUB[subj][0]; mp = mesh_path(subj, tag)
     if EAL.does_asset_exist(mp): EAL.delete_asset(mp)
     src = "/Game/ForgeLens/SM2/Characters/%s/%s" % (n, n)
     if not EAL.does_asset_exist(src): src = "/Game/ForgeLens/SM2/Tests/chars_cloth2/%s/%s" % (n, n)  # R91 imports under /Game/ForgeLens/SM2
+    if subj in SRCMAP: src = SRCMAP[subj][0]
     m = EAL.duplicate_asset(src, mp)
-    r = L.create_chaos_cloth(m, pj(n)); conv, rep = (r if isinstance(r, tuple) else ([], ""))[-2:]
+    r = L.create_chaos_cloth(m, SRCMAP[subj][1] if subj in SRCMAP else pj(n)); conv, rep = (r if isinstance(r, tuple) else ([], ""))[-2:]
     print("R90 converted", subj, tag, len(conv))
     for l in str(rep).split(" | "):
         if "restFitted" in l or "deepIgnored" in l or "fitFloor=" in l or "restShape" in l or "restParticles" in l: print("R90LOG", l[:300])

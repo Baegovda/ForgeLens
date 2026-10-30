@@ -21,6 +21,7 @@ print("R52 plugin", lib is not None)
 for n in names:
     folder = "/Game/ForgeLens/SM2/Characters/" + n
     pj = W + "/Exports/chars_phys52/%s/tpl/%s.tpl/%s.physics.json" % (n, n, n)
+    if not os.path.exists(pj): pj = W + "/Exports/chars_cloth2/%s/tpl/%s.tpl/%s.physics.json" % (n, n, n)  # R97p: chaplain/commissar/tech_priest
     mesh = unreal.load_asset(folder + "/" + n)
     if mesh is None or not os.path.exists(pj):
         print("R52 SKIP", n, "mesh", mesh is not None, "json", os.path.exists(pj)); continue
@@ -47,3 +48,4 @@ for n in names:
     pa = mesh.get_editor_property("physics_asset")
     d = json.load(open(pj, encoding="utf-8"))
     print("R52 AFTER", n, "pa", pa.get_path_name() if pa else None, "new", len(new), "jiggles", len(d.get("jiggles", [])), "cloths", len(d.get("cloths", [])))
+

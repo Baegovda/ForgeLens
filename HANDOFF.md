@@ -2773,3 +2773,17 @@ Parent agent use: tail events.jsonl (text, cheap) and check heartbeat.txt age < 
   /Game/ForgeLens/SM2/Tests/_bak_r97/LS_arifle_bolt_rifle_preHaze). Third-party pack untouched.
 - Result: frame 16 soft orange textured flame burst + sparks at the muzzle, 17 fading embers, 18+ clear (docs/handoff/r97/fire_final_sheet.jpg).
 - Test copies: /Game/ForgeLens/SM2/VFX/MuzzleFlash/NS_MF_*, Sequences/BoltRifleFire_r97/LS_mf_*.
+
+## NOTE: R97o push (b1748f2) went out while poe2m2 held the box push lock (my acquire printed 'locked', push.ps1 ran anyway; ff-only, no conflict). Lock is now always checked before push.
+## R97p chaplain on its OWN skeleton (5b) - tools/ue/ue_r97_ownskel.py, ue_phys52_all.py (chars_cloth2 sidecar fallback)
+- Cause of SKELREUSE: sm2_skeleton_rule search root /Game picked the user's /Game/Characters/.../cc_chaplain_Skeleton.
+- New: /Game/ForgeLens/SM2/Characters/cc_chaplain/{cc_chaplain, cc_chaplain_Skeleton (new), Anims/turn_180 + idle, PA_cc_chaplain_SM2, ABP_cc_chaplain_SM2Phys}
+  from Exports/chars_cloth2 FBX; 39/39 material slots copied from the old mesh; SetupFromJson missingBones=0 (Foot_L_jiggle + Scarf phys bones present).
+- ue_r90_cloth chaplain now uses Characters/cc_chaplain + its own turn clip: chaplain turn pen 12 skin 122 (old shared-skeleton run 10/336).
+- User skeleton untouched. Old Tests/chars_cloth2|chars_phys/cc_chaplain kept (no deletion).
+## R97q Titus cloth with physics on (2)
+- Export Exports/r97/titus_cloth (SM2Extractor_r97 --include-cloth-sim): 6 cloths, 34 jiggles, 922 cloth helper bones.
+- Import /Game/ForgeLens/SM2/Characters/cc_titus_cloth/cc_titus_assault onto OUR Characters/cc_titus_assault_Skeleton; 41/47 slots copied.
+- SetupFromJson: PA_cc_titus_assault_SM2 (812 simulated, 160 kinematic, 956 constraints, missingBones=0, jiggles 34/34) + ABP + damper, assigned.
+- ue_r90_cloth subject 'titus_cloth' (meshes r90_cloth/cc_titus_assault_cl_<tag>): run pen 0 skin 104 vs old titus run pen 198 skin 162. 6 cloths converted
+  (each cloth reports missingBones=1 collision shape - not investigated).
