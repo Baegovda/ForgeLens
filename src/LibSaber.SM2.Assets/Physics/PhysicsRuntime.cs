@@ -73,6 +73,42 @@ public sealed class PhysicsRuntime
 
       _cloths.Add(new ClothInstance(entry, shell, bones));
     }
+
+    if (_cloths.Count > 0)
+      BindBackstops(mesh);
+  }
+
+  /// <summary>R73: body vertices (mesh vertices not within 2 cm of any cloth shell) decide each particle's backstop side.</summary>
+  private void BindBackstops(ExportedMesh mesh)
+  {
+    const float cell = 0.05f;
+    static (int, int, int) K(Vector3 p, float c) => ((int)MathF.Floor(p.X / c), (int)MathF.Floor(p.Y / c), (int)MathF.Floor(p.Z / c));
+    var cloth = new HashSet<(int, int, int)>();
+    foreach (var s in mesh.ClothSims) foreach (var p in s.Positions) cloth.Add(K(p, 0.02f));
+    var grid = new Dictionary<(int, int, int), List<Vector3>>();
+    foreach (var p in mesh.Positions)
+    {
+      var (x, y, z) = K(p, 0.02f);
+      var near = false;
+      for (var a = -1; a <= 1 && !near; a++) for (var b = -1; b <= 1 && !near; b++) for (var c = -1; c <= 1 && !near; c++) near = cloth.Contains((x + a, y + b, z + c));
+      if (near) continue;
+      var k = K(p, cell);
+      if (!grid.TryGetValue(k, out var l)) grid[k] = l = new();
+      l.Add(p);
+    }
+
+    Vector3? Nearest(Vector3 q)
+    {
+      var (x, y, z) = K(q, cell);
+      var best = 0.15f * 0.15f; Vector3? hit = null;
+      for (var a = -3; a <= 3; a++) for (var b = -3; b <= 3; b++) for (var c = -3; c <= 3; c++)
+        if (grid.TryGetValue((x + a, y + b, z + c), out var l))
+          foreach (var v in l) { var d = (v - q).LengthSquared(); if (d < best) { best = d; hit = v; } }
+      return hit;
+    }
+
+    foreach (var c in _cloths)
+      c.SetBackstopSides(Nearest);
   }
 
   public PhysicsSetup Setup { get; }
@@ -119,14 +155,29 @@ public sealed class PhysicsRuntime
     else
     {
       dt = time - _lastTime;
+      var wrapped = false;
       if (dt < 0 && duration > 0 && _lastTime - time > duration * 0.5f)
+      {
         dt += duration;
+        wrapped = true;
+      }
+
       if (dt < 0 || dt > MaxFrameGap)
       {
         Reset();
         dt = 0;
       }
+      else if (wrapped && WrapReset && PoseJump(worlds) > WrapJump)
+      {
+        // R73: a non-cyclic clip (death, get-up, attack) jumps from its last pose back to its first on the loop wrap.
+        // Simulating through that one-frame teleport flung the cloth through the body; restart from the pose instead.
+        WrapResets++;
+        Reset();
+        dt = 0;
+      }
     }
+
+    RememberPose(worlds);
 
     // Root jumps (loop wrap of a clip with root motion) teleport the simulation with it, as the engine's
     // teleport check does (0x14147ed64: velocity change over dt^2 above a threshold zeroes the spring).
@@ -183,6 +234,32 @@ public sealed class PhysicsRuntime
     }
 
     LastStepMs = watch.Elapsed.TotalMilliseconds;
+  }
+
+  /// <summary>R73: largest bone displacement (m, root-relative) above which a loop wrap restarts the simulation. SM2_PHYS_WRAPRESET=0 disables.</summary>
+  public static float WrapJump { get; set; } = 0.15f;
+  public static bool WrapReset { get; set; } = Environment.GetEnvironmentVariable("SM2_PHYS_WRAPRESET") != "0";
+  public int WrapResets { get; private set; }
+  private Vector3[] _lastPose = Array.Empty<Vector3>();
+
+  private float PoseJump(Matrix4x4[] worlds)
+  {
+    if (_lastPose.Length != worlds.Length || _root < 0 || _root >= worlds.Length)
+      return 0;
+    var root = worlds[_root].Translation;
+    var lastRoot = _lastPose[_root];
+    var worst = 0f;
+    for (var i = 0; i < worlds.Length; i++)
+      worst = MathF.Max(worst, ((worlds[i].Translation - root) - (_lastPose[i] - lastRoot)).Length());
+    return worst;
+  }
+
+  private void RememberPose(Matrix4x4[] worlds)
+  {
+    if (_lastPose.Length != worlds.Length)
+      _lastPose = new Vector3[worlds.Length];
+    for (var i = 0; i < worlds.Length; i++)
+      _lastPose[i] = worlds[i].Translation;
   }
 
   private static bool IsDescendant(List<Bone> bones, int i, int ancestor)

@@ -37,15 +37,40 @@ internal static class PhysBench
       Console.WriteLine(text);
     }
 
-    var stem = Path.GetFileName(dir.TrimEnd('/')).Replace(".tpl", "");
-    var mesh = TemplateMeshReader.LoadRaw(File.ReadAllBytes(Path.Combine(dir, stem + ".tpl")),
+    string stem;
+    ExportedMesh mesh;
+    AnimationClip clip;
+    if (dir.StartsWith("game:"))
+    {
+      // R73: --physbench game:<client_pc> <model.tpl> <clip file name part> <out> [seconds] [every]: same loader,
+      // physics lookup and clip as the viewer (no loose export needed).
+      var catalog = LibSaber.SM2.Assets.Catalog.GameCatalog.Load(dir[5..]);
+      var store = new LibSaber.SM2.Assets.Catalog.ArchiveStore(catalog);
+      var hit = catalog.FindByFileName(saniPath.Split('|')[0])[0];
+      mesh = TemplateMeshReader.Load(catalog, store, hit);
+      MainWindow.ResolvePreview(catalog, store, mesh, hit);
+      stem = Path.GetFileNameWithoutExtension(saniPath.Split('|')[0]);
+      mesh.Physics = PhysicsLocator.Find(catalog, store, catalog.GetFile(hit).Path) ?? new PhysicsSetup();
+      if (!mesh.Physics.IsEmpty)
+        CdtObjectResolver.Apply(mesh.Physics, mesh.Bones, TplMarkup.Find(catalog, store, hit));
+      var want = clsRoot;
+      var headers = SaniIndex.ReadHeaders(catalog, store);
+      var h = headers.First(x => Path.GetFileName(x.Path).Contains(want, StringComparison.OrdinalIgnoreCase));
+      clip = SaniReader.Load(catalog, store, h.Index);
+      seconds = Math.Min(seconds, clip.Duration);
+    }
+    else
+    {
+    stem = Path.GetFileName(dir.TrimEnd('/')).Replace(".tpl", "");
+    mesh = TemplateMeshReader.LoadRaw(File.ReadAllBytes(Path.Combine(dir, stem + ".tpl")),
       File.Exists(Path.Combine(dir, stem + ".tpl_data")) ? File.ReadAllBytes(Path.Combine(dir, stem + ".tpl_data")) : null, stem);
-    var clip = SaniReader.FromBytes(File.ReadAllBytes(saniPath),
+    clip = SaniReader.FromBytes(File.ReadAllBytes(saniPath),
       File.Exists(saniPath + "_data") ? File.ReadAllBytes(saniPath + "_data") : null, Path.GetFileNameWithoutExtension(saniPath));
     mesh.Physics = PhysicsLocator.Find(new PhysicsLocator.DirectorySource(clsRoot), stem + ".tpl");
     var markup = Path.Combine(dir, stem + ".tpl_markup");
     if (mesh.Physics is not null && File.Exists(markup))
       CdtObjectResolver.Apply(mesh.Physics, mesh.Bones, TplMarkup.Locators(File.ReadAllText(markup))); // mtl1-37
+    }
     Line($"physbench {DateTime.Now:yyyy-MM-dd HH:mm:ss} {stem}: verts {mesh.Positions.Count} bones {mesh.Bones.Count} sims {mesh.ClothSims.Count}; clip {clip.Name} {clip.Duration:0.00}s tracks {clip.Tracks.Count}");
     Line($"class {mesh.Physics?.SourceClass}: cloths {mesh.Physics?.Cloths.Count} jiggles {mesh.Physics?.Jiggles.Count}");
     var runtime = MeshPreview.PhysicsFor(mesh);

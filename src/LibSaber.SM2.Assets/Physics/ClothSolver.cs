@@ -27,6 +27,8 @@ public sealed class ClothInstance
   private Vector3[] _current;
   private Vector3[] _previous;
   private Vector3[] _skinned;
+  private Vector3[] _skinnedNormal;
+  private Vector3[] _startSkinnedNormal = Array.Empty<Vector3>();
   private bool _started;
   private float _windClock;
 
@@ -47,6 +49,7 @@ public sealed class ClothInstance
   {
     _entry = entry;
     _shell = shell;
+    _bonesRef = bones;
     var n = shell.Positions.Count;
     _bind = shell.Positions.ToArray();
     _triangles = shell.Indices.ToArray();
@@ -77,6 +80,9 @@ public sealed class ClothInstance
     _current = (Vector3[])_bind.Clone();
     _previous = (Vector3[])_bind.Clone();
     _skinned = (Vector3[])_bind.Clone();
+    _skinnedNormal = new Vector3[n];
+    for (var i = 0; i < n; i++)
+      _skinnedNormal[i] = i < shell.Normals.Count && shell.Normals[i].LengthSquared() > 1e-12f ? Vector3.Normalize(shell.Normals[i]) : Vector3.Zero;
   }
 
   public string Name => _shell.Name;
@@ -114,6 +120,12 @@ public sealed class ClothInstance
   ///   particles out on the far side (radial projection from the new axis), flipping the helper 100-145 deg.
   ///   SM2_PHYS_COLLIDER_LERP=0 restores the old end-pose collision.
   /// </summary>
+  /// <summary>R73: side-preserving (swept) capsule push-out. SM2_PHYS_CCD=0 restores the radial projection.</summary>
+  public static bool Continuous { get; set; } = Environment.GetEnvironmentVariable("SM2_PHYS_CCD") != "0";
+
+  /// <summary>R73 experiment: minimum solver iterations per second (0 = class solverFrequency only).</summary>
+  public static float MinSolverHz { get; set; } = float.TryParse(Environment.GetEnvironmentVariable("SM2_PHYS_MINHZ"), System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out var hz) ? hz : 0f;
+
   public static bool ColliderLerp { get; set; } = Environment.GetEnvironmentVariable("SM2_PHYS_COLLIDER_LERP") != "0";
 
   private List<Collider>? _prevColliders;
@@ -152,13 +164,14 @@ public sealed class ClothInstance
       Array.Copy(_skinned, _previous, _previous.Length);
       _started = true;
       _prevColliders = Colliders(worlds);
+      _startSkinnedNormal = (Vector3[])_skinnedNormal.Clone();
       if (dt <= 0)
         return;
     }
 
     if (dt <= 0)
       return;
-    var iterations = Math.Clamp((int)MathF.Round(dt * Math.Max(1f, cfg.SolverFrequency)), 1, 64);
+    var iterations = Math.Clamp((int)MathF.Round(dt * Math.Max(MinSolverHz, Math.Max(1f, cfg.SolverFrequency))), 1, 64);
     var h = dt / iterations;
     var exponent = h * Math.Max(1f, cfg.StiffnessFrequency);
     float PerIteration(float stiffness) => 1f - MathF.Pow(1f - Math.Clamp(stiffness, 0f, 1f), exponent);
@@ -173,6 +186,8 @@ public sealed class ClothInstance
     var fromColliders = ColliderLerp && _prevColliders is { } pc && pc.Count == colliders.Count && pc.Select(c => c.Kind).SequenceEqual(colliders.Select(c => c.Kind)) ? pc : null;
     _prevColliders = colliders;
     var startSkinned = (Vector3[])_prevSkinnedOrSkinned.Clone();
+    if (_startSkinnedNormal.Length != _skinnedNormal.Length)
+      _startSkinnedNormal = (Vector3[])_skinnedNormal.Clone();
     for (var it = 0; it < iterations; it++)
     {
       var f = (it + 1f) / iterations;
@@ -216,7 +231,7 @@ public sealed class ClothInstance
         }
       }
 
-      if (cfg.Motion.Enable && motionStiffness > 0)
+      if ((cfg.Motion.Enable || ForceMotion) && motionStiffness > 0)
       {
         for (var i = 0; i < _current.Length; i++)
         {
@@ -231,8 +246,25 @@ public sealed class ClothInstance
         }
       }
 
+      // R73: backstop before collision so the capsule push-out has the last word (NvCloth order: separation, then collision).
+      if (Backstop && _side.Length == _current.Length)
+        for (var i = 0; i < _current.Length; i++)
+        {
+          if (_side[i] == 0)
+            continue;
+          var n = Vector3.Lerp(_startSkinnedNormal[i], _skinnedNormal[i], f);
+          if (n.LengthSquared() < 1e-12f)
+            continue;
+          n = Vector3.Normalize(n) * _side[i];
+          var target = Vector3.Lerp(startSkinned[i], _skinned[i], f);
+          var behind = Vector3.Dot(_current[i] - target, n) + BackstopMargin;
+          if (behind < 0)
+            _current[i] -= n * behind;
+        }
       Collide(fromColliders == null || it == iterations - 1 ? colliders : Lerp(fromColliders, colliders, f), cfg.CollisionThickness);
     }
+
+    _startSkinnedNormal = (Vector3[])_skinnedNormal.Clone();
 
     _prevSkinnedOrSkinned = (Vector3[])_skinned.Clone();
     var worst = 0f;
@@ -246,6 +278,35 @@ public sealed class ClothInstance
 
   /// <summary>Skinned (animation-only) particle positions of the last step.</summary>
   public Vector3[] SkinnedPositions => _skinned;
+  public Vector3[] SkinnedNormals => _skinnedNormal;
+
+  /// <summary>
+  ///   R73 backstop (generic, all cloths): a free particle may not sink behind its animation-skinned position along the
+  ///   skinned cloth normal by more than <see cref="BackstopMargin"/>. The authored skinned cloth sits on the outside of
+  ///   the body, and the class capsules leave most of the body uncovered (sorcerer: ~65% of sim-made penetrations are
+  ///   &gt;3 cm away from every capsule), so without it cloth falls through thighs/back between capsules. This is the
+  ///   standard APEX/NvCloth "backstop / separation" idea; SM2's own separation block is off in these classes, so this is
+  ///   an INFERRED stand-in, not a port. SM2_PHYS_BACKSTOP=0 disables it.
+  /// </summary>
+  public static bool Backstop { get; set; } = Environment.GetEnvironmentVariable("SM2_PHYS_BACKSTOP") != "0";
+  public static float BackstopMargin { get; set; } = float.TryParse(Environment.GetEnvironmentVariable("SM2_PHYS_BACKSTOP_CM"), System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out var cm) ? cm / 100f : 0.01f;
+  /// <summary>Per particle backstop normal sign: +1 the shell normal faces away from the body, -1 toward it, 0 no body within 15 cm at bind (no backstop).</summary>
+  private float[] _side = Array.Empty<float>();
+  public int BackstopParticles => _side.Count(x => x != 0);
+
+  /// <summary>Measure each particle's body side at bind: nearest body vertex within 15 cm decides the sign.</summary>
+  public void SetBackstopSides(Func<Vector3, Vector3?> nearestBody)
+  {
+    _side = new float[_bind.Length];
+    for (var i = 0; i < _bind.Length; i++)
+    {
+      var n = i < _shell.Normals.Count ? _shell.Normals[i] : Vector3.Zero;
+      if (_invMass[i] == 0 || n.LengthSquared() < 1e-12f || nearestBody(_bind[i]) is not { } v)
+        continue;
+      var d = Vector3.Dot(_bind[i] - v, n);
+      _side[i] = d >= 0 ? 1f : -1f;
+    }
+  }
 
   private Vector3[] _prevSkinnedOrSkinned = Array.Empty<Vector3>();
 
@@ -262,13 +323,16 @@ public sealed class ClothInstance
 
       var w = weights[i];
       var p = _bind[i];
+      var nb = i < _shell.Normals.Count ? _shell.Normals[i] : Vector3.Zero;
       var sum = Vector3.Zero;
+      var nsum = Vector3.Zero;
       var total = 0f;
       void Add(ushort joint, float weight)
       {
         if (weight <= 0 || joint >= skin.Length)
           return;
         sum += Vector3.Transform(p, skin[joint]) * weight;
+        nsum += Vector3.TransformNormal(nb, skin[joint]) * weight;
         total += weight;
       }
 
@@ -277,6 +341,8 @@ public sealed class ClothInstance
       Add(w.J2, w.W2);
       Add(w.J3, w.W3);
       _skinned[i] = total > 1e-6f ? sum / total : p;
+      if (total > 1e-6f && nsum.LengthSquared() > 1e-12f)
+        _skinnedNormal[i] = Vector3.Normalize(nsum);
     }
 
     if (_prevSkinnedOrSkinned.Length != _skinned.Length || !_started)
@@ -356,8 +422,12 @@ public sealed class ClothInstance
 
   private readonly record struct Collider(int Kind, Vector3 A, Vector3 B, float Ra, float Rb, Matrix4x4 Frame, Vector3 Half);
 
+  /// <summary>R73 experiment: scale on every capsule / sphere radius (SM2_PHYS_RSCALE).</summary>
+  public static float RadiusScale { get; set; } = float.TryParse(Environment.GetEnvironmentVariable("SM2_PHYS_RSCALE"), System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out var rs) ? rs : 1f;
+
   private List<Collider> Colliders(Matrix4x4[] worlds)
   {
+    var rsc = RadiusScale;
     var list = new List<Collider>();
     foreach (var c in _capsules)
     {
@@ -365,7 +435,7 @@ public sealed class ClothInstance
         continue;
       var a = Vector3.Transform(c.Offset, worlds[c.Bone]);
       var b = Vector3.Transform(c.Offset2, worlds[c.Bone2]);
-      list.Add(new Collider(0, a, b, c.Radius, c.Radius2, default, default));
+      list.Add(new Collider(0, a, b, c.Radius * rsc, c.Radius2 * rsc, default, default));
     }
 
     foreach (var s in _spheres)
@@ -373,7 +443,7 @@ public sealed class ClothInstance
       if (s.Bone >= worlds.Length)
         continue;
       var a = Vector3.Transform(s.Offset, worlds[s.Bone]);
-      list.Add(new Collider(0, a, a, s.Radius, s.Radius, default, default));
+      list.Add(new Collider(0, a, a, s.Radius * rsc, s.Radius * rsc, default, default));
     }
 
     foreach (var b in _boxes)
@@ -412,7 +482,24 @@ public sealed class ClothInstance
           var d = p - axis;
           var dist = d.Length();
           if (dist < r && dist > 1e-9f)
+          {
+            if (Continuous)
+            {
+              // R73: push out on the side the particle came from. A particle that crossed the axis within one
+              // iteration (fast limb, low solverFrequency) used to be projected radially out of the FAR side,
+              // i.e. through the body; NvCloth's continuous collision resolves along the swept path instead.
+              var q = _previous[i];
+              var tq = len2 > 1e-12f ? Math.Clamp(Vector3.Dot(q - c.A, ab) / len2, 0f, 1f) : 0f;
+              var dq = q - (c.A + ab * tq);
+              if (Vector3.Dot(dq, d) < 0 && dq.LengthSquared() > 1e-12f)
+              {
+                p = axis + Vector3.Normalize(dq) * r;
+                continue;
+              }
+            }
+
             p = axis + d * (r / dist);
+          }
         }
         else
         {
@@ -435,6 +522,105 @@ public sealed class ClothInstance
       _current[i] = p;
     }
   }
+
+  /// <summary>R73 metric: free particles inside the posed collision shapes (count, max depth) for the given positions.</summary>
+  public (int Count, float Max) ColliderDepth(Matrix4x4[] worlds, Vector3[] positions, float minDepth = 0.005f)
+  {
+    var colliders = Colliders(worlds);
+    var count = 0;
+    var max = 0f;
+    for (var i = 0; i < positions.Length; i++)
+    {
+      if (_invMass[i] == 0)
+        continue;
+      var p = positions[i];
+      var worst = 0f;
+      foreach (var c in colliders)
+      {
+        float depth;
+        if (c.Kind == 0)
+        {
+          var ab = c.B - c.A;
+          var len2 = ab.LengthSquared();
+          var t = len2 > 1e-12f ? Math.Clamp(Vector3.Dot(p - c.A, ab) / len2, 0f, 1f) : 0f;
+          depth = c.Ra + (c.Rb - c.Ra) * t - (p - (c.A + ab * t)).Length();
+        }
+        else
+        {
+          Matrix4x4.Invert(c.Frame, out var inv);
+          var l = Vector3.Transform(p, inv);
+          depth = MathF.Min(c.Half.X - MathF.Abs(l.X), MathF.Min(c.Half.Y - MathF.Abs(l.Y), c.Half.Z - MathF.Abs(l.Z)));
+        }
+
+        worst = MathF.Max(worst, depth);
+      }
+
+      if (worst > minDepth)
+      {
+        count++;
+        max = MathF.Max(max, worst);
+      }
+    }
+
+    return (count, max);
+  }
+
+  /// <summary>R73 metric: per free particle, signed distance to the nearest collision shape surface (negative = inside).</summary>
+  public float[] ColliderGap(Matrix4x4[] worlds, Vector3[] positions)
+  {
+    var colliders = Colliders(worlds);
+    var list = new List<float>();
+    for (var i = 0; i < positions.Length; i++)
+    {
+      if (_invMass[i] == 0) { if (AllIndices) list.Add(float.NaN); continue; }
+      var p = positions[i];
+      var best = float.MaxValue;
+      foreach (var c in colliders)
+      {
+        if (c.Kind != 0) continue;
+        var ab = c.B - c.A;
+        var len2 = ab.LengthSquared();
+        var t = len2 > 1e-12f ? Math.Clamp(Vector3.Dot(p - c.A, ab) / len2, 0f, 1f) : 0f;
+        best = MathF.Min(best, (p - (c.A + ab * t)).Length() - (c.Ra + (c.Rb - c.Ra) * t));
+      }
+      list.Add(best);
+    }
+    return list.ToArray();
+  }
+
+  /// <summary>R73 diagnostic: per shape (config order) the number of given particles inside it and the deepest one.</summary>
+  public IEnumerable<string> ShapeReport(Matrix4x4[] worlds, Vector3[] positions)
+  {
+    var colliders = Colliders(worlds);
+    var names = _entry.Config.Capsules.Where(c => Find2(c.BoneFirst) && Find2(c.BoneSecond.Length > 0 ? c.BoneSecond : c.BoneFirst))
+      .Select(c => $"cap {c.Name} {c.BoneFirst}->{c.BoneSecond} r {c.RadiusFirst:0.###}/{c.RadiusSecond:0.###} off {c.BoneFirstOffset}{(c.ResolvedFrom.Length > 0 ? " [" + c.ResolvedFrom + "]" : "")}")
+      .Concat(_entry.Config.Spheres.Where(x => Find2(x.Bone)).Select(x => $"sph {x.Bone} r {x.Radius:0.###}"))
+      .Concat(_entry.Config.Boxes.Where(x => Find2(x.Bone)).Select(x => $"box {x.Bone} {x.Size}")).ToList();
+    for (var k = 0; k < colliders.Count; k++)
+    {
+      var c = colliders[k];
+      var n = 0; var max = 0f;
+      for (var i = 0; i < positions.Length; i++)
+      {
+        if (_invMass[i] == 0 || c.Kind != 0) continue;
+        var ab = c.B - c.A; var len2 = ab.LengthSquared();
+        var t = len2 > 1e-12f ? Math.Clamp(Vector3.Dot(positions[i] - c.A, ab) / len2, 0f, 1f) : 0f;
+        var depth = c.Ra + (c.Rb - c.Ra) * t - (positions[i] - (c.A + ab * t)).Length();
+        if (depth > 0.005f) { n++; max = MathF.Max(max, depth); }
+      }
+      yield return $"{(k < names.Count ? names[k] : "?")}: inside {n} max {max * 100:0.0} cm, len {(c.B - c.A).Length() * 100:0} cm";
+    }
+  }
+
+  private bool Find2(string name) => _bonesRef is not null && FindBone(_bonesRef, name) >= 0;
+  private readonly IReadOnlyList<Bone>? _bonesRef;
+
+  public static bool AllIndices { get; set; }
+
+  public static bool ForceMotion { get; set; } = Environment.GetEnvironmentVariable("SM2_PHYS_FORCEMOTION") == "1";
+
+  public int FreeCount => _invMass.Count(w => w > 0);
+  public int ColliderCount => _capsules.Length + _spheres.Length + _boxes.Length;
 
   private static Matrix4x4 Normalized(Matrix4x4 m)
   {

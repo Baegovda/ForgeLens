@@ -12,6 +12,8 @@ internal static class Program
       return Bench.LevelBench.Run(args);
     if (args.Length > 0 && args[0] == "--bench")
       return Bench.PreviewBench.Run(args);
+    if (args.Length > 0 && args[0] == "--clothpen")
+      return Bench.ClothPenBench.Run(args);
     if (args.Length > 0 && args[0] == "--physbench")
       return Bench.PhysBench.Run(args);
     if (args.Length > 0 && args[0] == "--vfxbench")
