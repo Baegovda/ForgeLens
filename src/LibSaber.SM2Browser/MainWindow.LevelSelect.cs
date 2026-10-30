@@ -11,6 +11,15 @@ namespace LibSaber.SM2Browser;
 
 public partial class MainWindow
 {
+  private Task SaveWindowAsync(string png)
+  {
+    var size = new PixelSize(Math.Max(1, (int)Bounds.Width), Math.Max(1, (int)Bounds.Height));
+    using var bmp = new RenderTargetBitmap(size, new Vector(96, 96));
+    bmp.Render(this);
+    bmp.Save(png);
+    return Task.CompletedTask;
+  }
+
   private async Task SelectFromEnvironmentAsync()
   {
     if (Environment.GetEnvironmentVariable("SM2_SELECT") is not { Length: > 0 } path || _catalog is null)
@@ -38,6 +47,8 @@ public partial class MainWindow
       File.WriteAllText(shot + ".txt", $"selected {selected}\nlevel {(_level is null ? "(none)" : _level.Stats)}\nselect_to_level_shown {open:0.0}s gpu {UseGpu()} from_disk_cache {_level?.FromDiskCache}\ntiming {_level?.Timing}\n");
     }
     catch (Exception e) { File.WriteAllText(shot + ".txt", "winshot failed: " + e); }
+    if (Environment.GetEnvironmentVariable("SM2_FLYTEST") == "1")
+      await FlyTestAsync(shot, SaveWindowAsync);
     if (Environment.GetEnvironmentVariable("SM2_WINSHOT_EXIT") == "1")
       Dispatcher.UIThread.Post(Close);
   }

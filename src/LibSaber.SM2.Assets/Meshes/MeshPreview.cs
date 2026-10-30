@@ -1089,6 +1089,14 @@ public static partial class MeshPreview
       : 4f;
   }
 
+  /// <summary>Centre of the drawn bounds (the pivot the renderer orbits when <see cref="OrbitCamera.Target"/> is null).</summary>
+  public static Vector3 FitCentre(ExportedMesh mesh, int lod = 0, int part = -1)
+  {
+    if (!TrySelect(mesh, Math.Max(0, lod), out var positions, out _, out _, out var indices, out var parts, out _))
+      return Vector3.Zero;
+    return TryBounds(positions, indices, parts, part, out var c, out _) ? c : Vector3.Zero;
+  }
+
   public static float FitDistance(Vector3 extent, float aspect)
   {
     var height = Math.Max(extent.Y, 0.05f);

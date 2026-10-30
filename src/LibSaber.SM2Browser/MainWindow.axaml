@@ -201,6 +201,8 @@
           <local:WheelComboBox x:Name="LodBox" Width="150" IsVisible="False" SelectionChanged="LodChanged" />
           <TextBlock x:Name="PartLabel" Text="Part" VerticalAlignment="Center" IsVisible="False" Foreground="{DynamicResource FL.TextDim}" />
           <local:WheelComboBox x:Name="PartBox" Width="220" IsVisible="False" SelectionChanged="ViewChanged" />
+          <ToggleButton x:Name="FlyToggle" Content="Fly" IsChecked="False" IsVisible="False" Click="FlyToggleClicked"
+                        ToolTip.Tip="Fly camera (Unreal style): hold right mouse to look, WASD move, Q/E down/up, Shift faster, wheel while RMB held = speed, F = frame. Off = orbit." />
           <ToggleButton x:Name="WireToggle" Content="Wireframe" IsChecked="False" IsVisible="False" Click="ViewChanged" />
           <ToggleButton x:Name="SkeletonToggle" Content="Skeleton" IsChecked="False" IsVisible="False" Click="ViewChanged" />
           <ToggleButton x:Name="SmoothToggle" Content="AA" IsChecked="True" IsVisible="False" Click="ViewChanged"

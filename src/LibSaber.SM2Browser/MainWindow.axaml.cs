@@ -113,6 +113,7 @@ public partial class MainWindow : Window
     // Space = Play/Pause anywhere in the window, except while typing (search, anim filter) or in an open dropdown.
     AddHandler(KeyDownEvent, SpaceKeyDown, RoutingStrategies.Tunnel);
     AddHandler(KeyDownEvent, ShortcutKeyDown, RoutingStrategies.Tunnel);
+    InitFly();
     Opened += async (_, _) =>
     {
       if (!string.IsNullOrWhiteSpace(_settings.LastFolder) && Directory.Exists(_settings.LastFolder))
@@ -525,6 +526,7 @@ public partial class MainWindow : Window
         _time = 0;
         _yaw = 0.7f;
         _pitch = 0.18f;
+        FlyReset(false);
         FillModelControls(mesh);
         KitbashModelLoaded(mesh, index);
         SkeletonToggle.IsVisible = mesh.Bones.Count > 0;
@@ -587,6 +589,7 @@ public partial class MainWindow : Window
         _previewFileIndex = index;
         _albedo = scene.Albedo; _normals = scene.Normals; _specular = scene.Specular;
         _yaw = scene.Persp.Yaw; _pitch = scene.Persp.Pitch; _distance = scene.Persp.Distance; _time = 0;
+        FlyReset(true);
         WireToggle.IsVisible = true;
         PreviewNote.Text = scene.Stats;
         PreviewText.IsVisible = false;
@@ -826,6 +829,7 @@ public partial class MainWindow : Window
     var yaw = _yaw;
     var pitch = _pitch;
     var distance = _distance;
+    var pivot = _pivot;
     var time = _time;
     var skeleton = SkeletonToggle.IsChecked == true;
     var wire = WireToggle.IsChecked == true;
@@ -852,7 +856,7 @@ public partial class MainWindow : Window
         mesh,
         width,
         height,
-        new OrbitCamera { Yaw = yaw, Pitch = pitch, Distance = distance, Target = level?.Centre },
+        new OrbitCamera { Yaw = yaw, Pitch = pitch, Distance = distance, Target = pivot ?? level?.Centre },
         skeleton,
         time,
         out var note,
@@ -1065,7 +1069,7 @@ public partial class MainWindow : Window
     var clip = _clip;
     var request = new GpuFrameRequest(
       _mesh,
-      new OrbitCamera { Yaw = _yaw, Pitch = _pitch, Distance = _distance },
+      new OrbitCamera { Yaw = _yaw, Pitch = _pitch, Distance = _distance, Target = _pivot },
       SkeletonToggle.IsChecked == true,
       WireToggle.IsChecked == true,
       _time,
@@ -1472,12 +1476,16 @@ public partial class MainWindow : Window
 
   private void ViewPressed(object? sender, PointerPressedEventArgs e)
   {
+    if (FlyPressed(e))
+      return;
     _dragging = true;
     _lastPoint = e.GetPosition(ViewBorder);
   }
 
   private void ViewReleased(object? sender, PointerReleasedEventArgs e)
   {
+    if (FlyReleased(e))
+      return;
     if (!_dragging)
       return;
     _dragging = false;
@@ -1486,6 +1494,8 @@ public partial class MainWindow : Window
 
   private void ViewMoved(object? sender, PointerEventArgs e)
   {
+    if (FlyMoved(e))
+      return;
     if (_dragging && _fx is not null)
     {
       var p = e.GetPosition(ViewBorder);
@@ -1508,6 +1518,8 @@ public partial class MainWindow : Window
     if (VfxWheel(e))
       return;
     if (_mesh is null)
+      return;
+    if (FlyWheel(e))
       return;
     if (_distance <= 0 && _mesh is not null)
     {
