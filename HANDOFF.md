@@ -2808,3 +2808,20 @@ Parent agent use: tail events.jsonl (text, cheap) and check heartbeat.txt age < 
 - In-place FBX re-import onto our skeleton (ue_r97_reskel.py) does NOT rebind the skeleton (UE keeps the old one; SkeletalMesh.skeleton is read-only in Python) - nothing saved, discarded by editor restart. User skeleton .uasset mtime unchanged (2025-05-23).
 - The two old test meshes remain (no deletion) but nothing we load references them now.
 - Verified: editor restarted (-unattended), Map_Floor loaded + MRQ PIE render: 0 'Ensure condition failed' / AnimNode_RigidBody lines (previous session log: 874).
+
+## R97w final pass + SM2 STATUS (2026-10-31 ~07:00 KST)
+Final captures (tools/ue/ue_r96_cap.py neutral room dir20 sky6 EV0, RTF_RGBA8 non-sRGB, editor restarted, shaders settled): Shots/r96/r97w_<tag>_lit.png;
+sheets docs/handoff/r97/final_sheet_{lesser_sorc,hormagaunt,vortex,term_occult}.jpg (user F12 crop | UE) + final_all_characters.jpg (9 meshes, all /Game/ForgeLens/SM2).
+Fix in this pass: own-skeleton re-imports cc_titus_cloth/cc_titus_assault and cc_chaplain had WorldGrid materials -> MIs copied by slot name from our textured meshes (tools/ue/ue_r97_matcopy.py); 6/5 *_SIM proxy slots have no MI (still WorldGrid).
+### Matches (verified by captures this session)
+- Textures/materials: all 9 characters textured; lesser sorcerer teal/gold/blue tabard, occult terminator, Titus/Calgar blue+gold, hormagaunt bone/red - qualitatively match the user's shots.
+- Muzzle flash: soft orange flame + sparks (heat-haze card disabled on our sequence copy).
+- Cloth: commissar death pen 68->24 (per-cloth override), titus_cloth pen 0 skin 104, chaplain turn pen 12.
+- Missing-bone ensures: 0 after restart + Map_Floor PIE (was 874).
+- Vortex orb Niagara: glow/runes/sparks render (dark + hub MRQ), hue pink-violet like the game.
+- Hub level hue: teal (B>G>R) after game sun colour, like the game shot.
+### Remains
+- Vortex: game orb has a big bright pink-white bloom (core 194,177,217 vs UE 90,70,101); UE glow sprite small (template size), runes 2x2 atlas unsplit; body darker than game (lighting).
+- Hub level: red channel low/too saturated (UE means 4-19,13-42,22-47 vs game 22,29,32); sun direction placeholder; ColorCtrl channel order interpreted.
+- Pose/lighting not matched to game shots (bind pose, neutral room) -> comparisons are qualitative.
+- *_SIM proxy slots unmaterialed; old test meshes chars_cloth2/chars_phys cc_chaplain still on user skeleton (unused, not deleted); NS_vortex_orb, _v2.._v5, NS_orb_t/_t2 obsolete (not deleted).
