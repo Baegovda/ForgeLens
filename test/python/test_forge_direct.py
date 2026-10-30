@@ -12,9 +12,9 @@ spec.loader.exec_module(m)
 
 class ForgeDirectTests(unittest.TestCase):
     def test_dest_rules(self):
-        ok = ["/Game/SM2_Work/Tests/oneclick/wpn", "/Game/SM2_Work/Props/wpn", "/Game/Workshop/a"]
+        ok = ["/Game/SM2_Work/Tests/oneclick/wpn", "/Game/SM2_Work/Props/wpn", "/Game/Workshop/a", "/Game/ForgeLens/SM2/Characters/cc_x", "/Game/ForgeLens/POE/Props/y"]
         bad = ["/Game/SM2_Work/Original/x", "/game/sm2_work/ORIGINAL", "/Game/Work", "/Game/Work/x", "/Game/SM2_Work/Props",
-               "/Game/SM2_Work/Tests/", "/Game/X", "/Engine/a/b", "/Game/SM2_Work/Props/a b", "/Game/SM2_Work/Props/../Original"]
+               "/Game/SM2_Work/Tests/", "/Game/X", "/Engine/a/b", "/Game/SM2_Work/Props/a b", "/Game/SM2_Work/Props/../Original", "/Game/ForgeLens", "/Game/ForgeLens/SM2", "/Game/ForgeLens/SM2/Props"]
         for p in ok:
             self.assertIsNone(m.dest_error(p), p)
         for p in bad:

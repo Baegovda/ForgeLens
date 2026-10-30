@@ -27,7 +27,14 @@ SET = sys.argv[3] if len(sys.argv) > 3 else "bulk"
 CHAOS = "chaoscloth" in [a.lower() for a in sys.argv[4:]]  # opt-in: also build <asset>_ChaosCloth (bone method stays the default)  # optional set name: Exports/<set>/<asset> -> /Game/SM2_Work/Tests/<set>/<asset>
 W = r"C:/Users/Revaptor_FX/Desktop/SM2_Work"
 root = W + "/Exports/" + SET + "/" + name + "/tpl/" + name + ".tpl/"
-folder = "/Game/SM2_Work/Tests/" + SET + "/" + name
+def _fl_root():  # R84 (t200u): /Game/ForgeLens/SM2 by default; env FORGELENS_UE_ROOT=legacy -> /Game/SM2_Work
+    import importlib.util
+    here = os.path.dirname(os.path.abspath(globals().get("__file__") or os.environ.get("SM2_TOOLS_UE", ".") + "/x"))
+    p = os.path.join(here, "fl_roots.py")
+    if not os.path.exists(p): p = os.path.join(os.environ.get("SM2_TOOLS_UE", here), "fl_roots.py")
+    spec = importlib.util.spec_from_file_location("fl_roots", p); M = importlib.util.module_from_spec(spec); spec.loader.exec_module(M)
+    return M.root("SM2")
+folder = _fl_root() + "/Tests/" + SET + "/" + name
 EAL = unreal.EditorAssetLibrary; mel = unreal.MaterialEditingLibrary
 X = unreal.AnimPoseExtensions; WS = unreal.AnimPoseSpaces.WORLD
 res = {"asset": name, "errors": [], "warnings": []}

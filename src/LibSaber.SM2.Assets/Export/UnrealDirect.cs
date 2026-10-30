@@ -13,7 +13,41 @@ public static class UnrealContentPath
   public const string DefaultProject = @"K:\Unreal Projects\UE_VFX_57\UE_VFX_57.uproject";
 
   private static readonly string[] Protected = { "/Game/SM2_Work/Original", "/Game/Work" };
-  private static readonly string[] TopLevel = { "Characters", "Props", "Animations", "Materials", "Tests" };
+  private static readonly string[] TopLevel = { "Characters", "Props", "Animations", "Materials", "Tests", "Levels", "Textures" };
+
+  /// <summary>R84 (owner t200u): every game gets its own root under /Game/ForgeLens/&lt;GAMECODE&gt;. One table, used for
+  ///   all defaults. Same table as tools/ue/fl_roots.py. Old /Game/SM2_Work assets stay where they are.</summary>
+  public const string ForgeLensRoot = "/Game/ForgeLens";
+  public const string LegacySm2Root = "/Game/SM2_Work";
+  public static readonly IReadOnlyDictionary<string, string> GameRoots = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+  {
+    ["SM2"] = ForgeLensRoot + "/SM2",
+    ["POE"] = ForgeLensRoot + "/POE",
+  };
+  public const string DefaultGame = "SM2";
+
+  /// <summary>Env FORGELENS_UE_ROOT=legacy (or an explicit /Game/... path) targets the old root; default = the new one.</summary>
+  public static string Root(string game = DefaultGame, Func<string, string?>? env = null)
+  {
+    var e = (env ?? Environment.GetEnvironmentVariable)("FORGELENS_UE_ROOT")?.Trim();
+    if (!string.IsNullOrEmpty(e))
+    {
+      if (e.Equals("legacy", StringComparison.OrdinalIgnoreCase) && game.Equals("SM2", StringComparison.OrdinalIgnoreCase))
+        return LegacySm2Root;
+      if (e.StartsWith("/Game/", StringComparison.Ordinal))
+        return Normalize(e);
+    }
+    return GameRoots.TryGetValue(game, out var r) ? r : ForgeLensRoot + "/" + Safe(game).ToUpperInvariant();
+  }
+
+  private static bool IsRootish(string[] parts)
+  {
+    // /Game/SM2_Work, /Game/ForgeLens, /Game/ForgeLens/<GAME>, and their category folders are top-level.
+    if (parts.Length < 3) return true;
+    if (parts[1].Equals("ForgeLens", StringComparison.OrdinalIgnoreCase))
+      return parts.Length == 3 || parts.Length == 4 && TopLevel.Contains(parts[3], StringComparer.OrdinalIgnoreCase);
+    return parts.Length == 3 && parts[1].Equals("SM2_Work", StringComparison.OrdinalIgnoreCase) && TopLevel.Contains(parts[2], StringComparer.OrdinalIgnoreCase);
+  }
 
   public static string Normalize(string? path)
   {
@@ -33,8 +67,8 @@ public static class UnrealContentPath
       if (p.Equals(bad, StringComparison.OrdinalIgnoreCase) || p.StartsWith(bad + "/", StringComparison.OrdinalIgnoreCase))
         return $"{bad} is protected. Pick another folder.";
     var parts = p.Split('/', StringSplitOptions.RemoveEmptyEntries);
-    if (parts.Length < 3 || parts.Length == 3 && parts[1].Equals("SM2_Work", StringComparison.OrdinalIgnoreCase) && TopLevel.Contains(parts[2], StringComparer.OrdinalIgnoreCase))
-      return "That is a top-level folder. Pick a folder for this asset, e.g. /Game/SM2_Work/Props/<asset>.";
+    if (IsRootish(parts))
+      return "That is a top-level folder. Pick a folder for this asset, e.g. /Game/ForgeLens/SM2/Props/<asset>.";
     foreach (var seg in parts)
       if (seg is "." or ".." || seg.IndexOfAny(new[] { ':', '*', '?', '"', '<', '>', '|', ' ' }) >= 0)
         return $"Invalid folder name '{seg}' (no spaces or :*?\"<>|).";
@@ -54,7 +88,7 @@ public static class UnrealContentPath
     return a.StartsWith("cc_") || a.StartsWith("ch_") || a.StartsWith("chr_") ? "Characters" : "Props";
   }
 
-  public static string Default(string asset, bool animationOnly) => $"/Game/SM2_Work/{Category(asset, animationOnly)}/{Safe(asset)}";
+  public static string Default(string asset, bool animationOnly, string game = DefaultGame) => $"{Root(game)}/{Category(asset, animationOnly)}/{Safe(asset)}";
 
   /// <summary>Unreal-safe folder/asset name.</summary>
   public static string Safe(string name)

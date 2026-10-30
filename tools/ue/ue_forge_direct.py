@@ -36,8 +36,13 @@ def dest_error(path):
         if low == bad or low.startswith(bad + "/"):
             return "the destination is a protected folder (" + bad + ")"
     parts = [s for s in p.split("/") if s]
-    if len(parts) < 3 or (len(parts) == 3 and parts[1].lower() == "sm2_work" and parts[2].lower() in ("characters", "props", "animations", "materials", "tests")):
-        return "the destination is a top-level folder; pick a folder for this asset (e.g. /Game/SM2_Work/Props/<asset>)"
+    top = ("characters", "props", "animations", "materials", "tests", "levels", "textures")
+    lp = [s.lower() for s in parts]
+    rootish = len(parts) < 3 or (len(parts) == 3 and lp[1] == "sm2_work" and lp[2] in top)
+    if len(parts) >= 2 and lp[1] == "forgelens":  # R84 (t200u): /Game/ForgeLens/<GAME>[/<category>] is top-level
+        rootish = len(parts) <= 3 or (len(parts) == 4 and lp[3] in top)
+    if rootish:
+        return "the destination is a top-level folder; pick a folder for this asset (e.g. /Game/ForgeLens/SM2/Props/<asset>)"
     for seg in parts:
         if seg in (".", "..") or any(c in seg for c in ':*?"<>| '):
             return "invalid folder name '" + seg + "'"

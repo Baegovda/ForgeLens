@@ -89,3 +89,8 @@ LibSaber.SM2Extractor list "D:\Steam\steamapps\common\Space Marine 2\client_pc" 
 ```
 
 Import the clip FBX as animation onto the existing skeleton `/Game/SM2/cc_titus_assault/cc_titus_assault_Skeleton`. That file has no mesh: it is the limb hierarchy plus the take. The armature node is a Null with a connected Null node attribute, and each bone is a LimbNode, matching an armature-only Blender FBX. UE 5.7.4's default Interchange importer can still report no data for a meshless animation (UE-307815, reproduced by Epic on their own file, unresolved as of late 2025 with a 5.8 target). The legacy FBX importer (`Interchange.FeatureFlags.Import.FBX` off, `FBXIT_ANIMATION`) reads the curves. It uses the same axis and units as the bind mesh: source `(x, y, z)` becomes `(-x, z, y)`, centimeters, Z-up, facing +Y. Bone names, hierarchy, and the bind pose on the nodes stay those of `cc_titus_assault`. A rotation key is the bone's local rotation, not an offset from the bind. `--no-root-motion` leaves the `0xF4` translation off the skeleton root; without that flag the run cycle travels forward. `tacticus_unarmed_run_fwd_intercessor` is inline in the `.sani` and is written.
+
+## Unreal content roots (R86)
+
+Forge Lens imports into `/Game/ForgeLens/<GAMECODE>/...` (`/Game/ForgeLens/SM2/Characters/<asset>`, later `/Game/ForgeLens/POE/...`). Table: `UnrealContentPath.GameRoots` = `tools/ue/fl_roots.py`. `FORGELENS_UE_ROOT=legacy` targets the old `/Game/SM2_Work`; old assets there are never moved.
+

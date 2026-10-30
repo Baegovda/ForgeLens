@@ -22,16 +22,21 @@ public class UnrealDirectTests
   [InlineData("/Game/SM2_Work/Props/../Original", false)]
   [InlineData(@"\Game\SM2_Work\Props\x\", true)]
   [InlineData("/Game/Workshop/a", true)]
+  [InlineData("/Game/ForgeLens/SM2/Characters/cc_titus", true)]
+  [InlineData("/Game/ForgeLens/POE/Props/x", true)]
+  [InlineData("/Game/ForgeLens", false)]
+  [InlineData("/Game/ForgeLens/SM2", false)]
+  [InlineData("/Game/ForgeLens/SM2/Characters", false)]
   public void Validate(string path, bool ok) => Assert.Equal(ok, UnrealContentPath.Validate(path) is null);
 
   [Fact]
   public void BackslashesNormalize() => Assert.Equal("/Game/SM2_Work/Props/x", UnrealContentPath.Normalize(@"/Game\SM2_Work//Props\x\"));
 
   [Theory]
-  [InlineData("cc_titus_assault", false, "/Game/SM2_Work/Characters/cc_titus_assault")]
-  [InlineData("wpn_bolt_rifle_01", false, "/Game/SM2_Work/Props/wpn_bolt_rifle_01")]
-  [InlineData("cc_titus_assault", true, "/Game/SM2_Work/Animations/cc_titus_assault")]
-  [InlineData("a b.c", false, "/Game/SM2_Work/Props/a_b_c")]
+  [InlineData("cc_titus_assault", false, "/Game/ForgeLens/SM2/Characters/cc_titus_assault")]
+  [InlineData("wpn_bolt_rifle_01", false, "/Game/ForgeLens/SM2/Props/wpn_bolt_rifle_01")]
+  [InlineData("cc_titus_assault", true, "/Game/ForgeLens/SM2/Animations/cc_titus_assault")]
+  [InlineData("a b.c", false, "/Game/ForgeLens/SM2/Props/a_b_c")]
   public void Default(string asset, bool animOnly, string want) => Assert.Equal(want, UnrealContentPath.Default(asset, animOnly));
 
   [Fact]
@@ -39,7 +44,7 @@ public class UnrealDirectTests
   {
     Assert.Equal("/Game/SM2_Work/Tests/oneclick/x", UnrealContentPath.ForModel("/Game/SM2_Work/Tests/oneclick/x", false, "a", 1, false));
     Assert.Equal("/Game/SM2_Work/Tests/oneclick/a", UnrealContentPath.ForModel("/Game/SM2_Work/Tests/oneclick", false, "a", 2, false));
-    Assert.Equal("/Game/SM2_Work/Characters/cc_b", UnrealContentPath.ForModel("/Game/SM2_Work/Props/a", true, "cc_b", 2, false));
+    Assert.Equal("/Game/ForgeLens/SM2/Characters/cc_b", UnrealContentPath.ForModel("/Game/ForgeLens/SM2/Props/a", true, "cc_b", 2, false));
   }
 
   [Fact]

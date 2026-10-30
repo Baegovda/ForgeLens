@@ -27,7 +27,7 @@
                 <TextBox x:Name="ProjectBox" MinHeight="30" Watermark="K:\Unreal Projects\UE_VFX_57\UE_VFX_57.uproject" />
               </DockPanel>
               <TextBlock Text="Content folder" Opacity="0.85" />
-              <TextBox x:Name="ContentBox" MinHeight="30" Watermark="/Game/SM2_Work/Props/asset" TextChanged="ContentChanged" />
+              <TextBox x:Name="ContentBox" MinHeight="30" Watermark="/Game/ForgeLens/SM2/Props/asset" TextChanged="ContentChanged" />
               <TextBlock x:Name="DirectHint" TextWrapping="Wrap" FontSize="12" Opacity="0.7"
                          Text="Uses the open editor (EngineWire :3000 or Python Remote Execution); with no editor open it runs UnrealEditor-Cmd headless. An existing folder is kept as a _bakN copy first. /Game/SM2_Work/Original and /Game/Work are refused." />
             </StackPanel>
