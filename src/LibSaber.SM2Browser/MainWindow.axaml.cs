@@ -1038,7 +1038,9 @@ public partial class MainWindow : Window
   private DispatcherTimer? _gpuWatchdog;
 
   private bool UseGpu()
-    => GpuToggle.IsChecked == true && !GpuView.HasFailed && _texture is null;
+    // R54b: levels draw on the CPU path: it frames the level focus (OrbitCamera.Target) and lights it with the level's
+    // point lights; the GPU mesh path has neither (pvp_city rendered black there, measured 10/30).
+    => GpuToggle.IsChecked == true && !GpuView.HasFailed && _texture is null && _level is null;
 
   private void DrawGpu(bool fast)
   {
