@@ -799,7 +799,12 @@ int32 AddCollision(UPhysicsAsset* PA, const TSharedPtr<FJsonObject>& Coll, const
   // R93 A/B: the floor is only applied when fewer than this fraction of the free rest particles sit shallowly inside the shape
   // (many shallow hits = the authored shape is really too big for this mesh, e.g. a single coat capsule). 1 = always floor (R91).
   static TAutoConsoleVariable<float> CVarShallowFrac(TEXT("sm2.RestFitShallowFrac"), 1.0f, TEXT("SM2 cloth rest-fit: skip the radius floor when the shallow-inside fraction of free particles is >= this (1 = always floor)"));
-  const float ShallowFrac = FMath::Clamp(CVarShallowFrac.GetValueOnGameThread(), 0.0f, 1.0f);
+  float ShallowFrac = FMath::Clamp(CVarShallowFrac.GetValueOnGameThread(), 0.0f, 1.0f);
+  // R97k: per-cloth override "name=frac;name=frac" (exact cloth name). Commissar coat_SIM_01 + straps_SIM_01 (names unique to the commissar) need the floor skipped
+  // (R97j A/B: global 0.04 fixed the coat but hurt titus/tech_priest/chaplain/straps).
+  static TAutoConsoleVariable<FString> CVarShallowOverride(TEXT("sm2.RestFitShallowOverride"), TEXT("coat_SIM_01=0.04;straps_SIM_01=0.04"), TEXT("SM2 cloth rest-fit: per-cloth ShallowFrac overrides, 'cloth=frac;cloth=frac' ('' = none)"));
+  { TArray<FString> Ents; CVarShallowOverride.GetValueOnGameThread().ParseIntoArray(Ents, TEXT(";"), true);
+    for (const FString& E : Ents) { FString K, V; if (E.Split(TEXT("="), &K, &V) && K.TrimStartAndEnd().Equals(Who, ESearchCase::IgnoreCase)) { ShallowFrac = FMath::Clamp(FCString::Atof(*V), 0.0f, 1.0f); Log.Add(FString::Printf(TEXT("%s: shallowFrac override %.3f"), *Who, ShallowFrac)); } } }
   int32 DeepIgnored = 0, FloorSkipped = 0;
   float LastRawScale = 1.0f;
   // R97g: per-shape rest-fit log (raw S before the floor, shallow/deep/free particle counts) for the commissar coat A/B.

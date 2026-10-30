@@ -2738,3 +2738,12 @@ Parent agent use: tail events.jsonl (text, cheap) and check heartbeat.txt age < 
 - sf04 side effects: titus run skin 179->743, titus melee pen 32->69; tech_priest/chaplain radii drop to 0.25.
 - sf20: same as cur except titus (pen 198->193, 32->28) - no commissar gain.
 - DECISION: default NOT changed (no global value fixes the coat without harming others). Next: per-cloth override for coat_SIM_01 only.
+
+## R97k per-cloth ShallowFrac override (plugin; src .bak2, installed .bak30/.bak31)
+- New CVar sm2.RestFitShallowOverride, default 'coat_SIM_01=0.04;straps_SIM_01=0.04' (exact cloth names, both only on the commissar).
+- coat-only override: commissar death pen 68 (unchanged); coat+straps: pen 24 (= R97j global sf04 result).
+- Fresh editor with new default: commissar death pen 24; titus run 198/162, chaplain turn 10/336, sorcerer/calgar/vortex/tech_priest identical to cur (fskip 0) -> no harm.
+## R97l ForgeLens_r95b Settings real click test (game not running; hook input_block; fg pid checked before every click/key)
+- Toolbar Settings -> Settings window; threads Auto off, typed 6; memory Auto off, typed 8 -> settings.json {WorkerThreads:6, MaxMemoryMB:8192}.
+- Window shows 'In use now: 6 worker threads (manual), memory limit 8.0 GB (manual)' = PerfBudget.Apply took effect. Physical events dropped 0, block 5.3 s.
+- settings.json restored to Auto (null/null) afterwards. UIA tree of the Avalonia window was empty -> coordinate clicks from window screenshots.

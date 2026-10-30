@@ -1,0 +1,16 @@
+05:25:03.732 viewer pid 59004 hwnd 5837482 settings.json before {"WorkerThreads":null,"MaxMemoryMB":null}
+05:25:03.804 settings buttons: 0
+05:25:03.809 ERR null 배열로 인덱싱할 수 없습니다.
+05:25:03.827 restored input/cursor/fg
+05:25:51.490 fg ok (pid 59004) -> click toolbar Settings at 1113,434
+05:25:57.208 settings hwnd 0
+05:25:57.224 restored
+05:26:40.428 ABORT fg not ForgeLens before threads Auto
+05:26:40.434 ERR fg
+05:26:40.455 restored
+05:26:49.899 fg ok (pid 59004) -> click threads Auto at 688,473
+05:26:50.592 fg ok (pid 59004) -> click threads box at 774,473
+05:26:52.332 fg ok (pid 59004) -> click memory Auto at 688,517
+05:26:53.041 fg ok (pid 59004) -> click memory box at 774,517
+05:26:54.815 settings.json after: {"WorkerThreads":6,"MaxMemoryMB":8192}
+05:26:54.831 restored
