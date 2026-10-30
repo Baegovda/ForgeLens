@@ -21,7 +21,7 @@ internal sealed class SettingsWindow : Window
   {
     _settings = settings;
     Title = "Settings";
-    Width = 520; SizeToContent = SizeToContent.Height; CanResize = false;
+    Width = 640; SizeToContent = SizeToContent.Height; CanResize = false;
     WindowStartupLocation = WindowStartupLocation.CenterOwner;
     _threads.Maximum = PerfBudget.MaxManualThreads;
     _mem.Minimum = PerfBudget.MinMemoryMB / 1024m;
@@ -39,7 +39,7 @@ internal sealed class SettingsWindow : Window
     StackPanel Row(string label, Control a, Control b, string unit) => new()
     {
       Orientation = Orientation.Horizontal, Spacing = 10,
-      Children = { new TextBlock { Text = label, Width = 150, VerticalAlignment = VerticalAlignment.Center }, a, b, new TextBlock { Text = unit, VerticalAlignment = VerticalAlignment.Center, Foreground = Brushes.Gray } },
+      Children = { new TextBlock { Text = label, Width = 140, VerticalAlignment = VerticalAlignment.Center }, a, b, new TextBlock { Text = unit, VerticalAlignment = VerticalAlignment.Center, Foreground = Brushes.Gray } },
     };
     Content = new StackPanel
     {
@@ -47,8 +47,8 @@ internal sealed class SettingsWindow : Window
       Children =
       {
         new TextBlock { Text = "Performance", FontSize = 16, FontWeight = FontWeight.SemiBold },
-        Row("Worker threads", _threadsAuto, _threads, $"1 - {PerfBudget.MaxManualThreads} (Auto = {PerfBudget.Logical} logical processors)"),
-        Row("Max working memory", _memAuto, _mem, $"GB (Auto = 50 % of {PerfBudget.TotalRamMB / 1024.0:0.#} GB RAM)"),
+        Row("Worker threads", _threadsAuto, _threads, $"1-{PerfBudget.MaxManualThreads} (Auto = {PerfBudget.Logical})"),
+        Row("Max working memory", _memAuto, _mem, $"GB (Auto = 50 % of {PerfBudget.TotalRamMB / 1024.0:0} GB)"),
         new TextBlock { Text = "Applied immediately to the next model open. Environment variables SM2_THREADS / SM2_MAXMEM override these values.", TextWrapping = TextWrapping.Wrap, Foreground = Brushes.Gray, FontSize = 11 },
         _effective,
         close,
