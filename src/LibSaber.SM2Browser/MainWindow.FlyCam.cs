@@ -3,7 +3,7 @@
 // Shift = x4, wheel while RMB held = move speed x1.25 per notch, wheel without RMB = dolly along the view, F = frame
 // (level: default perspective; mesh: fit). LMB still orbits the current pivot. Orbit mode (toggle off) = old behaviour.
 // The renderer is an orbit camera (eye = pivot + dir(yaw,pitch)*distance); fly moves the pivot (_pivot) and, while
-// looking, re-places the pivot so the eye stays put. Default: levels fly, meshes orbit.
+// looking, re-places the pivot so the eye stays put. Default: fly on for levels and meshes (R66), LMB orbits in both.
 // Test hook: SM2_FLYTEST=1 with SM2_WINSHOT runs FlyLook/FlyMove (the same code the mouse/keys call) after the first
 // shot and saves <png>_fly1/_fly2/_fly3.png + eye positions into <png>.txt.
 using System.Numerics;
@@ -40,11 +40,11 @@ public partial class MainWindow
     _flyKeys.Clear();
     _flyLooking = false;
     FlyToggle.IsVisible = true;
-    FlyToggle.IsChecked = level;
+    FlyToggle.IsChecked = true; // R66: fly default for meshes too (owner t130u); LMB still orbits
     _flySpeed = Math.Clamp((level && _level is { } l ? l.Spread : Math.Max(0.5f, CurrentDistance())) * 0.25f, 0.2f, 200f);
   }
 
-  private void FlyToggleClicked(object? sender, RoutedEventArgs e) => _flyKeys.Clear();
+  private void FlyToggleClicked(object? sender, RoutedEventArgs e) { _flyKeys.Clear(); UpdateHud(); }
 
   private float CurrentDistance()
   {
@@ -133,7 +133,7 @@ public partial class MainWindow
     if (!FlyOn)
       return false;
     if (_flyLooking)
-      _flySpeed = Math.Clamp(_flySpeed * MathF.Pow(1.25f, (float)e.Delta.Y), 0.05f, 2000f);
+      FlyAdjustSpeed((float)e.Delta.Y);
     else
     {
       FlyMove((float)e.Delta.Y * Math.Max(0.1f, _flySpeed * 0.5f), 0, 0);
@@ -141,6 +141,13 @@ public partial class MainWindow
     }
     e.Handled = true;
     return true;
+  }
+
+  /// <summary>Wheel notches while RMB held: speed x1.25 per notch (0.05..2000 m/s); HUD updates live.</summary>
+  private void FlyAdjustSpeed(float notches)
+  {
+    _flySpeed = Math.Clamp(_flySpeed * MathF.Pow(1.25f, notches), 0.05f, 2000f);
+    UpdateHud();
   }
 
   private static bool IsFlyKey(Key k) => k is Key.W or Key.A or Key.S or Key.D or Key.Q or Key.E or Key.LeftShift or Key.RightShift;
@@ -155,12 +162,12 @@ public partial class MainWindow
       e.Handled = true;
       return;
     }
-    if (_flyLooking && IsFlyKey(e.Key)) { _flyKeys.Add(e.Key); e.Handled = true; }
+    if (_flyLooking && IsFlyKey(e.Key)) { _flyKeys.Add(e.Key); e.Handled = true; UpdateHud(); }
   }
 
   private void FlyKeyUp(object? sender, KeyEventArgs e)
   {
-    if (_flyKeys.Remove(e.Key)) e.Handled = true;
+    if (_flyKeys.Remove(e.Key)) { e.Handled = true; UpdateHud(); }
   }
 
   /// <summary>F: level -> its default perspective, mesh -> fit the bounds.</summary>
@@ -203,6 +210,9 @@ public partial class MainWindow
     for (var i = 0; i < 30; i++) FlyMove(0, sp * 4 / 30f, 0);
     for (var i = 0; i < 15; i++) FlyMove(0, 0, sp * 4 / 30f);
     DrawMesh(false); await Task.Delay(6000); Note("after Shift+D 1s, Shift+E 0.5s"); await save(shot.Replace(".png", "_fly3.png"));
+    // RMB+wheel: 3 notches up (x1.25^3), HUD speed must change live
+    _flyLooking = true; FlyAdjustSpeed(3); Note("after RMB+wheel +3"); await Task.Delay(1500); await save(shot.Replace(".png", "_fly4.png")); _flyLooking = false;
+    log.Append("hud: " + HudSnapshot() + "\n");
     FlyFrame(); Note("after F");
     File.AppendAllText(shot + ".txt", log.ToString());
   }

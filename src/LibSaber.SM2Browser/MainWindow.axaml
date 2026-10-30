@@ -203,6 +203,8 @@
           <local:WheelComboBox x:Name="PartBox" Width="220" IsVisible="False" SelectionChanged="ViewChanged" />
           <ToggleButton x:Name="FlyToggle" Content="Fly" IsChecked="False" IsVisible="False" Click="FlyToggleClicked"
                         ToolTip.Tip="Fly camera (Unreal style): hold right mouse to look, WASD move, Q/E down/up, Shift faster, wheel while RMB held = speed, F = frame. Off = orbit." />
+          <ToggleButton x:Name="HudToggle" Content="HUD" IsChecked="True" IsVisible="False" Click="HudToggleClicked"
+                        ToolTip.Tip="Viewport info overlay: camera speed, position, heading, FOV, keys (H)" />
           <ToggleButton x:Name="WireToggle" Content="Wireframe" IsChecked="False" IsVisible="False" Click="ViewChanged" />
           <ToggleButton x:Name="SkeletonToggle" Content="Skeleton" IsChecked="False" IsVisible="False" Click="ViewChanged" />
           <ToggleButton x:Name="SmoothToggle" Content="AA" IsChecked="True" IsVisible="False" Click="ViewChanged"
@@ -305,8 +307,12 @@
             <ComboBoxItem Content="Covering demo: sphere (heuristic)" />
           </ComboBox>
         </WrapPanel>
-        <TextBlock x:Name="PreviewNote" DockPanel.Dock="Bottom" TextWrapping="Wrap" MaxLines="5" TextTrimming="CharacterEllipsis" Margin="2,8,2,0" Foreground="{DynamicResource FL.TextDim}" FontSize="12"
-                   ToolTip.Tip="{Binding Text, RelativeSource={RelativeSource Self}}" />
+        <!-- R66: short summary; full technical notes behind Details (and the tooltip) -->
+        <DockPanel DockPanel.Dock="Bottom" Margin="2,8,2,0">
+          <ToggleButton x:Name="NoteDetails" DockPanel.Dock="Right" Content="Details" IsVisible="False" Click="NoteDetailsClicked" Padding="8,2" FontSize="11" VerticalAlignment="Top"
+                        ToolTip.Tip="Show the full reader notes" />
+          <TextBlock x:Name="PreviewNote" TextWrapping="Wrap" MaxLines="5" TextTrimming="CharacterEllipsis" Foreground="{DynamicResource FL.TextDim}" FontSize="12" />
+        </DockPanel>
         <Border x:Name="ViewBorder" Background="{DynamicResource FL.Viewport}" CornerRadius="4" BorderBrush="{DynamicResource FL.Border}" BorderThickness="1" ClipToBounds="True"
                 PointerPressed="ViewPressed" PointerMoved="ViewMoved" PointerReleased="ViewReleased" PointerWheelChanged="ViewWheel">
           <Grid>
@@ -314,6 +320,26 @@
             <Image x:Name="PreviewImage" Stretch="Uniform" />
             <TextBox x:Name="PreviewText" IsReadOnly="True" AcceptsReturn="True" TextWrapping="NoWrap"
                      FontFamily="Consolas,Courier New,monospace" FontSize="12" Background="Transparent" BorderThickness="0" />
+            <!-- R66: Unreal-viewport-style HUD (camera info top-left, speed top-right); H toggles -->
+            <Border x:Name="HudInfo" IsVisible="False" IsHitTestVisible="False" HorizontalAlignment="Left" VerticalAlignment="Top" Margin="8" Padding="8,5" CornerRadius="4" Background="#99101216">
+              <StackPanel Spacing="1">
+                <TextBlock x:Name="HudMode" FontSize="11" FontWeight="SemiBold" Foreground="#E8E8E8" />
+                <TextBlock x:Name="HudCam" FontSize="11" FontFamily="Consolas,Courier New,monospace" Foreground="#C8C8C8" />
+                <TextBlock x:Name="HudKeys" FontSize="10" Foreground="#909090" />
+              </StackPanel>
+            </Border>
+            <Border x:Name="HudSpeed" IsVisible="False" IsHitTestVisible="False" HorizontalAlignment="Right" VerticalAlignment="Top" Margin="8" Padding="8,5" CornerRadius="4" Background="#99101216">
+              <StackPanel Spacing="3" Width="132">
+                <DockPanel>
+                  <TextBlock Text="CAMERA SPEED" FontSize="9" Foreground="#909090" DockPanel.Dock="Left" VerticalAlignment="Center" />
+                  <TextBlock x:Name="HudSpeedText" FontSize="11" FontWeight="SemiBold" Foreground="#E8E8E8" HorizontalAlignment="Right" />
+                </DockPanel>
+                <Grid Height="4">
+                  <Border Background="#40FFFFFF" CornerRadius="2" />
+                  <Border x:Name="HudSpeedBar" Background="#FF4FA3FF" CornerRadius="2" HorizontalAlignment="Left" Width="0" />
+                </Grid>
+              </StackPanel>
+            </Border>
             <!-- mtl1-49: in-game style colour scheme picker (td materials + game names / heraldry swatches) -->
             <Border x:Name="ColourPanel" Classes="colourpanel" IsVisible="False" VerticalAlignment="Bottom" HorizontalAlignment="Center" Margin="0,0,0,14"
                     PointerPressed="ColourPanelPointer" PointerMoved="ColourPanelPointer" PointerReleased="ColourPanelPointer" PointerWheelChanged="ColourPanelWheel">

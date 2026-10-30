@@ -244,6 +244,15 @@ public sealed class ExportedMesh
   public LibSaber.SM2.Assets.Physics.PhysicsSetup? Physics { get; set; }
   public string Message { get; set; } = "";
 
+  /// <summary>R66: short viewer summary (same numbers as <see cref="Message"/>, which keeps the full technical notes).</summary>
+  public string Summary { get; set; } = "";
+
+  /// <summary>R66: submeshes visible at load / listed (all LODs); textures resolved / named. -1 = not counted.</summary>
+  public int SubmeshesShown { get; set; } = -1;
+  public int SubmeshesListed { get; set; } = -1;
+  public int TexturesResolved { get; set; } = -1;
+  public int TexturesNamed { get; set; } = -1;
+
   public bool HasTriangles => Indices.Count >= 3;
   public bool HasSkin => Skin.Count == Positions.Count && Bones.Count > 0 && Skin.Count > 0;
 

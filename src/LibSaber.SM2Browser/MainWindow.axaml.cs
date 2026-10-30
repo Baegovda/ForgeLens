@@ -114,6 +114,7 @@ public partial class MainWindow : Window
     AddHandler(KeyDownEvent, SpaceKeyDown, RoutingStrategies.Tunnel);
     AddHandler(KeyDownEvent, ShortcutKeyDown, RoutingStrategies.Tunnel);
     InitFly();
+    InitHud();
     Opened += async (_, _) =>
     {
       if (!string.IsNullOrWhiteSpace(_settings.LastFolder) && Directory.Exists(_settings.LastFolder))
@@ -467,6 +468,7 @@ public partial class MainWindow : Window
       _mesh = null;
       _previewFileIndex = -1;
       AnimBar.IsVisible = false;
+      UpdateHud();
       if (file.Kind != AssetKind.Model)
         MeshList.ItemsSource = null;
     }
@@ -533,7 +535,7 @@ public partial class MainWindow : Window
         SkeletonToggle.IsChecked = false;
         WireToggle.IsVisible = mesh.HasTriangles;
         GpuToggle.IsVisible = true;
-        PreviewNote.Text = mesh.Message;
+        SetModelNote(mesh);
         if (mesh.Bones.Count > 0)
           _ = ListAnimationsAsync(++_animGeneration);
         else
@@ -799,6 +801,7 @@ public partial class MainWindow : Window
   {
     if (_mesh is null)
       return;
+    UpdateHud();
     if (UseGpu())
     {
       DrawGpu(fast);

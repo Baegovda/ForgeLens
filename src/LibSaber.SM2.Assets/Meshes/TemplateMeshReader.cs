@@ -107,7 +107,23 @@ public static class TemplateMeshReader
       notes.Add($"{mesh.Bones.Count} bones.");
 
     mesh.Message = string.Join(" ", notes.Where(note => note.Length > 0));
+    mesh.Summary = BuildSummary(mesh);
     return mesh;
+  }
+
+  /// <summary>R66: compact one/two-line summary for the viewer; every number comes from the same fields as the notes.</summary>
+  public static string BuildSummary(ExportedMesh mesh)
+  {
+    if (mesh.Positions.Count == 0)
+      return mesh.Bones.Count > 0 ? $"Skeleton only · {mesh.Bones.Count:N0} bones · no geometry decoded" : "No geometry decoded";
+    var line1 = new List<string> { "LOD 0", $"{mesh.Positions.Count:N0} verts", $"{mesh.Indices.Count / 3:N0} tris", $"{mesh.Parts.Count:N0} parts" };
+    if (mesh.Bones.Count > 0) line1.Add($"{mesh.Bones.Count:N0} bones");
+    var line2 = new List<string>();
+    if (mesh.TexturesNamed > 0) line2.Add($"Textures {mesh.TexturesResolved}/{mesh.TexturesNamed}");
+    if (mesh.SubmeshesListed > 0) line2.Add($"Showing {mesh.SubmeshesShown} of {mesh.SubmeshesListed} submeshes");
+    if (mesh.Levels.Count > 0) line2.Add($"{mesh.Levels.Count + 1} LODs");
+    if (mesh.Skin.Count == 0) line2.Add("unskinned");
+    return string.Join("  ·  ", line1) + (line2.Count > 0 ? "\n" + string.Join("  ·  ", line2) : "");
   }
 
   /// <summary>
@@ -344,6 +360,8 @@ public static class TemplateMeshReader
       notes.Add($"{rigidParts} unskinned parts are bound rigidly (weight 1) to their node and placed by its composed world (local * parent world), so node tracks move them.");
     var shown = mesh.Parts.Count(part => part.Visible) + mesh.Levels.Sum(level => level.Parts.Count(part => part.Visible));
     var listed = mesh.Parts.Count + mesh.Levels.Sum(level => level.Parts.Count);
+    mesh.SubmeshesShown = shown;
+    mesh.SubmeshesListed = listed;
     notes.Add($"LOD0 is every part on the largest vertex pool: {mesh.Positions.Count:N0} vertices, {mesh.Indices.Count / 3:N0} triangles, {mesh.Parts.Count} parts.");
     notes.Add($"Index shows {shown} of {listed} submeshes. Names containing _LOD, and collision volumes (cdt, _glr, rb_, visibility affixes), start hidden. _SIM stays checked. mtl1-51: sfx-shader cards (td preset \"sfx\") and placeholder-material sfx locators start hidden too (FX parts toggle).");
     if (mesh.Levels.Count > 0)
@@ -359,6 +377,8 @@ public static class TemplateMeshReader
     if (textureNames.Count > 0 && textureResolves is not null)
     {
       var resolved = textureNames.Count(name => textureResolves(name!));
+      mesh.TexturesResolved = resolved;
+      mesh.TexturesNamed = textureNames.Count;
       notes.Add(resolved == 0
         ? "Part materials name diffuse textures, and none of them are in this folder, so the preview stays a lit solid color."
         : $"Resolved {resolved} of {textureNames.Count} diffuse textures for the preview.");

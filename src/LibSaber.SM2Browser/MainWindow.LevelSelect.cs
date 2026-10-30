@@ -32,7 +32,7 @@ public partial class MainWindow
     if (Environment.GetEnvironmentVariable("SM2_WINSHOT") is not { Length: > 0 } shot)
       return;
     // wait for the level build and the first rendered frame
-    for (var i = 0; i < 6000 && _level is null; i++)
+    for (var i = 0; i < 6000 && _level is null && _mesh is null; i++) // R66: meshes too
       await Task.Delay(100);
     var open = sw.Elapsed.TotalSeconds;
     await Task.Delay(6000); // first frame (CPU or GPU path)
@@ -44,7 +44,7 @@ public partial class MainWindow
       bmp.Render(this);
       Directory.CreateDirectory(Path.GetDirectoryName(Path.GetFullPath(shot))!);
       bmp.Save(shot);
-      File.WriteAllText(shot + ".txt", $"selected {selected}\nlevel {(_level is null ? "(none)" : _level.Stats)}\nselect_to_level_shown {open:0.0}s gpu {UseGpu()} from_disk_cache {_level?.FromDiskCache}\ntiming {_level?.Timing}\n");
+      File.WriteAllText(shot + ".txt", $"selected {selected}\nlevel {(_level is null ? "(none)" : _level.Stats)}\nmesh {_mesh?.Name} summary {_mesh?.Summary.Replace("\n", " | ")}\nhud {HudSnapshot()}\nselect_to_level_shown {open:0.0}s gpu {UseGpu()} from_disk_cache {_level?.FromDiskCache}\ntiming {_level?.Timing}\n");
     }
     catch (Exception e) { File.WriteAllText(shot + ".txt", "winshot failed: " + e); }
     if (Environment.GetEnvironmentVariable("SM2_FLYTEST") == "1")
