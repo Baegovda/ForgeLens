@@ -142,3 +142,9 @@ handoff/poe2_m2/monsters6_sheet.png shows bind pose and the first clip at t=0.5 
 ### Incident: shared ue_args.json
 - Scripts/uerun.ps1 writes the SHARED C:\Users\Revaptor_FX\ue_args.json. During one of my calls (lock taken as poe2m2) that file had been overwritten by the SM2 worker, so the editor ran its C:\Users\Revaptor_FX\fl_r95fid\tools\ue\ue_r97_orbhub7.py once. It failed at its line 12 (LightingChannels read-only); lines 1-11 may have run. The SM2 worker apparently called uerun while the lock said poe2m2. PoE2 now uses tools/poe2/ue_poe2_call.ps1 (private args file per call).
 - Also: one diagnostic import call for wolfremake (about 6 s, re-importing our own folder) ran without taking the lock. Protocol slip, no conflict observed.
+
+### F.3 Skill effects in Unreal (handoff/poe2_m2/ue_vfx_frames.png)
+- Route: the SM2 frozen-frame path, not Niagara. `ForgeLens --vfxue poe2:<prepared> - - <out> <effect.ao>@start:end:step` (new poe2 branch in VfxUeExport) simulates the same Poe2Particles EffectDefinition and writes <effect>_<ms>.vfxframe.json plus textures/*.png. The textures are decoded with Poe2FxTextures; asset-safe names keep the #lum/#strip variants as _lum/_strip.
+- tools/poe2/ue_poe2_vfx_frame.py is a copy of Scripts/mtl_fix/ue_vfx_frame.py limited to /Game/ForgeLens/POE/ (the original only allows /Game/SM2_Work/, and it is not modified). Calls: `import <dir> /Game/ForgeLens/POE/VFX fresh`, `render <frame.json> /Game/ForgeLens/POE/VFX 512`, `export <png>`.
+- Imported: Firebolt projectile 0.2-1.0 s, Firebolt impact 0.1-0.9 s, arc impact 0.05-0.35 s, stormblast 0.1-1.1 s (19 frames) into /Game/ForgeLens/POE/VFX. The UE renders of one frame each match the viewer, and the stormblast octagon card does not appear in UE.
+- Limits: frozen frames (one ProceduralMesh per batch per time), not a playing Niagara system. A Niagara port would need an emitter template per EmitterDef (not done).

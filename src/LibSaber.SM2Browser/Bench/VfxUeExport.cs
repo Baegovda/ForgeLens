@@ -31,10 +31,14 @@ internal static class VfxUeExport
 
   public static int Run(string[] args)
   {
-    var library = new EffectLibrary(new DirectoryEffectSource(args[1]));
+    // PoE2 (M2 F): --vfxue poe2:<prepared folder> - - <out> <effect.ao>@seconds ... (same frame JSON for ue_vfx_frame.py import)
+    var poe2 = args[1].StartsWith("poe2:", StringComparison.Ordinal) ? new LibSaber.SM2.Assets.Games.Poe2.Poe2Reader(args[1][5..]) : null;
+    var poeTex = poe2 is null ? null : Poe2FxTextures.For(poe2);
+    var library = new EffectLibrary(new DirectoryEffectSource(poe2 is null ? args[1] : Directory.CreateDirectory(Path.Combine(Path.GetTempPath(), "fl_poe2_nosfx")).FullName));
     var aliases = PartAliases.Load(args[2]);
     var files = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
     var alphaCoverage = new Dictionary<string, bool>(StringComparer.OrdinalIgnoreCase);
+    if (poe2 is null)
     foreach (var f in Directory.EnumerateFiles(args[3], "*.pct.resource", SearchOption.AllDirectories))
       files.TryAdd(Path.GetFileName(f)[..^".pct.resource".Length], f);
     var output = args[4];
@@ -65,11 +69,24 @@ internal static class VfxUeExport
     {
       var parts = spec.Split('@');
       var name = parts[0];
-      var tree = library.Resolve(name);
-      if (tree is null) { Console.WriteLine($"{name}: not found"); exit = 1; continue; }
-      var def = EffectDefinition.Build(name, tree);
+      EffectDefinition def;
+      EffectInstance instance;
+      if (poe2 is not null)
+      {
+        var pr = LibSaber.SM2.Assets.Games.Poe2.Poe2Particles.Build(poe2, name);
+        aliases = PartAliases.From(pr.Frames);
+        def = pr.Definition;
+        instance = LibSaber.SM2.Assets.Games.Poe2.Poe2Particles.Instance(pr);
+        name = Path.GetFileNameWithoutExtension(name);
+      }
+      else
+      {
+        var tree = library.Resolve(name);
+        if (tree is null) { Console.WriteLine($"{name}: not found"); exit = 1; continue; }
+        def = EffectDefinition.Build(name, tree);
+        instance = EffectInstance.Standalone(def, 1);
+      }
       var seconds = parts.Length > 1 ? float.Parse(parts[1], CultureInfo.InvariantCulture) : Math.Min(def.Duration, 3f) * 0.5f;
-      var instance = EffectInstance.Standalone(def, 1);
       // Same framing as the vfxbench sheet (Fit over the effect's capture window, min(duration, 3 s)).
       var camera = EffectCamera.Fit(instance, Math.Min(def.Duration, 3f));
       if (parts.Length > 2 && float.TryParse(parts[2], CultureInfo.InvariantCulture, out var distance)) camera = camera with { Distance = distance };
@@ -81,6 +98,31 @@ internal static class VfxUeExport
       foreach (var b in batches)
       {
         var j = VfxFrameExport.Batch(b);
+        if (poeTex is not null)
+        {
+          // PoE2: textures come decoded (alpha rules of Poe2FxTextures) by game path; asset-safe file names.
+          foreach (var key in new[] { "texture", "alphaMask" })
+          {
+            var t0 = (string?)j[key];
+            if (string.IsNullOrEmpty(t0)) continue;
+            var safe = string.Concat(Path.GetFileNameWithoutExtension(t0.Split('#')[0]).Select(ch => char.IsLetterOrDigit(ch) || ch == '_' ? ch : '_'))
+              + (t0.Contains('#') ? "_" + t0[(t0.IndexOf('#') + 1)..] : "");
+            var png0 = Path.Combine(texDir, safe.ToLowerInvariant() + ".png");
+            if (!alphaCoverage.ContainsKey(safe))
+            {
+              poeTex.Get(t0); poeTex.WaitAll(TimeSpan.FromSeconds(60)); // async decode cache
+              if (poeTex.Get(t0) is { Width: > 0 } img)
+              {
+                var bgra0 = (byte[])img.Rgba.Clone();
+                EffectTextures.SwapRedBlue(bgra0);
+                alphaCoverage[safe] = VfxDrawKinds.HasAlphaCoverage(bgra0);
+                ImageWriters.WritePng(png0, bgra0, img.Width, img.Height);
+              }
+              else missing.Add(t0);
+            }
+            j[key] = safe;
+          }
+        }
         foreach (var t in new[] { (string?)j["texture"], (string?)j["alphaMask"] })
         {
           if (string.IsNullOrEmpty(t)) continue;
