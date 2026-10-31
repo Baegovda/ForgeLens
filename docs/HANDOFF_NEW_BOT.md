@@ -1,5 +1,7 @@
 # HANDOFF_NEW_BOT - ForgeLens + Bong* projects, transfer to a new Grok Bot account
 
+> **NEW BOT: START HERE. The owner's usage on the old account is nearly exhausted (2026-10-31). Read this whole file first, then section 0.** Last update: 2026-10-31 ~17:40 KST (6th, final verification pass; origin tip before this doc commit = `50dbf5b`).
+
 Written 2026-10-31 ~16:00-16:30 KST by the previous assistant ("ForgeLens" bot, Grok Bot) because the owner's usage is running out.
 Owner request (t279u, verbatim): "이제 사용량이 얼마 안남아서 다른 계정의 봇에게 인계할 인수인계문서를 아주아주 꼼꼼하게 모든걸 전달할수있게 남겨줘 5번 재확인하고 보강해줘"
 
@@ -14,7 +16,7 @@ Where this file and older docs disagree, THIS file wins (it is the newest). Olde
 2. **Save memory** (your account has none): the facts in sections 1 and 2 below (owner, tone, rules, never launch the game, core concept, paths).
 3. **Read** (on the PC, repo `C:\Users\Revaptor_FX\Desktop\SM2_Work\PoE2\dev` or `ls_push`): this file -> `docs/RULES_CORE.md` -> `HANDOFF.md` from line ~2845 ("SM2 FINAL STATUS") to the end -> `docs/POE2_M2.md`, `docs/POE2_M3.md` -> `docs/WUKONG_M0.md`.
 4. **Check state before touching anything:** `git -C ...\PoE2\dev status -sb` (other workers' uncommitted files may be there - see 6.2), editor lock file, `window_watch\heartbeat.txt` age (< 30 s), `window_watch\NEEDS_ACTION.txt` (should not exist), game not running (`Get-Process "Warhammer*","PathOfExile*","b1-Win64*" -EA 0`).
-5. **Finish the two in-flight jobs** (section 5, items P1 and P2): they were running in the old account when this was written and may have died without committing. Look at the dev tree's uncommitted changes and the newest files in `docs/handoff/poe2_m2/viewer_fx/` and `docs/handoff/poe2_m3/`.
+5. **Nothing is running** at 17:40 KST: the VFX plate job (50dbf5b) and physics tuning (0ed49e4) finished and are pushed. Start with the todo in section 5. The dev tree only has untracked `.bak1` source backups from the VFX worker (keep them).
 6. **Send the owner one short Korean 해요체 message**: taken over, what you checked, what you start now. Then work; report only the final result.
 
 ---------------------------------------------------------------------------------------------------
@@ -105,11 +107,10 @@ Game: `D:\Daum Games\Path of Exile2\Content.ggpk` (159.9 GB, GGPK v3, bundles in
 - **M1** (7d9f511, d4a154b): Poe2Reader sm/smd/fmt/ast/mat/dds -> shared mesh/clip model; skills list; .ao/.pet effect reader.
 - **M2** (30e4683 ... 83594c7): real skill->effect links (629/1147 skills), orientation fix (**PoE left-handed, -Y forward; reflection + winding flip**), viewer PoE2 UI (English), particle sim via SM2 EffectDefinition, 7 rigged monsters (bellcrow 73 clips, wolfremake 30, basicskeleton 252, wingedrhoa 10, harpy 57, lichboss 42, ramgiant 46), UE import `/Game/ForgeLens/POE/` (M_Poe2Lit masters, MICs), 4 effects as 19 frozen frames in `/Game/ForgeLens/POE/VFX` (mesh+material, NOT Niagara), phys_ bones physics bellcrow (20) and lich (7). Harpy attack_01 finger stretch up to 2.24x = game's own animation (left as is).
 - **M3** (bc4aec1, 4973954, db0e1db): `.tgm` reader (24/24 tiles), `.arm` room assembly, space hideout 961 tiles + 4 doodads, viewer Levels tab, UE `/Game/ForgeLens/POE/Levels/space_hideout` + `L_space_hideout` (celestial floor material is an approximation `M_Poe2Celestial`), cart rhoa (10 clips, 17 phys bones), PIE swing tune t2 (world 0.4, damp 0.9, stiff 400, dampDrive 40, swing 0.5): all bones move, but **lich tail and BellCrow bells still pop -> not verified good; heuristic values**. [V POE2_M3]
-- **In progress at writing (old-account workers, may be dead):**
-  - **P1 VFX plate removal + real viewer captures** (owner t272u-t274u): the owner sees a semi-transparent white plate/card behind the lightning-sphere (stormblast) and other effects in viewer captures; he wants it GONE (not made transparent). Uncommitted edits in `src/LibSaber.SM2.Assets/Games/Poe2/Poe2Particles.cs` (hide untextured emitter in the stormblast, change glow-card blending) and `src/LibSaber.SM2Browser/MainWindow.axaml.cs`; untracked `docs/handoff/poe2_m2/viewer_fx/`. Build, before/after compare, then **real ForgeLens window captures of as many different skills as possible (12+)**, send to owner, commit. [V git status]
-  - **P2 physics smoothing:** uncommitted `tools/poe2/ue_poe2_pie.py` + untracked `docs/handoff/poe2_m3/pie_s4_*.png`, `pie_s5_*.png` (new tune rounds s4/s5). Goal: lich tail / BellCrow bells no longer pop. Editor lock was held by "poe2m3 level+pie" at 15:57. [V]
+- **M2 G - VFX plates removed + real viewer captures (DONE, 50dbf5b) [V git log]:** owner saw a semi-transparent white plate behind the lightning sphere and other effects (t272u-t274u, wanted it REMOVED, not transparent). Removed: untextured cards, material-texture sprites, huge glow cards, XYLock ground flashes; hooks `FL_POE2_EFFECT` / legacy-plate toggle. Real ForgeLens window captures of **16 skills** + before/after sheets in `docs/handoff/poe2_m2/viewer_fx/` (`skills_sheet_1.png`, `skills_sheet_2.png`, `before_after_plate.png`, `bench_before_after.png`, scripts `fxg_cap.ps1`, `fxg_sheets.ps1`, list `fxg_skills.txt`). **Remaining:** Frost Bomb has a cut (hard) edge, Glacial Bolt shows dark blobs, several effects are barely visible, smoke is flat colour.
+- **M3.4b - physics tuning (DONE as far as possible, 0ed49e4) [V git log]:** 8 per-mesh tune sets, front/side PIE camera. Cart rhoa OK; lich tail about half as jumpy; **BellCrow bells still pop** - root cause: the top bell bones are simulated 80-126 cm from their parents (lever arm). Fix needs a NEW function in the `SM2PhysicsSetup` C++ plugin (physics bodies are not exposed to Python) to make those top bones kinematic/follow animation, then plugin rebuild + editor restart (restart pre-authorised; take the editor lock; game must not run). Values remain heuristic.
 - Not done: tile rotation, ground blending/masks, decals, lights/.env, other areas; smoke is flat colour; stormblast octagon only in the viewer; no subsurface/specular; cart rhoa/others physics not seen against the game.
-- **Niagara conversion** (owner asked size only, t278u): large. Steps: (1) converter EmitterDef -> Niagara emitter (spawn rate, lifetime, velocity, size/colour curves, flipbook, mesh particles, lights) on 5 representative effects; (2) compare with the viewer; (3) automated compile + validation (EngineWire-made emitters needed an editor open+compile in SM2 orb work, R97t); (4) extend to the most-used effects. Not started; do only if the owner says go.
+- **Niagara conversion** (owner asked for an estimate, t278u, and it was offered as the NEXT job after the current work; he has not said go yet): large, no time measured. Steps: (1) converter EmitterDef -> Niagara emitter (spawn rate, lifetime, velocity, size/colour curves, flipbook, mesh particles, lights) on 5 representative effects; (2) compare with the viewer; (3) automated compile + validation (EngineWire-made emitters needed an editor open+compile in SM2 orb work, R97t); (4) extend to the most-used effects. Not started; do only if the owner says go.
 
 ### 4.3 Black Myth: Wukong (code BMW) - M0 done (f4dc100)
 Install `D:\Steam\steamapps\common\BlackMythWukong` (app 2358720, ~150 GB), exe `b1\Binaries\Win64\b1-Win64-Shipping.exe`, paks `b1\Content\Paks\pakchunk*.pak` (no IoStore). Custom UE 5.0 pak **v11 + extra int16**, **AES-256 encrypted index**, **Oodle**. Community AES key + usmap noted in `docs/WUKONG_M0.md` - **key NOT tested, nothing decrypted, no asset parsed**. M1 plan: pak reader -> `bmw_index.tsv`; UE5.0 cooked asset reader with usmap (CUE4Parse as reference; check licence); glTF -> viewer -> `/Game/ForgeLens/BMW/`. Never run the game (no usmap dumping). [V WUKONG_M0]
@@ -129,8 +130,8 @@ Plugin installed at `K:\Unreal Projects\_Plugins\BongThumbLive` (not a git clone
 
 | # | Item | Next step |
 |---|---|---|
-| P1 | PoE2 VFX plate removal + real viewer captures (owner waiting) | dev tree: build ForgeLens, render stormblast before/after, confirm the plate is gone (not just transparent) on all effects, capture the real viewer window for 12+ skills (input_block if clicking), sheet -> owner, commit only those files via pushstep.ps1 |
-| P2 | PoE2 physics smoothing (lich tail, BellCrow bells pop) | take editor lock, `tools/poe2/ue_poe2_pie.py` tune rounds, accept only when no POP, commit, say values are heuristic |
+| P1 | PoE2 VFX leftovers | Frost Bomb cut edge, Glacial Bolt dark blobs, barely visible effects, flat smoke; re-capture with `viewer_fx/fxg_cap.ps1` + `fxg_sheets.ps1`, send sheet |
+| P2 | BellCrow bell pop | add SM2PhysicsSetup C++ function to set named bodies kinematic (follow anim) for the top bell bones, rebuild plugin (VS 2022), restart editor with lock, PIE check via `tools/poe2/ue_poe2_pie.py`; lich tail further smoothing optional |
 | P3 | BongThumbLive dots spinner build + live check | pull ce19434, build with UE 5.7 (editor closed or plugin hot-reload rules per BTL HANDOFF), capture |
 | P4 | PoE2 levels beyond the hideout | tile rotation from .arm, ground blending, one outdoor area |
 | P5 | Wukong M1 | pak reader + index decrypt test with the key from WUKONG_M0, file count |
@@ -139,7 +140,7 @@ Plugin installed at `K:\Unreal Projects\_Plugins\BongThumbLive` (not a git clone
 | P8 | Viewer: Unreal-style UI batch (no gizmo) | was marked in progress in the old todo; state [U]: no commit with UI/Unreal-style in its message since 10/30 20:00 [V]; it was likely never started - confirm scope with the old notes or the owner's original request before starting |
 | P9 | Memory budget gaps | CPU mesh copies and GL textures are not budgeted (R95b) |
 | P10 | BongLodge unverified items | real monitor removal, dock-back, shared Root |
-| P11 | PoE2 -> Niagara | only if the owner orders it (4.2 plan) |
+| P11 | PoE2 -> Niagara (offered as next job) | when the owner says go: converter on 5 effects -> compare with viewer -> extend by skill usage (4.2) |
 
 ---------------------------------------------------------------------------------------------------
 ## 6. Key technical findings
@@ -183,7 +184,7 @@ Repo docs: `docs/RULES_CORE.md`, `docs/SUBAGENT_PREAMBLE.md` (give to every work
 ---------------------------------------------------------------------------------------------------
 ## 8. Open questions for the owner (ask only at the end of a result message)
 1. Delete the kept chaplain test folders (needs moving ~34 materials of the main chaplain first)? Owner said keep (15:06) - ask only if relevant.
-2. Start the PoE2 -> Niagara conversion (large)?
+2. Start the PoE2 -> Niagara conversion (large; offered as next after current work)?
 3. In-game captures for F45 physics and muzzle/aim pose, if he wants those closed (never ask him to; just note they wait).
 4. Order after PoE2 polish: more PoE2 areas first, or Wukong M1?
 
@@ -197,4 +198,5 @@ See the bottom section "Pass log".
 3. Commits: every hash cited in sections 4 and 6 looked up in `git log origin/...`; 5c48c8f (M0) confirmed; found dev tree "ahead 2" = local duplicates of db0e1db/4973954 (noted).
 4. Other repos: BTL origin tip ce19434 via `gh api` (local clone is behind at 58e39fe - noted); BongLodge tip/LIMITATIONS read; repo visibility via `gh repo list` (matches the old report). Removed the AES key from this doc (points to WUKONG_M0).
 5. Gaps/stale rules: added 2.4 superseded lines (routine, BTL scope, /Game/ForgeLens, Niagara, interim reports), shared ue_args.json hazard, P8 UI batch has no commits [U], in-flight P1/P2 uncommitted files listed from `git status`.
-Still [U]: whether P1/P2 workers finished after 16:00; BLTest project path; owner's exact scope for the Unreal-style UI batch; PC hardware specs (from 10/29 doc).
+Still [U]: BLTest project path; owner's exact scope for the Unreal-style UI batch; PC hardware specs (from 10/29 doc).
+6. **Final pass (17:40 KST):** origin log re-read: 50dbf5b (VFX plates + 16 captures) and 0ed49e4 (physics 8 tune sets) present [V]; viewer_fx folder listing [V]; replaced the "in progress" P1/P2 text with results and new next steps; added the Niagara offer and the start-here banner. Re-confirmed cited SM2/PoE2/Wukong/BTL hashes d7e4e92, 21eaf69, f9d6909, bc4aec1, 4973954, db0e1db, f4dc100, ce19434 (from pass 3/4). Root cause of the BellCrow pop is from the worker's commit/report, not re-measured by me [I].
