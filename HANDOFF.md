@@ -2850,3 +2850,10 @@ Remains: orb ~15 % dimmer, no large soft bloom sprite (template size not settabl
 - Backup first: `K:\SM2_Backups\predelete_20261031_1505\` (6 orb .uasset + both Tests/chars_cloth2|chars_phys/cc_chaplain folders, 211 files).
 - Deleted via EditorAssetLibrary (0 hard/soft referencers each): `/Game/ForgeLens/SM2/VFX/vortex_orb/` NS_vortex_orb, NS_vortex_orb_v2..v5, NS_orb_t. NS_orb_t2 did not exist. Kept NS_vortex_orb_v6, v7 and all M_/MI_/NE_/T_/LS_ orb assets.
 - NOT deleted: `/Game/ForgeLens/SM2/Tests/chars_cloth2/cc_chaplain` (referenced by 8 r90_cloth test meshes) and `Tests/chars_phys/cc_chaplain` (its MI_* are used by the main `Characters/cc_chaplain/cc_chaplain` mesh). Owner decision 15:06: keep them.
+
+## R98a orb brightness + large bloom (SM2 leftover a)
+- Found: Map_Floor main PPV manual exposure bias was -5 (not written by any R97 script; frames went near-black, orb glow invisible). Set back to 0 (tools/ue/ue_r98_floorev.py 0); with EV 0 the R97 frame is reproduced exactly (Shots/r98_orb/e0 = hub7e, peak15 183,146,212).
+- New: M_orb_bloomcard (additive unlit, radial falloff^Falloff, white core lerp) + MI_orb_bloomcard; plane actor R98A_orb_bloomcard (tag R98A) 20 cm in front of the orb, facing the cap_vortex/LS_orb_cam camera, attached to the Vortex DISK socket. tools/ue/ue_r98_orbbloom.py 1.2 280 0.5 1.6 0.45 0.55 1.2 (final). Map_Floor saved.
+- Measure (tools/ue/r98_orbdisc.ps1, disc centre 621,206 r55 on the 1280x720 MRQ frame 60, tools/ue/r98_orbtest.ps1): before 170,128,173 -> after 201,180,216; target game 194,177,217. Sweep I=1/3/6 tint pink: 205,163,202 / 224,190,219 / 234,206,229.
+- Sheet docs/handoff/r98/orb_bloom_r98a.jpg (game | before | after, alpha ignored).
+- Limits: the card is a camera-facing plane for this camera only (not a true billboard; other views see it at an angle). MRQ PNG alpha is 0 over the sky, so the halo past the ring is only visible in RGB with alpha ignored. Game's hot yellow-white centre not reproduced (UE centre stays pink-lavender).
