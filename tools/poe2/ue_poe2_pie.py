@@ -1,0 +1,91 @@
+"""PoE2 M3.4: Simulate-in-editor swing check of the PoE2 phys_ bones (editor only, never the game). Scratch map
+/Game/ForgeLens/POE/Tests/pie/Map_PhysCheck. Reuses ue_pie_phys.py (osc/result/snap/stop: actors tagged R60_*).
+steps: setup | anims | sim | osc,<sec>,<amp>[,hz,tag] | cap,<png> | stop | result | tune,<mesh>,<damping>,<stiffness> | restore,<map>
+Refuses setup when the open map has unsaved changes (other workers' maps are never saved or switched away from dirty)."""
+import sys, os, json, unreal
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "ue"))
+import ue_pie_phys as P
+
+MAP = "/Game/ForgeLens/POE/Tests/pie/Map_PhysCheck"
+MESHES = {"bellcrow": "/Game/ForgeLens/POE/bellcrow/bellcrow", "lichboss": "/Game/ForgeLens/POE/lichboss/lichboss",
+          "cartrhoa": "/Game/ForgeLens/POE/cartrhoa/cartrhoa"}
+EAL = unreal.EditorAssetLibrary
+
+def idle(name):
+    for a in EAL.list_assets(f"/Game/ForgeLens/POE/{name}/Anims", recursive=False):
+        if "idle" in a.lower(): return a.split(".")[0]
+    return None
+
+def setup():
+    dirty = [str(p.get_name()) for p in unreal.EditorLoadingAndSavingUtils.get_dirty_map_packages()]
+    if dirty and not all(d.startswith("/Game/ForgeLens/POE") for d in dirty):
+        print("POE3 refuse: dirty maps", dirty); return
+    w = P.world(); prev = w.get_path_name().split(".")[0] if w else ""
+    json.dump({"prev": prev}, open(os.path.join(P.SAVED, "poe3_prev.json"), "w"))
+    if EAL.does_asset_exist(MAP): P.les().load_level(MAP)
+    else: P.les().new_level(MAP)
+    eas = unreal.get_editor_subsystem(unreal.EditorActorSubsystem)
+    for a in eas.get_all_level_actors():
+        if a.get_actor_label().startswith(("R60_", "POE3_")): eas.destroy_actor(a)
+    fl = eas.spawn_actor_from_object(unreal.load_asset("/Engine/BasicShapes/Plane"), unreal.Vector(0, 0, 0))
+    fl.set_actor_scale3d(unreal.Vector(60, 30, 1)); fl.set_actor_label("POE3_floor")
+    eas.spawn_actor_from_class(unreal.DirectionalLight, unreal.Vector(0, 0, 800), unreal.Rotator(0, -50, -30)).set_actor_label("POE3_sun")
+    eas.spawn_actor_from_class(unreal.SkyLight, unreal.Vector(0, 0, 500)).set_actor_label("POE3_sky")
+    for k, x in zip(MESHES, (-700, 0, 700)):
+        if not EAL.does_asset_exist(MESHES[k]): print("POE3 missing", MESHES[k]); continue
+        a = eas.spawn_actor_from_class(unreal.SkeletalMeshActor, unreal.Vector(x, 0, 0), unreal.Rotator(0, 0, 0))
+        a.skeletal_mesh_component.set_skinned_asset_and_update(unreal.load_asset(MESHES[k]))
+        a.set_actor_label("R60_" + k); a.tags = ["R60_" + k]
+    rt_path = MAP.rsplit("/", 1)[0] + "/RT_poe3cap"
+    rt = unreal.load_asset(rt_path) if EAL.does_asset_exist(rt_path) else unreal.AssetToolsHelpers.get_asset_tools().create_asset(
+        "RT_poe3cap", MAP.rsplit("/", 1)[0], unreal.TextureRenderTarget2D, unreal.TextureRenderTargetFactoryNew())
+    rt.set_editor_property("size_x", 1600); rt.set_editor_property("size_y", 800)
+    rt.set_editor_property("render_target_format", unreal.TextureRenderTargetFormat.RTF_RGBA8_SRGB)
+    rt.set_editor_property("render_target_format", unreal.TextureRenderTargetFormat.RTF_RGBA8)  # non-sRGB target
+    EAL.save_loaded_asset(rt)
+    cap = eas.spawn_actor_from_class(unreal.SceneCapture2D, unreal.Vector(0, -1500, 350), unreal.Rotator(roll=0, pitch=-8, yaw=90))
+    cap.set_actor_label("POE3_cap"); c = cap.capture_component2d
+    c.set_editor_property("texture_target", rt); c.set_editor_property("capture_every_frame", False)
+    c.set_editor_property("capture_source", unreal.SceneCaptureSource.SCS_FINAL_COLOR_LDR)
+    P.les().save_current_level()
+    print("POE3 setup", MAP, [a.get_actor_label() for a in P.actors()], "prev", prev)
+
+def anims():
+    for x in P.actors():
+        k = str(x.tags[0])[4:] if x.tags else ""
+        clip = idle(k)
+        if not clip: print("POE3 no idle", k); continue
+        c = x.skeletal_mesh_component; c.set_editor_property("animation_mode", unreal.AnimationMode.ANIMATION_SINGLE_NODE)
+        d = unreal.SingleAnimationPlayData(); d.set_editor_property("anim_to_play", unreal.load_asset(clip))
+        d.set_editor_property("saved_looping", True); d.set_editor_property("saved_playing", True)
+        c.set_editor_property("animation_data", d); print("POE3 anim", k, clip)
+        mesh = c.get_skinned_asset()
+        print("POE3 ppabp", k, mesh.get_editor_property("post_process_anim_blueprint"), "pa", mesh.get_editor_property("physics_asset"))
+    P.les().save_current_level()
+
+def cap(png):
+    caps = [a for a in unreal.GameplayStatics.get_all_actors_of_class(P.world(), unreal.SceneCapture2D)]
+    c = caps[0].capture_component2d; c.capture_scene()
+    d, f = os.path.split(png.replace("\\", "/"))
+    unreal.RenderingLibrary.export_render_target(P.world(), c.get_editor_property("texture_target"), d, f)
+    print("POE3 cap", png, os.path.exists(png))
+
+def restore():
+    prev = json.load(open(os.path.join(P.SAVED, "poe3_prev.json"))).get("prev", "")
+    P.les().save_current_level()
+    if prev and not prev.startswith("/Game/ForgeLens/POE") and EAL.does_asset_exist(prev):
+        P.les().load_level(prev); print("POE3 restored", prev)
+    else: print("POE3 no restore", prev)
+
+if __name__ == "__main__":
+    a = sys.argv[1].split(",") if len(sys.argv) == 2 else sys.argv[1:]
+    m = a[0]
+    if m == "setup": setup()
+    elif m == "anims": anims()
+    elif m == "cap": cap(a[1])
+    elif m == "restore": restore()
+    elif m == "sim": P.les().editor_play_simulate(); print("POE3 sim started")
+    elif m == "stop": P.les().editor_request_end_play(); print("POE3 stopped")
+    elif m == "osc": P.osc(float(a[1]), float(a[2]), float(a[3]) if len(a) > 3 else 1.0, a[4] if len(a) > 4 else "phys")
+    elif m == "result": P.result()
+    elif m == "list": print("POE3 world", P.world().get_path_name(), [x.get_actor_label() for x in P.actors()])
