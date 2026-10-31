@@ -2857,3 +2857,9 @@ Remains: orb ~15 % dimmer, no large soft bloom sprite (template size not settabl
 - Measure (tools/ue/r98_orbdisc.ps1, disc centre 621,206 r55 on the 1280x720 MRQ frame 60, tools/ue/r98_orbtest.ps1): before 170,128,173 -> after 201,180,216; target game 194,177,217. Sweep I=1/3/6 tint pink: 205,163,202 / 224,190,219 / 234,206,229.
 - Sheet docs/handoff/r98/orb_bloom_r98a.jpg (game | before | after, alpha ignored).
 - Limits: the card is a camera-facing plane for this camera only (not a true billboard; other views see it at an angle). MRQ PNG alpha is 0 over the sky, so the halo past the ring is only visible in RGB with alpha ignored. Game's hot yellow-white centre not reproduced (UE centre stays pink-lavender).
+
+## R98b hub local lights from game data (SM2 leftover b)
+- tools/ue/ue_r98_hublights.py: 1821 of the 1824 point/spot lights in Raw/level_lights/hub_battle_barge_lights.tsv placed in /Game/SM2_Work/Tests/r54_level/L_hub_battle_barge as movable unshadowed PointLights (tag R98B), 3 skipped (no intensity). Position SM2 m (x,y,z) -> UE cm (x,z,y); colour ColorCtrl [A,R,G,B] (PROVEN R97y), given as sRGB so UE uses (c/255)^2.2 like the game packer (P1.rgb, PROVEN 2026-10-29); radius RadiusCtrl*100.
+- Intensity scale K (UE cd per game Intensity) is a FIT, not data: 4-view AVG (ue_r97_levelcap.py, tools/ue/r98_hubtest.ps1): before 19,28,23; K50 no fill 28,46,55; K15 no fill 14,28,35; K15 fill 6 28,41,42; **K10 fill 3 17,30,34 (kept, saved)**; game 22,29,32. The fitted fill DirectionalLight went from 6 to 3, so half of that fit is now replaced by placed data lights.
+- Limits: spot lights have no direction in the TSV, so they are placed as points (cone, attenCurveParam falloff and shadows not applied); the viewpoint is still the actor median, not the game camera; red stays a bit low.
+- Sheet docs/handoff/r98/hub_lights_r98b.jpg (top before, bottom after).
