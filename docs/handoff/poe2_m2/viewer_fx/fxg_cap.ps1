@@ -1,0 +1,12 @@
+$R='C:\Users\Revaptor_FX\Desktop\SM2_Work\PoE2'
+Add-Type -AssemblyName System.Drawing
+if (-not ('W4' -as [type])) { Add-Type @"
+using System;using System.Runtime.InteropServices;using System.Text;
+public class W4{public delegate bool EP(IntPtr h,IntPtr l);[DllImport("user32.dll")]public static extern bool EnumWindows(EP e,IntPtr l);[DllImport("user32.dll")]public static extern uint GetWindowThreadProcessId(IntPtr h,out uint p);[DllImport("user32.dll")]public static extern int GetWindowText(IntPtr h,StringBuilder s,int n);[DllImport("user32.dll")]public static extern bool IsWindowVisible(IntPtr h);[DllImport("user32.dll")]public static extern bool GetWindowRect(IntPtr h,out RECT r);[DllImport("user32.dll")]public static extern bool PrintWindow(IntPtr h,IntPtr dc,uint f);[DllImport("user32.dll")]public static extern bool SetWindowPos(IntPtr h,IntPtr a,int x,int y,int cx,int cy,uint f);
+public struct RECT{public int L,T,R,B;}
+public static IntPtr[] Of(uint pid){var l=new System.Collections.ArrayList();EnumWindows((h,x)=>{uint p;GetWindowThreadProcessId(h,out p);if(p==pid&&IsWindowVisible(h))l.Add(h);return true;},IntPtr.Zero);return (IntPtr[])l.ToArray(typeof(IntPtr));}}
+"@ }
+function CapAll($p,$name,$dir="$R\fxg_test"){ New-Item -ItemType Directory -Force $dir | Out-Null; $i=0; foreach($h in [W4]::Of($p.Id)){ $r=New-Object W4+RECT; [W4]::GetWindowRect($h,[ref]$r)|Out-Null; $w=$r.R-$r.L; $hh=$r.B-$r.T; if($w -lt 200){continue}; $sb=New-Object Text.StringBuilder 256; [W4]::GetWindowText($h,$sb,256)|Out-Null; $t=$sb.ToString() -replace '[^A-Za-z0-9]',''; $b=New-Object Drawing.Bitmap $w,$hh; $g=[Drawing.Graphics]::FromImage($b); $dc=$g.GetHdc(); [W4]::PrintWindow($h,$dc,2)|Out-Null; $g.ReleaseHdc($dc); $g.Dispose(); $b.Save("$dir\${name}_$t.png"); $b.Dispose(); $i++ } }
+function CapMain($p,$file){ $best=$null;$ba=0; foreach($h in [W4]::Of($p.Id)){ $sb=New-Object Text.StringBuilder 256; [W4]::GetWindowText($h,$sb,256)|Out-Null; if($sb.ToString() -like 'Forge Lens*'){ $best=$h } }
+  if(-not $best){ return $false }; [W4]::SetWindowPos($best,[IntPtr](-1),0,0,0,0,0x13)|Out-Null; Start-Sleep -m 250; $r=New-Object W4+RECT; [W4]::GetWindowRect($best,[ref]$r)|Out-Null
+  $b=New-Object Drawing.Bitmap ($r.R-$r.L),($r.B-$r.T); $g=[Drawing.Graphics]::FromImage($b); $g.CopyFromScreen($r.L,$r.T,0,0,$b.Size); $g.Dispose(); [W4]::SetWindowPos($best,[IntPtr](-2),0,0,0,0,0x13)|Out-Null; $b.Save($file); $b.Dispose(); return $true }

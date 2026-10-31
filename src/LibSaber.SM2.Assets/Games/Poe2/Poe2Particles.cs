@@ -25,6 +25,10 @@ namespace LibSaber.SM2.Assets.Games.Poe2;
 /// </summary>
 public static class Poe2Particles
 {
+    /// <summary>M2 G: FL_POE2_FX_LEGACYPLATE=1 restores the old untextured / alpha glow cards (before/after captures only).</summary>
+    /// <summary>M2 G: terrain / PBR / model material textures used as sprites have no sprite alpha mask and draw as square plates (frost bomb, glacial bolt).</summary>
+    private static bool PlateTexture(string? t) => t is not null && (t.Contains("/PBR/", StringComparison.OrdinalIgnoreCase) || t.Contains("/Terrain/", StringComparison.OrdinalIgnoreCase) || t.Contains("Art/Models/", StringComparison.OrdinalIgnoreCase));
+    private static readonly bool LegacyPlates = Environment.GetEnvironmentVariable("FL_POE2_FX_LEGACYPLATE") == "1";
   public static float SizeUnit = Env("FL_POE2_FX_SIZE", 0.05f);
   public static float Intensity = Env("FL_POE2_FX_INTENSITY", 60f);
   public static float TrailWidthUnit = Env("FL_POE2_FX_TRAILW", 0.05f);
@@ -205,7 +209,8 @@ public static class Poe2Particles
         if (r.Any(x => x.Graph.StartsWith("FlipbookRandomPick", StringComparison.Ordinal))) frameOffset = new Vector2(0, fx * fy - 0.01f);
         else { frameMode = FrameMode.AgeSpline; frameSpline = new ScalarParam(new Curve1([0f, 0f, 1f, fx * fy - 0.01f]), Vector2.Zero); }
       }
-      var distortion = (render ?? "").Contains("distortion", StringComparison.OrdinalIgnoreCase) || (tex ?? "").Contains("/distortion/", StringComparison.OrdinalIgnoreCase) || r.Any(x => x.Graph.Contains("Distort", StringComparison.Ordinal));
+      if (!LegacyPlates && blend == EffectBlend.Blend && (tex ?? "").Contains("/glow/", StringComparison.OrdinalIgnoreCase)) blend = EffectBlend.BlendAdd; // M2 G: alpha-blended glow card drew a grey plate (stormblast e1) // M2 G: alpha-blended glow card drew a grey plate (stormblast e1)
+            var distortion = (render ?? "").Contains("distortion", StringComparison.OrdinalIgnoreCase) || (tex ?? "").Contains("/distortion/", StringComparison.OrdinalIgnoreCase) || r.Any(x => x.Graph.Contains("Distort", StringComparison.Ordinal));
       var meshFile = Str(em, "particle_mesh");
       var c0 = color;
       var def = new EmitterDef
@@ -213,7 +218,7 @@ public static class Poe2Particles
         Name = $"{Path.GetFileNameWithoutExtension(pet)}_e{n}" + (string.IsNullOrEmpty(meshFile) ? "" : "_meshsprite"),
         Path = pet + "#" + n,
         IsGpu = true,
-        Visible = !distortion && !hidden,
+        Visible = !distortion && !hidden && (LegacyPlates || (!string.IsNullOrEmpty(tex) && !PlateTexture(tex) && !((tex ?? "").Contains("/glow/", StringComparison.OrdinalIgnoreCase) && size.Curve.Max >= 20))) /* M2 G: untextured cards, material textures and huge glow cards drew plates behind the effect */,
         Transform = at,
         EmitDuration = continuous ? 0 : F(em, "emitter_duration_max", 1),
         Emission = kind,
@@ -304,7 +309,7 @@ public static class Poe2Particles
     res.Definition.Emitters.Add(new EmitterDef
     {
       Name = name, Path = pet + "#c" + n, Transform = at,
-      Visible = face != "XYAligned" && !(tex ?? "").Contains("/distortion/", StringComparison.OrdinalIgnoreCase),
+      Visible = face != "XYAligned" && (LegacyPlates || (face != "XYLock" && !PlateTexture(tex))) /* M2 G: flat ground flash cards drew a panel (flame dash) */ && !(tex ?? "").Contains("/distortion/", StringComparison.OrdinalIgnoreCase),
       EmitDuration = infinite ? 0 : Math.Max(One("emitter_duration", 1), 1f / 60f),
       Emission = EmissionKind.ConstantFlow, Rate = new Vector2(rate, rate), MaxParticles = 4000,
       AngleEmission = One("scatter_cone_size", 0), EmitDir = Vector3.UnitY,

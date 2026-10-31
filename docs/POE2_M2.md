@@ -161,3 +161,14 @@ handoff/poe2_m2/monsters6_sheet.png shows bind pose and the first clip at t=0.5 
 - Tool: `poe_data_tools -p 2 --ggpk <Content.ggpk> translate <out> <glob>` decodes arm/tgt/tdt/gt/et/mat to JSON. For .tgm it only returns version + bbox (geometry NOT decoded).
 - Done: space hideout (`metadata/terrain/missions/hideouts/space/rooms/hideout.arm`, 19x19 grid, 4 placed .ao: waypoint, map device, chest, stash) translated (70 JSON in PC `m6lvl/`, 153 raw files incl. 24 .tgm, 12 .sm/.smd in PC `m6raw/`). Sample: handoff/poe2_m2/space_hideout.arm.json.
 - NOT done: .tgm geometry decoder and level assembly in UE. Next steps: write a .tgm reader (same family as .smd: header + vertex/index buffers), place tiles from the .arm grid (250 units/tile per tgm bbox), spawn .ao via our existing monster/prop route (.sm/.smd).
+
+### G. Effect plates removed + real viewer captures (2026-10-31 15:00-16:30 KST)
+- Cause (PROVEN from the emitter dumps, fx_out/h_before vs h_after): flat cards behind the effects came from
+  (1) a GPU emitter with no texture (stormblast explosion e3, size 30) drawn as a solid card = the octagon;
+  (2) alpha-blended glow_star cards (stormblast e1) = grey plate; glow cards of size >= 20 (stormblast e1 25, impact_greater e4 60) show their square edge;
+  (3) terrain / PBR / model material textures used as sprites (frostBomb PulseWave e3 CSI_FrozenLake thickness, crossbow_permafrost VFX_FrozenLake / IceShards) = square plates;
+  (4) CPU emitters with face XYLock (flame_dash c1 flash 2.86 m, c4 warp) = dark-red ground panel.
+- Fix (Poe2Particles.cs): those emitters are hidden (not made translucent); alpha-blended glow cards use BlendAdd. FL_POE2_FX_LEGACYPLATE=1 restores the old cards (only for before/after captures).
+- Test hooks: FL_POE2_EFFECT=<substring> picks the effect of FL_POE2_SKILL (Poe2Window); FL_OPEN_POE2=1 no longer auto-opens the SM2 last folder (it replaced the effect view).
+- Evidence: handoff/poe2_m2/viewer_fx/bench_before_after.png (bench), before_after_plate.png (real viewer window, screen captures of the main window made topmost without activation for ~4 s), skills_sheet_1.png / skills_sheet_2.png (16 skills), raw/ (3 auto-picked time points per skill + one full-window shot each). Script: PoE2/fxg2.ps1 (not in git).
+- OPEN: frostBomb glow cards still show a straight cut edge; crossbow_permafrost (Glacial Bolt) gradient_radial #lum cards render as dark blobs (pure Add made them white blobs, reverted); several skills (Comet, Chaos Bolt, Essence Drain, Freezing Shards, Flame Wall) show little or nothing at the default camera. In-game look not compared (game not launched).

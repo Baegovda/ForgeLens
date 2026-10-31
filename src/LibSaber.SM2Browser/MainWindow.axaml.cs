@@ -124,7 +124,7 @@ public partial class MainWindow : Window
     if (Environment.GetEnvironmentVariable("SM2_OPEN_SETTINGS") == "1") Opened += (_, _) => Avalonia.Threading.Dispatcher.UIThread.Post(() => new SettingsWindow(_settings).Show(this), Avalonia.Threading.DispatcherPriority.Background); // R95 test hook
     Opened += async (_, _) =>
     {
-      if (!string.IsNullOrWhiteSpace(_settings.LastFolder) && Directory.Exists(_settings.LastFolder))
+      if (Environment.GetEnvironmentVariable("FL_OPEN_POE2") != "1" /* M2 G: PoE2 test hook, keep the SM2 last folder from replacing the effect view */ && !string.IsNullOrWhiteSpace(_settings.LastFolder) && Directory.Exists(_settings.LastFolder))
         await LoadFolderAsync(_settings.LastFolder);
       await OpenLooseEffectFromEnvironmentAsync();
       await OpenLooseModelFromEnvironmentAsync();
