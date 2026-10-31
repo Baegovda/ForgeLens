@@ -161,7 +161,7 @@
 | F46 | 10/29 | 티투스 걸으며 사격 시퀀스(Sequencer, 본별 레이어 블렌드) | Layered blend per bone (upper/lower body) — 상하체 분리 블렌드 | done v2 (Gun_pose 부착, 총구 끝 머즐, 반동은 별도 additive 슬롯, 생성한 pitchUp35 조준 포즈); 남음: 머즐 플래시를 총구 앞·측면 각도로, 생성 조준 포즈 다듬기 → in progress | UE `/Game/SM2_Work` Sequencer; box `/workspace/titus_seq/` |
 | F47 | 10/29 | 체인소드 sfx 검은 판 수정 + 캐릭터 컬러 스킴 스크린샷 | Bug fix (sfx black quads) + visual QA — 렌더 결함 수정, 결과 캡처 | done (mtl1-51): td `preset = "sfx"` 파츠("sfx")와 placeholder 재질 sfx 로케이터("sfxSource")는 기본 숨김, Meshes 탭 "FX parts" 토글로 켜면 가산(additive) sfx 패스로 그림, `SM2_SHOW_SFX_PARTS=1`은 예전 동작. 캐릭터 컬러 스킴 피커는 **미지원**(무기 전용 `wpn_` 게이트, 스킴 소스 = 무기 diffuse td `materials` 변형뿐; 아머는 `armor_color_library.sso` 레이어 파라미터라 소스·적용 경로 둘 다 없음) → 구현 대기 | `Meshes/MaterialMaps.cs` (HideSfxParts), `Gpu/GlPreview.cs` (PreviewBlend.Sfx), RE_NOTES "mtl1-51", box `/workspace/mtl_fix/mtl51/` |
 | F48 | 10/29 | 티투스 물리 sim 본 전수 점검(앞치마 해골 장식 포함, 빠짐없이) | Sim-bone audit / coverage check — 시뮬 대상 누락 점검 | done (조사: box `/workspace/mtl_fix/titus_phys/REPORT.md`; 수정은 F52) | box `/workspace/mtl_fix/titus_phys/` |
-| F49 | 10/29 | OOM 이후 REA 재개: 라이트 감쇠 `attenCurveParam`, `UseSpecMap` (10/29 재요청: "아까 하던 rea 작업 이거 중단된거 여유될때 잊지말고 해") | RE follow-up (resume after OOM) — 메모리 부족 후 분석 재개 | pending (phys52 동안 손대지 않음; 다음 여유 작업 1순위) | `heuristics4_progress.md` items 2·4, `tools/re/` |
+| F49 | 10/29 | OOM 이후 REA 재개: 라이트 감쇠 `attenCurveParam`, `UseSpecMap` (10/29 재요청: "아까 하던 rea 작업 이거 중단된거 여유될때 잊지말고 해") | RE follow-up (resume after OOM) — 메모리 부족 후 분석 재개 | attenCurveParam done (2026-10-29 level-lights, P0.w PROVEN); UseSpecMap flag writer NOT found (HEURISTIC switch stays; R98 did not resume the Ghidra search) | `heuristics4_progress.md` items 2·4, `tools/re/` |
 | F50 | 10/29 | 노출(exposure) 규칙 증명 | sfx emissive exposure k = `adaptiveIntensity` (FUN_1424540e0) — 자동 노출 계수 | done (8bdd80a) | VFX 렌더 (`SM2_VFX_SFX_LUM_K`) |
 | F51 | 10/29 | 파워피스트 손 숨김 규칙을 게임 스크립트에서 | SSLB bytecode rule (RIGHT_GAUNTLET = 6 PROVEN) — 컴파일된 스크립트에서 규칙 추출 | done (fcc16bf) | `Scripting/Sslb.cs`, `PowerFistHandRule.cs` |
 | F52 | 10/29 | 제안한 두 수정을 모든 캐릭터에 일반 규칙으로 적용: (1) 플러그인이 jiggle을 `"Name"`(없으면 `"bone"`)으로 읽고, 건너뛴 jiggle은 missing으로 세고 로그, 플러그인 재빌드(에디터 재시작 사전 승인, 크래시 프로토콜) (2) `prop_motion_damper_controller`를 PhysicsParser에서 파싱(클라이언트 .cls에 없으면 authority .cls), sidecar에 내보내고, UE에서 스프링-댐퍼로 구현(추정치는 HEURISTIC 표기). 티투스 물리 다시 적용(.bakN 백업, 보호 경로·Lightning_01 금지, PIE/SIE 종료), 검증: jiggle 바디 34개, 걷기 클립에서 상자 흔들림 before/after 이미지·gif → `/workspace/mtl_fix/titus_phys/after/`, 다른 작업자 Forge Lens 배포와 충돌 없이 rebase + push.ps1(ff-only, force 금지), 메모리 적게, HANDOFF/문서 갱신 | Data-driven secondary-motion import (key fallback + spring-damper constraint) — 키 불일치 수정과 모션 댐퍼 이식 | done (phys52, 이 커밋; HANDOFF "Update phys52") | `SM2PhysicsSetupLibrary.cpp`, `Physics/PhysicsParser.cs`, `PhysicsLocator.cs`, `PhysicsSidecar.cs`, box `/workspace/mtl_fix/titus_phys/after/` |
@@ -306,7 +306,7 @@ For any agent continuing this work: read this whole file before you do anything.
 ## Open items (do them in order, one at a time)
 1. **Tyranid color: resolved.** The grey look came from a capture taken before the textures had loaded; the diffuse textures themselves carry the real colors.
    - Commit ef29997 applies the material data's `albedo_tint` (stored as [A, R, G, B]) as the M_SM2 `AlbedoTint` parameter.
-   - Not done yet: the second_spec (gold metallicTint) and anisotropic highlight layers.
+   - Not done yet: the second_spec (gold metallicTint) and anisotropic highlight layers. **[R98: done later - 19c7eb0, c1c4de0 (Substrate second slab), 1c892ee; UE-verified in "Step 3 PC verification"]**
 2. **Transparent face slots.** Titus's head_01* slots are marked transparent. Confirm in the game what their alpha means before using the translucent parent on them.
 3. **VFX.** There is no `.sfx` to Niagara conversion; files are extracted raw only.
 4. **Rhino parts.** Check whether destroyed or variant parts are stacked on the hull.
@@ -823,7 +823,7 @@ Base b913484. Branch `bulk`. Tools in `tools/bulk/` (PC copies in `Desktop\SM2_W
   - In `make_report.py`, `meta_fix/` overrides `meta/`. A zero-displacement loco clip with ROOT as bone 0 is a WARN (in-place; rubric `rubric_fwd`, lesser sorcerer `walk_fwd`; not verified in REA).
 - **Captures:**
   - Captures right after a batch import can show grey placeholder textures while textures compile. 7 assets were recaptured into `Captures\bulk_re`.
-  - TODO: `ue_cap_lit.py` should wait for texture compilation.
+  - TODO: `ue_cap_lit.py` should wait for texture compilation. **[R98: done in 988555d (mtl1-42), wait_compiled() = AutomationLibrary.finish_loading_before_screenshot]**
 - **Result** (`/workspace/bulk/REPORT.md`): 37 assets, PASS 31, WARN 3 (captain partial tracks, rubric/sorcerer in-place clips), FAIL 3 (constructors, not imported).
 - **Disk:**
   - Cleanup was approved by the user. Deleted `Exports\bulk\*.bakN`: 36 folders, 61.1 GB. C: free went from 4.9 GB to 66.0 GB; it was ~50 GB after the bulk_fix imports and DDC.
@@ -2863,3 +2863,10 @@ Remains: orb ~15 % dimmer, no large soft bloom sprite (template size not settabl
 - Intensity scale K (UE cd per game Intensity) is a FIT, not data: 4-view AVG (ue_r97_levelcap.py, tools/ue/r98_hubtest.ps1): before 19,28,23; K50 no fill 28,46,55; K15 no fill 14,28,35; K15 fill 6 28,41,42; **K10 fill 3 17,30,34 (kept, saved)**; game 22,29,32. The fitted fill DirectionalLight went from 6 to 3, so half of that fit is now replaced by placed data lights.
 - Limits: spot lights have no direction in the TSV, so they are placed as points (cone, attenCurveParam falloff and shadows not applied); the viewpoint is still the actor median, not the game camera; red stays a bit low.
 - Sheet docs/handoff/r98/hub_lights_r98b.jpg (top before, bottom after).
+
+## R98c-f tracker audit (SM2 leftovers c-f)
+- (c) F43 .td non-texture params: already done (R50 f839c9e, R97 e04be15); tracker row was stale, now marked done.
+- (d) second_spec metal tint + anisotropic layer: already done and UE-verified (19c7eb0, c1c4de0, 1c892ee); old "Not done yet" note annotated.
+- (e) ue_cap_lit.py texture-compile wait: already done (988555d, wait_compiled()); old TODO annotated.
+- (f) F49 REA: attenCurveParam -> P0.w PROVEN on 2026-10-29. The UseSpecMap flag writer (OBJ_MTLBLEND_LAYER_CONST[15].x) is still not located, and this round did not resume that Ghidra search (multi-hour RE, no new lead). The switch stays HEURISTIC.
+- Skipped (need in-game captures, owner-only): F45 physics motion vs game, R51 muzzle flash / aim pose visual check.
