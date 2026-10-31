@@ -1,6 +1,6 @@
 """PoE2 M3.4: Simulate-in-editor swing check of the PoE2 phys_ bones (editor only, never the game). Scratch map
 /Game/ForgeLens/POE/Tests/pie/Map_PhysCheck. Reuses ue_pie_phys.py (osc/result/snap/stop: actors tagged R60_*).
-steps: setup | anims | sim | osc,<sec>,<amp>[,hz,tag] | cap,<png> | stop | result | tune,<mesh>,<damping>,<stiffness> | restore,<map>
+steps: setup | anims | sim | osc,<sec>,<amp>[,hz,tag] | cap,<png> | stop | result | tune,<world>,<dampAlpha>,<stiff>,<damp>,<swing>[,<mesh>] | restore,<map>
 Refuses setup when the open map has unsaved changes (other workers' maps are never saved or switched away from dirty)."""
 import sys, os, json, unreal
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "ue"))
@@ -30,7 +30,7 @@ def setup():
         if a.get_actor_label().startswith(("R60_", "POE3_")): eas.destroy_actor(a)
     fl = eas.spawn_actor_from_object(unreal.load_asset("/Engine/BasicShapes/Plane"), unreal.Vector(0, 0, 0))
     fl.set_actor_scale3d(unreal.Vector(60, 30, 1)); fl.set_actor_label("POE3_floor")
-    eas.spawn_actor_from_class(unreal.DirectionalLight, unreal.Vector(0, 0, 800), unreal.Rotator(roll=0, pitch=-40, yaw=60)).set_actor_label("POE3_sun")
+    eas.spawn_actor_from_class(unreal.DirectionalLight, unreal.Vector(0, 0, 800), unreal.Rotator(roll=0, pitch=-40, yaw=-120)).set_actor_label("POE3_sun")
     eas.spawn_actor_from_class(unreal.SkyLight, unreal.Vector(0, 0, 500)).set_actor_label("POE3_sky")
     for k, x in zip(MESHES, (-700, 0, 700)):
         if not EAL.does_asset_exist(MESHES[k]): print("POE3 missing", MESHES[k]); continue
@@ -44,7 +44,7 @@ def setup():
     rt.set_editor_property("render_target_format", unreal.TextureRenderTargetFormat.RTF_RGBA8_SRGB)
     rt.set_editor_property("render_target_format", unreal.TextureRenderTargetFormat.RTF_RGBA8)  # non-sRGB target
     EAL.save_loaded_asset(rt)
-    cap = eas.spawn_actor_from_class(unreal.SceneCapture2D, unreal.Vector(0, -1100, 260), unreal.Rotator(roll=0, pitch=-6, yaw=90))
+    cap = eas.spawn_actor_from_class(unreal.SceneCapture2D, unreal.Vector(-450, 1150, 260), unreal.Rotator(roll=0, pitch=-6, yaw=-68))
     cap.set_actor_label("POE3_cap"); c = cap.capture_component2d
     c.set_editor_property("texture_target", rt); c.set_editor_property("capture_every_frame", False)
     c.set_editor_property("capture_source", unreal.SceneCaptureSource.SCS_FINAL_COLOR_LDR)
@@ -71,11 +71,12 @@ def cap(png):
     unreal.RenderingLibrary.export_render_target(P.world(), c.get_editor_property("texture_target"), d, f)
     print("POE3 cap", png, os.path.exists(png))
 
-def tune(world_alpha, damp_alpha, stiff, damp, swing=1.0):
+def tune(world_alpha, damp_alpha, stiff, damp, swing=1.0, only=""):
     """Feed the actor's world motion into the RigidBody node (WorldAlpha/DampingAlpha) and give every phys_ joint a SLERP spring
     (acceleration drive). Values are HEURISTIC (no game spring data). Saves only the POE PA/ABP assets."""
     out = {}
     for k, mp in MESHES.items():
+        if only and k != only: continue
         if not EAL.does_asset_exist(mp): continue
         mesh = unreal.load_asset(mp); pa = mesh.get_editor_property("physics_asset")
         abp_cls = mesh.get_editor_property("post_process_anim_blueprint")
@@ -88,7 +89,30 @@ def tune(world_alpha, damp_alpha, stiff, damp, swing=1.0):
             if a: EAL.save_loaded_asset(a, False)
         out[k] = {"abp": str(r1), "pa": str(r2), "base": str(base)}
         print("POE3 tune", k, out[k])
-    json.dump(out, open(os.path.join(P.SAVED, "poe3_tune.json"), "w"))
+    json.dump(out, open(os.path.join(P.SAVED, "poe3_tune_%s.json" % (only or "all")), "w"))
+
+def grav(on, only):
+    pa = unreal.load_asset(MESHES[only]).get_editor_property("physics_asset")
+    n = unreal.SM2PhysicsSetupLibrary.set_sim_gravity(pa, bool(int(on))); EAL.save_loaded_asset(pa, False)
+    print("POE3 grav", only, on, "bodies", n)
+
+def desc(only, pattern):
+    mesh = unreal.load_asset(MESHES[only]); pa = mesh.get_editor_property("physics_asset")
+    X = unreal.AnimPoseExtensions
+    for b in X.get_bone_names(X.get_reference_pose(mesh.get_editor_property("skeleton"))):
+        if pattern in str(b): print("POE3 desc", unreal.SM2PhysicsSetupLibrary.describe_body(pa, mesh, b))
+
+def kin(only, pattern):
+    """Make the matching bodies kinematic (follow animation). Used for chain roots that hang far from their kinematic parent."""
+    pa = unreal.load_asset(MESHES[only]).get_editor_property("physics_asset")
+    try: bs = pa.get_editor_property("skeletal_body_setups")
+    except Exception as e: print("POE3 kin no access", e); return
+    n = 0
+    for b in bs:
+        if pattern in str(b.get_editor_property("bone_name")):
+            b.set_editor_property("physics_type", unreal.PhysicsType.PHYS_TYPE_KINEMATIC); n += 1
+            print("POE3 kin", only, b.get_editor_property("bone_name"))
+    EAL.save_loaded_asset(pa, False); print("POE3 kin count", n)
 
 def restore():
     prev = json.load(open(os.path.join(P.SAVED, "poe3_prev.json"))).get("prev", "")
@@ -113,9 +137,12 @@ if __name__ == "__main__":
     elif m == "cap": cap(a[1])
     elif m == "restore": restore()
     elif m == "blank": blank()
-    elif m == "tune": tune(*[float(x) for x in a[1:6]])
+    elif m == "tune": tune(*[float(x) for x in a[1:6]], only=a[6] if len(a) > 6 else "")
     elif m == "sim": P.les().editor_play_simulate(); print("POE3 sim started")
     elif m == "stop": P.les().editor_request_end_play(); print("POE3 stopped")
     elif m == "osc": P.osc(float(a[1]), float(a[2]), float(a[3]) if len(a) > 3 else 1.0, a[4] if len(a) > 4 else "phys")
     elif m == "result": P.result()
+    elif m == "grav": grav(a[1], a[2])
+    elif m == "kin": kin(a[1], a[2])
+    elif m == "desc": desc(a[1], a[2])
     elif m == "list": print("POE3 world", P.world().get_path_name(), [x.get_actor_label() for x in P.actors()])

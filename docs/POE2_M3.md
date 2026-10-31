@@ -36,3 +36,19 @@
 | t1 | 1,0.5,100,8,1 | 23.0/23.0 POP | 101.3/38.3 POP | 18.9/5.3 POP |
 | t2 (kept) | 0.4,0.9,400,40,0.5 | 15.9/11.5 POP | 53.3/23.4 POP | 8.5/2.2 JITTER |
 All bones now move under physics (20/7/17), nan=0. Lich tail and BellCrow bells still pop above threshold: NOT verified good; values are heuristic. Frames: pie3_rest.png, pie3_swing_1..6.png, sheet_pie3_swing.jpg.
+
+### M3.4b tune iteration (front/side camera (-450,1150,260) yaw -68, sun yaw -120)
+Per-mesh tune `tune,<world>,<dampAlpha>,<stiff>,<damp>,<swing>,<mesh>`. Max added jump cm/frame / settle (phys minus nophys, 8 s osc 60 cm 1.2 Hz):
+| set | lich (w,da,k,d,s) | lich | bellcrow (w,da,k,d,s) | bellcrow | rhoa (w,da,k,d,s) | rhoa |
+|---|---|---|---|---|---|---|
+| s4 | .2,.95,800,80,.4 | 17.95/6.99 POP | .25,.95,600,60,.5 | 19.66/18.74 POP | same as bell | 6.56/1.22 OK |
+| s5 | .1,1,1500,150,.3 | 8.37/1.91 OK | .15,1,1000,100,.4 | 19.97/17.33 POP | same as bell | 4.69/3.23 JITTER |
+| s6 | .05,1,3000,300,.25 | 4.58/2.98 JITTER | .1,1,2000,200,.3 | 21.05/19.61 POP | same as bell | 4.44/1.11 OK |
+| s7 | .2,1,800,160,.5 | 11.83/4.04 JITTER | same | 21.51/18.87 POP | same | 4.40/0.23 OK |
+| s8 | .1,1,1500,300,.3 | 6.44/4.15 JITTER | .05,1,1500,300,.3 | 21.40/19.55 POP | .15,1,1000,200,.4 | 4.43/0.24 OK |
+| s9 | 0,1,400,120,.5 | 4.67/2.04 JITTER | same | 23.09/18.71 POP | same | 3.93/1.80 OK |
+| s10 | s5 | 8.96/4.00 JITTER | s5 + gravity off | 21.06/19.16 POP | s7 | 4.49/0.24 OK |
+| s11 (kept) | s5 | 8.36/2.07 JITTER | s5, gravity on | 21.75/18.70 POP | s7 | 4.57/1.45 OK |
+Run-to-run noise with identical settings is about +-3 cm (s10 vs s11).
+Root cause (DescribeBody): the BellCrow bell chain roots phys_L/R_hanging_bell_jntBnd_1 are SIMULATED bodies attached to kinematic clavicle/chest 80.5 / 126.3 cm away; the lich tail end phys_skinned_tail_jntBnd_07 sits 95.3 cm from _06. Long lever arms turn small angle errors into ~20 cm/frame jumps; BellCrow pop is independent of feed-in, spring and gravity. Fix needs the chain roots kinematic (or a shorter constraint frame): not reachable from Python (PhysicsAsset.skeletal_body_setups is not exposed) and needs a plugin function plus rebuild. NOT done.
+Frames: pie_s4..s11_rest.png / _swing_1..6.png; sheet_pie_s11_swing.jpg.
