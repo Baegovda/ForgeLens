@@ -68,6 +68,7 @@ internal sealed class Poe2Window : Window
       {
         new TabItem { Header = "Files", Content = new StackPanel { Spacing = 6, Children = { _search, _files } } },
         new TabItem { Header = "Skills", Content = new StackPanel { Spacing = 6, Children = { _skillSearch, _skills, new TextBlock { Text = "Effects (projectile / animated)" }, _effects } } },
+        new TabItem { Header = "Levels", Content = LevelsTab() },
       },
     };
     Content = new StackPanel
@@ -126,7 +127,13 @@ internal sealed class Poe2Window : Window
       _skillSearch.Text = sk;
       FilterSkills();
       var row = (_skills.ItemsSource as IEnumerable<SkillRow>)?.FirstOrDefault(r => r.Skill.Id == sk);
-      if (row != null) { if (Content is StackPanel sp && sp.Children[1] is TabControl tc) tc.SelectedIndex = 1; _skills.SelectedItem = row; _effects.SelectedIndex = 0; }
+      if (row != null) { if (Content is StackPanel sp && sp.Children[1] is TabControl tc) tc.SelectedIndex = 1; _skills.SelectedItem = row; var ef = Environment.GetEnvironmentVariable("FL_POE2_EFFECT") ?? ""; var k = ef.Length == 0 ? 0 : _effects.Items.Cast<object>().ToList().FindIndex(o => (o?.ToString() ?? "").Contains(ef, StringComparison.OrdinalIgnoreCase)); _effects.SelectedIndex = Math.Max(k, 0); }
+    }
+    else if (Environment.GetEnvironmentVariable("FL_POE2_LEVEL") is { Length: > 0 } lvl)
+    {
+      if (Content is StackPanel sp2 && sp2.Children[1] is TabControl tc2) tc2.SelectedIndex = 2;
+      _arm.Text = lvl;
+      await ShowLevelAsync(lvl);
     }
     else if (Environment.GetEnvironmentVariable("FL_POE2_SELECT") is { Length: > 0 } sel)
     {
@@ -193,6 +200,53 @@ internal sealed class Poe2Window : Window
     catch (Exception e)
     {
       Status($"Failed: {path}: {e.GetType().Name}: {e.Message}");
+    }
+  }
+  private readonly TextBox _arm = new() { Text = "metadata/terrain/missions/hideouts/space/rooms/hideout.arm", Width = 460 };
+
+  private Control LevelsTab()
+  {
+    var load = new Button { Content = "Load level" };
+    load.Click += async (_, _) => await ShowLevelAsync(_arm.Text ?? "");
+    return new StackPanel
+    {
+      Spacing = 6,
+      Children =
+      {
+        new TextBlock { Text = "Room layout (.arm): tiles (.tdt/.tgt/.tgm) and placed objects (.ao)", TextWrapping = TextWrapping.Wrap },
+        new StackPanel { Orientation = Orientation.Horizontal, Spacing = 8, Children = { _arm, load } },
+        new TextBlock { Text = "Tile rotation and terrain blending are not applied yet.", TextWrapping = TextWrapping.Wrap },
+      },
+    };
+  }
+
+  public async Task ShowLevelAsync(string arm)
+  {
+    if (_source == null) { Status("Open the GGPK first."); return; }
+    arm = arm.Trim().ToLowerInvariant();
+    Status($"Preparing level {arm}...");
+    var src = _source;
+    var sw = System.Diagnostics.Stopwatch.StartNew();
+    try
+    {
+      var (mesh, albedo, log) = await Task.Run(() =>
+      {
+        src.PrepareLevel(arm);
+        var reader = new Poe2Reader(src.Cache);
+        var m = reader.LoadLevel(arm);
+        var a = new Dictionary<string, PreviewImage>(StringComparer.OrdinalIgnoreCase);
+        foreach (var t in m.Parts.Select(p => p.Texture).Where(t => t != null).Distinct())
+          if (reader.Texture(t!) is { } img) a[t!] = img;
+        Bench.Poe2Bench.TintAlbedo(m, a);
+        return (m, a, reader.Log);
+      });
+      _current = null;
+      _main.ShowPoe2(mesh, albedo, arm);
+      Status($"{log.LastOrDefault()}  ({sw.Elapsed.TotalSeconds:0.0} s)");
+    }
+    catch (Exception e)
+    {
+      Status($"Failed: {arm}: {e.GetType().Name}: {e.Message}");
     }
   }
 }

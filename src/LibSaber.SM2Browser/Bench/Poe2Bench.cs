@@ -13,6 +13,49 @@ namespace LibSaber.SM2Browser.Bench;
 /// </summary>
 internal static class Poe2Bench
 {
+  /// <summary>PoE2 M3: <c>--poe2level &lt;prepared&gt; &lt;out&gt; &lt;room.arm&gt; [ggpk tooldir]</c>: assembles the room (tiles + doodads) and writes
+  ///   &lt;name&gt;.glb / .fbx (Unreal space), PNG textures and poe2level.txt. With ggpk + tool dir it first runs Poe2Source.PrepareLevel.</summary>
+  public static int Level(string[] args)
+  {
+    var prepared = args[1]; var output = args[2]; var arm = args[3];
+    Directory.CreateDirectory(output);
+    var log = new StringBuilder();
+    var reader = new Poe2Reader(prepared);
+    try
+    {
+      if (args.Length > 5)
+      {
+        var src = new Poe2Source(args[4], prepared, args[5]);
+        src.PrepareLevel(arm);
+        foreach (var l in src.Log) log.AppendLine(l);
+      }
+      var mesh = reader.LoadLevel(arm);
+      var name = mesh.Name.ToLowerInvariant();
+      var files = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+      foreach (var tex in mesh.Parts.SelectMany(p => p.Maps.Select(m => m.Name)).Distinct())
+      {
+        var img = reader.Texture(tex);
+        if (img == null) continue;
+        var png = Path.Combine(output, Path.GetFileNameWithoutExtension(tex) + ".png");
+        ImageWriters.WritePng(png, img.Bgra, img.Width, img.Height);
+        files[tex] = png;
+        log.AppendLine($"texture {tex} {img.Width}x{img.Height} -> {Path.GetFileName(png)}");
+      }
+      foreach (var p in mesh.Parts)
+        log.AppendLine($"part {p.Name} tris {p.IndexCount / 3} mat {p.Variant} albedo {p.Texture} normal {p.Normal}");
+      GltfWriter.Write(Path.Combine(output, name + ".glb"), mesh, ExportSpace.Unreal, files);
+      FbxWriter.Write(Path.Combine(output, name + ".fbx"), mesh, ExportSpace.Unreal, files);
+    }
+    catch (Exception e)
+    {
+      log.AppendLine(e.ToString());
+      File.WriteAllText(Path.Combine(output, "poe2level.txt"), string.Join("\n", reader.Log) + "\n" + log);
+      return 1;
+    }
+    File.WriteAllText(Path.Combine(output, "poe2level.txt"), string.Join("\n", reader.Log) + "\n" + log);
+    return 0;
+  }
+
   public static int Run(string[] args)
   {
     var prepared = args[1]; var output = args[2]; var meshPath = args[3];

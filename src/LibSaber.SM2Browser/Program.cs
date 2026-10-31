@@ -48,6 +48,8 @@ internal static class Program
       foreach (var l in src.Log) Console.WriteLine(l);
       return 0;
     }
+    if (args.Length > 0 && args[0] == "--poe2level")
+      return Bench.Poe2Bench.Level(args);
     if (args.Length > 0 && args[0] == "--poe2export")
       return Bench.Poe2Bench.Run(args);
     if (args.Length > 0 && args[0] == "--glbench")

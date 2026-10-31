@@ -93,6 +93,38 @@ public sealed class Poe2Source
     }
   }
 
+  /// <summary>PoE2 M3: everything <see cref="Poe2Reader.LoadLevel"/> needs for one room: the .arm, the set's tsi/tst/gft, the .gt,
+  /// every .tdt (raw) and its .tgt (json) and .tgm (raw), the tile materials and the placed .ao doodads (with their .sm/.ast/.dds).</summary>
+  public void PrepareLevel(string arm)
+  {
+    arm = arm.ToLowerInvariant();
+    var set = Poe2Reader.SetDir(arm);
+    var meta = new List<string> { arm, set + "/master.tsi", set + "/tiles.tst", set + "/random_fill_tiles.gft" };
+    Fetch(meta, true);
+    var text = string.Join("\n", meta.Select(JsonPath).Where(File.Exists).Select(File.ReadAllText));
+    var refs = Regex.Matches(text, @"metadata/[^""\\\s]+?\.(?:tdt|gt|et|ao)", RegexOptions.IgnoreCase).Select(m => m.Value.ToLowerInvariant()).Distinct().ToList();
+    Fetch(refs.Where(r => !r.EndsWith(".tdt")).ToList(), true);
+    var tdts = refs.Where(r => r.EndsWith(".tdt")).ToList();
+    Fetch(tdts, false);
+    var tgts = tdts.Select(RawPath).Where(File.Exists).Select(p => Poe2Reader.TdtTile(File.ReadAllBytes(p)).ToLowerInvariant()).Where(t => t.Length > 0).Distinct().ToList();
+    Fetch(tgts, true);
+    var tt = string.Join("\n", tgts.Select(JsonPath).Where(File.Exists).Select(File.ReadAllText));
+    Fetch(Regex.Matches(tt, @"art/[^""\\\s]+?\.tgm", RegexOptions.IgnoreCase).Select(m => m.Value.ToLowerInvariant()).Distinct().ToList(), false);
+    foreach (var mat in Regex.Matches(tt, @"art/[^""\\\s]+?\.mat", RegexOptions.IgnoreCase).Select(m => m.Value.ToLowerInvariant()).Distinct())
+      Prepare(mat);
+    foreach (var ao in refs.Where(r => r.EndsWith(".ao")))
+      Prepare(ao);
+    Log.Add($"level {arm}: {tdts.Count} tdt, {tgts.Count} tgt, {refs.Count(r => r.EndsWith(".ao"))} doodads");
+  }
+
+  private void Fetch(List<string> paths, bool translate)
+  {
+    var todo = paths.Where(p => !File.Exists(RawPath(p))).ToList();
+    if (todo.Count > 0) Run(Tool, Base().Concat(new[] { "extract", Path.Combine(Cache, "raw") }).Concat(todo));
+    var tr = paths.Where(p => translate && !File.Exists(JsonPath(p))).ToList();
+    if (tr.Count > 0) Run(Tool, Base().Concat(new[] { "translate", Path.Combine(Cache, "json") }).Concat(tr));
+  }
+
   /// <summary>Skill tables for <see cref="Poe2Skills"/> (dump-tables JSON, once).</summary>
   public string Tables()
   {

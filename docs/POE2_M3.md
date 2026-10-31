@@ -1,0 +1,18 @@
+# POE2 M3 - levels (.tgm terrain), hideout in Unreal, cart rhoa physics, PIE swing check (2026-10-31 KST)
+
+## M3.1 .tgm reader and room assembly (done)
+- Code: `src/LibSaber.SM2.Assets/Games/Poe2/Poe2Terrain.cs` (`Poe2Reader.ReadTgm`, `TdtTile`, `LoadLevel`), `Poe2Source.PrepareLevel`,
+  CLI `--poe2level <prepared> <out> <room.arm> [<ggpk> <tool dir>]` (Bench/Poe2Bench.cs), viewer PoE2 window tab **Levels** (English strings, test hook `FL_POE2_LEVEL=<arm>`).
+- .tgm layout, PROVEN on all 24 cosmic tiles (every index < vertex count, shape index ranges add up to the index count):
+  `u8 version(4) | 6 f32 bbox | u8 shapeCount | u8 | u32 vertexCount | u32 triangleCount | 12 B unknown |
+  shapeCount x {u16 id, 6 f32 bbox, u32 indexStart, u32 indexCount} | vertexCount x 24 B {f32 xyz, u8x4 normal (-128), u8x4 tangent, f16 u, f16 v} | u16 indices`.
+  Edge tiles end with 142 more bytes (unknown, unused). u32 indices above 65535 vertices is an assumption (no such tile seen).
+- .tdt: `u32 14 | u32 string-table chars | UTF-16 strings`; the first string is the .tgt (PROVEN on 27 tdt files). .tgt JSON gives `tile_mesh` + `normal_materials` (`uint` = shapes per material, same run-length rule as .sm).
+- Placement (INFERRED, no in-game check): 1 grid cell = 1 tile = 250 units; doodad x/y in 23 sub-units per tile (waypoint 219,219 = centre of 19x19).
+  K cells use the .tst tile, S cells the .gft `default` fill, plus a ring of `OuterBufferSize` (6) cells with the .gft section named by the `OuterGroundType` .gt (`CosmicGround`).
+  In the space hideout every one of these .tdt points to the same `cosmic_fill_hideout.tgt` (81 verts, 128 tris, `void_hideoutc.mat`), so tile rotation, which is not applied, makes no visible difference here. It will matter for other areas.
+- Space hideout result (PC `PoE2\m7out\poe2level.txt`): 961 tiles (31x31), 4 doodads (waypoint core, map device cauldron, stash, guild stash) from their .ao -> SkinMesh .sm, 84,303 verts, 129,859 tris, 22 parts, 24 PNGs.
+  Files: PC `PoE2\m7out\space_hideout.glb` (27.8 MB, embedded PNGs) and `space_hideout.fbx` (Unreal space). Not added to the repo (size).
+- Materials: `void_hideoutc.mat` is CelestialMaterial + ProjectiveUV_Accurate (`[4, 2048, 2048]`). The base colour is an 8x8 texture. UVs are world-projected at 1/512 per unit (INFERRED), and `01. Space Texture` is kept as the emissive map (approximation: no scroll, no parallax). The waypoint mesh uses `transparentobjectsc.mat` (invisible in game; shown here). Chest filler items have only normal maps found (role names not matched).
+- Viewer: `docs/handoff/poe2_m3/viewer_level_t120_0.png` (PoE2 window, Levels tab, "84303 verts, 129859 tris, 22 parts (64.5 s)" incl. extraction) and `viewer_level_t120_1.png` (main viewport: 31x31 floor, the 4 objects small at the centre). The camera frames the whole floor, so the objects look tiny. Ground shows flat grey in the preview (the celestial look is not modelled).
+- NOT done: tile rotation from the .arm edges/corners, .gt/.et ground blending and ground masks, .tgm tail bytes, decals, lights/.env, other areas (only the space hideout was tested).
