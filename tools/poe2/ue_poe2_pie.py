@@ -18,10 +18,11 @@ def idle(name):
 
 def setup():
     dirty = [str(p.get_name()) for p in unreal.EditorLoadingAndSavingUtils.get_dirty_map_packages()]
-    if dirty and not all(d.startswith("/Game/ForgeLens/POE") for d in dirty):
+    if [d for d in dirty if not d.startswith(("/Game/ForgeLens/POE", "/Temp/"))]:
         print("POE3 refuse: dirty maps", dirty); return
     w = P.world(); prev = w.get_path_name().split(".")[0] if w else ""
-    json.dump({"prev": prev}, open(os.path.join(P.SAVED, "poe3_prev.json"), "w"))
+    if prev and not prev.startswith(("/Game/ForgeLens/POE", "/Temp/")):
+        json.dump({"prev": prev}, open(os.path.join(P.SAVED, "poe3_prev.json"), "w"))
     if EAL.does_asset_exist(MAP): P.les().load_level(MAP)
     else: P.les().new_level(MAP)
     eas = unreal.get_editor_subsystem(unreal.EditorActorSubsystem)
@@ -29,7 +30,7 @@ def setup():
         if a.get_actor_label().startswith(("R60_", "POE3_")): eas.destroy_actor(a)
     fl = eas.spawn_actor_from_object(unreal.load_asset("/Engine/BasicShapes/Plane"), unreal.Vector(0, 0, 0))
     fl.set_actor_scale3d(unreal.Vector(60, 30, 1)); fl.set_actor_label("POE3_floor")
-    eas.spawn_actor_from_class(unreal.DirectionalLight, unreal.Vector(0, 0, 800), unreal.Rotator(0, -50, -30)).set_actor_label("POE3_sun")
+    eas.spawn_actor_from_class(unreal.DirectionalLight, unreal.Vector(0, 0, 800), unreal.Rotator(roll=0, pitch=-40, yaw=60)).set_actor_label("POE3_sun")
     eas.spawn_actor_from_class(unreal.SkyLight, unreal.Vector(0, 0, 500)).set_actor_label("POE3_sky")
     for k, x in zip(MESHES, (-700, 0, 700)):
         if not EAL.does_asset_exist(MESHES[k]): print("POE3 missing", MESHES[k]); continue
@@ -43,7 +44,7 @@ def setup():
     rt.set_editor_property("render_target_format", unreal.TextureRenderTargetFormat.RTF_RGBA8_SRGB)
     rt.set_editor_property("render_target_format", unreal.TextureRenderTargetFormat.RTF_RGBA8)  # non-sRGB target
     EAL.save_loaded_asset(rt)
-    cap = eas.spawn_actor_from_class(unreal.SceneCapture2D, unreal.Vector(0, -1500, 350), unreal.Rotator(roll=0, pitch=-8, yaw=90))
+    cap = eas.spawn_actor_from_class(unreal.SceneCapture2D, unreal.Vector(0, -1100, 260), unreal.Rotator(roll=0, pitch=-6, yaw=90))
     cap.set_actor_label("POE3_cap"); c = cap.capture_component2d
     c.set_editor_property("texture_target", rt); c.set_editor_property("capture_every_frame", False)
     c.set_editor_property("capture_source", unreal.SceneCaptureSource.SCS_FINAL_COLOR_LDR)
@@ -70,12 +71,39 @@ def cap(png):
     unreal.RenderingLibrary.export_render_target(P.world(), c.get_editor_property("texture_target"), d, f)
     print("POE3 cap", png, os.path.exists(png))
 
+def tune(world_alpha, damp_alpha, stiff, damp, swing=1.0):
+    """Feed the actor's world motion into the RigidBody node (WorldAlpha/DampingAlpha) and give every phys_ joint a SLERP spring
+    (acceleration drive). Values are HEURISTIC (no game spring data). Saves only the POE PA/ABP assets."""
+    out = {}
+    for k, mp in MESHES.items():
+        if not EAL.does_asset_exist(mp): continue
+        mesh = unreal.load_asset(mp); pa = mesh.get_editor_property("physics_asset")
+        abp_cls = mesh.get_editor_property("post_process_anim_blueprint")
+        abp = unreal.load_asset(abp_cls.get_path_name().rsplit(".", 1)[0]) if abp_cls else None
+        X = unreal.AnimPoseExtensions; names = X.get_bone_names(X.get_reference_pose(mesh.get_editor_property("skeleton")))
+        base = names[1] if len(names) > 1 else names[0]
+        r1 = unreal.SM2PhysicsSetupLibrary.tune_rigid_body(abp, 2, base, world_alpha, damp_alpha, 600.0, 2000.0, 10.0, 100.0) if abp else None
+        r2 = unreal.SM2PhysicsSetupLibrary.tune_constraint_drive(pa, stiff, damp, swing) if pa else None
+        for a in (abp, pa):
+            if a: EAL.save_loaded_asset(a, False)
+        out[k] = {"abp": str(r1), "pa": str(r2), "base": str(base)}
+        print("POE3 tune", k, out[k])
+    json.dump(out, open(os.path.join(P.SAVED, "poe3_tune.json"), "w"))
+
 def restore():
     prev = json.load(open(os.path.join(P.SAVED, "poe3_prev.json"))).get("prev", "")
-    P.les().save_current_level()
+    if P.world() and P.world().get_path_name().startswith("/Game/ForgeLens/POE"): P.les().save_current_level()
     if prev and not prev.startswith("/Game/ForgeLens/POE") and EAL.does_asset_exist(prev):
         P.les().load_level(prev); print("POE3 restored", prev)
     else: print("POE3 no restore", prev)
+
+def blank():
+    """Leave a foreign map WITHOUT saving it (its unsaved edits are discarded; the saved file is untouched), remember it for restore."""
+    w = P.world(); prev = w.get_path_name().split(".")[0] if w else ""
+    dirty = [str(p.get_name()) for p in unreal.EditorLoadingAndSavingUtils.get_dirty_map_packages()]
+    json.dump({"prev": prev, "discarded_dirty": dirty}, open(os.path.join(P.SAVED, "poe3_prev.json"), "w"))
+    unreal.EditorLoadingAndSavingUtils.new_blank_map(False)
+    print("POE3 blank: left", prev, "unsaved (dirty was", dirty, ")")
 
 if __name__ == "__main__":
     a = sys.argv[1].split(",") if len(sys.argv) == 2 else sys.argv[1:]
@@ -84,6 +112,8 @@ if __name__ == "__main__":
     elif m == "anims": anims()
     elif m == "cap": cap(a[1])
     elif m == "restore": restore()
+    elif m == "blank": blank()
+    elif m == "tune": tune(*[float(x) for x in a[1:6]])
     elif m == "sim": P.les().editor_play_simulate(); print("POE3 sim started")
     elif m == "stop": P.les().editor_request_end_play(); print("POE3 stopped")
     elif m == "osc": P.osc(float(a[1]), float(a[2]), float(a[3]) if len(a) > 3 else 1.0, a[4] if len(a) > 4 else "phys")

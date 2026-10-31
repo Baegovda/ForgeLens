@@ -27,6 +27,35 @@ def part_lines(src):
         out[w[1].replace("|", "_")] = (after("albedo"), after("normal"))
     return out
 
+CEL = "/Game/ForgeLens/POE/_Shared/M_Poe2Celestial"
+
+def celestial_master():
+    """CelestialMaterial approximation (void_hideoutc.mat): unlit-looking dark base, emissive = SpaceTex.R * ColorR + SpaceTex.B * ColorB
+    (the mat's 'Space Tex R/B Channel_1 Color'), UV * Tile. Scroll, the second layer and muddle distortion are not modelled (INFERRED)."""
+    if EAL.does_asset_exist(CEL): return unreal.load_asset(CEL)
+    pkg, name = CEL.rsplit("/", 1)
+    m = unreal.AssetToolsHelpers.get_asset_tools().create_asset(name, pkg, unreal.Material, unreal.MaterialFactoryNew())
+    tc = MEL.create_material_expression(m, unreal.MaterialExpressionTextureCoordinate, -900, 0)
+    tile = MEL.create_material_expression(m, unreal.MaterialExpressionScalarParameter, -900, 150); tile.set_editor_property("parameter_name", "Tile"); tile.set_editor_property("default_value", 0.3)
+    uvm = MEL.create_material_expression(m, unreal.MaterialExpressionMultiply, -700, 50)
+    MEL.connect_material_expressions(tc, "", uvm, "A"); MEL.connect_material_expressions(tile, "", uvm, "B")
+    t = MEL.create_material_expression(m, unreal.MaterialExpressionTextureSampleParameter2D, -500, 0); t.set_editor_property("parameter_name", "SpaceTex")
+    MEL.connect_material_expressions(uvm, "", t, "UVs")
+    cr = MEL.create_material_expression(m, unreal.MaterialExpressionVectorParameter, -500, 300); cr.set_editor_property("parameter_name", "ColorR")
+    cb = MEL.create_material_expression(m, unreal.MaterialExpressionVectorParameter, -500, 500); cb.set_editor_property("parameter_name", "ColorB")
+    k = MEL.create_material_expression(m, unreal.MaterialExpressionScalarParameter, -500, 700); k.set_editor_property("parameter_name", "Intensity"); k.set_editor_property("default_value", 0.1)
+    mr = MEL.create_material_expression(m, unreal.MaterialExpressionMultiply, -250, 200); MEL.connect_material_expressions(t, "R", mr, "A"); MEL.connect_material_expressions(cr, "", mr, "B")
+    mb = MEL.create_material_expression(m, unreal.MaterialExpressionMultiply, -250, 400); MEL.connect_material_expressions(t, "B", mb, "A"); MEL.connect_material_expressions(cb, "", mb, "B")
+    ad = MEL.create_material_expression(m, unreal.MaterialExpressionAdd, -100, 300); MEL.connect_material_expressions(mr, "", ad, "A"); MEL.connect_material_expressions(mb, "", ad, "B")
+    mk = MEL.create_material_expression(m, unreal.MaterialExpressionMultiply, 50, 300); MEL.connect_material_expressions(ad, "", mk, "A"); MEL.connect_material_expressions(k, "", mk, "B")
+    MEL.connect_material_property(mk, "", unreal.MaterialProperty.MP_EMISSIVE_COLOR)
+    bc = MEL.create_material_expression(m, unreal.MaterialExpressionConstant3Vector, 50, 0); bc.set_editor_property("constant", unreal.LinearColor(0.004, 0.005, 0.012, 1))
+    MEL.connect_material_property(bc, "", unreal.MaterialProperty.MP_BASE_COLOR)
+    r = MEL.create_material_expression(m, unreal.MaterialExpressionConstant, 50, 150); r.set_editor_property("r", 0.9)
+    MEL.connect_material_property(r, "", unreal.MaterialProperty.MP_ROUGHNESS)
+    MEL.recompile_material(m); EAL.save_loaded_asset(m)
+    return m
+
 def do_import(src, name, rep):
     dest = f"{ROOT}/{name}"
     tex = imp.textures(src, dest)
@@ -66,14 +95,15 @@ def do_import(src, name, rep):
         mi_path = f"{dest}/Materials/{mi_name}"
         mi = unreal.load_asset(mi_path) if EAL.does_asset_exist(mi_path) else unreal.AssetToolsHelpers.get_asset_tools().create_asset(
             mi_name, f"{dest}/Materials", unreal.MaterialInstanceConstant, unreal.MaterialInstanceConstantFactoryNew())
-        MEL.set_material_instance_parent(mi, imp.master())
+        MEL.set_material_instance_parent(mi, celestial_master() if slot.startswith("terrain_") else imp.master())
         for pname, base in (("BaseColorTex", alb), ("NormalTex", nrm)):
             if base and EAL.does_asset_exist(f"{dest}/Textures/{base}"):
                 MEL.set_material_instance_texture_parameter_value(mi, pname, unreal.load_asset(f"{dest}/Textures/{base}"))
         if slot.startswith("terrain_") and EAL.does_asset_exist(f"{dest}/Textures/space_pack01_DXT5"):
-            # CelestialMaterial approximation: the space texture as emissive (INFERRED, no scroll/parallax)
-            MEL.set_material_instance_texture_parameter_value(mi, "GlowTex", unreal.load_asset(f"{dest}/Textures/space_pack01_DXT5"))
-            MEL.set_material_instance_vector_parameter_value(mi, "GlowColor", unreal.LinearColor(0.6, 0.6, 0.6, 1))
+            # void_hideoutc.mat values: 'Space Tex R Channel_1 Color' (1.15, 3.5, 4.0), 'B Channel_1' (1.5, 8, 12), 'Space Texture Tile_1' 0.3
+            MEL.set_material_instance_texture_parameter_value(mi, "SpaceTex", unreal.load_asset(f"{dest}/Textures/space_pack01_DXT5"))
+            MEL.set_material_instance_vector_parameter_value(mi, "ColorR", unreal.LinearColor(1.15, 3.5, 4.0, 1))
+            MEL.set_material_instance_vector_parameter_value(mi, "ColorB", unreal.LinearColor(1.5, 8.0, 12.0, 1))
         EAL.save_loaded_asset(mi)
         m.set_editor_property("material_interface", mi); mats[i] = m
         done.append([slot, key, alb, nrm])
@@ -154,12 +184,12 @@ def main(a):
     try:
         if step in ("import", "all"): do_import(src, name, rep)
         if step in ("map", "cap", "all"):
-            if dirty and not any(ROOT in d for d in dirty):
+            if [d for d in dirty if not d.startswith(("/Game/ForgeLens/POE", "/Temp/"))]:
                 rep["refused"] = "open map has unsaved changes"; return
             do_map(name, rep)
             if step in ("cap", "all"): do_cap(name, out_dir, rep)
             les().save_current_level()
-            if prev and not prev.startswith(ROOT) and EAL.does_asset_exist(prev):
+            if prev and not prev.startswith((ROOT, "/Temp/")) and EAL.does_asset_exist(prev):
                 les().load_level(prev); rep["restored"] = prev
     except Exception as e:
         import traceback; rep["error"] = traceback.format_exc()

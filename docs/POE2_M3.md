@@ -23,3 +23,16 @@
 - `tools/poe2/ue_poe2_physics.py` -> PA_cartrhoa_SM2 + ABP_cartrhoa_SM2Phys: simulated 17, kinematic 3, constraints 17, missing bones 0, compiled 1 (PC `PoE2\m3_cart_phys.json`).
   17 bones: mouthpiece ropes L/R, saddle cords L/R x2, tail feathers (centre x3, L x3, R x3), undertail L/R. Values are the plugin defaults (HEURISTIC, no game values found).
 - Runner `tools/poe2/ue_poe2_go.ps1`: one locked EngineWire call (waits for editor-free, refuses on NEEDS_ACTION / game / no editor, named owner, always releases).
+
+## M3.2 UE level import (space hideout)
+- Assets: /Game/ForgeLens/POE/Levels/space_hideout (SM_space_hideout, 22 MIs, 23 textures, L_space_hideout); celestial master /Game/ForgeLens/POE/_Shared/M_Poe2Celestial (emissive R*(1.15,3.5,4)+B*(1.5,8,12), x0.1, tile 0.3) replaces the 8x8 white base.
+- Captures (RGBA16F non-sRGB RT): docs/handoff/poe2_m3/ue_level_{overview,room,objects,top}.png, sheet_ue_level.jpg.
+- Note: to switch maps, another worker's dirty L_hub_battle_barge was left via new_blank_map(False) without saving (its saved 15:21 file untouched; unsaved post-save edits, ~12 SceneCapture2D actors, were discarded). The saved hub map was reopened afterwards.
+
+## M3.4 PIE swing check (editor PIE only)
+| run | tune (world,damp,stiff,dampDrive,swing) | bellcrow jump/settle | lich jump/settle | cartrhoa jump/settle |
+|---|---|---|---|---|
+| baseline | 0,-,none | moved=0 | moved=0 | moved=0 |
+| t1 | 1,0.5,100,8,1 | 23.0/23.0 POP | 101.3/38.3 POP | 18.9/5.3 POP |
+| t2 (kept) | 0.4,0.9,400,40,0.5 | 15.9/11.5 POP | 53.3/23.4 POP | 8.5/2.2 JITTER |
+All bones now move under physics (20/7/17), nan=0. Lich tail and BellCrow bells still pop above threshold: NOT verified good; values are heuristic. Frames: pie3_rest.png, pie3_swing_1..6.png, sheet_pie3_swing.jpg.
