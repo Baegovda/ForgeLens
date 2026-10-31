@@ -2845,3 +2845,8 @@ Fix in this pass: own-skeleton re-imports cc_titus_cloth/cc_titus_assault and cc
 ## SM2 FINAL STATUS (2026-10-31 07:05 KST, supersedes the R97w status list)
 Matches (verified by captures): 9 characters textured incl. cloth-sim slots; muzzle flash soft flame+sparks; cloth (commissar 68->24, titus_cloth pen 0); 0 missing-bone ensures after restart; vortex orb glow/runes(1 frame)/sparks + bloom, core 163,123,173 vs game 194,177,217 (~85 %), floor unaffected; hub level 4-view avg 22,33,32 vs game 22,29,32 (sun colour ARGB proven, direction from matrix).
 Remains: orb ~15 % dimmer, no large soft bloom sprite (template size not settable); sun direction axis (+Z) and fill intensity 6 are assumptions/fit; game-shot comparisons qualitative (pose/camera differ); obsolete NS_vortex_orb, _v2.._v5, NS_orb_t/_t2 kept (deletion needs the user's word); old chars_cloth2/chars_phys cc_chaplain still on user skeleton (unused).
+
+## R98 (2026-10-31 15:05 KST): old orb effects deleted (owner t276u)
+- Backup first: `K:\SM2_Backups\predelete_20261031_1505\` (6 orb .uasset + both Tests/chars_cloth2|chars_phys/cc_chaplain folders, 211 files).
+- Deleted via EditorAssetLibrary (0 hard/soft referencers each): `/Game/ForgeLens/SM2/VFX/vortex_orb/` NS_vortex_orb, NS_vortex_orb_v2..v5, NS_orb_t. NS_orb_t2 did not exist. Kept NS_vortex_orb_v6, v7 and all M_/MI_/NE_/T_/LS_ orb assets.
+- NOT deleted: `/Game/ForgeLens/SM2/Tests/chars_cloth2/cc_chaplain` (referenced by 8 r90_cloth test meshes) and `Tests/chars_phys/cc_chaplain` (its MI_* are used by the main `Characters/cc_chaplain/cc_chaplain` mesh). Owner decision 15:06: keep them.
