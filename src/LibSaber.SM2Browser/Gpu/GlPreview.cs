@@ -1041,7 +1041,7 @@ internal sealed unsafe class GlPreview : IDisposable
       _gl.Uniform1(U("uHasAlbedo"), albedo != 0 ? 1 : 0);
       _gl.Uniform1(U("uHasNormal"), normal != 0 ? 1 : 0);
       // Shared with materials.json / UE UseSpecMap (UseSpecMapPolicy; PROVEN FUN_14217da70).
-      _gl.Uniform1(U("uHasSpec"), UseSpecMapPolicy.Decide(part) ? 1 : 0);
+      _gl.Uniform1(U("uHasSpec"), (part.Source is { } mp ? UseSpecMapPolicy.Decide(mp) : part.Specular is not null) ? 1 : 0);
       _gl.Uniform1(U("uRoughA"), part.RoughInAlpha ? 1 : 0);
       _gl.Uniform1(U("uAoB"), part.AoInBlue ? 1 : 0);
       _gl.Uniform1(U("uUseAlpha"), pass != PreviewBlend.Opaque && part.AlphaFromAlbedo ? 1 : 0);
