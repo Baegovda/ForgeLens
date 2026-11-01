@@ -1,3 +1,5 @@
+> **Status pointer (2026-11-02):** M1 done. Later: M2–M3 + P1/P2; BellCrow kinematic is code-only (`760c055`); see `HANDOFF_NEW_BOT.md`.
+
 # POE2 M1 - meshes, skeleton, animation, textures, materials into the shared ForgeLens pipeline
 
 CORE CONCEPT: same SM2 feature set, only the reader changes. PoE2 data is loaded into the SAME internal model SM2 uses

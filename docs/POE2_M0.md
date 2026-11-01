@@ -1,3 +1,5 @@
+> **Status pointer (2026-11-02):** M0 done. Later: M1–M3 landed; P1 VFX leftovers done (`edf8e92`); see `HANDOFF_NEW_BOT.md`.
+
 # POE2 M0 - read-only probe of the Kakao PoE2 Content.ggpk (2026-10-30 ~23:30-23:50 KST)
 
 Scope: **PoE2 only** (owner t215u). Game folder `D:\Daum Games\Path of Exile2` opened READ-ONLY

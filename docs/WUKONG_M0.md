@@ -45,3 +45,9 @@ only the reader differs. The game was NOT launched for this survey (rule t265u).
 
 ## Not verified
 - Key not tested; index not decrypted; no asset parsed; chunk map is from community posts.
+
+## M1 draft status (2026-11-02, commit `1461bbf`)
+- **In repo:** `BmwGlb` + `BmwWindow` + Wukong toolbar button + `tools/bmw/ue_bmw_import.py` (C# Release build OK). Draft only — no retail assets parsed in-tree.
+- **Not committed (on purpose):** pak decrypt readers that embed AES key literals (`tools/bmw/Program.cs`, `bmw_pak.py` left untracked on `fl_bmw`).
+- **Key handling:** pass the community key via env **`BMW_AES_KEY`** (hex). The public community value is listed above for humans; **do not hard-code it into committed tools**. Key was **not** re-tested in the 2026-11-02 pass (still: index not decrypted in CI; no asset parsed from a committed reader).
+- Unreal target root: `/Game/ForgeLens/BMW/`. Never launch the game.

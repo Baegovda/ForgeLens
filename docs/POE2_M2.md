@@ -1,3 +1,5 @@
+> **Status pointer (2026-11-02):** M2 done. M2 H / P1 VFX leftovers pushed as `edf8e92` (2026-11-02). Captures in `viewer_fx2/` stay untracked. See `HANDOFF_NEW_BOT.md`.
+
 # POE2 M2 - viewer UI, real skill links, particles, more meshes, Unreal import
 
 CORE CONCEPT: same SM2 feature set, only the reader changes. Game never launched or controlled.

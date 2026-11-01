@@ -1,3 +1,5 @@
+> **Status pointer (2026-11-02):** M3 done. M3.4b tune + P2 `SetBodiesKinematic`/`ListBodies` in `760c055` — **code only; UE plugin rebuild + PIE unverified**. See `HANDOFF_NEW_BOT.md`.
+
 # POE2 M3 - levels (.tgm terrain), hideout in Unreal, cart rhoa physics, PIE swing check (2026-10-31 KST)
 
 ## M3.1 .tgm reader and room assembly (done)
@@ -52,3 +54,7 @@ Per-mesh tune `tune,<world>,<dampAlpha>,<stiff>,<damp>,<swing>,<mesh>`. Max adde
 Run-to-run noise with identical settings is about +-3 cm (s10 vs s11).
 Root cause (DescribeBody): the BellCrow bell chain roots phys_L/R_hanging_bell_jntBnd_1 are SIMULATED bodies attached to kinematic clavicle/chest 80.5 / 126.3 cm away; the lich tail end phys_skinned_tail_jntBnd_07 sits 95.3 cm from _06. Long lever arms turn small angle errors into ~20 cm/frame jumps; BellCrow pop is independent of feed-in, spring and gravity. Fix needs the chain roots kinematic (or a shorter constraint frame): not reachable from Python (PhysicsAsset.skeletal_body_setups is not exposed) and needs a plugin function plus rebuild. NOT done.
 Frames: pie_s4..s11_rest.png / _swing_1..6.png; sheet_pie_s11_swing.jpg.
+
+## P2 BellCrow kinematic API (2026-11-02, `760c055`) — code only
+- `SM2PhysicsSetup`: `SetBodiesKinematic` + `ListBodies` for chain-root bells; `ue_poe2_pie` kin path; `ue_poe2_quit.py`.
+- **Unverified:** UE plugin rebuild against 5.7, editor restart, PIE swing re-check. Do not claim bells are fixed until that lands.
