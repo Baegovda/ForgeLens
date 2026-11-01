@@ -1,14 +1,16 @@
+> **SUPERSEDED as entry point (2026-11-02).** Read [`../HANDOFF_NEW_BOT.md`](../HANDOFF_NEW_BOT.md) first — it wins. This file remains as a 2026-10-29 SM2 cold-start snapshot (tip then `bd5fc0c`; interim-% / `sm2-20` / `/Game/SM2_Work` only / "Niagara out of roadmap" / BongThumbLive "not ours" lines are stale — see HANDOFF_NEW_BOT "2026-11-02 정리" + §2.4).
+
 # START HERE — cold-start handoff for a new assistant (Grok Bot)
 
-> **For AI agents: read [`../BOT_TRANSFER.md`](../BOT_TRANSFER.md) (§0 Resume checklist) and [`../../HANDOFF.md`](../../HANDOFF.md) first.**
+> **For AI agents: read [../HANDOFF_NEW_BOT.md](../HANDOFF_NEW_BOT.md) first** (wins). BOT_TRANSFER is box-rebuild only; HANDOFF.md is the long ledger.
 >
-> **2026-10-29 20:50 KST: SM2 was transferred to a new Grok Bot — read [`../BOT_TRANSFER.md`](../BOT_TRANSFER.md) first; it wins over this file where they differ.** BongThumbLive (item 13 below, plugin rows) stays with the original bot.
+> **2026-10-29 note (historical):** SM2 transfer used BOT_TRANSFER; **as of 2026-11-02 HANDOFF_NEW_BOT wins.** BongThumbLive is in scope when the owner asks (P3).
 
 > Written 2026-10-29 17:15 KST at origin tip `bd5fc0c`. This is the **single entry point**. It summarises and links; details live in the files listed in §7. Where older docs disagree, **this file and the newest-dated statement win**.
 > **Talk to the user in Korean 해요체, short.** This file is in English because it is for agents.
 
 ## 1. Project in one line
-**Forge Lens** = a Warhammer 40,000: **Space Marine 2** asset browser/viewer (textures, models, animations, physics, VFX, customisation) + selective **Unreal Engine 5.7 exporter**. Repo `Baegovda/ForgeLens` (private, https://github.com/Baegovda/ForgeLens), branch `cursor/sm2-pck-extractor-4420` (default branch). Migrated 2026-10-29 from the public fork `Baegovda/LibSaber` (PR #1 there was not migrated; that repo is kept untouched). Later goals (only after SM2 is done): **Path of Exile**, then **Unreal Engine games** (.pak/IoStore). Halo code in the repo is out of scope.
+**Forge Lens** = a Warhammer 40,000: **Space Marine 2** asset browser/viewer (textures, models, animations, physics, VFX, customisation) + selective **Unreal Engine 5.7 exporter**. Repo `Baegovda/ForgeLens` (private, https://github.com/Baegovda/ForgeLens), branch `cursor/sm2-pck-extractor-4420` (default branch). Migrated 2026-10-29 from the public fork `Baegovda/LibSaber` (any PR on that public fork was not migrated; that repo is kept untouched). Later goals (only after SM2 is done): **Path of Exile**, then **Unreal Engine games** (.pak/IoStore). Halo code in the repo is out of scope.
 
 ## 2. Environment
 | What | Where / value |
@@ -16,7 +18,7 @@
 | User PC | Windows, user `Revaptor_FX`, ListMachines id `d3fb99ad-25ca-45c1-81af-41e5ca09104a` (old account; on a new account use the id ListMachines shows for Revaptor-FX). PowerShell via `Shell` with machineId. If offline, retry later (R21). PC shell works even when browser routing to the PC is offline. |
 | PC work folder | `C:\Users\Revaptor_FX\Desktop\SM2_Work\` — `Bin` (deployed builds), `Scripts` (incl. `mtl_fix\push.ps1`, `mtl_fix\oneclick\`), `Export`/`Exports`, `Captures`, `Raw`, `Anim`, `Backup`, `Build` (plugin builds), `Tools`, `Research`, `cleanup_log.txt` |
 | Game | `D:\Steam\steamapps\common\Space Marine 2\client_pc` |
-| Unreal | UE **5.7.4**, project `K:\Unreal Projects\UE_VFX_57\UE_VFX_57.uproject`, work only in `/Game/SM2_Work`. Driven by **EngineWire / McpAutomationBridge** at `127.0.0.1:3000/mcp` (token `%USERPROFILE%\.enginewire_token`, never commit). Helpers `tools/ue/enginewire_call.py`, `uerun.ps1`. Plugins: `SM2PhysicsSetup` (repo `tools/ue/`), `BongThumbLive` (`K:\Unreal Projects\_Plugins\`, outside repo). |
+| Unreal | UE **5.7.4**, project `K:\Unreal Projects\UE_VFX_57\UE_VFX_57.uproject`, work in `/Game/ForgeLens/<CODE>/` (default) and legacy `/Game/SM2_Work`. Driven by **EngineWire / McpAutomationBridge** at `127.0.0.1:3000/mcp` (token `%USERPROFILE%\.enginewire_token`, never commit). Helpers `tools/ue/enginewire_call.py`, `uerun.ps1`. Plugins: `SM2PhysicsSetup` (repo `tools/ue/`), `BongThumbLive` (`K:\Unreal Projects\_Plugins\`, outside repo). |
 | Deployed exe | `Desktop\SM2_Work\Bin\ForgeLens_latest\ForgeLens.exe`, sha256 `3B74C6179C39A0E0D563AC4E522D4AE2ED9F6458C9210B09F32C1C9672124A36` (oneclick build). Backups `.bak14`–`.bak17`; next deploy → `.bak18`. "실행해줘" = launch Forge Lens on the PC (R28). |
 | Box repo | `/workspace/LibSaber` + many worktrees `/workspace/LibSaber-*` (e.g. `-reab`, `-handoff`). Use a fresh worktree from `origin/…` after `git fetch`. Patches in `/workspace/patches/<stage>/`, stage artefacts in `/workspace/mtl_fix/<stage>/`, Titus sequence `/workspace/titus_seq/`. |
 | .NET | `/home/box/tools/dotnet/dotnet` (build serially `-m:1`, `dotnet build-server shutdown` first). Tests: SM2.Assets 372, SM2Extractor 43, LibSaber.Tests 5, `test/python` 20 (HaloCEA failures = ignore). |
@@ -25,16 +27,16 @@
 
 ## 3. User preferences and standing rules
 Full list with dates and status: **HANDOFF.md → "사용자 요청 대장" A (R01–R32)**. Essentials:
-- **Reply in Korean 해요체, short**; interim reports with progress % and ETA "(추정)", times in KST (R01). Translate each request into **industry terms + a short Korean explanation** (R02).
+- **Reply in Korean 해요체, short**; **final results only** (interim %/ETA superseded; answer "상황보고" at once). Times in KST (R01). Translate each request into **industry terms + a short Korean explanation** (R02).
 - **Evidence first (R32, WORKFLOW §0):** game data → exe (REA) → shader/RenderDoc. Label every conclusion **PROVEN / INFERRED / HEURISTIC**; HEURISTIC only as a last resort and clearly marked. **Never ask the user for in-game captures** (R13). Consult `docs/SYMBOL_DB` before re-running RE (R15/R16).
 - **Assets (R61):** everything under `/Game/SM2_Work/` (incl. `Original/*`, `_bakN`, Tests, hologram_planet) is generated by our extraction: delete, rename, move, re-import, overwrite freely, no asking, no `_bakN` needed (check live referencers before deleting; log deletions in `docs/handoff/CLEANUP_DELETED.tsv`). Never touch anything outside `/Game/SM2_Work/` (`/Game/Work/*`, the owner's own content, `Lightning_01`); if unsure, leave it and list it. Source code / PC files: back up as `.bakN` (next free N, never overwrite an existing one).
 - **Autonomy:** act first, report decisions later, pending questions at the end (R07). Editor restarts are pre-authorised (save first) (R08). On a UE crash: close the crash reporter, read the report, relaunch visibly with `-AutoDeclinePackageRecovery`, continue (R09). Always stop any PIE/SIE you start (R10). Game-data parsing is delegated — do it without asking (R17).
 - **Fixes are generic rules**, never per-character patches (R11).
 - **Push** ff-only via PC `Scripts\mtl_fix\push.ps1`, **never force** (R23, WORKFLOW §4).
-- No untrusted executables (R24). No Discord actions unless asked (R25). No Niagara unless the user asks (R19).
+- No untrusted executables (R24). No Discord actions unless asked (R25). Niagara: PoE2→Niagara is owner-gated **P11** (offer OK; no start without go). (R19 updated 2026-11-02).
 - Before PC-heavy work check no game is running (`Get-Process | ? MainWindowTitle`); during games use hidden + Idle priority, no focus stealing (R26).
 - **Record every user request** in the HANDOFF ledger (term, Korean meaning, status), keep it current (R31); update HANDOFF/STATUS each stage (R18).
-- Hourly report routine **`sm2-20`**, silent when nothing changed (R22).
+- ~~Hourly report routine `sm2-20`~~ **deleted by owner (t245u)** — do not recreate.
 - Plugin options go in settings UI, not console vars (R27). UE goal is cinematic quality (Chaos Cloth, bone physics) (R29).
 
 ## 4. Done so far (10/29 highlights)

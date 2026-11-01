@@ -1,3 +1,5 @@
+> **PARTLY SUPERSEDED (2026-11-02).** Current transfer / status of truth: [`HANDOFF_NEW_BOT.md`](HANDOFF_NEW_BOT.md) (incl. "2026-11-02 정리"). This file remains useful for **box rebuild recipes** (§0.2–0.5) and SM2-era environment notes; ignore its "BongThumbLive is NOT part of this handoff", "read START_HERE first", and 10/29 tip/`sm2-20` assumptions when they conflict with HANDOFF_NEW_BOT. BTL is in scope when the owner asks (P3).
+
 # BOT_TRANSFER — SM2 / Forge Lens: transfer to a new Grok Bot
 
 > Written 2026-10-29 ~20:50 KST by the previous SM2 assistant (Grok Bot), on top of origin tip `e5b4e8b`.
@@ -88,7 +90,7 @@ You may have been given **only the repo URL** `https://github.com/Baegovda/Forge
 
    **0.6 PC-side tooling (already on the PC; just verify).** `C:\Users\Revaptor_FX\ls_push` (clone of ForgeLens, origin set to ForgeLens, remote `libsaber-old`), `Desktop\SM2_Work\Scripts\mtl_fix\push.ps1`, `C:\Users\Revaptor_FX\enginewire_call.py` + `uemcp_call.py`, `Desktop\SM2_Work\Scripts\uerun.ps1`, Python 3.10 (`pip install mcp uemcp`), UE **5.7.4** at `C:\Program Files\Epic Games\UE_5.7`, project `K:\Unreal Projects\UE_VFX_57` with plugins `McpAutomationBridge` 0.5.30 (EngineWire, port 3000, token `%USERPROFILE%\.enginewire_token` — never print/commit) and `SM2PhysicsSetup`; Forge Lens `Desktop\SM2_Work\Bin\ForgeLens_latest\ForgeLens.exe`; VS 2022 for plugin builds. If a script is missing, copy it from the repo `tools/ue/` (WORKFLOW §5).
 
-   **0.7 Recreate the hourly progress routine** (§9) under your account — load your `routines` skill; name `sm2-20`; silent when nothing changed.
+   **0.7 ~~Recreate the hourly progress routine~~ SUPERSEDED:** owner deleted sm2-20 (t245u); do **not** recreate. Final-results-only reporting. (Was: (§9) under your account — load your `routines` skill; name `sm2-20`; silent when nothing changed.
 
    **0.8 Re-save these memory facts** (your new account has none of the old memory):
    - The user = owner **Baegovda** (GitHub); reply in short Korean 해요체; bot-to-bot docs in English, user quotes in Korean; interim reports with % + ETA (추정) in KST; translate requests into industry terms + short Korean explanation.
