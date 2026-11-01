@@ -2877,3 +2877,7 @@ Remains: orb ~15 % dimmer, no large soft bloom sprite (template size not settabl
 - P1 PoE2 VFX leftovers done (`edf8e92`). P2 BellCrow kinematic **code-only** (`760c055`; UE plugin build/PIE unverified).
 - Entry docs updated to point at HANDOFF_NEW_BOT first; STATUS historical SM2 ledger retained below its new banner.
 - **master** cleanup vs keep working branch: **owner decision** — this pass does not push to `master`.
+
+## Update SM2 oddities A/B/C (2026-11-02 KST)
+
+See docs/HANDOFF_NEW_BOT.md section "2026-11-02 SM2 oddities A/B/C". UseSpecMap/RestFit/hub-light decisions moved into LibSaber.SM2.Assets sidecars + shared UE core; writer of OBJ_MTLBLEND_LAYER_CONST[15].x and RestFit/F45/K=10 remain HEURISTIC.

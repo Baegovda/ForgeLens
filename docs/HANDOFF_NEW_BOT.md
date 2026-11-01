@@ -1,6 +1,6 @@
 # HANDOFF_NEW_BOT - ForgeLens + Bong* projects, transfer to a new Grok Bot account
 
-> **NEW BOT: START HERE. The owner's usage on the old account is nearly exhausted (2026-10-31). Read this whole file first, then section 0.** Last update: 2026-11-02 ~01:55 KST (cleanup pass; origin tip = `1461bbf`). See section "2026-11-02 정리" below — it wins over older sections here when they disagree.
+> **NEW BOT: START HERE. The owner's usage on the old account is nearly exhausted (2026-10-31). Read this whole file first, then section 0.** Last update: 2026-11-02 (SM2 oddities A/B/C after tip `e937708`; see section above). Prior cleanup tip `1461bbf`. See section "2026-11-02 정리" below — it wins over older sections here when they disagree.
 
 Written 2026-10-31 ~16:00-16:30 KST by the previous assistant ("ForgeLens" bot, Grok Bot) because the owner's usage is running out.
 Owner request (t279u, verbatim): "이제 사용량이 얼마 안남아서 다른 계정의 봇에게 인계할 인수인계문서를 아주아주 꼼꼼하게 모든걸 전달할수있게 남겨줘 5번 재확인하고 보강해줘"
@@ -11,6 +11,32 @@ Where this file and older docs disagree, THIS file wins (it is the newest). Olde
 ---------------------------------------------------------------------------------------------------
 
 ---------------------------------------------------------------------------------------------------
+---------------------------------------------------------------------------------------------------
+## 2026-11-02 SM2 oddities A/B/C (metal/rough, cloth rest-fit, hub lights) — after tip e937708
+
+Owner brief: deep root-cause + move decisions into core/sidecar; implement PROVEN/strong INFERRED only; no game launch.
+
+### Root causes (labels)
+| Area | Root cause | Label |
+|---|---|---|
+| **A** metalness/roughness UseSpecMap | Spec-map channel flags live in CPU CB OBJ_MTLBLEND_LAYER_CONST[15].x; writer still **not found**. Decision was duplicated in import_sm2_materials.py only so preview/UE could drift. | **HEURISTIC** rule (strong **DATA**: armory 128197 0x2000/0x40 bound-spec correlation; chameleon flags 0). Closing evidence = REA store into CB byte 336 / reg 21. |
+| **B** cloth rest-fit | Rest-fit floor/shallow knobs lived as UE CVars + scene A/B scripts (sm2.RestFit*), not in physics.json, so reimport lost commissar coat overrides. Algorithm itself is **HEURISTIC** (R76-R97k). **F45** motion vs in-game still unverified. | **HEURISTIC** (A/B). F45 needs owner observation only. |
+| **C** hub lighting | Placement math (ARGB, K*Intensity, spot->point, YZ swap) lived in one-off ue_r98_hublights.py. Only ARGB order **PROVEN**; K=10 **HEURISTIC FIT**. Map_Floor EV -5->0 already landed historically (d7e4e92). | ARGB **PROVEN**; K **HEURISTIC FIT**; spot->point **INFERRED** (no direction in TSV). |
+
+### What changed (this pass)
+- **A:** UseSpecMapPolicy -> materials.json useSpecMap / useSpecMapEvidence; import_sm2_materials.py prefers sidecar; viewer GlPreview uses the same policy.
+- **B:** RestFitPolicy -> physics.json ue.chaosCloth.restFit + collision.restFit*; SM2PhysicsSetup AddCollision prefers sidecar over CVar defaults (CVars remain A/B).
+- **C:** LevelLightUe (C#) + tools/ue/ue_level_lights_core.py; ue_r98_hublights.py calls the shared core.
+- Tests: Sm2OdditiesPolicyTests; test_level_lights.py hub core; fixed brittle EffectTests.HiddenSourceStillSpawnsAttachedChildren.
+- Dotnet: Assets.Tests **433** pass, Extractor.Tests **43** pass. Python test_level_lights 6/6.
+- UE before/after hub PNGs: **not captured** this pass (editor free but full re-place of ~1800 lights + visual judgment left for owner after reimport; no game). Plugin C++ change needs UE plugin rebuild before PIE cloth check.
+
+### Still HEURISTIC / open
+1. UseSpecMap CB writer (F49 / SYMBOL_DB materials).
+2. RestFitFloor / ShallowFrac values (not from retail); F45 physics motion.
+3. Hub intensity K=10 FIT; spot direction if a future dump adds it.
+4. PoE2/Wukong tracks untouched.
+
 ## 2026-11-02 정리 (KST ~01:55)
 
 Owner-approved cleanup on Revaptor-FX. **This section wins** over older STATUS.md / AGENTS.md content; those two are stale — follow this file.
