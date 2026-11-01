@@ -31,6 +31,19 @@ Owner brief: deep root-cause + move decisions into core/sidecar; implement PROVE
 - Dotnet: Assets.Tests **433** pass, Extractor.Tests **43** pass. Python test_level_lights 6/6.
 - UE before/after hub PNGs: **not captured** this pass (editor free but full re-place of ~1800 lights + visual judgment left for owner after reimport; no game). Plugin C++ change needs UE plugin rebuild before PIE cloth check.
 
+### Commits (origin tip **eddf91e**)
+| SHA | What |
+|---|---|
+| [98c6886](https://github.com/Baegovda/ForgeLens/commit/98c6886) | EffectTests HiddenSource fixture |
+| [4960763](https://github.com/Baegovda/ForgeLens/commit/4960763) | SM2 A UseSpecMap sidecar |
+| [5db0ee5](https://github.com/Baegovda/ForgeLens/commit/5db0ee5) | SM2 B RestFit sidecar |
+| [e9ad274](https://github.com/Baegovda/ForgeLens/commit/e9ad274) | SM2 C hub lights core |
+| [eddf91e](https://github.com/Baegovda/ForgeLens/commit/eddf91e) | HANDOFF docs |
+
+### ForgeLens_latest
+- Single-file win-x64 publish from tip **eddf91e** → `Desktop\SM2_Work\Bin\ForgeLens_latest\ForgeLens.exe` (~48.0 MB), also `Bin\ForgeLens_eddf91e`.
+- Previous renamed (kept): `Bin\ForgeLens_latest_old_eddf91e` (was 1461bbf build).
+
 ### Still HEURISTIC / open
 1. UseSpecMap CB writer (F49 / SYMBOL_DB materials).
 2. RestFitFloor / ShallowFrac values (not from retail); F45 physics motion.
