@@ -78,5 +78,40 @@ Long-form: RE_NOTES "Materials / shaders", HANDOFF Item 2, mtl1-26/27, mtl1-47/4
 | FUN_1425ec940 | 0x1425ec940 | DECOMPILED | strings: speedScaleY / speedScaleX / texture / textureScaleX / textureScaleY / textureRotation | /workspace/rea/vfxy_1.c |
 | FUN_1425ef600 | 0x1425ef600 | DECOMPILED | strings: speedScaleY / speedScaleX / distortTexture / distortTextureScaleX / distortTextureScaleY / distortTextureRotation | /workspace/rea/vfxy_1.c |
 | FUN_1425fc510 | 0x1425fc510 | DECOMPILED | strings: speedScaleY / enable / source_texture / speedScaleX / texScaleX / texScaleY | /workspace/rea/vfxy_1.c |
-| FUN_1421aa940 | 0x1421aa940 | NOTED | CB_OBJ_MATERIAL_DATA layout initialiser incl. OBJ_MTLBLEND_LAYER_CONST (0x40 float4); ~40 siblings FUN_14219f000…FUN_1421d19a0; UseSpecMap writer not found (rea-batch 2); raw [15].x flags DATA in rea-batch 3 (8200/4424/4168/…, bit 8 on all non-zero but one) | RE_NOTES#rea-batch-3 |
+| FUN_1421aa940 | 0x1421aa940 | NOTED | CB_OBJ_MATERIAL_DATA layout initialiser incl. OBJ_MTLBLEND_LAYER_CONST (0x40 float4); ~40 siblings FUN_14219f000…FUN_1421d19a0; UseSpecMap writer PROVEN FUN_14217da70 (REA 2026-11-02); raw [15].x flags DATA in rea-batch 3 (8200/4424/4168/…, bit 8 on all non-zero but one) | RE_NOTES#rea-batch-3 |
 | OBJ_MTLBLEND_LAYER_CONST[15].x | — | DATA | per-draw material bit mask vs bound PS textures (armory 128197, 140 draws): 0x2000 ↔ packed MSCRGHAO spec td 68/68, 0x40 ↔ legacy *_spec td 66/67, 0x8 ↔ MNM normal 133/134, 0x100 → MH height bound 31/31, 0x800 → MEM 7/7 (+4 without), 0x1000 → MAO 40/41 (+4), 0x10 ↔ detail partial; CPU writer not found (rea-batch 4) | RE_NOTES#rea-batch-4 |
+
+## Texture usage bit table (PROVEN, `0x144ccee10`, FUN_14267baf0)
+
+| bit | mask | name |
+|----:|------|------|
+| 0 | 0x00000001 | MD |
+| 1 | 0x00000002 | MSC |
+| 2 | 0x00000004 | MSP |
+| 3 | 0x00000008 | MRGH |
+| 4 | 0x00000010 | MNM |
+| 5 | 0x00000020 | MDT |
+| 6 | 0x00000040 | MDTM |
+| 7 | 0x00000080 | MT |
+| 8 | 0x00000100 | MAK |
+| 9 | 0x00000200 | MH |
+| 10 | 0x00000400 | MBR |
+| 11 | 0x00000800 | MBL |
+| 12 | 0x00001000 | MR |
+| 13 | 0x00002000 | MF |
+| 14 | 0x00004000 | MLM |
+| 15 | 0x00008000 | MPM |
+| 16 | 0x00010000 | MRC |
+| 17 | 0x00020000 | HDR |
+| 18 | 0x00040000 | MSCG |
+| 19 | 0x00080000 | MEM |
+| 20 | 0x00100000 | MAO |
+| 21 | 0x00200000 | **MSCRGHAO** |
+| 22 | 0x00400000 | MD16U |
+| 23 | 0x00800000 | MRGHAOD |
+| 24 | 0x01000000 | MHTERR |
+| 25 | 0x02000000 | MMRAOT |
+| 26 | 0x04000000 | MTRAO |
+
+Code: `LibSaber.SM2.Assets.Meshes.TextureUsage.Names` / `ParseMask`. LAYER[15].x 0x2000 ↔ bit21; 0x40 ↔ bit18 (FUN_14217da70). See `docs/handoff/RE_CACHE/notes/REA_DEEP.md`.
+

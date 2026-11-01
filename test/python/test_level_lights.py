@@ -34,7 +34,14 @@ class HubLightCoreTests(unittest.TestCase):
     def test_metres_to_ue_cm(self):
         self.assertEqual(L.metres_to_ue_cm(1, 2, 3), (100.0, 300.0, 200.0))
 
-    def test_spot_becomes_point_and_fit_k(self):
+    def test_p0w_proven(self):
+        self.assertAlmostEqual(L.p0w(0.0), 1.0, places=6)
+        self.assertAlmostEqual(L.p0w(1.0), 300.0, places=4)
+        self.assertAlmostEqual(L.p0w(1.0, use_inverse_squared_falloff=True), 0.0025, places=7)
+        self.assertEqual(L.p0w(1.0, is_const_atten=True), 8e22)
+        self.assertEqual(L.p0w(1.0, directional=True), 0.0)
+
+    def test_spot_stays_spot_no_fit_k(self):
         row = {
             "lightType": "spot",
             "x": 1,
@@ -43,13 +50,36 @@ class HubLightCoreTests(unittest.TestCase):
             "Intensity": 8,
             "ColorCtrl": "[255,165,207,226]",
             "RadiusCtrl": 10,
+            "attenCurveParam": 1,
+            "spotAngle": 110,
+            "spotInnerAngleFactor": 0.04,
         }
-        p = L.light_row_to_ue(row, k=10, spot_scale=1.0)
-        self.assertEqual(p["lightType"], "point")
+        p = L.light_row_to_ue(row, spot_scale=1.0)
+        self.assertEqual(p["lightType"], "spot")
         self.assertEqual(p["authoredType"], "spot")
-        self.assertAlmostEqual(p["intensity"], 80.0, places=6)
-        self.assertIn("HEURISTIC", p["evidence"])
+        self.assertAlmostEqual(p["intensity"], 8.0, places=6)  # no K=10
+        self.assertAlmostEqual(p["outer_cone_degrees"], 110.0, places=5)
+        self.assertAlmostEqual(p["inner_cone_degrees"], 110.0 * 0.04, places=5)
+        self.assertAlmostEqual(p["p0w"], 300.0, places=4)
+        self.assertIn("PROVEN", p["evidence"])
+        self.assertNotIn("HEURISTIC FIT K=10", p["evidence"])
         self.assertIn("PROVEN", L.COLOR_ORDER_EVIDENCE)
+
+    def test_inv_sq_scales_intensity_x400(self):
+        row = {
+            "lightType": "point",
+            "x": 0,
+            "y": 0,
+            "z": 0,
+            "Intensity": 2,
+            "ColorCtrl": "[255,255,255,255]",
+            "RadiusCtrl": 15,
+            "useInverseSquaredFalloff": "true",
+        }
+        p = L.light_row_to_ue(row)
+        self.assertAlmostEqual(p["intensity"], 800.0, places=5)
+        self.assertTrue(p["use_inverse_squared"])
+        self.assertAlmostEqual(p["p0w"], 0.0025, places=7)
 
 
 if __name__ == "__main__":

@@ -1491,10 +1491,7 @@ public static class AssetExporter
   {
     var slots = MaterialMaps.Slots(mesh).Select(slot =>
     {
-      var hasSpec = slot.Part.Maps.Any(m => string.Equals(m.Role, "specular", StringComparison.OrdinalIgnoreCase)
-        && !string.IsNullOrEmpty(m.Name) && !m.Missing)
-        || !string.IsNullOrEmpty(slot.Part.Specular);
-      var useSpecMap = UseSpecMapPolicy.Decide(hasSpec, slot.Part.Chameleon is not null);
+      var useSpecMap = UseSpecMapPolicy.Decide(slot.Part);
       return new
     {
       slot = slot.Name,
@@ -1503,9 +1500,10 @@ public static class AssetExporter
       albedoTint = slot.Part.AlbedoTint,
       tdScalars = slot.Part.TdScalars.Count == 0 ? null : slot.Part.TdScalars,
       blendMode = slot.Part.BlendMode,
-      // F49 / mtl1-26: shared UseSpecMap decision (HEURISTIC — writer of OBJ_MTLBLEND_LAYER_CONST[15].x not found).
+      // F49 / mtl1-26: shared UseSpecMap decision (PROVEN FUN_14217da70 — MSCRGHAO bit21 / MSCG bit18).
       useSpecMap,
       useSpecMapEvidence = UseSpecMapPolicy.Evidence,
+      specularUsage = string.IsNullOrEmpty(slot.Part.SpecularUsage) ? null : slot.Part.SpecularUsage,
       // glt.second_spec / glt.anisotropic_spec (null when the variant leaves them disabled). Tints are R, G, B, A in 0..1.
       secondSpec = slot.Part.SecondSpec is { } second ? new
       {

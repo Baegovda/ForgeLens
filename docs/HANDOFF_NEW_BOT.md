@@ -12,6 +12,38 @@ Where this file and older docs disagree, THIS file wins (it is the newest). Olde
 
 ---------------------------------------------------------------------------------------------------
 ---------------------------------------------------------------------------------------------------
+## 2026-11-02 REA-proven cloth thickness + RestFit opt-out (with UseSpecMap/lights)
+
+### Cloth (C) — REA_DEEP §2
+- Phase 0.8/1.0/0.9/1.1, gravity (0,-9.8,0), solverFreq 30, **collisionThickness default 0.0** PROVEN (FUN_14108ef40 / FUN_141089140 / FUN_14108f112).
+- ClothEntry remap 0.15/5 PROVEN (FUN_141093260). airDrag/wind env block mapped.
+- Exe has **no** restFit/ShallowFrac. Plugin ThickCm was 2 cm HEURISTIC — now **0** from data; RestFitPolicy.Enabled=**false** (optional HEURISTIC if PIE explodes).
+- Evidence: docs/handoff/RE_CACHE/notes/REA_DEEP.md + evidence/cloth_*.c.
+
+### Also this pass
+- UseSpecMap PROVEN FUN_14217da70; full usage bit table 0–26 in SYMBOL_DB + TextureUsage.cs.
+- Level lights: no FIT K=10; spots keep cones; UE unit bridge INFERRED.
+
+## 2026-11-02 REA-proven UseSpecMap + level lights (after tip eddf91e)
+
+Owner-approved: implement REA_FINDINGS.md into ForgeLens; verify UE before/after.
+
+### Root causes closed
+| Area | Root cause | Label |
+|---|---|---|
+| **A** UseSpecMap | Writer **FUN_14217da70** sets LAYER[15].x 0x2000 iff usage bit 21 MSCRGHAO; 0x40 iff bit 18 MSCG. Chameleon 0 naturally. | **PROVEN** |
+| **C** hub lights | Packer **FUN_14224ecf0** + P0.w **FUN_14224f010** + desc **FUN_141384090**. Removed FIT K=10 and spot→point. | Engine math **PROVEN**; UE candela/exponent/direction bridge **INFERRED** |
+
+### Code
+- UseSpecMapPolicy + TextureUsage (0x144ccee10); materials.json useSpecMap/specularUsage; import_sm2_materials.py + GlPreview.
+- LevelLightUe + ue_level_lights_core.py: Intensity=I*colorScale (x400 invSq); spots keep cones; P0.w exposed.
+- Evidence copied to docs/handoff/RE_CACHE/notes/REA_FINDINGS.md + evidence/*.c; SHADERS.md §5 updated.
+
+### Still approximate (INFERRED)
+1. UE Intensity unit = authored I * colorScale (no FIT K); soft falloff exponent from attenCurveParam is a thin mapping — SM2 window+soft IS is not UE InverseSquare.
+2. Spot direction: lights TSV has no dir/matrix → SpotLight default forward (cd_list 4x4 needed for parity).
+3. RestFit / F45 unchanged.
+
 ## 2026-11-02 SM2 oddities A/B/C (metal/rough, cloth rest-fit, hub lights) — after tip e937708
 
 Owner brief: deep root-cause + move decisions into core/sidecar; implement PROVEN/strong INFERRED only; no game launch.
@@ -45,9 +77,9 @@ Owner brief: deep root-cause + move decisions into core/sidecar; implement PROVE
 - Previous renamed (kept): `Bin\ForgeLens_latest_old_eddf91e` (was 1461bbf build).
 
 ### Still HEURISTIC / open
-1. UseSpecMap CB writer (F49 / SYMBOL_DB materials).
-2. RestFitFloor / ShallowFrac values (not from retail); F45 physics motion.
-3. Hub intensity K=10 FIT; spot direction if a future dump adds it.
+1. RestFitFloor / ShallowFrac values (not from retail); F45 physics motion.
+2. Hub UE intensity unit + soft exponent + spot direction (see INFERRED above).
+3. PoE2/Wukong tracks untouched.
 4. PoE2/Wukong tracks untouched.
 
 ## 2026-11-02 정리 (KST ~01:55)

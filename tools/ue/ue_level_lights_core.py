@@ -5,12 +5,24 @@
 #   ColorCtrl order [A,R,G,B] — PROVEN (R97y)
 #   Colour decode (c/255)^2.2 — PROVEN (level-lights DATA / CaptureLightUnits.LightColorToLinear)
 #   Position SM2 m (x,y,z) → UE cm (x*100, z*100, y*100) — PROVEN (ue_vfx_frame / ue_r66_level)
-#   Intensity candela = K * Intensity — HEURISTIC FIT (R98b K=10); not from RE
-#   spot→point when direction missing — INFERRED from TSV schema (lights_tsv2 has no direction column)
+#   P0.w + colour×400 invSq — PROVEN FUN_14224f010 / FUN_14224ecf0 (REA_FINDINGS)
+#   UE Intensity = I * colorScale (no FIT K=10) — INFERRED unit bridge
+#   Spot stays SpotLight with cones — PROVEN cone math; direction missing in TSV — INFERRED default forward
 
-INTENSITY_FIT_K = 10.0
-INTENSITY_EVIDENCE = "HEURISTIC FIT K=10 (R98b); ARGB colour order PROVEN; spot→point when direction missing INFERRED"
+INV_SQUARED_COLOR_SCALE = 400.0
+INV_SQUARED_SOFT = 0.0025
+CONST_ATTEN_SOFT = 8e22
+
+INTENSITY_EVIDENCE = (
+    "PROVEN FUN_14224ecf0/FUN_14224f010: colour=(c/255)^2.2*I [*400 if invSq]; "
+    "P0.w directional=0 / constAtten=8e22 / invSq=0.0025 / else 299*a^4+1 or 256^a. "
+    "INFERRED UE: Intensity=I*colorScale (no FIT K=10); radius m→cm; soft exponent from attenCurveParam approx."
+)
 COLOR_ORDER_EVIDENCE = "PROVEN R97y: ColorCtrl = [A,R,G,B]"
+SPOT_EVIDENCE = (
+    "PROVEN FUN_14224ecf0 type1 spot cones; FUN_141384090 spotAngle/spotInnerAngleFactor. "
+    "INFERRED UE outer=spotAngle, inner=spotAngle*factor; direction not in TSV."
+)
 
 
 def metres_to_ue_cm(x, y, z):
@@ -38,8 +50,27 @@ def color_ctrl_to_linear_rgb(color_ctrl):
     return argb_to_linear_rgb(a, r, g, b)
 
 
-def ue_candela(intensity, k=INTENSITY_FIT_K):
-    return float(k) * float(intensity)
+def color_scale(use_inverse_squared_falloff):
+    return INV_SQUARED_COLOR_SCALE if use_inverse_squared_falloff else 1.0
+
+
+def p0w(atten_curve_param, use_inverse_squared_falloff=False, is_const_atten=False, directional=False):
+    """PROVEN FUN_14224f010."""
+    if directional:
+        return 0.0
+    if use_inverse_squared_falloff:
+        return INV_SQUARED_SOFT
+    if is_const_atten:
+        return CONST_ATTEN_SOFT
+    a = float(atten_curve_param or 0.0)
+    if a > 0.0:
+        return 299.0 * (a ** 4) + 1.0
+    return 256.0 ** a
+
+
+def ue_intensity(intensity, use_inverse_squared_falloff=False):
+    """INFERRED UE Intensity = authored I * engine colour scale (replaces FIT K=10)."""
+    return float(intensity) * color_scale(use_inverse_squared_falloff)
 
 
 def attenuation_radius_cm(radius_ctrl_metres, fallback_metres=10.0):
@@ -47,23 +78,65 @@ def attenuation_radius_cm(radius_ctrl_metres, fallback_metres=10.0):
     return r * 100.0
 
 
-def light_row_to_ue(row, k=INTENSITY_FIT_K, spot_scale=1.0):
-    """Map a lights TSV/dict row to UE spawn params. Spots without direction become points (INFERRED)."""
+def spot_cone_degrees(spot_angle, spot_inner_angle_factor):
+    outer = float(spot_angle) if float(spot_angle or 0.0) > 0 else 45.0
+    factor = max(0.0, min(1.0, float(spot_inner_angle_factor or 0.0)))
+    inner = outer * factor
+    if inner > outer:
+        inner = outer
+    return outer, inner
+
+
+def ue_falloff_exponent(atten_curve_param, use_inverse_squared_falloff, is_const_atten):
+    if use_inverse_squared_falloff:
+        return 2.0
+    if is_const_atten:
+        return 0.0
+    a = float(atten_curve_param or 0.0)
+    if a <= 0.0:
+        return max(0.1, min(16.0, 2.0 + a * 2.0))
+    return max(0.1, min(16.0, 2.0 + a * 6.0))
+
+
+def _truthy(v):
+    if isinstance(v, bool):
+        return v
+    s = str(v or "").strip().lower()
+    return s in ("1", "true", "yes", "y")
+
+
+def light_row_to_ue(row, spot_scale=1.0):
+    """Map a lights TSV/dict row to UE spawn params. Spots stay spots with cones (PROVEN)."""
     lt = (row.get("lightType") or "point").strip().lower()
+    if lt not in ("point", "spot", "directional"):
+        return None
     x, y, z = float(row["x"]), float(row["y"]), float(row["z"])
     I = float(row.get("Intensity") or 0)
     if I <= 0:
         return None
+    inv_sq = _truthy(row.get("useInverseSquaredFalloff"))
+    const_atten = _truthy(row.get("isConstAtten"))
+    acp = float(row.get("attenCurveParam") or 0.0)
+    spot_angle = float(row.get("spotAngle") or 0.0)
+    spot_inner = float(row.get("spotInnerAngleFactor") or 0.0)
     loc = metres_to_ue_cm(x, y, z)
     rgb = color_ctrl_to_linear_rgb(row["ColorCtrl"])
+    outer, inner = spot_cone_degrees(spot_angle, spot_inner)
     scale = float(spot_scale) if lt == "spot" else 1.0
+    ue_type = "spot" if lt == "spot" else ("directional" if lt == "directional" else "point")
     return {
-        "lightType": "point",  # spot→point when no direction in dump
+        "lightType": ue_type,
         "authoredType": lt,
         "location": loc,
-        "intensity": ue_candela(I, k) * scale,
+        "intensity": ue_intensity(I, inv_sq) * scale,
         "color_linear": rgb,
         "attenuation_radius": attenuation_radius_cm(row.get("RadiusCtrl")),
+        "use_inverse_squared": inv_sq,
+        "falloff_exponent": ue_falloff_exponent(acp, inv_sq, const_atten),
+        "p0w": p0w(acp, inv_sq, const_atten, lt == "directional"),
+        "outer_cone_degrees": outer,
+        "inner_cone_degrees": inner,
         "cast_shadows": False,
         "evidence": INTENSITY_EVIDENCE,
+        "spot_evidence": SPOT_EVIDENCE,
     }

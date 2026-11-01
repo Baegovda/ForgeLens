@@ -44,6 +44,8 @@ public sealed class MeshPart
   public string? Emissive { get; set; }
   /// <summary><c>.td</c> <c>format_descr</c> of <see cref="Specular"/>, for example <c>Metalness(r)+Roughness(g)+AO(b)</c>.</summary>
   public string SpecularChannels { get; set; } = "";
+  /// <summary>.td <c>usage</c> of <see cref="Specular"/> (e.g. MSCRGHAO). Drives UseSpecMapPolicy.</summary>
+  public string SpecularUsage { get; set; } = "";
   /// <summary>Shader variant inside the texture definition. Empty shading materials are <c>default</c>.</summary>
   public string Variant { get; set; } = "default";
   /// <summary><c>opaque</c>, <c>masked</c> (alpha kill), or <c>translucent</c>.</summary>
@@ -105,6 +107,7 @@ public sealed class MeshPart
       Specular = Specular,
       Emissive = Emissive,
       SpecularChannels = SpecularChannels,
+      SpecularUsage = SpecularUsage,
       Variant = Variant,
       Blend = Blend,
       AlbedoTint = AlbedoTint,

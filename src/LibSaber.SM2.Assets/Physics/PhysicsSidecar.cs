@@ -144,10 +144,33 @@ public static class PhysicsSidecar
             // HEURISTIC rest-fit (R76/R91/R93/R97k): plugin prefers these over sm2.RestFit* CVar defaults so reimport keeps the decision.
             restFit = new
             {
+              // Optional HEURISTIC (exe has no restFit*). Off by default — collisionThickness from asset (often 0).
+              enabled = RestFitPolicy.Enabled,
               evidence = RestFitPolicy.Evidence,
               floor = RestFitPolicy.Floor,
               deepFrac = RestFitPolicy.DeepFrac,
               shallowFrac = RestFitPolicy.ShallowFracFor(c.SimMeshName),
+            },
+            phaseDefaultsProven = new
+            {
+              evidence = "PROVEN FUN_141089140: stiffness 0.8 / mult 1.0 / compression 0.9 / stretch 1.1",
+              stiffness = 0.8f,
+              stiffnessMultiplier = 1.0f,
+              compressionLimit = 0.9f,
+              stretchLimit = 1.1f,
+            },
+            solverDefaultsProven = new
+            {
+              evidence = "PROVEN FUN_14108ef40 / FUN_14108f112: gravity (0,-9.8,0), solverFrequency 30, collisionThickness 0",
+              gravity = new[] { 0f, -9.8f, 0f },
+              solverFrequency = 30f,
+              collisionThickness = 0f,
+            },
+            clothEntryRemapProven = new
+            {
+              evidence = "PROVEN FUN_141093260: maxInfluenceDist 0.15, distanceRemapPower 5",
+              maxInfluenceDist = 0.15f,
+              distanceRemapPower = 5f,
             },
             maxDistanceScaleCm = cfg.Motion.DistanceScale * 100f,
             edgeStiffness = Math.Clamp((cfg.Vertical.Stiffness + cfg.Horizontal.Stiffness) * 0.5f * cfg.StiffnessMultiplier, 0f, 1f),
@@ -176,6 +199,7 @@ public static class PhysicsSidecar
               sharedShapesAdded = cfg.SharedShapesAdded,
               space = "boneLocal", // mtl1-14d: bone-local offsets are NOT mirrored (imported bone frames absorb the X reflection; mirroring blew up the sorcerer cloak). Plugin also shrinks shapes off free rest particles.
               // Duplicated from chaosCloth.restFit so AddCollision(Coll) can read without the parent object.
+              restFitEnabled = RestFitPolicy.Enabled,
               restFitFloor = RestFitPolicy.Floor,
               restFitDeepFrac = RestFitPolicy.DeepFrac,
               restFitShallowFrac = RestFitPolicy.ShallowFracFor(c.SimMeshName),

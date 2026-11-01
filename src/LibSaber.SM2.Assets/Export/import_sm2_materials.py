@@ -752,10 +752,8 @@ def make_master(folder, asset_name="M_SM2", translucent=False):
     tint.set_editor_property("default_value", unreal.LinearColor(1.0, 1.0, 1.0, 1.0))
     # glt.metalness / glt.roughness {scale, bias} (sidecar baseLayer): base metal/rough = saturate(packed * scale + bias)
     # (PS 00004_1 cb6 rows 8.xy / 9.xy). glt.metallicTint: albedo *= lerp(albedo_tint, metallicTint, metal) (lines 455-457).
-    # UseSpecMap (default on). mtl1-26: on the captured chameleon draws (PS 19112/22961) the spec-map channel flags
-    # OBJ_MTLBLEND_LAYER_CONST[15].x are 0, so the PS replaces the packed metal with 0 and the packed roughness with 1
-    # (PS 22961 lines 615-625): metal = saturate(bias), roughness = saturate(scale + bias). The importer turns it off
-    # for chameleon slots (HEURISTIC generalisation: 7/7 chameleon draws; the flag writer was not located).
+    # UseSpecMap (default on). PROVEN FUN_14217da70: LAYER[15].x 0x2000/0x40 from MSCRGHAO/MSCG usage bits;
+    # chameleon draws naturally have those bits 0 when no packed spec usage at +0xb0.
     use_spec = expr(material, unreal.MaterialExpressionStaticSwitchParameter, -160, 300)
     use_spec.set_editor_property("parameter_name", "UseSpecMap")
     use_spec.set_editor_property("default_value", True)
@@ -909,15 +907,18 @@ def apply_spec_layers(instance, slot, texture_for):
     mel.set_material_instance_static_switch_parameter_value(instance, "UseInstanceTint", inst is not None and not cham)
     if inst is not None:
         mel.set_material_instance_vector_parameter_value(instance, "InstanceTint", unreal.LinearColor(*inst))
-    # mtl1-26 / F49: Prefer materials.json useSpecMap (LibSaber.SM2.Assets UseSpecMapPolicy) so viewer preview and
-    # UE import share one decision. Fallback = same HEURISTIC (has specular map and not chameleon).
-    # DATA: armory 128197 bits 0x2000/0x40 <-> bound spec; chameleon flags 0. Writer of OBJ_MTLBLEND_LAYER_CONST[15].x
-    # still NOT FOUND (HEURISTIC — SHADERS.md §5).
+    # mtl1-26 / F49: Prefer materials.json useSpecMap (UseSpecMapPolicy PROVEN FUN_14217da70:
+    # OBJ_MTLBLEND_LAYER_CONST[15].x 0x2000 iff usage bit 21 MSCRGHAO; 0x40 iff bit 18 MSCG).
+    # Fallback when sidecar lacks useSpecMap: specularUsage / MSCRGHAO|MSCG in maps, else bound specular.
     if "useSpecMap" in slot:
         use_spec_map = bool(slot.get("useSpecMap"))
     else:
-        has_spec = first_map(slot, "specular") is not None
-        use_spec_map = has_spec and not cham
+        usage = (slot.get("specularUsage") or "").upper()
+        if usage:
+            use_spec_map = ("MSCRGHAO" in usage.split("+")) or ("MSCG" in usage.split("+"))
+        else:
+            has_spec = first_map(slot, "specular") is not None
+            use_spec_map = bool(has_spec)
     mel.set_material_instance_static_switch_parameter_value(instance, "UseSpecMap", use_spec_map)
     if cham:
         # Raw .td colours (bytes / 255, sRGB space; the PS multiplies them with the sRGB texture before linearising).

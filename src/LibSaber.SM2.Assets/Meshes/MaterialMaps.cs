@@ -29,6 +29,8 @@ public sealed class MaterialMap
   public string Format { get; set; } = "";
   /// <summary><see cref="Channels"/> with physical channels, for example <c>MetGray(r)->r+Roughness(a)->g</c>.</summary>
   public string StoredChannels { get; set; } = "";
+  /// <summary>.td top-level <c>usage</c> string (e.g. MSCRGHAO, MSCG+MRGH). PROVEN table 0x144ccee10.</summary>
+  public string Usage { get; set; } = "";
 }
 
 /// <param name="Stored">Physical channel in the exported image, when the stored format moved it (BC5 a -> g, BC4 a -> r).</param>
@@ -93,7 +95,9 @@ public static class MaterialMaps
         part.Normal = FirstPresent(maps, "normal");
         part.Specular = FirstPresent(maps, "specular");
         part.Emissive = FirstPresent(maps, "emissive");
-        part.SpecularChannels = maps.FirstOrDefault(map => map.Role == "specular")?.Channels ?? "";
+        var specMap = maps.FirstOrDefault(map => map.Role == "specular");
+        part.SpecularChannels = specMap?.Channels ?? "";
+        part.SpecularUsage = specMap?.Usage ?? "";
         if (!variants.TryGetValue(key, out var shading))
         {
           var text = DefinitionText(catalog, store, hint, key[..key.IndexOf('\n')], texts);
@@ -353,11 +357,13 @@ public static class MaterialMaps
     var packing = Pack(channels);
     if (packing.Count == 0)
       packing = Pack(ImpliedChannels(role));
+    var usage = text is null ? "" : (TextureUsage.FromTd(text) ?? "");
     var map = new MaterialMap
     {
       Role = role,
       Name = stem,
       Channels = channels.Length == 0 ? ImpliedChannels(role) : channels,
+      Usage = usage,
       // anisoDir _dm maps say Diff(rgb) but hold a direction (usage "MD", fade color 127 = zero vector), so linear.
       Srgb = role != "anisoDir" && IsSrgb(packing.Count == 0 ? Pack(ImpliedChannels(role)) : packing),
     };

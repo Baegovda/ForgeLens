@@ -781,7 +781,7 @@ FVector JVec(const TSharedPtr<FJsonObject>& O, const TCHAR* F, bool bMirror)
 }
 
 int32 AddCollision(UPhysicsAsset* PA, const TSharedPtr<FJsonObject>& Coll, const FReferenceSkeleton& RS, const TArray<FTransform>& CS, TArray<FString>& Log, const FString& Who,
-  const TArray<FVector3f>* RestPV = nullptr, const TArray<float>* RestMaxDist = nullptr, float ThickCm = 2.0f)
+  const TArray<FVector3f>* RestPV = nullptr, const TArray<float>* RestMaxDist = nullptr, float ThickCm = 0.0f) /* PROVEN game default 0; was HEURISTIC 2 cm */
 {
   int32 Fitted = 0;
   float MinScale = 1.0f;
@@ -797,6 +797,7 @@ int32 AddCollision(UPhysicsAsset* PA, const TSharedPtr<FJsonObject>& Coll, const
   // HEURISTIC R76/R91/R93/R97k — not from game data. F45 motion unverified.
   static TAutoConsoleVariable<float> CVarFitFloor(TEXT("sm2.RestFitFloor"), 0.9f, TEXT("SM2 cloth rest-fit radius floor (R76 default 0.9; legacy 0.25); overridden by sidecar collision.restFitFloor when present"));
   static TAutoConsoleVariable<float> CVarDeepFrac(TEXT("sm2.RestFitDeepFrac"), 0.5f, TEXT("SM2 cloth rest-fit: particles deeper than this fraction of the radius are ignored (0 = legacy, none ignored); overridden by sidecar collision.restFitDeepFrac"));
+  bool bRestFitEnabled = false; // sidecar restFitEnabled; default OFF (exe has no restFit)
   float RestFitFloor = FMath::Clamp(CVarFitFloor.GetValueOnGameThread(), 0.0f, 1.0f), DeepFrac = FMath::Clamp(CVarDeepFrac.GetValueOnGameThread(), 0.0f, 1.0f);
   // R93 A/B: the floor is only applied when fewer than this fraction of the free rest particles sit shallowly inside the shape
   // (many shallow hits = the authored shape is really too big for this mesh, e.g. a single coat capsule). 1 = always floor (R91).
@@ -810,6 +811,7 @@ int32 AddCollision(UPhysicsAsset* PA, const TSharedPtr<FJsonObject>& Coll, const
   if (Coll.IsValid())
   {
     double V = 0.0;
+    Coll->TryGetBoolField(TEXT("restFitEnabled"), bRestFitEnabled);
     if (Coll->TryGetNumberField(TEXT("restFitFloor"), V)) RestFitFloor = FMath::Clamp((float)V, 0.0f, 1.0f);
     if (Coll->TryGetNumberField(TEXT("restFitDeepFrac"), V)) DeepFrac = FMath::Clamp((float)V, 0.0f, 1.0f);
     if (Coll->TryGetNumberField(TEXT("restFitShallowFrac"), V)) { ShallowFrac = FMath::Clamp((float)V, 0.0f, 1.0f); Log.Add(FString::Printf(TEXT("%s: restFit from sidecar floor=%.2f deep=%.2f shallow=%.3f"), *Who, RestFitFloor, DeepFrac, ShallowFrac)); }
@@ -821,7 +823,7 @@ int32 AddCollision(UPhysicsAsset* PA, const TSharedPtr<FJsonObject>& Coll, const
   auto FitScale = [&](const FVector& A, const FVector& B, float RA, float RB) {
     float S = 1.0f, Raw = 1.0f; int32 Shallow = 0, Free = 0;
     LastRawScale = 1.0f; LastPreFloor = 1.0f; LastShallow = LastDeep = LastFree = 0;
-    if (!RestPV) return S;
+    if (!bRestFitEnabled || !RestPV) return S; // HEURISTIC rest-fit off by default (REA_DEEP)
     const FVector AB = B - A; const double L2 = AB.SizeSquared();
     for (int32 I = 0; I < RestPV->Num(); ++I)
     {
@@ -1450,7 +1452,7 @@ bool USM2PhysicsSetupLibrary::CreateChaosCloth(USkeletalMesh* Mesh, const FStrin
         SetProp(Config, TEXT("TetherScale"), W(FMath::Clamp(Num(CC, TEXT("tetherScale"), 1), 1.0, 1.2)), Log);
         SetProp(Config, TEXT("DampingCoefficient"), FString::SanitizeFloat(FMath::Clamp(Num(CC, TEXT("dampingCoefficient"), 0.01), 0.0, 1.0)), Log);
         // mtl1-13b: thicker collision + CCD against fast limbs (HEURISTIC; measured penetration 2-6% at 1 cm).
-        SetProp(Config, TEXT("CollisionThickness"), FString::SanitizeFloat(FMath::Max(2.0, Num(CC, TEXT("collisionThicknessCm"), 1))), Log);
+        SetProp(Config, TEXT("CollisionThickness"), FString::SanitizeFloat(FMath::Max(0.0, Num(CC, TEXT("collisionThicknessCm"), 0.0)) /* PROVEN default 0 */), Log);
         SetProp(Config, TEXT("bUseCCD"), TEXT("True"), Log);
         SetProp(Config, TEXT("FrictionCoefficient"), FString::SanitizeFloat(Num(CC, TEXT("frictionCoefficient"), 0.8)), Log);
         const double LV = FMath::Clamp(Num(CC, TEXT("linearVelocityScale"), 0.75), 0.0, 1.0);
@@ -1478,7 +1480,7 @@ bool USM2PhysicsSetupLibrary::CreateChaosCloth(USkeletalMesh* Mesh, const FStrin
         TSharedPtr<FJsonObject> Coll;
         if (CC.IsValid() && CC->TryGetObjectField(TEXT("collision"), CO))
           Coll = *CO;
-        if ((bAddCollision && AddCollision(CollPA, Coll, Mesh->GetRefSkeleton(), RefCS, Log, SimName, &PV, &MaxCm, FMath::Max(2.0f, (float)Num(CC, TEXT("collisionThicknessCm"), 1))) > 0) || CollPA->SkeletalBodySetups.Num() > 0)
+        if ((bAddCollision && AddCollision(CollPA, Coll, Mesh->GetRefSkeleton(), RefCS, Log, SimName, &PV, &MaxCm, FMath::Max(0.0f, (float)Num(CC, TEXT("collisionThicknessCm"), 0.0)) /* PROVEN default 0 */) > 0) || CollPA->SkeletalBodySetups.Num() > 0)
         {
           Asset->PhysicsAsset = CollPA;
           Asset->RefreshBoneMapping(Mesh);
