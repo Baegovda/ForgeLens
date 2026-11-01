@@ -1760,6 +1760,34 @@ FString USM2PhysicsSetupLibrary::DescribeBody(UPhysicsAsset* PA, USkeletalMesh* 
   return Out;
 }
 
+FString USM2PhysicsSetupLibrary::ListBodies(UPhysicsAsset* PA)
+{
+  if (!PA) return TEXT("no PA");
+  FString Out;
+  for (int32 I = 0; I < PA->SkeletalBodySetups.Num(); ++I)
+    if (const USkeletalBodySetup* B = PA->SkeletalBodySetups[I])
+      Out += FString::Printf(TEXT("%d %s %d\n"), I, *B->BoneName.ToString(), (int32)B->PhysicsType);
+  return Out;
+}
+
+int32 USM2PhysicsSetupLibrary::SetBodiesKinematic(UPhysicsAsset* PA, const TArray<FString>& BoneNames, bool bKinematic, FString& Report)
+{
+  Report.Reset();
+  if (!PA) { Report = TEXT("no PA"); return 0; }
+  PA->Modify();
+  int32 N = 0;
+  for (USkeletalBodySetup* B : PA->SkeletalBodySetups)
+  {
+    if (!B || !BoneNames.Contains(B->BoneName.ToString())) continue;
+    const EPhysicsType Want = bKinematic ? PhysType_Kinematic : PhysType_Default;
+    Report += FString::Printf(TEXT("%s %d->%d; "), *B->BoneName.ToString(), (int32)B->PhysicsType, (int32)Want);
+    if (B->PhysicsType != Want) { B->Modify(); B->PhysicsType = Want; ++N; }
+  }
+  if (N) { PA->RefreshPhysicsAssetChange(); PA->MarkPackageDirty(); }
+  Report += FString::Printf(TEXT("changed=%d"), N);
+  return N;
+}
+
 int32 USM2PhysicsSetupLibrary::SetSimGravity(UPhysicsAsset* PA, bool bEnable)
 {
   if (!PA) return 0;

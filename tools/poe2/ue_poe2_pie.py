@@ -102,17 +102,13 @@ def desc(only, pattern):
     for b in X.get_bone_names(X.get_reference_pose(mesh.get_editor_property("skeleton"))):
         if pattern in str(b): print("POE3 desc", unreal.SM2PhysicsSetupLibrary.describe_body(pa, mesh, b))
 
-def kin(only, pattern):
-    """Make the matching bodies kinematic (follow animation). Used for chain roots that hang far from their kinematic parent."""
+def kin(only, names, on="1"):
+    """Make the named bodies (exact bone names, '+'-separated) kinematic = follow animation (on=1) or simulated again (on=0).
+    Uses SM2PhysicsSetupLibrary.set_bodies_kinematic (plugin, 2026-10-31). For chain roots far from their kinematic parent."""
     pa = unreal.load_asset(MESHES[only]).get_editor_property("physics_asset")
-    try: bs = pa.get_editor_property("skeletal_body_setups")
-    except Exception as e: print("POE3 kin no access", e); return
-    n = 0
-    for b in bs:
-        if pattern in str(b.get_editor_property("bone_name")):
-            b.set_editor_property("physics_type", unreal.PhysicsType.PHYS_TYPE_KINEMATIC); n += 1
-            print("POE3 kin", only, b.get_editor_property("bone_name"))
-    EAL.save_loaded_asset(pa, False); print("POE3 kin count", n)
+    r = unreal.SM2PhysicsSetupLibrary.set_bodies_kinematic(pa, names.split("+"), bool(int(on)))
+    EAL.save_loaded_asset(pa, False); print("POE3 kin", only, names, on, r)
+    print("POE3 bodies", only, unreal.SM2PhysicsSetupLibrary.list_bodies(pa).replace("\n", " | "))
 
 def restore():
     prev = json.load(open(os.path.join(P.SAVED, "poe3_prev.json"))).get("prev", "")
@@ -143,6 +139,6 @@ if __name__ == "__main__":
     elif m == "osc": P.osc(float(a[1]), float(a[2]), float(a[3]) if len(a) > 3 else 1.0, a[4] if len(a) > 4 else "phys")
     elif m == "result": P.result()
     elif m == "grav": grav(a[1], a[2])
-    elif m == "kin": kin(a[1], a[2])
+    elif m == "kin": kin(a[1], a[2], a[3] if len(a) > 3 else "1")
     elif m == "desc": desc(a[1], a[2])
     elif m == "list": print("POE3 world", P.world().get_path_name(), [x.get_actor_label() for x in P.actors()])

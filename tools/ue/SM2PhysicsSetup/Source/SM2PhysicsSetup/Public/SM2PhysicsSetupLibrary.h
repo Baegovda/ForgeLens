@@ -45,6 +45,16 @@ public:
   UFUNCTION(BlueprintCallable, Category = "SM2|Physics")
   static FString DescribeBody(UPhysicsAsset* PA, USkeletalMesh* Mesh, FName Bone);
 
+  /** List every body of PA: "index bone type(0 default,1 kinematic,2 simulated)" per line. */
+  UFUNCTION(BlueprintCallable, Category = "SM2|Physics")
+  static FString ListBodies(UPhysicsAsset* PA);
+
+  /** Set the bodies whose bone name is in BoneNames (exact match) to kinematic (follow animation) or back to default (simulated
+      by the RigidBody node). Used for chain roots that hang far from their kinematic parent (long lever arm -> pops).
+      Refreshes the asset; caller saves. Returns the number of bodies changed. */
+  UFUNCTION(BlueprintCallable, Category = "SM2|Physics")
+  static int32 SetBodiesKinematic(UPhysicsAsset* PA, const TArray<FString>& BoneNames, bool bKinematic, FString& Report);
+
   /** Diagnostic: gravity on/off for every simulated body. Caller saves. */
   UFUNCTION(BlueprintCallable, Category = "SM2|Physics")
   static int32 SetSimGravity(UPhysicsAsset* PA, bool bEnable);
