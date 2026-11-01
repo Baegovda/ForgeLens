@@ -50,5 +50,5 @@ You are taking over **ForgeLens** for owner **Baegovda** on PC **Revaptor-FX**. 
 ## How to work
 - Prefer Shell with machineId on Revaptor-FX for git/UE/Ghidra.
 - Take/release editor lock; use EngineWire when editor up, else headless Cmd.
-- Commit docs/code carefully; push **ff-only** with the push lock held.
+- Commit docs/code carefully; push fast-forward only (no --force) with the push lock held.
 - If anything in HANDOFF conflicts with older STATUS/ledger text, **HANDOFF usage-cutoff section wins**.
