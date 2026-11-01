@@ -41,7 +41,7 @@ $p = Start-Process -FilePath $exe -ArgumentList $a -WindowStyle Hidden -PassThru
 - Game: `D:\Steam\steamapps\common\Space Marine 2\client_pc`. Some D: reads are refused; copy to `C:\Users\Revaptor_FX\` first.
 - Unreal 5.7.4 project: `K:\Unreal Projects\UE_VFX_57`.
   - Log: `Saved\Logs\UE_VFX_57.log`. Crash reports: `Saved\Crashes\`.
-  - Content `/Game/SM2_Work/{Animations, Characters, Materials, Original (read-only), Props, Tests/<stage>}`.
+  - Content: default **`/Game/ForgeLens/<CODE>/`** (SM2/POE/BMW); legacy `/Game/SM2_Work/{Animations, Characters, Materials, Original (read-only), Props, Tests/<stage>}` still present (`FORGELENS_UE_ROOT=legacy`).
   - Tests folders now: `anim_finish(2)`, `anim_survey`, `bulk`, `bulk_fix`, `mat2_hair`, `physics`, `pre_step3`, `retarget`, `rhino_stacked`, `sani_before`, `step3_ab_off`, `v4`.
 - Tools on the PC: Python 3.10 (`pip install uemcp mcp`; mcp ≥1.30 for streamable HTTP), Node 24 / npm 11, VS 2022 (Community + Build Tools 17.14), git, gh (logged in as the repo owner).
 - No Ghidra project on the PC; RE happens on the box.
@@ -186,8 +186,8 @@ xvfb-run -a -s "-screen 0 1920x1080x24" dotnet run --project src/LibSaber.SM2Bro
 5. Format-patch → PC `push.ps1` (§4).
 6. Short Korean report to the user with the % and what's next.
 
-## 9. The progress report routine (`sm2-20`) — every 20 min; hourly after the owner says "자러간다" (10/30, supersedes "hourly")
-The user wants automatic interim reports. The recurring routine is named `sm2-20` (historical name) and runs **every hour** (changed from 20 minutes on 10/28, ledger R22). It should:
+## 9. The progress report routine (`sm2-20` (DELETED — do not recreate)) — every 20 min; hourly after the owner says "자러간다" (10/30, supersedes "hourly")
+The user wants automatic interim reports. The recurring routine is named `sm2-20` (DELETED — do not recreate) (historical name) and runs **every hour** (changed from 20 minutes on 10/28, ledger R22). It should:
 - check running executors/subagents, the box worktrees (`git log -3`, `git status`), new files in `/workspace/patches/*` and `/workspace/browser_run_shots/*`, and, only if cheap, the PC capture folders;
 - write a 2–4 line Korean report: what finished, what is running, **progress %**, ETA (추정), blockers;
 - **stay quiet if nothing changed** since the last report. Never send a stale or duplicate report, and never say "nothing is running" while an executor is active;
