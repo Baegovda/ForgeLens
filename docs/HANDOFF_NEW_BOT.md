@@ -12,6 +12,25 @@ Where this file and older docs disagree, THIS file wins (it is the newest). Olde
 
 ---------------------------------------------------------------------------------------------------
 ---------------------------------------------------------------------------------------------------
+---------------------------------------------------------------------------------------------------
+## 2026-11-02 R99 SM2PhysicsSetup build + commissar coat PIE A/B (Asia/Seoul)
+
+### UBT / KawaiiPhysics (NOT our plugin)
+- Host project build of `UE_VFX_57Editor` failed with **RulesError** (UBT Log.txt ~03:48 KST). Exact lines:
+  - `Expecting to find a type to be declared in a module rules named 'KawaiiPhysics' in 'UE5Rules, Version=0.0.0.0, Culture=neutral, PublicKeyToken=null'.  This type must derive from the 'ModuleRules' type defined by UnrealBuildTool.`
+  - `Result: Failed (RulesError)`
+- Cause: `K:\Unreal Projects\UE_VFX_57\UE_VFX_57.uproject` enabled marketplace plugin **KawaiiPhysics**, but the installed engine plugin under `C:\Program Files\Epic Games\UE_5.7\Engine\Plugins\KawaiiPhysics` does **not** contribute a `KawaiiPhysics` ModuleRules type into the installed `UE5Rules` assembly (broken/incomplete engine-plugin install). Our repo has **zero** KawaiiPhysics references (`git grep` empty).
+- Fix (no engine edit): set `"Name": "KawaiiPhysics", "Enabled": false` in the host `.uproject` (backup `UE_VFX_57.uproject.bak_r99_kawaii`). Built our plugin alone via **RunUAT BuildPlugin** → SUCCESS; deployed `UnrealEditor-SM2PhysicsSetup.dll` (412672 bytes, 04:25 KST) to `K:\Unreal Projects\UE_VFX_57\Plugins\SM2PhysicsSetup\Binaries\Win64\` (previous Binaries → `Binaries.bak_r99`).
+
+### Commissar coat PIE before/after
+- Script: `tools/ue/ue_r99_coat_ab.py` (swap physics sidecar → ue_r90 prep/scene/actor/cams/sim/cap/measure).
+- **before_old**: collisionThicknessCm=2, restFitEnabled=true → prep log coat `restFitted=1 final=0.900`.
+- **after_new**: collisionThicknessCm=0, restFitEnabled=false → prep log coat `restFitted=0 final=1.000`.
+- Measures (run anim, ~12s sim): old skinInside>1cm free=**206** worst=11.07; new free=**303** worst=9.93. nan=false both (no explosion).
+- Verdict: thickness 0 + restFit off increases measured skin penetration (~206→303 free). **Documented; heuristics NOT silently re-enabled.** Visually no cloth explosion; coat still simulates.
+- PNGs: `docs/handoff/r99/commissar_coat_{before_old,after_new}.png`; box `/workspace/r99/commissar_coat_{before_old,after_new}.png`; PC `Shots\r99_coat\`. MEASURE.md beside them.
+
+
 ## 2026-11-02 REA-proven cloth thickness + RestFit opt-out (with UseSpecMap/lights)
 
 ### Cloth (C) — REA_DEEP §2
