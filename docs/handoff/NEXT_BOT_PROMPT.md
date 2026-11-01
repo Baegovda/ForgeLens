@@ -11,7 +11,7 @@ You are taking over **ForgeLens** for owner **Baegovda** on PC **Revaptor-FX**. 
 ## Repo / branch / tip
 - GitHub: **Baegovda/ForgeLens** (private)
 - Branch: **`cursor/sm2-pck-extractor-4420`**
-- Tip at handoff: **`3a6ba3f`** (`3a6ba3f725fc79a9b89ef892b7365a7e0db745c4`)  -  confirm with `git fetch && git log --oneline -5`
+- Code tip before docs handoff: **`3a6ba3f`**. Docs tip (this file): **`33a8cda`** (`33a8cdaabcf0ee2be2d76be2c9cd6380f65d0ec7`). Confirm with `git fetch && git log --oneline -5`
 - Push clone (clean): `C:\Users\Revaptor_FX\ls_push` on machineId **`d3fb99ad-25ca-45c1-81af-41e5ca09104a`**
 - vs master: ~**387 ahead / 1 behind**  -  **do not** push/merge `master` without an explicit owner decision
 
@@ -20,7 +20,7 @@ You are taking over **ForgeLens** for owner **Baegovda** on PC **Revaptor-FX**. 
 - UE project: `K:\Unreal Projects\UE_VFX_57\UE_VFX_57.uproject` (UE 5.7.4)
 - Content roots: only `/Game/SM2_Work` and `/Game/ForgeLens/<CODE>/` (SM2, POE, BMW, …)
 - Editor lock: `C:\Users\Revaptor_FX\ue_editor_busy.txt` (idle = `editor-free …`)
-- Push: `Desktop\SM2_Work\Scripts\mtl_fix\push.ps1` (ff-only; applies `%USERPROFILE%\0*.patch`) **or** direct `git push --ff-only` from `ls_push` if you committed there; one push at a time via named lock (`forgelens_push.lock` / `tools/re/box/push_lock.sh`). **Never force-push.**
+- Push: `Desktop\SM2_Work\Scripts\mtl_fix\push.ps1` (ff-only; applies `%USERPROFILE%\0*.patch`) **or** direct `git push` (never `--force`; verify merge-base equals remote tip first) from `ls_push` if you committed there; one push at a time via named lock (`forgelens_push.lock` / `tools/re/box/push_lock.sh`). **Never force-push.**
 - RE / Ghidra: `C:\Users\Revaptor_FX\sm2_re\` (project `ghidra_full`, log `ghidra_full.log`); JDK+Ghidra under `Desktop\SM2_Work\Tools\re_env\`
 - UE delete candidates CSV: `C:\Users\Revaptor_FX\sm2_re\ue_old_assets_candidates.csv`
 
