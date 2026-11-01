@@ -2870,3 +2870,10 @@ Remains: orb ~15 % dimmer, no large soft bloom sprite (template size not settabl
 - (e) ue_cap_lit.py texture-compile wait: already done (988555d, wait_compiled()); old TODO annotated.
 - (f) F49 REA: attenCurveParam -> P0.w PROVEN on 2026-10-29. The UseSpecMap flag writer (OBJ_MTLBLEND_LAYER_CONST[15].x) is still not located, and this round did not resume that Ghidra search (multi-hour RE, no new lead). The switch stays HEURISTIC.
 - Skipped (need in-game captures, owner-only): F45 physics motion vs game, R51 muzzle flash / aim pose visual check.
+
+## 2026-11-02 docs refresh (pointer only — do not rewrite history above)
+- Source of truth for new bots / current tip / P-list: **`docs/HANDOFF_NEW_BOT.md`** ("2026-11-02 정리").
+- App tip at cleanup: **`1461bbf`** (Wukong M1 draft). ForgeLens_latest = that publish (01:52 KST). Editor lock → `editor-free`.
+- P1 PoE2 VFX leftovers done (`edf8e92`). P2 BellCrow kinematic **code-only** (`760c055`; UE plugin build/PIE unverified).
+- Entry docs updated to point at HANDOFF_NEW_BOT first; STATUS historical SM2 ledger retained below its new banner.
+- **master** cleanup vs keep working branch: **owner decision** — this pass does not push to `master`.

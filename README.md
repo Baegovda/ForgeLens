@@ -1,11 +1,25 @@
 > **⭐ CORE CONCEPT:** Every supported game (SM2, PoE2, Black Myth: Wukong, Stellar Blade, Elden Ring) is **the SM2 feature set with only the game changed** — same models, skeletons, animations, textures, materials, physics/cloth, levels/props, viewer, and Unreal import under `/Game/ForgeLens/<CODE>/`. **Shared pipeline; only game-specific readers/parsers differ.** PoE2 skills (effects/animations) must be viewable in the viewer. Full text: `docs/RULES_CORE.md`.
-> **For AI agents (new SM2 / Forge Lens assistant): read [`docs/BOT_TRANSFER.md`](docs/BOT_TRANSFER.md) first (its §0 "Resume checklist"), then [`HANDOFF.md`](HANDOFF.md).** Reply to the user in short Korean 해요체.
+> **For AI agents: read [`docs/HANDOFF_NEW_BOT.md`](docs/HANDOFF_NEW_BOT.md) FIRST** (wins). Then `AGENTS.md`, `docs/RULES_CORE.md`. Older: `docs/BOT_TRANSFER.md` (box rebuild), `HANDOFF.md` (ledger). Reply in short Korean 해요체. App version **0.97.0**; working branch `cursor/sm2-pck-extractor-4420` (not `master`).
 
 # LibSaber
 
+## Current status (2026-11-02 KST)
+- **Forge Lens** `ForgeLens.exe` version **0.97.0** (`src/LibSaber.SM2Browser/LibSaber.SM2Browser.csproj`).
+- Branch tip for app code: **`1461bbf`** (Wukong M1 draft UI). Docs tip = this branch HEAD.
+- Deploy: `Desktop\SM2_Work\Bin\ForgeLens_latest` (publish of 1461bbf, 2026-11-02 01:52 KST).
+- Tracks: SM2 ≈ done; PoE2 M0–M3 landed (BellCrow kinematic = **code only**, UE plugin/PIE unverified); Wukong M0 + M1 draft (AES via **`BMW_AES_KEY`**, not committed tool literals).
+- Build/run (box or PC with .NET 8):
+  ```
+  dotnet build LibSaber.sln -c Release -m:1
+  dotnet publish src/LibSaber.SM2Browser -c Release -p:PublishProfile=win-x64
+  dotnet run --project src/LibSaber.SM2Browser
+  ```
+- Full status: `docs/HANDOFF_NEW_BOT.md`. **master cleanup is an owner decision** — do not push docs/code to `master` from this pass.
+
+
 **Forge Lens** is the desktop asset browser/exporter built on this library (project `src/LibSaber.SM2Browser`, published as `ForgeLens.exe`; the CLI stays `LibSaber.SM2Extractor.exe`).
 
-> Agents / contributors continuing the Space Marine 2 work: start with [`AGENTS.md`](AGENTS.md) and [`docs/handoff/`](docs/handoff/).
+> Agents: [`docs/HANDOFF_NEW_BOT.md`](docs/HANDOFF_NEW_BOT.md) → [`AGENTS.md`](AGENTS.md) → [`docs/handoff/`](docs/handoff/). Tracks: SM2 done (R97–R98), PoE2 M0–M3, Wukong M0 + M1 draft.
 
 A work-in-progress library for parsing game files used by Saber Interactive's Saber3D engine.
 
@@ -58,7 +72,7 @@ The extractor is covered by synthetic `.pak` / `.pck` archives in `test/LibSaber
 
 ## Space Marine 2 browser
 
-`LibSaber.SM2Browser` is the desktop browser on top of the same archive reader. Open the game folder or a `client_pc` folder. The app reads `.pak.cache` / `.pck.cache` files under that folder, builds one folder tree merged across those archives, and leaves the payloads on disk until a preview or export asks for one file. The last folder is stored under `%LocalAppData%\LibSaber\SM2Browser\settings.json`.
+`LibSaber.SM2Browser` is the desktop browser on top of the same archive reader. Open the game folder or a `client_pc` folder. The app reads `.pak.cache` / `.pck.cache` files under that folder, builds one folder tree merged across those archives, and leaves the payloads on disk until a preview or export asks for one file. The last folder is stored under `%LocalAppData%\ForgeLens\settings.json (legacy LibSaber path may exist)`.
 
 The folder tree starts expanded at the root you opened. Files stay in a virtualized list (path, type, size, archive) because a retail install is on the order of 486,000 entries, most of them `.pct_mip`. "Include subfolders" lists every file under the selected folder. Search matches the path. The type filter covers textures, models, animations, effects, and text. The same internal path in more than one archive keeps the last archive in path order, and the archive column is that archive's path relative to the folder you opened.
 

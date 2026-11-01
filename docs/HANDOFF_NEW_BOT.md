@@ -61,7 +61,8 @@ Owner-approved cleanup on Revaptor-FX. **This section wins** over older STATUS.m
 | P11 | PoE2 → Niagara | **owner go/no-go still needed** |
 
 ### Docs note
-- `docs/handoff/STATUS.md` and `AGENTS.md` are **stale**. **HANDOFF_NEW_BOT.md wins.** STATUS.md now has a one-line pointer at the top to this file.
+- **This file still wins.** A 2026-11-02 docs-refresh pass updated `AGENTS.md`, `START_HERE`, `BOT_TRANSFER`, `RULES_CORE`, `SUBAGENT_PREAMBLE`, `STATUS.md` (current summary + historical SM2 ledger), `README`, root `HANDOFF.md` (append-only pointer), `POE2_M*.md`, `WUKONG_M0.md`, `ROADMAP`, `WORKFLOW` for the stale items listed in the owner brief. Re-read those files; do not resurrect interim-% / `sm2-20` / "Niagara out of roadmap" / "`/Game/SM2_Work` only" / "BTL not ours".
+- **master cleanup remains an owner decision** — docs refresh pushes only to `cursor/sm2-pck-extractor-4420`.
 
 ### Open owner questions
 1. **Niagara P11** go/no-go?
@@ -172,8 +173,8 @@ Game: `D:\Daum Games\Path of Exile2\Content.ggpk` (159.9 GB, GGPK v3, bundles in
 - Not done: tile rotation, ground blending/masks, decals, lights/.env, other areas; smoke is flat colour; stormblast octagon only in the viewer; no subsurface/specular; cart rhoa/others physics not seen against the game.
 - **Niagara conversion** (owner asked for an estimate, t278u, and it was offered as the NEXT job after the current work; he has not said go yet): large, no time measured. Steps: (1) converter EmitterDef -> Niagara emitter (spawn rate, lifetime, velocity, size/colour curves, flipbook, mesh particles, lights) on 5 representative effects; (2) compare with the viewer; (3) automated compile + validation (EngineWire-made emitters needed an editor open+compile in SM2 orb work, R97t); (4) extend to the most-used effects. Not started; do only if the owner says go.
 
-### 4.3 Black Myth: Wukong (code BMW) - M0 done (f4dc100)
-Install `D:\Steam\steamapps\common\BlackMythWukong` (app 2358720, ~150 GB), exe `b1\Binaries\Win64\b1-Win64-Shipping.exe`, paks `b1\Content\Paks\pakchunk*.pak` (no IoStore). Custom UE 5.0 pak **v11 + extra int16**, **AES-256 encrypted index**, **Oodle**. Community AES key + usmap noted in `docs/WUKONG_M0.md` - **key NOT tested, nothing decrypted, no asset parsed**. M1 plan: pak reader -> `bmw_index.tsv`; UE5.0 cooked asset reader with usmap (CUE4Parse as reference; check licence); glTF -> viewer -> `/Game/ForgeLens/BMW/`. Never run the game (no usmap dumping). [V WUKONG_M0]
+### 4.3 Black Myth: Wukong (code BMW) - M0 done (f4dc100); M1 draft (1461bbf)
+Install `D:\Steam\steamapps\common\BlackMythWukong` (app 2358720, ~150 GB), exe `b1\Binaries\Win64\b1-Win64-Shipping.exe`, paks `b1\Content\Paks\pakchunk*.pak` (no IoStore). Custom UE 5.0 pak **v11 + extra int16**, **AES-256 encrypted index**, **Oodle**. Community AES key + usmap in `docs/WUKONG_M0.md`; tools must use **`BMW_AES_KEY`** (do not commit key literals). **M1 draft in-tree:** BmwGlb + BmwWindow + toolbar + `ue_bmw_import.py`. Pak decrypt readers with hard-coded keys left untracked. Key decrypt path still not verified in CI. Never run the game (no usmap dumping). [V WUKONG_M0 + 2026-11-02 정리]
 
 ### 4.4 Stellar Blade, Elden Ring - not started. Elden Ring is not UE (FromSoftware formats). [I]
 

@@ -54,3 +54,6 @@
   * Map_Floor has no ABP on any actor (ue_r97_rbcheck.py), so the source is something loaded at startup: BongThumbLive asset thumbnails or a chars_phys ABP.
   * INFERRED: the commissar/tech_priest meshes in chars_cloth2 use chars_phys skeletons (mismatch), and the log shows a linker warning on PA_cc_commissar_SM2.
   * No symbols in the stack, so the exact asset is not pinned.
+
+## 2026-11-02 docs refresh (pointer)
+See root `HANDOFF.md` append and `docs/HANDOFF_NEW_BOT.md`. Live status is not maintained in this short R97 file.
