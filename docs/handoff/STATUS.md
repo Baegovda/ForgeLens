@@ -1,9 +1,36 @@
-> **STALE.** Current handoff: [docs/HANDOFF_NEW_BOT.md](../HANDOFF_NEW_BOT.md) (wins over this file and AGENTS.md). Tip as of 2026-11-02 KST cleanup: `1461bbf`.
+> **Current handoff (wins):** [`docs/HANDOFF_NEW_BOT.md`](../HANDOFF_NEW_BOT.md) — "2026-11-02 정리". App tip **`1461bbf`** (Wukong M1 draft); docs tip moves with this branch. Confirm with `git fetch && git log --oneline -5 origin/cursor/sm2-pck-extractor-4420`.
 
-# STATUS — SM2 pipeline (as of 2026-10-27 ~05:15 KST, tip 57c38f9)
+# STATUS — ForgeLens / multi-game (current summary 2026-11-02 KST)
 
-Repo `Baegovda/ForgeLens` (private), branch `cursor/sm2-pck-extractor-4420`. Always confirm the current state with `git fetch && git log --oneline -30 origin/cursor/sm2-pck-extractor-4420`.
-Percentages are the previous agent's estimates of how complete each track is against the "looks exactly like in-game" goal.
+Repo `Baegovda/ForgeLens` (private), branch `cursor/sm2-pck-extractor-4420`. App version **0.97.0**. Deployed: `Desktop\SM2_Work\Bin\ForgeLens_latest` = publish of **1461bbf** (2026-11-02 01:52 KST). Editor lock released to `editor-free`. **Do not push to `master`** (owner decision; working branch is ~373 ahead / 1 behind master as of 2026-11-02).
+
+## Tracks (authoritative detail in HANDOFF_NEW_BOT §4–5)
+
+| Track | State | Notes |
+|---|---|---|
+| **SM2** | essentially done (R97–R98) | Cloth/orb/hub lights/muzzle soft/settings; leftovers F45/F49/muzzle aim wait on owner captures or REA |
+| **PoE2 M0** | done (`5c48c8f`) | GGPK probe — `docs/POE2_M0.md` |
+| **PoE2 M1** | done | meshes/skel/anim/mat into shared pipeline — `docs/POE2_M1.md` |
+| **PoE2 M2** | done + VFX leftovers **P1 DONE** (`edf8e92`) | skills/UI/particles/UE `/Game/ForgeLens/POE/` — `docs/POE2_M2.md` |
+| **PoE2 M3** | done + BellCrow kin **P2 code** (`760c055`) | levels/hideout/physics; **UE plugin rebuild + PIE unverified** — `docs/POE2_M3.md` |
+| **Wukong M0** | done (`f4dc100`) | format survey — `docs/WUKONG_M0.md` |
+| **Wukong M1** | **draft** (`1461bbf`) | BmwGlb + BmwWindow + toolbar + `ue_bmw_import.py`; pak decrypt tools **not** in repo (use `BMW_AES_KEY` env) |
+| Stellar Blade / Elden Ring | not started | |
+| BongThumbLive | pending P3 | dots spinner build/live check |
+| Niagara PoE2 | **P11 owner-gated** | offer/estimate only until go |
+
+## Open owner questions
+1. Niagara P11 go/no-go?
+2. Next focus: PoE2 polish vs finish Wukong M1 (pak reader without committing key literals)?
+3. Chaplain test folder deletion (move ~34 materials first)?
+4. **master** cleanup vs keep working only on `cursor/sm2-pck-extractor-4420`?
+
+---
+
+# STATUS — SM2 pipeline historical ledger (as of 2026-10-27 ~05:15 KST, tip 57c38f9)
+
+> The sections below are the **historical SM2 stage log** (kept for evidence). They are **not** the live multi-game status. Percentages are period estimates. Always prefer HANDOFF_NEW_BOT + `git log` above.
+
 
 ## adaptive-light / rea-batch 7 item 2 (2026-10-30 KST, R37): adaptive light multiplier implemented PROVEN — `CaptureLightUnits.AdaptiveFactor` = isAdaptiveIntensity ? clamp(avgLum, 0.05, 50) : 1 (FUN_14224ecf0 ← FUN_141ee9e80 ← FUN_141e90cb0; FUN_141de8140 LIGHTS_BUFFER passes 1.0); Capture()/Relative() and bench/UE export use it. No change for capture scenes (avgLum in range). Still HEURISTIC: DefaultAdaptive = true, bench exposure 1/250. Tests 381/43/5, py 24.
 

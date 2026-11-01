@@ -1,3 +1,5 @@
+> **Partly historical (2026-11-02).** Live priority list = `docs/HANDOFF_NEW_BOT.md` §5 (P1–P11). SM2 VFX/% rows below are 10/26–10/29 era; PoE2/Wukong work is tracked in HANDOFF_NEW_BOT + `docs/POE2_*.md` / `WUKONG_M0.md`. Niagara is **P11 owner-gated**, not "out of roadmap forever".
+
 # ROADMAP — approved work order and next steps
 
 ## Work order the user approved (2026-10-26 22:07 KST), with status
