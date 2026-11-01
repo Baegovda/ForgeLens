@@ -190,7 +190,14 @@ public class EffectTests
   public void HiddenSourceStillSpawnsAttachedChildren()
   {
     // isVisible only gates draw submission in the exe (FUN_1417f71b0 / FUN_1417ee5c0), so a hidden source still emits.
-    var hidden = Part.Replace("burst   =   {\n      isVisible   =   True", "burst   =   {\n      isVisible   =   False");
+    // Brittle whitespace-sensitive Replace used to fail when the fixture indent drifted; flip the first burst isVisible only.
+    var burstAt = Part.IndexOf("burst", StringComparison.Ordinal);
+    Assert.True(burstAt >= 0);
+    var visAt = Part.IndexOf("isVisible", burstAt, StringComparison.Ordinal);
+    Assert.True(visAt > burstAt);
+    var trueAt = Part.IndexOf("True", visAt, StringComparison.Ordinal);
+    Assert.True(trueAt > visAt && trueAt - visAt < 40);
+    var hidden = Part.Substring(0, trueAt) + "False" + Part.Substring(trueAt + 4);
     Assert.NotEqual(Part, hidden);
     var library = new EffectLibrary(new MemoryEffectSource(new Dictionary<string, string> { ["fx_part"] = hidden }));
     var def = EffectDefinition.Build("fx_part", library.Resolve("fx_part")!);
