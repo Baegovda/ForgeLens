@@ -1,6 +1,6 @@
 # HANDOFF_NEW_BOT - ForgeLens + Bong* projects, transfer to a new Grok Bot account
 
-> **NEW BOT: START HERE. The owner's usage on the old account is nearly exhausted (2026-10-31). Read this whole file first, then section 0.** Last update: 2026-11-02 (SM2 oddities A/B/C after tip `e937708`; see section above). Prior cleanup tip `1461bbf`. See section "2026-11-02 정리" below — it wins over older sections here when they disagree.
+> **NEW BOT: START HERE.** Owner usage nearly exhausted (2026-11-02). Read this whole file first, then section 0. **Current tip `3a6ba3f`**. Winning section: **"2026-11-02 ~04:55 KST  -  usage-cutoff handoff"**. Also read `docs/handoff/NEXT_BOT_PROMPT.md`. Prior cleanup tip `1461bbf` is historical.
 
 Written 2026-10-31 ~16:00-16:30 KST by the previous assistant ("ForgeLens" bot, Grok Bot) because the owner's usage is running out.
 Owner request (t279u, verbatim): "이제 사용량이 얼마 안남아서 다른 계정의 봇에게 인계할 인수인계문서를 아주아주 꼼꼼하게 모든걸 전달할수있게 남겨줘 5번 재확인하고 보강해줘"
@@ -13,6 +13,88 @@ Where this file and older docs disagree, THIS file wins (it is the newest). Olde
 ---------------------------------------------------------------------------------------------------
 ---------------------------------------------------------------------------------------------------
 ---------------------------------------------------------------------------------------------------
+## 2026-11-02 ~04:55 KST  -  usage-cutoff handoff (tip **3a6ba3f**)
+
+> **This section wins** over older HANDOFF sections / STATUS tip lines when they disagree. Written so the next bot can resume without chat history.
+
+### Git tip [V]
+- Branch `cursor/sm2-pck-extractor-4420` @ **`3a6ba3f`** (`3a6ba3f725fc79a9b89ef892b7365a7e0db745c4`)  -  *R99: SM2PhysicsSetup BuildPlugin deploy + commissar coat PIE A/B*
+- Clean checkout for docs/push: `C:\Users\Revaptor_FX\ls_push` on **Revaptor-FX** (`machineId` `d3fb99ad-25ca-45c1-81af-41e5ca09104a`)
+- vs `origin/master`: working branch **~387 ahead / 1 behind** (do **not** push/merge master without owner decision)
+- Recent commits after prior docs tip `eddf91e`:
+  | SHA | What |
+  |---|---|
+  | [`ddc8f88`](https://github.com/Baegovda/ForgeLens/commit/ddc8f88) | SM2 REA: PROVEN UseSpecMap + level lights + cloth thickness |
+  | [`4be1d4e`](https://github.com/Baegovda/ForgeLens/commit/4be1d4e) | GlPreview UseSpecMap Decide via PreviewPartDraw.Source MeshPart |
+  | [`3a6ba3f`](https://github.com/Baegovda/ForgeLens/commit/3a6ba3f) | R99 SM2PhysicsSetup BuildPlugin + commissar coat PIE A/B |
+
+### REA findings (authoritative copies in-repo) [V]
+Copied from box `/workspace/sm2_re/` → **`docs/re/REA_FINDINGS.md`**, **`docs/re/REA_DEEP.md`** (also mirrored earlier under `docs/handoff/RE_CACHE/notes/`; prefer `docs/re/` for the full deep pass).
+
+| Topic | Status | Key facts |
+|---|---|---|
+| **UseSpecMap** | **PROVEN** | Writer **`FUN_14217da70`** → `OBJ_MTLBLEND_LAYER_CONST[15].x`; flag **0x2000** iff tex `@+0xb0` usage bit **21 MSCRGHAO**; **0x40** iff bit **18 MSCG**. Usage table serializer **`FUN_14267baf0`** @ `0x144ccee10` (27 names). |
+| **Light packing / P0.w** | **PROVEN** | **`FUN_14224ecf0`** packs CB; **`FUN_14224f010`** P0.w: directional **0**, const atten **8e22**, inv-square **0.0025** with colour **×400**, else `a>0 ? 299*a^4+1 : 256^a`. |
+| **Tonemap / exposure / bloom** | **PROVEN** (CPU binder + prior DXIL) | **`FUN_1423bfc00`** registers vignette/hist/tonemapExposure/whitePoint; HDR layout `FUN_1421b24f0`. |
+| **Cloth defaults** | **PROVEN** | Stiffness phase **0.8 / 1.0 / 0.9 / 1.1**, gravity **(0,-9.8,0)**, solver **30 Hz**, **`collisionThickness` default 0**; **no rest-fit** knobs in exe. Capsule stride 0x48. |
+| **nmb ops** | **DATA-PROVEN** | **`c4`** = jump-if-falsey; **`98`** = jump-if-truthy; **`95`** = prep/coerce (ALU INFERRED). Exe dispatch table not found. |
+| **Muzzle** | **DATA-PROVEN** | From `.cls` `prop_firearm_shoot_tip.shootTip.locator` (default name `shootTip`); exe has no `shootTip` plaintext. |
+| **SFX emissive** | **PROVEN** | Loader **`FUN_1425fd580`** (`intensity`→+0x24, adaptive, bloomIntensity); packer `FUN_1424540e0` / `SFX_EMISSIVE_PARAMS`. |
+
+**Still open after REA:** IBL numeric CB values; shadow bias/cascades (names exhausted in exe  -  need .sdc/capture); spot light **directions** (TSV lacks dir/matrix); light intensity → UE units (**INFERRED**, historically maybe ~10× dim vs eye  -  FIT K=10 removed; do not silently restore). Full material re-export/reimport still TODO. Apply nmb ops + muzzle locator in code still TODO. Re-cite REA Evidence IDs after a successful Ghidra full analyze.
+
+### Cloth thickness-0 A/B (R99) [V]
+- PIE measure: penetrations free **206 → 303** when thickness 0 + restFit off; heuristics **not** re-enabled.
+- Suspected cause: collision **capsule data** / setup, not thickness alone. Next: coat penetration via collision capsules.
+
+### KawaiiPhysics / SM2PhysicsSetup [V]
+- Host `UE_VFX_57.uproject`: marketplace **KawaiiPhysics** set `"Enabled": false` (backup `UE_VFX_57.uproject.bak_r99_kawaii`) because UBT **RulesError** (engine plugin lacks ModuleRules in UE5Rules).
+- Our plugin **SM2PhysicsSetup** built via **RunUAT BuildPlugin** (SUCCESS); old binaries `Plugins\SM2PhysicsSetup\Binaries.bak_r99`.
+
+### Ghidra (user PC only  -  never bot box) [V]
+- Leave **java PID 102852** running if still alive. Cmd: headless AnalyzeHeadless import → project `C:\Users\Revaptor_FX\sm2_re\ghidra_full`, log `C:\Users\Revaptor_FX\sm2_re\ghidra_full.log`, **`-Xmx96G`**, **`-max-cpu 32`**.
+- Observed ~04:38 KST: log shows **`IllegalArgumentException: Negative delay`** then **`Import failed`** for Retail.exe; `sm2.gpr` size **0**. Process may still be alive with large RSS  -  **do not kill** unless owner says; if failed, restart headless with fixed timeout (avoid absurd `-analysisTimeoutPerFile 999999999` that overflows Timer) on PC with max resources.
+- Separate smaller java (GhidraServe on `proj_sm2`, ~2G heap) may also run  -  unrelated; leave unless conflicting.
+- Rule: **Ghidra / heavy RE only on Revaptor-FX**, never on the bot box.
+
+### UE old-asset cleanup (interrupted) [V 2026-11-02 ~04:52 KST]
+- CSV paths are under `Content/ForgeLens/SM2/Tests/...` (and `Sequences/`, `VFX/`, `Characters/`, `POE/Tests`). There is no top-level `SM2/chars_phys` delete target.
+- Candidate list: `C:\Users\Revaptor_FX\sm2_re\ue_old_assets_candidates.csv` (owner approved deleting listed `delete` rows).
+- **Actual disk state under** `K:\Unreal Projects\UE_VFX_57\Content\ForgeLens\SM2\`  -  **nothing from the delete set was removed** (interrupt before deletes landed):
+
+| Path (under SM2/) | Intended | Actual |
+|---|---|---|
+| `Tests/r63_cloth` | delete | **still EXISTS** |
+| `Tests/r67_cloth` | delete | **still EXISTS** |
+| `Tests/r67_phys` | delete | **still EXISTS** |
+| `Tests/r84_legacy` | delete | **still EXISTS** |
+| `Tests/r96` (+ nested bak) | delete | **still EXISTS** |
+| `Tests/r97` | delete | **still EXISTS** |
+| `Tests/r97_orbdark` | delete | **still EXISTS** |
+| `Tests/chars_phys/cc_commissar` | delete | **still EXISTS** |
+| `Tests/chars_phys/cc_tech_priest` | delete | **still EXISTS** |
+| `Sequences/BoltRifleFire_r97` | delete | **still EXISTS** |
+
+- **KEEP (do not delete)**  -  verified present: `Tests/r92_floor`, `Tests/r54_level`, `Tests/r72_mats`, `Tests/chars_cloth2` (+ chaplain folders), `VFX/vortex_orb`, `Tests/r90_cloth`, `Tests/chars_phys/cc_titus_assault`, `Tests/physics`, `Tests/pre_step3`, `Tests/sani_before`, `VfxUe_bak3`, `Characters/cc_chaplain/cc_chaplain_bak1.uasset`, `POE/Tests` (under `Content\ForgeLens\POE\Tests`).
+- Editor lock file `C:\Users\Revaptor_FX\ue_editor_busy.txt` = **`editor-free`** (was already free; not held by cleanup). Resume deletes only with editor free + owner confirmation still in force for any path not on the approved CSV delete list.
+
+### Prioritized TODO for next bot
+1. **Coat penetration**  -  collision capsules / Chaos setup (thickness-0 A/B already documented; do not flip heuristics back without owner).
+2. Finish **UE old-asset deletes** from CSV (approved rows only) when editor-free; log to `docs/handoff/CLEANUP_DELETED.tsv`.
+3. Apply **nmb ops c4/98/95** + **muzzle locator** in ForgeLens code (`nmb_reader` / fire-clip / muzzle_aim).
+4. Full **material re-export/reimport** after UseSpecMap PROVEN path.
+5. After Ghidra succeeds: finish REA open items (IBL, shadow bias from capture/.sdc, spot dirs).
+6. Owner-gated: **PoE2 P1-P4 polish**, **Wukong M1** (pak via `BMW_AES_KEY` env only  -  **never** commit `fl_bmw/tools/bmw/Program.cs` or `bmw_pak.py` with key), **Niagara** (explicit approval).
+7. **master** ~387 behind working branch  -  owner decision only.
+
+### Standing rules (reminder  -  full text §2)
+- Never run any game. UE assets only under `/Game/SM2_Work` and `/Game/ForgeLens/<CODE>/`. Editor lock. ff-only push + one-at-a-time lock (`forgelens_push.lock` / `tools/re/box/push_lock.sh`); **no force push**. No engine-folder edits. No deletes without confirmation (CSV delete set already approved). Korean **해요체**, results-only to owner. AES only via **`BMW_AES_KEY`** env.
+
+### Next-bot prompt
+Self-contained English takeover prompt: **`docs/handoff/NEXT_BOT_PROMPT.md`**.
+
+---------------------------------------------------------------------------------------------------
+
 ## 2026-11-02 R99 SM2PhysicsSetup build + commissar coat PIE A/B (Asia/Seoul)
 
 ### UBT / KawaiiPhysics (NOT our plugin)
@@ -33,14 +115,14 @@ Where this file and older docs disagree, THIS file wins (it is the newest). Olde
 
 ## 2026-11-02 REA-proven cloth thickness + RestFit opt-out (with UseSpecMap/lights)
 
-### Cloth (C) — REA_DEEP §2
+### Cloth (C)  -  REA_DEEP §2
 - Phase 0.8/1.0/0.9/1.1, gravity (0,-9.8,0), solverFreq 30, **collisionThickness default 0.0** PROVEN (FUN_14108ef40 / FUN_141089140 / FUN_14108f112).
 - ClothEntry remap 0.15/5 PROVEN (FUN_141093260). airDrag/wind env block mapped.
-- Exe has **no** restFit/ShallowFrac. Plugin ThickCm was 2 cm HEURISTIC — now **0** from data; RestFitPolicy.Enabled=**false** (optional HEURISTIC if PIE explodes).
+- Exe has **no** restFit/ShallowFrac. Plugin ThickCm was 2 cm HEURISTIC  -  now **0** from data; RestFitPolicy.Enabled=**false** (optional HEURISTIC if PIE explodes).
 - Evidence: docs/handoff/RE_CACHE/notes/REA_DEEP.md + evidence/cloth_*.c.
 
 ### Also this pass
-- UseSpecMap PROVEN FUN_14217da70; full usage bit table 0–26 in SYMBOL_DB + TextureUsage.cs.
+- UseSpecMap PROVEN FUN_14217da70; full usage bit table 0-26 in SYMBOL_DB + TextureUsage.cs.
 - Level lights: no FIT K=10; spots keep cones; UE unit bridge INFERRED.
 
 ## 2026-11-02 REA-proven UseSpecMap + level lights (after tip eddf91e)
@@ -59,11 +141,11 @@ Owner-approved: implement REA_FINDINGS.md into ForgeLens; verify UE before/after
 - Evidence copied to docs/handoff/RE_CACHE/notes/REA_FINDINGS.md + evidence/*.c; SHADERS.md §5 updated.
 
 ### Still approximate (INFERRED)
-1. UE Intensity unit = authored I * colorScale (no FIT K); soft falloff exponent from attenCurveParam is a thin mapping — SM2 window+soft IS is not UE InverseSquare.
+1. UE Intensity unit = authored I * colorScale (no FIT K); soft falloff exponent from attenCurveParam is a thin mapping  -  SM2 window+soft IS is not UE InverseSquare.
 2. Spot direction: lights TSV has no dir/matrix → SpotLight default forward (cd_list 4x4 needed for parity).
 3. RestFit / F45 unchanged.
 
-## 2026-11-02 SM2 oddities A/B/C (metal/rough, cloth rest-fit, hub lights) — after tip e937708
+## 2026-11-02 SM2 oddities A/B/C (metal/rough, cloth rest-fit, hub lights)  -  after tip e937708
 
 Owner brief: deep root-cause + move decisions into core/sidecar; implement PROVEN/strong INFERRED only; no game launch.
 
@@ -101,9 +183,9 @@ Owner brief: deep root-cause + move decisions into core/sidecar; implement PROVE
 3. PoE2/Wukong tracks untouched.
 4. PoE2/Wukong tracks untouched.
 
-## 2026-11-02 정리 (KST ~01:55)
+## 2026-11-02 정리 (KST ~01:55)  -  **SUPERSEDED by 3a6ba3f usage-cutoff section above**
 
-Owner-approved cleanup on Revaptor-FX. **This section wins** over older STATUS.md / AGENTS.md content; those two are stale — follow this file.
+Owner-approved cleanup on Revaptor-FX. **This section wins** over older STATUS.md / AGENTS.md content; those two are stale  -  follow this file.
 
 ### Tip
 - Branch `cursor/sm2-pck-extractor-4420` tip: **`1461bbf`** (`1461bbf4404c2b2ad4f3c852b0020d1e018a895b`)
@@ -114,7 +196,7 @@ Owner-approved cleanup on Revaptor-FX. **This section wins** over older STATUS.m
 |---|---|---|
 | [`edf8e92`](https://github.com/Baegovda/ForgeLens/commit/edf8e9256273951bbb2965c10bbc0dd5bccb3dd2) | **P1** PoE2 M2 H VFX leftovers (glow Add, FXLit tint, SIM shade, gradient white, radial glow fade, ground depth, short fit) | C# Release build OK (warnings only) |
 | [`760c055`](https://github.com/Baegovda/ForgeLens/commit/760c055cc6b33abbbb30e52f9752658ff1d8ea0c) | **P2** SM2PhysicsSetup `SetBodiesKinematic` + `ListBodies` (BellCrow); `ue_poe2_pie` kin API; `ue_poe2_quit.py` | **code only, UE plugin build/PIE unverified** |
-| [`1461bbf`](https://github.com/Baegovda/ForgeLens/commit/1461bbf4404c2b2ad4f3c852b0020d1e018a895b) | **Wukong M1 draft** BmwGlb + BmwWindow + toolbar button + `ue_bmw_import.py` | C# build OK; draft only. Pak readers **not** committed (hard-coded AES key literals in `tools/bmw/Program.cs` + `bmw_pak.py` — left untracked on `fl_bmw`; use `BMW_AES_KEY` / `docs/WUKONG_M0.md`) |
+| [`1461bbf`](https://github.com/Baegovda/ForgeLens/commit/1461bbf4404c2b2ad4f3c852b0020d1e018a895b) | **Wukong M1 draft** BmwGlb + BmwWindow + toolbar button + `ue_bmw_import.py` | C# build OK; draft only. Pak readers **not** committed (hard-coded AES key literals in `tools/bmw/Program.cs` + `bmw_pak.py`  -  left untracked on `fl_bmw`; use `BMW_AES_KEY` / `docs/WUKONG_M0.md`) |
 
 ### Excluded (left untracked on purpose)
 - `docs/handoff/poe2_m2/viewer_fx2/` (~97 PNGs, ~15.5 MB capture dumps)
@@ -147,12 +229,12 @@ Owner-approved cleanup on Revaptor-FX. **This section wins** over older STATUS.m
 | P3 | BongThumbLive dots spinner | unchanged / pending |
 | P4 | PoE2 levels beyond hideout | unchanged / pending |
 | P5 | Wukong M1 | **draft UI+Glb+import** (1461bbf); pak decrypt tools not in repo (keys) |
-| P6–P10 | as before | unchanged |
+| P6-P10 | as before | unchanged |
 | P11 | PoE2 → Niagara | **owner go/no-go still needed** |
 
 ### Docs note
 - **This file still wins.** A 2026-11-02 docs-refresh pass updated `AGENTS.md`, `START_HERE`, `BOT_TRANSFER`, `RULES_CORE`, `SUBAGENT_PREAMBLE`, `STATUS.md` (current summary + historical SM2 ledger), `README`, root `HANDOFF.md` (append-only pointer), `POE2_M*.md`, `WUKONG_M0.md`, `ROADMAP`, `WORKFLOW` for the stale items listed in the owner brief. Re-read those files; do not resurrect interim-% / `sm2-20` / "Niagara out of roadmap" / "`/Game/SM2_Work` only" / "BTL not ours".
-- **master cleanup remains an owner decision** — docs refresh pushes only to `cursor/sm2-pck-extractor-4420`.
+- **master cleanup remains an owner decision**  -  docs refresh pushes only to `cursor/sm2-pck-extractor-4420`.
 
 ### Open owner questions
 1. **Niagara P11** go/no-go?
@@ -287,7 +369,7 @@ Plugin installed at `K:\Unreal Projects\_Plugins\BongThumbLive` (not a git clone
 | P4 | PoE2 levels beyond the hideout | tile rotation from .arm, ground blending, one outdoor area |
 | P5 | Wukong M1 | pak reader + index decrypt test with the key from WUKONG_M0, file count |
 | P6 | Stellar Blade M0, Elden Ring M0 | format surveys like WUKONG_M0 |
-| P7 | SM2 leftovers | F49 REA UseSpecMap writer (batch REA session); F45 + muzzle/aim only with owner captures |
+| P7 | SM2 leftovers | UseSpecMap **PROVEN** (landed); still: coat capsules, nmb ops+muzzle in code, full mat reimport, F45 owner captures; REA open IBL/shadows/spot dirs |
 | P8 | Viewer: Unreal-style UI batch (no gizmo) | was marked in progress in the old todo; state [U]: no commit with UI/Unreal-style in its message since 10/30 20:00 [V]; it was likely never started - confirm scope with the old notes or the owner's original request before starting |
 | P9 | Memory budget gaps | CPU mesh copies and GL textures are not budgeted (R95b) |
 | P10 | BongLodge unverified items | real monitor removal, dock-back, shared Root |

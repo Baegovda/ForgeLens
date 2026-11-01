@@ -1,41 +1,49 @@
-> **Current handoff (wins):** [`docs/HANDOFF_NEW_BOT.md`](../HANDOFF_NEW_BOT.md) — "2026-11-02 정리". App tip **`1461bbf`** (Wukong M1 draft); docs tip moves with this branch. Confirm with `git fetch && git log --oneline -5 origin/cursor/sm2-pck-extractor-4420`.
+> **Current handoff (wins):** [`docs/HANDOFF_NEW_BOT.md`](../HANDOFF_NEW_BOT.md) § "2026-11-02 ~04:55 KST  -  usage-cutoff handoff". Tip **`3a6ba3f`**. Next-bot prompt: [`NEXT_BOT_PROMPT.md`](NEXT_BOT_PROMPT.md). Confirm with `git fetch && git log --oneline -5 origin/cursor/sm2-pck-extractor-4420`.
 
-# STATUS — ForgeLens / multi-game (current summary 2026-11-02 KST)
+# STATUS  -  ForgeLens / multi-game (current summary 2026-11-02 ~04:55 KST)
 
-Repo `Baegovda/ForgeLens` (private), branch `cursor/sm2-pck-extractor-4420`. App version **0.97.0**. Deployed: `Desktop\SM2_Work\Bin\ForgeLens_latest` = publish of **1461bbf** (2026-11-02 01:52 KST). Editor lock released to `editor-free`. **Do not push to `master`** (owner decision; working branch is ~373 ahead / 1 behind master as of 2026-11-02).
+Repo `Baegovda/ForgeLens` (private), branch `cursor/sm2-pck-extractor-4420`. App version **0.97.0**. Deployed: `Desktop\SM2_Work\Bin\ForgeLens_latest` = publish of **1461bbf** (app tip for Wukong M1 draft; later REA/R99 commits are on branch  -  republish if owner wants latest viewer). Editor lock: **`editor-free`**. **Do not push to `master`** (owner decision; working branch ~**387 ahead / 1 behind** master as of 2026-11-02 04:55 KST).
 
-## Tracks (authoritative detail in HANDOFF_NEW_BOT §4–5)
+## Live snapshot (2026-11-02 ~04:55 KST)
+- Tip **`3a6ba3f`**: R99 SM2PhysicsSetup BuildPlugin + commissar coat PIE A/B (thickness 0 → penetrations 206→303; heuristics left off).
+- REA docs: `docs/re/REA_FINDINGS.md`, `docs/re/REA_DEEP.md`  -  UseSpecMap `FUN_14217da70`, lights `FUN_14224ecf0`/`FUN_14224f010`, tonemap `FUN_1423bfc00`, cloth defaults, nmb c4/98/95, muzzle locator DATA, SFX `FUN_1425fd580`.
+- Ghidra full import on PC PID **102852** (96G/32CPU): log showed **Import failed (Negative delay)**; leave process; may need restart with sane timeout.
+- UE CSV cleanup: **all delete candidates still on disk** (interrupted); KEEP list intact.
+- KawaiiPhysics disabled in host uproject (`bak_r99_kawaii`); SM2PhysicsSetup via RunUAT BuildPlugin.
+
+## Tracks (authoritative detail in HANDOFF_NEW_BOT §4-5 + usage-cutoff section)
 
 | Track | State | Notes |
 |---|---|---|
-| **SM2** | essentially done (R97–R98) | Cloth/orb/hub lights/muzzle soft/settings; leftovers F45/F49/muzzle aim wait on owner captures or REA |
-| **PoE2 M0** | done (`5c48c8f`) | GGPK probe — `docs/POE2_M0.md` |
-| **PoE2 M1** | done | meshes/skel/anim/mat into shared pipeline — `docs/POE2_M1.md` |
-| **PoE2 M2** | done + VFX leftovers **P1 DONE** (`edf8e92`) | skills/UI/particles/UE `/Game/ForgeLens/POE/` — `docs/POE2_M2.md` |
-| **PoE2 M3** | done + BellCrow kin **P2 code** (`760c055`) | levels/hideout/physics; **UE plugin rebuild + PIE unverified** — `docs/POE2_M3.md` |
-| **Wukong M0** | done (`f4dc100`) | format survey — `docs/WUKONG_M0.md` |
-| **Wukong M1** | **draft** (`1461bbf`) | BmwGlb + BmwWindow + toolbar + `ue_bmw_import.py`; pak decrypt tools **not** in repo (use `BMW_AES_KEY` env) |
+| **SM2** | essentially done + R99 cloth/REA | Open: coat capsules, nmb+muzzle code apply, mat reimport, REA IBL/shadows/spot dirs, F45 |
+| **PoE2 M0** | done (`5c48c8f`) | GGPK probe  -  `docs/POE2_M0.md` |
+| **PoE2 M1** | done | meshes/skel/anim/mat  -  `docs/POE2_M1.md` |
+| **PoE2 M2** | done + VFX leftovers **P1 DONE** (`edf8e92`) | `docs/POE2_M2.md` |
+| **PoE2 M3** | done + BellCrow kin **P2 code** (`760c055`) | plugin rebuild+PIE still verify  -  `docs/POE2_M3.md` |
+| **Wukong M0** | done (`f4dc100`) | `docs/WUKONG_M0.md` |
+| **Wukong M1** | **draft** (`1461bbf`) | BmwGlb + window + `ue_bmw_import.py`; pak tools **not** in repo (`BMW_AES_KEY`) |
 | Stellar Blade / Elden Ring | not started | |
-| BongThumbLive | pending P3 | dots spinner build/live check |
-| Niagara PoE2 | **P11 owner-gated** | offer/estimate only until go |
+| BongThumbLive | pending P3 | dots spinner |
+| Niagara PoE2 | **P11 owner-gated** | offer only until go |
 
 ## Open owner questions
 1. Niagara P11 go/no-go?
 2. Next focus: PoE2 polish vs finish Wukong M1 (pak reader without committing key literals)?
-3. Chaplain test folder deletion (move ~34 materials first)?
-4. **master** cleanup vs keep working only on `cursor/sm2-pck-extractor-4420`?
+3. Finish interrupted UE old-asset CSV deletes now?
+4. Chaplain test folder deletion (move ~34 materials first)?
+5. **master** cleanup vs keep working only on `cursor/sm2-pck-extractor-4420`?
 
 ---
 
-# STATUS — SM2 pipeline historical ledger (as of 2026-10-27 ~05:15 KST, tip 57c38f9)
+# STATUS  -  SM2 pipeline historical ledger (as of 2026-10-27 ~05:15 KST, tip 57c38f9)
 
 > The sections below are the **historical SM2 stage log** (kept for evidence). They are **not** the live multi-game status. Percentages are period estimates. Always prefer HANDOFF_NEW_BOT + `git log` above.
 
 
-## adaptive-light / rea-batch 7 item 2 (2026-10-30 KST, R37): adaptive light multiplier implemented PROVEN — `CaptureLightUnits.AdaptiveFactor` = isAdaptiveIntensity ? clamp(avgLum, 0.05, 50) : 1 (FUN_14224ecf0 ← FUN_141ee9e80 ← FUN_141e90cb0; FUN_141de8140 LIGHTS_BUFFER passes 1.0); Capture()/Relative() and bench/UE export use it. No change for capture scenes (avgLum in range). Still HEURISTIC: DefaultAdaptive = true, bench exposure 1/250. Tests 381/43/5, py 24.
+## adaptive-light / rea-batch 7 item 2 (2026-10-30 KST, R37): adaptive light multiplier implemented PROVEN  -  `CaptureLightUnits.AdaptiveFactor` = isAdaptiveIntensity ? clamp(avgLum, 0.05, 50) : 1 (FUN_14224ecf0 ← FUN_141ee9e80 ← FUN_141e90cb0; FUN_141de8140 LIGHTS_BUFFER passes 1.0); Capture()/Relative() and bench/UE export use it. No change for capture scenes (avgLum in range). Still HEURISTIC: DefaultAdaptive = true, bench exposure 1/250. Tests 381/43/5, py 24.
 
 ## trail-fade / rea-batch 7 (2026-10-30 KST): ribbon trail colour bake PROVEN and implemented (R36). FUN_14184c8d0 uploads 80-byte points to "Trail points data" (slot {7,2} = RB_TRAIL_POINTS INFERRED ~85%); SfxTrail update FUN_141909810 → per-point FUN_141847640 → colour baker FUN_141ab9b60 (gradient by point age, fadeParams front/back × len unless _useMeters, add → rgb else alpha, isAlphaInherited → a = pt alpha (255), × owner+0x144); add-point FUN_1418bd8d0 spawn colour white. Code: `SM2_VFX_TRAIL_FADE` default ON (=0 opt-out), `TrailDef.BakePointColor`, `AlphaInherited`, ribbon colour now by age/timeLifeSeg. Open: owner+0x144 source (passed 1), curve+0x400 index scale (assumed full 0..1 range), age normalisation by timeLifeSeg INFERRED, swept-triangle trails unchanged. Tests 373/43/5, py 20.
-## split-skeleton (2026-10-29 KST): R35 split skeleton — anim and sibling mesh must share one Skeleton. Importer guard SPLITSKEL + sani_fix skeleton reuse + tools/ue/ue_fix_split_skeletons.py scan|fix. Scan 1 split (Tests/sani_before/hologram_planet/localbake clip) → repaired (on Props hologram_planet_Skeleton, pose diff 0.0003 cm) → 0. See HANDOFF "Split skeleton (R35)".
+## split-skeleton (2026-10-29 KST): R35 split skeleton  -  anim and sibling mesh must share one Skeleton. Importer guard SPLITSKEL + sani_fix skeleton reuse + tools/ue/ue_fix_split_skeletons.py scan|fix. Scan 1 split (Tests/sani_before/hologram_planet/localbake clip) → repaired (on Props hologram_planet_Skeleton, pose diff 0.0003 cm) → 0. See HANDOFF "Split skeleton (R35)".
 ## R38 player fire clip (2026-10-30 KST): primaris.nmb decoded (tools/re/nmb_reader.py). wpnType → tacticus_shtN_shoot_aim|blind via Switch/Expression nodes (INFERRED); aim defaults for unassigned values, heavies-in-aim and ops 95/98/c4 are HEURISTIC. `PlayerFireClips` + PropAnimStates step 3b (player fire clips recognised by data; the old name regex is kept only as a HEURISTIC fallback). docs/handoff/FIRE_CLIP.md.
 
 ## rea-batch 6 (2026-10-29 KST): adaptive light multiplier PROVEN (FUN_14224ecf0 param_3 = FUN_141e90cb0 = clamp(avgLum, 0.05, 50) on the dynamic-light path, 1.0 elsewhere); DAT_14502deac has no writer (3 READs, BSS) → constant false INFERRED; ribbon trail CPU point emitter/updater PROVEN (FUN_141902840 / FUN_141847c30, half-float pairs, colour = 255 constant, trlPOINT mapping INFERRED); player fire clip not in exe (no fireRate/shootAnim strings) → HEURISTIC stays. Docs only (HANDOFF "Update rea-batch 6").
@@ -45,7 +53,7 @@ Repo `Baegovda/ForgeLens` (private), branch `cursor/sm2-pck-extractor-4420`. App
 ## level-lights (2026-10-29 KST): attenCurveParam → P0.w PROVEN: CB packer FUN_14224ecf0 + P0.w FUN_14224f010 (directional 0; useInverseSquaredFalloff 1/400 + colour ×400; isConstAtten 8e22; a > 0 299a⁴+1; a ≤ 0 256^a), confirmed by hub_battle_barge level lights paired 4/4 at 0 m with armory capture 128197 (P0.w 300/300/1/300, radius, cone, colour (c/255)^2.2 × I exact) → bench shaders + UE export + vfxframe ground use per-light P0.w; light colour decode gamma 2.2. Tests 343/343, py 18/18.
 
 ## rea-batch 4 (2026-10-29 KST): UseSpecMap bit meanings DATA from armory draws vs bound .td (0x2000 MSCRGHAO 68/68, 0x40 legacy _spec 66/67, 0x8 MNM, 0x100 MH, 0x800 MEM, 0x1000 MAO) → UE importer UseSpecMap off when a slot has no specular map; P0.w writer and ribbon point writer tried (offset scans, 300.0 search, trail serializer layout FUN_14183b3a0, RenderDoc trlPOINT dump stalled), still open (HANDOFF "Update rea-batch 4")
-## rea-batch 3 (2026-10-29 KST): colour-scheme screenshots OK (no fix); light desc → render-light field map PROVEN (FUN_141384090: attenCurveParam → +0x54, useInverseSquaredFalloff/isConstAtten → +0x6d bits 1/2), P0.w writer still open; UseSpecMap raw flags DATA from an armory raw re-dump (8200/4424/4168/…, bit 8 on all non-zero but one), writer open; trail fadeParams = along-trail end fade (lightning VS PROVEN, not TRAIL_DEGR), ribbon emulation opt-in SM2_VFX_TRAIL_FADE=1 (HEURISTIC); trail_melee_dark invisible in game because 15 weapon .cls/.sso override isAutoStart False + colorIntensityMultiplier 0.01–1 (DATA). Details HANDOFF "Update rea-batch 3", RE_NOTES "rea-batch 3".
+## rea-batch 3 (2026-10-29 KST): colour-scheme screenshots OK (no fix); light desc → render-light field map PROVEN (FUN_141384090: attenCurveParam → +0x54, useInverseSquaredFalloff/isConstAtten → +0x6d bits 1/2), P0.w writer still open; UseSpecMap raw flags DATA from an armory raw re-dump (8200/4424/4168/…, bit 8 on all non-zero but one), writer open; trail fadeParams = along-trail end fade (lightning VS PROVEN, not TRAIL_DEGR), ribbon emulation opt-in SM2_VFX_TRAIL_FADE=1 (HEURISTIC); trail_melee_dark invisible in game because 15 weapon .cls/.sso override isAutoStart False + colorIntensityMultiplier 0.01-1 (DATA). Details HANDOFF "Update rea-batch 3", RE_NOTES "rea-batch 3".
 ## rea-batch 2 (2026-10-29 KST): colour-scheme texture-array patterns (tex_blend slice + spec slice from glt PS 003784, PROVEN; density/textureIndex INFERRED; customUV fallback HEURISTIC) + lens emissive params (UE/tooltip only); prop-anim reload by reload_sound_seq track + shotsPerMin fire timing (DATA; firing clip by name HEURISTIC); light falloff × P0.w/(d²+P0.w) PROVEN in deferred/particle/fog shaders, P0.w = 1 for sfx lights (DATA) → bench + UE export; TRAIL_DEGR camera-distance fade PROVEN (not emulated); attenCurveParam → P0.w, UseSpecMap writer, ribbon point writer still open.
 ## rea-batch (2026-10-29 KST): spring damper solver/defaults PROVEN (FUN_1414828a0 RK4, a = −(k/m)x − d·v, h = dt·timeScale; defaults damping 0, mass 1, jointAngle 10, gravity 0 = bend fraction) → parser + UE sidecar fixed; colour schemes too dark fixed (tintBlendMode linear_blend replaces instead of × base: glt PS CB[180+L], exe enum [multiply, linear_blend]); trail EMISSIVE/MISC_2 mapped, no trail-only exposure (evidence only); attenCurveParam, UseSpecMap, prop-anim still open.
 ## fix54 (2026-10-29 KST): chainsword "dark fan" fixed. Trails now blend per blendType: add → One/One (alpha Zero/One), blend/blend_add → SrcAlpha/InvSrcAlpha (CB_PASS_TRAIL One/One draw PROVEN in plasma capture eid 4914; add/blend mapping INFERRED from sfx selector FUN_142451840). Before, the additive trail_mele_01_yellow grey tail was drawn straight-alpha and darkened the frame. Trails with a normal-map texture (td usage MNM ⇔ `_nm`, PROVEN data) or isDistortion go to the Distortion target and are not drawn in colour (trail_melee_dark: INFERRED distortion clone; skip = HEURISTIC until REA batch item 3). New standing rule R32 evidence-first (WORKFLOW §0). Yellow additive arc is still too faint (no visible bright arc at 0.30/0.42/0.60; trail emissive/fade-off CB not emulated). In-game comparison pending (HANDOFF "Update fix54", ledger F58).
@@ -68,15 +76,15 @@ Repo `Baegovda/ForgeLens` (private), branch `cursor/sm2-pck-extractor-4420`. App
 
 ## mtl1-44 (2026-10-28 KST): SFX blend selector PROVEN. td sfx loader FUN_1425fd580 reads blendMode {blend 0, add 1, premul_a 2} (table 0x144cccd38). Key builder FUN_142451840: blend → SFX_ALPHA_BLEND (SrcAlpha/InvSrcAlpha), add → SFX_BLEND_ADD_NO_ALPHA (One/One), premul_a → none (One/InvSrcAlpha). Applied per material in the browser and UE export. A missing blendMode stays additive (HEURISTIC, final). UseSpecMap / 0x400 / auto-exposure / falloff are HEURISTIC, final (HANDOFF "Update mtl1-44")
 ## mtl1-43 (2026-10-28 KST): cc_calgar cloak detail re-import (stripes gone), cloak V-flip = false lead, loop-seamless cloth bakes (seam 179.6°→0.06°) + fit prior (hem spikes reduced), unresolved CDT bones PROVEN dropped by game, finger curl tool (Cadian), sfx blendMode enum + define bits PROVEN, selector still HEURISTIC (HANDOFF "Update mtl1-43")
-## ui-45 (2026-10-28 KST): Forge Lens Kitbash Enemy/NPC mode — 75 inst_constructor templates (835/835 links), layer rules, weighted Randomize, 61 .cls presets, npc= --variant; melee region skins (skin=, Team MELEE) + armor power fist. Link/weight/model mapping HEURISTIC (HANDOFF "Update ui-45")
-## ui-44 (2026-10-28 KST): Forge Lens Kitbasher — Kitbash tab: faction/class/preset + one part per slot from the customization .sso, live preview = export filter (ArmorVariant, SLOT=none), Export combination. Story/champion tpl mapping HEURISTIC (HANDOFF "Update ui-44")
-## ui-43 (2026-10-28 KST): Forge Lens UE5-style Content Browser — Favorites / Folders|Categories / Collections, thumbnail grid + list, chips, hover-animated cached thumbnails; Anim wheel steps clips. Category name rules, effect splat and clay thumbnails are HEURISTIC (HANDOFF "Update ui-43")
+## ui-45 (2026-10-28 KST): Forge Lens Kitbash Enemy/NPC mode  -  75 inst_constructor templates (835/835 links), layer rules, weighted Randomize, 61 .cls presets, npc= --variant; melee region skins (skin=, Team MELEE) + armor power fist. Link/weight/model mapping HEURISTIC (HANDOFF "Update ui-45")
+## ui-44 (2026-10-28 KST): Forge Lens Kitbasher  -  Kitbash tab: faction/class/preset + one part per slot from the customization .sso, live preview = export filter (ArmorVariant, SLOT=none), Export combination. Story/champion tpl mapping HEURISTIC (HANDOFF "Update ui-44")
+## ui-43 (2026-10-28 KST): Forge Lens UE5-style Content Browser  -  Favorites / Folders|Categories / Collections, thumbnail grid + list, chips, hover-animated cached thumbnails; Anim wheel steps clips. Category name rules, effect splat and clay thumbnails are HEURISTIC (HANDOFF "Update ui-43")
 ## mtl1-42 physics/materials batch (2026-10-28 KST): Calgar cape stripe = detail tiling, 60 Hz Calgar clips, PA assign, cloth bone cap 4096, CDT sweep
 ## mtl1-42 (2026-10-28 KST): VFX black squares/fly-by fixed, cloth SIM shells hidden in preview, export In place, file list UI
 
 ## mtl1-41 (2026-10-28 KST): particle flag 0x20 isAlphaKill rule PROVEN, inline list nodes; VFX ≈95 %
 
-## shaders-1 (2026-10-28 KST): static .sdc shader bundles — LUT apply, SFX blend, particle blend/tint PROVEN; see SHADERS.md
+## shaders-1 (2026-10-28 KST): static .sdc shader bundles  -  LUT apply, SFX blend, particle blend/tint PROVEN; see SHADERS.md
 
 ## Per-feature status
 
@@ -92,7 +100,7 @@ Repo `Baegovda/ForgeLens` (private), branch `cursor/sm2-pck-extractor-4420`. App
 | Mannequin → SM2 retarget prototype | prototype | 70 | Cadian index finger curl −14…−20° open; Anim Only (Manny) root yaw-180 fix mtl1-13 |
 | Browser GPU preview (v3/v4: ANGLE, MSAA, blend passes, anim ordering, Space) | done | 95 | CPU renderer ignores blend and physics |
 | Secondary physics (jiggle exact port, cloth PBD ≈ NvCloth) browser + FBX bake + **live UE (plugin v2, mtl1-7)** | done + UE live verified | 88 | 6 chars live, no NaN; tech_priest robe drop + sorcerer_exalted dash lag FLAG |
-| Chaos Cloth option (opt-in) + sidecar collision PA | in progress | 70 | mtl1-13: collision wired, no NaN, 2–6% particles >1 cm inside; wind not yet applied |
+| Chaos Cloth option (opt-in) + sidecar collision PA | in progress | 70 | mtl1-13: collision wired, no NaN, 2-6% particles >1 cm inside; wind not yet applied |
 | Browser VFX (`.sfx` sprites, meshes, trails, lights, distortion, sockets, anim-event cues) | in progress | ~85 | see ROADMAP "VFX3 remaining" |
 | Bulk validation (37 assets) | done | 100 | PASS 31 / WARN 3 / FAIL 3 → constructors fixed afterwards |
 | UE verification of constructors + physics | done (first pass) | 100 / 85 | open issues below |
@@ -130,7 +138,7 @@ HANDOFF's "vfx3 part 2/3" sections cite **local** hashes (d6b28f4, e5628ce, 1f9f
 - HaloCEA tests fail and are **out of scope**.
 - Retail-data tests read env vars (`LIBSABER_SM2_SAMPLE`, `LIBSABER_SM2_TITUS`, `LIBSABER_SM2_PICK`). When unset they return early, so they pass without game files.
 
-## Bulk validation (step 4, d0ad14f) — `/workspace/bulk/REPORT.md`, `tools/bulk/`
+## Bulk validation (step 4, d0ad14f)  -  `/workspace/bulk/REPORT.md`, `tools/bulk/`
 - 37 assets (SM, Tyranid, Chaos, Human, Vehicle, Prop/Weapon/Door). **PASS 31, WARN 3, FAIL 3.**
 - WARN: captain partial tracks (face bones; expected); rubric `rubric_fwd` and lesser sorcerer `walk_fwd` have 0 root displacement (in-place clip?). That one is **not REA-verified**.
 - FAIL: the 3 constructors (too big, UE RHI abort). **Fixed in b7ae735 and verified in UE** (below).
@@ -179,23 +187,23 @@ Extractor build: PC `Desktop\SM2_Work\Bin\SM2Extractor_e4ceb7d`. Captures: PC `D
 - **UE:** `ue_cap_lit.py` should wait for texture compilation (grey captures otherwise).
 
 ### 2026-10-27 (KST) vfx3d
-- Tests: SM2.Assets 118, Extractor 42, LibSaber.Tests 5 — all pass.
+- Tests: SM2.Assets 118, Extractor 42, LibSaber.Tests 5  -  all pass.
 - Trail degNear/degFar + texcoord scale done (TC behind SM2_VFX_TRAIL_TC=1). Tint exact formula behind SM2_VFX_TINT_EXACT=1.
 - VAT VS still unlocated. VFX estimate ≈ 80% (estimate).
 
 ### 2026-10-27 (KST) vfx3e
-- Tests: SM2.Assets 120, Extractor 42, LibSaber.Tests 5 — pass.
+- Tests: SM2.Assets 120, Extractor 42, LibSaber.Tests 5  -  pass.
 - VAT VS found (combine_material.sdc 00000_0) + VatDecode helpers; renderer hookup pending. Sprite degNear fix behind SM2_VFX_DEGNEAR_FIX=1.
 - VFX estimate ≈ 81% (estimate; VAT decode known but not rendered).
 
 ### 2026-10-27 (KST) vfx3f
-- Tests: SM2.Assets 121, Extractor 42, LibSaber.Tests 5 — pass. VAT hooked into EffectRenderer behind SM2_VFX_VAT=1 (unverified on real assets).
+- Tests: SM2.Assets 121, Extractor 42, LibSaber.Tests 5  -  pass. VAT hooked into EffectRenderer behind SM2_VFX_VAT=1 (unverified on real assets).
 - Ghidra 12.1.4 light re-analysis running: /workspace/rea/ghidra_proj3 (log /workspace/rea/ghidra3.log).
 - VFX estimate ≈ 82% (estimate; VAT path unverified).
 
-## vfx3g — 2026-10-27 (KST): VFX flag verification (headless `--vfxbench`, llvmpipe, box)
+## vfx3g  -  2026-10-27 (KST): VFX flag verification (headless `--vfxbench`, llvmpipe, box)
 Captures: `/workspace/browser_run_shots/vfx3_verify/` (PC copy `Desktop\SM2_Work\Captures\vfx3_verify\`); OFF top / flag bottom.
-- `SM2_VFX_VAT=1` — **was broken at 9474df0** (`splash_vat_broken_9474df0_cmp.png`: long spikes/streaks), **fixed here**
+- `SM2_VFX_VAT=1`  -  **was broken at 9474df0** (`splash_vat_broken_9474df0_cmp.png`: long spikes/streaks), **fixed here**
   (`splash_vat_fixed_cmp.png`: droplet spray that gathers into the splash shape; VatDraws(cum) = 59 on fx_mgs_hierophant_bomb_ee).
   Bugs fixed (all still behind the flag):
   1. Every part used the first td material (`splash_05`): solid_blood.td has one material per part (`splash_07` ↔ part
@@ -203,15 +211,15 @@ Captures: `/workspace/browser_run_shots/vfx3_verify/` (PC copy `Desktop\SM2_Work
      `VatDecode.MaterialBlockFor(td, partName)` (HEURISTIC: name match only) + tests. Extra textures extracted to PC `Raw\vfx\tex8`.
   2. Channel order: the pct is ARGB8888 = DXGI 87 B8G8R8A8 (`TextureDecode`) and decodes to raw bytes → sample `.bgr`.
   3. Texel-exact `texelFetch` (1 column per vertex; bilinear u blended neighbours) and `fract(v)` wrap (band 0 goes below 0
-     in the VS formula; wrap sampler assumed — HEURISTIC).
+     in the VS formula; wrap sampler assumed  -  HEURISTIC).
   Offline check (python, splashe05..18): decoded triangles stay coherent (edge p99 ≈ 1.2 cm vs rest 1.0 cm).
   Still open: frame source (animStage = age/life, heuristic); rest-pose match is approximate (median ≈ 3 cm); node-transform
   offset not observed at this camera.
-- `SM2_VFX_CONTRAST=1` — frag grenade: very subtle (mean |Δ| 0.07/255), slightly crisper core/sparks; plausible, low impact.
-- `SM2_VFX_TINT_EXACT=1` — frag grenade: visible change (mean |Δ| 0.46): first frames gain orange/blue tints in the fireball
-  and smoke. Plausible per the REA'd tint, but the blue cast on early smoke looks suspicious — needs an in-game reference.
-- `SM2_VFX_TRAIL_TC=1` / tint on `trail_stalker_bolter_smoke` — **inconclusive**: the bench emitter is stationary, the trail
-  builds 6–45 quads but renders ~invisible (max pixel Δ 5). Needs a moving-emitter capture (bench has no motion path).
+- `SM2_VFX_CONTRAST=1`  -  frag grenade: very subtle (mean |Δ| 0.07/255), slightly crisper core/sparks; plausible, low impact.
+- `SM2_VFX_TINT_EXACT=1`  -  frag grenade: visible change (mean |Δ| 0.46): first frames gain orange/blue tints in the fireball
+  and smoke. Plausible per the REA'd tint, but the blue cast on early smoke looks suspicious  -  needs an in-game reference.
+- `SM2_VFX_TRAIL_TC=1` / tint on `trail_stalker_bolter_smoke`  -  **inconclusive**: the bench emitter is stationary, the trail
+  builds 6-45 quads but renders ~invisible (max pixel Δ 5). Needs a moving-emitter capture (bench has no motion path).
 - `VfxBench` per-frame lines now print `vatDraws(cum)`; `GlPreview.VatDraws` exposes the counter.
 
 ## vfx3h (Ghidra REA, sm2_retail.exe, 2026-10-27)
@@ -221,12 +229,12 @@ Evidence from decompiling ghidra_proj3 (scripts /workspace/rea/scripts/DecompAt.
 - blendType (PARTIAL): FUN_141751c70 gives blend=0, add=1, blend_add=2 (writer FUN_141752030 also has 3). The D3D12 blend-desc consumer was not located within the time box; the mapping in the existing code stays HEURISTIC.
 - animStage: serialised in FUN_14179fdd0 group (FUN_14179edc0/FUN_14179f290 at desc+0x20). Runtime setter not located, so VatDecode.StageFrame age/life remains HEURISTIC.
 - Exposure 1/250, light x100, distortion strength, and trail DEGR/MISC/OFFSET CPU mapping: NOT resolved (only shader define strings DISTORTION_* / EXPOSURE=%g found). These remain HEURISTIC.
-- VFX estimate corrected to ≈ 72% (honest; earlier 80–82% figures were optimistic).
+- VFX estimate corrected to ≈ 72% (honest; earlier 80-82% figures were optimistic).
 
 ## vfx3i (Ghidra REA follow-up, 2026-10-27)
 Scripts: /workspace/rea/scripts/Callers.java (new), DispScan.java. Outputs: /workspace/rea/vfxi_1.c, vfxi_2.c. Docs only. Nothing proven was worth a code change, so there is no env flag.
 - Emitter desc layout (PROVEN): typeParams variant at emitter+0x1a8 (FUN_1417adea0 → FUN_1417a37c0). Type int at +0x1a8: 0=default (FUN_141793d40), 1=distortion (FUN_141796980), 2=lwiGeom (FUN_1417a1ef0). Payload at +0x1b0. Runtime code reads emitter desc via [inst+0x450].
-- blendType (PARTIAL): default.visuals (FUN_14178ce70 at payload+0x1f8). blendType sits at emitter+0x48c, isBlendAlphaMultiply at +0x490. Only reader in 0x1417b0000–0x141a00000 is FUN_1417e1e50 (GPU emitter constants). It sets flag bit 0x20 when blendType==1 ("add") and clears bit 0x400 when isBlendAlphaMultiply && blendType!=1. blend_add (2) gets NO separate bit there, so it is handled like "blend" for these flags. The D3D12_BLEND_DESC builder is still not found; the current mapping stays HEURISTIC.
+- blendType (PARTIAL): default.visuals (FUN_14178ce70 at payload+0x1f8). blendType sits at emitter+0x48c, isBlendAlphaMultiply at +0x490. Only reader in 0x1417b0000-0x141a00000 is FUN_1417e1e50 (GPU emitter constants). It sets flag bit 0x20 when blendType==1 ("add") and clears bit 0x400 when isBlendAlphaMultiply && blendType!=1. blend_add (2) gets NO separate bit there, so it is handled like "blend" for these flags. The D3D12_BLEND_DESC builder is still not found; the current mapping stays HEURISTIC.
 - ratioDependency (PROVEN for distortion): emitter+0x270 (payload+0xc0). FUN_1417e29b0 binds the pointer emitter+0x270 into a GPU curve slot (inst+0x240, tag 0x2000000000000), the same as the other curves at +0x508/+0x580. So ratioXY is evaluated on GPU. Emitter flag 0x1000 (inst+0x6b8) is set unless dependencyType==none, or (field[2]==0 and ratioXY ends ==1.0) (1417e3f73). HEURISTIC: it scales the sprite X/Y aspect by velocity or age.
 - Distortion strength: distortion.power at payload+0x98 = emitter+0x248, curve parser FUN_14177c520. Reader FUN_1417daac0 references +0x248 but was not decoded (size 5033).
 - animStage: in the lwiGeom payload, FUN_14179fdd0 at payload+0x178 = emitter+0x328 (+0x20 inside). FUN_1417e9480 writes inst+0x328 = 0 (an instance field, not proven to be animStage). The runtime setter is still unproven, so age/life remains HEURISTIC.
@@ -264,26 +272,26 @@ Disassembly: /workspace/vfxsh_dis/{pc,pg,dx_pc_dx12_sfx,dx_pc_dx12_distort}, GLS
 - pc_dx12_sfx is the world/decal SFX material (SFX_DISTORT_PARAMS, SFX_DISTORT_*_LAYER, SFX_BLOOM_INTENSITY, SFX_TEX_DISTORT*), not particle emitters. SFX_BLEND_ADD_NO_ALPHA variants belong to it, so they do NOT prove the particle blend_add mapping.
 - Particles: the CPU path has CB_PARTICLES (view/proj, FPS_PARAMS[2]@368, SHADING_DATA[4]@400) and CB_PARTICLES_DATA (PARTICLES_TEXTURE_DATA[3072], raw). The GPU path keeps emitter params in the untyped f32 buffer PART_GPU_EMITTERS_PART_SHARED_DATA (PART_GPU_EMITTER_STATE is 404 B: data[3], simulationMask, render, alive, ...). Particle per-emitter constants are unnamed, so distortion power/ratioXY slots can't be read from reflection.
 - Exposure: particles read the global COMMON_HDR_EXPOSURE_DIV_AVG_LUM (CB_COMMON @336). So exposure is a runtime camera value, not a per-effect constant. The fixed 1/250 stays HEURISTIC.
-- Trail packing: readers of render-side +0x1f8..+0x218 in 0x141800000–0x142400000 are FUN_14187e8b0 (lerp of degNear/degFar fields vs +0xec.., i.e. LOD/state blend) and FUN_14189db00 (defaults: +0x1fc=255.0, +0x20c=0.5), plus unrelated hits at 141a1/141ef/141f2. The CB_PASS_TRAIL pack was NOT found. The DEGR slot mapping stays HEURISTIC.
+- Trail packing: readers of render-side +0x1f8..+0x218 in 0x141800000-0x142400000 are FUN_14187e8b0 (lerp of degNear/degFar fields vs +0xec.., i.e. LOD/state blend) and FUN_14189db00 (defaults: +0x1fc=255.0, +0x20c=0.5), plus unrelated hits at 141a1/141ef/141f2. The CB_PASS_TRAIL pack was NOT found. The DEGR slot mapping stays HEURISTIC.
 - VFX estimate remains ≈ 72%.
 
 - vfx3m: blend flags 0x20/0x400 proven (FUN_1417e1e50 → t8 PART_EMITTERS_SHARED_DATA → particles.sdc 00000_0); opt-in SM2_VFX_BLEND_REA=1. VFX ≈73%.
 - vfx3n: blend-REA bench sanity (grenade brighter, kept opt-in); 0x60 record ↔ visuals field map (FUN_14178ce70). VFX ≈73%.
 - vfx3o: curve slots = texture bindings; r0.y = 1/softDepth (not exposure); r4.y/z/w + r0.w decoded; colour-gradient LUT proven (unused in data). distortion.power and trail DEGR unresolved. VFX ≈73%.
 - vfx3p/q: distortion.power and trail DEGR unresolved after 2 no-progress chunks → stopped. VFX ≈73%.
-- vfx3r: in-game comparison prep — bench sheets in Captures\ingame_cmp, user refs go to Captures\ingame_ref.
+- vfx3r: in-game comparison prep  -  bench sheets in Captures\ingame_cmp, user refs go to Captures\ingame_ref.
 - vfx3s: textures added (tex9), Fit reframed (hierophant renders, VAT d=0.48); Retail.exe direct launch relaunches via start_protected_game + EAC → no capture (route disproved); steam_appid.txt.check incident (created/deleted in game root, verified gone). Open: muzzle/candle 0 quads, chainsaw blood 0 particles.
 - vfx3t: muzzle/candle were culled by degNear (camera < 2 m) → Fit keeps the eye outside degNear; isVisible=+0x88 is draw-only (FUN_1417f71b0) → hidden sources spawn children (SM2_VFX_HIDDEN_SPAWN=0 off); chainsaw blood is all-hidden in data → empty is correct. VFX ≈ 73%.
 - vfx3u: in-game refs compared (side_by_side_*.png); BLEND_REA default ON (grenade core/sparks); open: muzzle flash missing, blood too bright/orange, grenade fireball/smoke too weak. VFX ≈ 74%.
 - vfx3v: muzzle flash & grenade fireball were sub-frame lifetimes (SM2_VFX_STEP_HZ); chainsaw blood hidden-by-default (SM2_VFX_FORCE_VISIBLE debug) matches dark red; open: muzzle mesh untextured, smoke lit scale, blood size. VFX ≈ 77%.
 
-## vfx3w (2026-10-27 KST) — VFX ~79%
+## vfx3w (2026-10-27 KST)  -  VFX ~79%
 Muzzle mesh named-material (mzl_geom) fixed; hidden blood = templates, compare vs finisher copies; emitScale trace inconclusive; MaskClip opt-in; lit-smoke light heuristic. See HANDOFF.md.
 
-## vfx3x (2026-10-27 KST) — VFX ~80%
+## vfx3x (2026-10-27 KST)  -  VFX ~80%
 phantom_hands extracted (rings textured but dim: no bloom); grey columns fixed via exact particles.sdc alpha-clip (SM2_VFX_CLIP_EXACT); socket +Z fallback (SM2_VFX_SOCKET_FWD). See HANDOFF.md.
 
-## vfx3y (2026-10-27 KST) — VFX ~81%
+## vfx3y (2026-10-27 KST)  -  VFX ~81%
 Mesh UV scroll (overrideAffixScroll, FUN_1425fd580) on; opt-in bench bloom from material bloomIntensity (SM2_VFX_BLOOM=1, heuristic). See HANDOFF.md.
 
 ### vfx3z (2026-10-27)
@@ -291,7 +299,7 @@ Bloom includes sprites + bloom point (heuristic value, threshold design from Blo
 
 _Niagara conversion: off the roadmap (2026-10-27), listed under ROADMAP → Possible future development._
 
-## vfx4-3 (2026-10-27 KST) — browser polish
+## vfx4-3 (2026-10-27 KST)  -  browser polish
 - Search: several words must all match (`GameCatalog.MatchesAll`, tested). Ctrl+F focuses the box, Enter previews the first hit, Down moves into the list, Esc or ✕ clears. When nothing matches, the status bar says so.
 - Export: enabled only when something is selected. Label shows "Export N files…" and changes to "Exporting…" while it runs. Ctrl+E starts it.
 ### mtl1 (2026-10-27)
@@ -314,8 +322,8 @@ glt.chameleon REA'd (FUN_142576f30 + glt PS 03558_0) and implemented in sidecar 
 - Six characters (calgar, chaplain, commissar, tech_priest, sorcerer_exalted, titus_assault) are in /Game/SM2_Work/Tests/chars_phys with PA and ABP, 0 errors. The live sim check needs clips (pending).
 
 ## mtl1-8a (2026-10-27 KST): Anim Only (Manny)
-- The `--anim-only-manny` CLI flag and the Forge Lens "Anim Only (Manny)" checkbox write `_Manny.fbx` clips directly on SK_Mannequin (HEURISTIC world-delta retarget). `ue_import_manny.py` imports them at yaw 0 and is wired into `ue_bulk`. On titus run/idle/attack, the bone error against SM2 is a mean of 8–10 cm. Status ~85%: only biped humanoids are mapped, fingers fall back, and nothing else has been checked yet.
-- mtl1-8/9 physics: in PhysTestMap, tech_priest mean is 23 cm (was 56; robe sag FLAG remains), sorcerer dash is 41–62 cm (was 69–137; no blow-up), and the other 4 characters are unchanged or better. Physics status ~90%.
+- The `--anim-only-manny` CLI flag and the Forge Lens "Anim Only (Manny)" checkbox write `_Manny.fbx` clips directly on SK_Mannequin (HEURISTIC world-delta retarget). `ue_import_manny.py` imports them at yaw 0 and is wired into `ue_bulk`. On titus run/idle/attack, the bone error against SM2 is a mean of 8-10 cm. Status ~85%: only biped humanoids are mapped, fingers fall back, and nothing else has been checked yet.
+- mtl1-8/9 physics: in PhysTestMap, tech_priest mean is 23 cm (was 56; robe sag FLAG remains), sorcerer dash is 41-62 cm (was 69-137; no blow-up), and the other 4 characters are unchanged or better. Physics status ~90%.
 - mtl1-10 Chaos Cloth (opt-in): 6 SIM sections converted on 3 characters. tech_priest robe sag fixed with Chaos. Other sections fall back to bones (FLAG: sim/section mismatch). ~92%.
 - mtl1-11: SIM sections were X-mirrored; fixed in the exporter and the plugin, so Chaos now converts 16/16 cloths on 3 characters. Bone-mode chain-depth cap brings the tech_priest sag from 64 cm to about 10 cm. ~95%.
 - mtl1-12: chaplain fixed (5.7 cm), Chaos framing unified, sidecar wind/collision offsets X-mirror fixed, gravity restored on the diag PAs. ~97%.
@@ -425,7 +433,7 @@ glt.chameleon REA'd (FUN_142576f30 + glt PS 03558_0) and implemented in sidecar 
 - UE check: SM2Extractor_18 (Desktop\SM2_Work\Bin\SM2Extractor_18) -> Exports\mtl18\cc_hellbrute -> /Game/SM2_Work/Tests/mtl18/cc_hellbrute. Sidecar now has color0 [0,0,0,0]. Env capture plate mean mtl16 -> mtl18: front (52,118,139) -> (51,117,138), q3 (57,107,129) -> (55,104,126): only grazing rims darken. Box /workspace/mtl_fix/hb18_cmp.png (rows: lit16, lit18, env16, env18; the lit rows rendered grey = capture artefact, not material).
 - Conclusion: every CPU material constant of the chameleon path now matches the exe, so the in-game navy (35,39,50) is **not** a material-constant problem. Remaining: the per-instance RGB `_783` (set=2 binding0 buffer, 108-dword record, likely TPL customization data; the Librarium "Hellbrute" inst_constructor template has no materialModifier and cc_hellbrute.tpl tints are all white, so it is probably white there) or the reference lighting (user screenshot = Librarium model viewer, librarium_character_helbrute.cls). /workspace/ingame_ref has VFX shots only, no Hellbrute. Next lead if needed: capture a RenderDoc/PIX frame of the Librarium viewer and read the bound _783 values.
 
-## mtl1-19 — Browser VFX: SELF_DISTORTION + ROADMAP 1-6 time-box (2026-10-28 KST)
+## mtl1-19  -  Browser VFX: SELF_DISTORTION + ROADMAP 1-6 time-box (2026-10-28 KST)
 - SELF_DISTORTION render (EffectRenderer sprite FS): `uv = vUv + (texture(selfTex, vMask + frac(speed*t)).rg*2-1) * power * K * k`, with k = |dFdx(vUv)|/|dFdx(vMask)| clamped to [0,4] (maps the mask-space offset into atlas UV). power = SelfDistortPower.Sample(0.5,0.5). **HEURISTIC:** K = 0.04 (env `SM2_VFX_SELF_DISTORT_K`), because data power is 0.5..1 in quad units and K=1 warps the whole sprite. Off with `SM2_VFX_SELF_DISTORT=0`. The REA clip branch reads `texture(uTex, uv).a` (no double mask multiply).
 - Bug fixed during the work: `LinearTexture`'s first upload bound the new texture on active unit 0, replacing the sprite texture (full-screen blue rectangle). The self texture is now resolved before any binds and bound on unit 3.
 - Bench (fx_mgs_hub_enemy_spawn_med, /workspace/browser_run_shots/vfx19self): K=0 identical to off; K=0.04 small shimmer; K=0.3 visibly warps the glow.
@@ -435,12 +443,12 @@ glt.chameleon REA'd (FUN_142576f30 + glt PS 03558_0) and implemented in sidecar 
 - ROADMAP 3, 5, 6: skipped (time-box; stuck before).
 - Hellbrute navy (part 1 of this brief): CPU chameleon fully REA'd and fixed in mtl1-18 (zero defaults + exact packer); env-plate means barely change (front (52,118,139)→(51,117,138)) → navy is not from material constants. Remaining suspects: per-instance RGB `_783` or Librarium-viewer lighting; next lead is a RenderDoc/PIX frame of the viewer.
 
-## mtl1-20 — ROADMAP VFX 3/5/6 retry (2026-10-28 KST, box only; PC offline)
+## mtl1-20  -  ROADMAP VFX 3/5/6 retry (2026-10-28 KST, box only; PC offline)
 - **6 VAT animStage (FOUND, implemented):** lwiGeom serialiser FUN_1417a1ef0 puts `combineMtlAnimControl` (str @0x143645a20) at lwiGeom desc +0x178. Its group serialiser FUN_14179fdd0 has animStage (str @0x143645878) at +0x00, worldOffsetX/Y/Z +0x20/+0x40/+0x60, translucencyMultByMask +0x80 (all the same curve reader FUN_14179ea80), startColor/endColor +0xa0/+0xc0. Data: animStage is `splineOverride` 190x, `withoutOverride` 8x (corpus vfx3_raw/sfx). Code: `MeshParticleDef.AnimStage` + `StageAt(n)` = spline(age/life), clamped to [0,1]; fallback age/life when not overridden. The x-domain = normalised age is by analogy with sfxMtlOverrides (same union type); the evaluator is GPU-side, so that part stays labelled. Test `AnimStageCurveDrivesVatStage` (Assets tests 146 pass). worldOffset/translucencyMultByMask/start/endColor are parsed by the exe but not used by us yet.
 - **5 Flesh covering (classified, not drawn):** FUN_141e08d30 (`coveringParams` @0x1436715a0, next to waterParams/slimeParams/mudParams/footprintTex) and FUN_141778460 (`coveringLayerNumber` @0x143644c48, intensitySplineMin/Max) show `em_covering_*` paint an intensity layer of the hit surface (`covering_simulation`, `coveringMask`, "covering intensity buffer!" @0x1436d7529). No particle geometry exists. Missing for a render: a host character with its covering-layer mask + the covering_simulation pass; the standalone effect bench has no host surface. Left as a note.
 - **3 Guessed values (still PARTIAL):** new leads checked: shader-define tables FUN_1424e32c0 (TRAIL_BLEND_ADD_NO_ALPHA), FUN_142450650 (SFX_ALPHA_BLEND / SFX_BLEND_ADD_NO_ALPHA, mesh-sfx variants) and FUN_1424eca70 (BLEND_MODE_ADD / PREMULTIPLIED_SOURCE = UI/Scaleform shader). None is the particle PSO. Global scan for emitter+0x48c/+0x490 readers (0x141000000-0x142f00000) found only FUN_1417e1e50 (already known: add -> flag 0x20) and unrelated writers. So the blend_add D3D12 blend desc, ratioXY meaning (GPU curve slot), exposure (runtime COMMON_HDR_EXPOSURE_DIV_AVG_LUM) and distortion power scale stay HEURISTIC. **Unblock:** a RenderDoc/PIX capture of an in-game frame with a blend_add sprite (e.g. grenade smoke) to read the OM blend state, the emitter CB values and the exposure CB.
 
-## mtl1-21 — Covering demo host in the browser VFX preview (2026-10-28 KST) — DEMO / HEURISTIC
+## mtl1-21  -  Covering demo host in the browser VFX preview (2026-10-28 KST)  -  DEMO / HEURISTIC
 - What: effects with `em_covering_*` stubs (blood 19, water 6, mud 3 in the corpus) get a built-in host surface in the VFX view: ComboBox "Covering demo: off / plane / sphere (heuristic)" (visible only when the effect has coverings; default plane) plus a PreviewNote saying it is a demo, not game-accurate. Bench: `SM2_VFX_COVERING=plane|sphere` (paints at 60 Hz between sheet frames; log prints coverHits/coverMax).
 - `CoveringDemo` (Assets): 128x128 intensity mask on a plane (3 m, through the effect origin, normal = effect +Y) or sphere (r 0.6 m, effect origin on its pole). Paint: one splat 0.5 m x radiusScale at the origin at t=0 (the stub), and every particle closer than 5 cm to (or up to 30 cm behind) the surface splats 0.12 m x radiusScale, gain dt*20; scrubbing back clears. radiusScale = max `physics.cdt.coveringInteraction.radiusScale` of the effect's coverings (data, parsed since 1f9ffce).
 - Material (EffectRenderer `CoverFs`): grey checker host; covered texels lerp to a per-kind albedo and gloss (blood dark red 0.7, water dark glossy 0.9, mud brown 0.3, slime green 0.8), Blinn-Phong spec exponent 2^(2+9 gloss), key light + effect lights.
@@ -464,28 +472,28 @@ Evidence: box /workspace/rdc/NOTES.md and /workspace/rdc/<scene>/{nightly,deep} 
 - Bench (box, llvmpipe): /workspace/mtl_fix/mtl23/vfx_before_after.png (before = SM2_VFX_TONEMAP=exp SM2_VFX_SFX_ADD=0 SM2_VFX_DISTORT=0.04 SM2_VFX_SELF_DISTORT_K=0.04). Shaders compile (vfxbench + glbench synthetic). Mean diffs small (0-6/255); muzzle sfx mesh 5.2.
 - Armory customization lead: see HANDOFF mtl1-23.
 
-## mtl1-24 (2026-10-28 KST): Hellbrute sections mapped to capture draws — variant assignment already correct
+## mtl1-24 (2026-10-28 KST): Hellbrute sections mapped to capture draws  -  variant assignment already correct
 - Method: PC `SM2Extractor_22 extract --filter *cc_hellbrute.tpl*` -> box; `tools/sections_dump` (TemplateMeshReader.LoadRaw) lists every section (pool, texture, variant, index count, verts, bounds); `tools/rdc/map_sections_to_draws.py sections.tsv nightly/draws.json --min-eid 2800 --max-eid 3900` matches by exact index count.
 - Evidence (capture 68141, GBUFFER eids 2870-3464): **31/31** exported sections match a draw with a unique index count (2979 = armor_02 default 102480, 2945 = legs_01 blue 1062, 2956 = arm_02 blue 1332, 2870 = inner_01 default 37998, 3027 = body_01 default 15387, ...). The game draws the "hellbrute"/"hellbrute_pilot" nodes, the same set our LOD0 export writes (VisibleGeometry), in the same order as the sidecar slots hellbrute..hellbrute_26.
 - Pixel shader per variant: every `blue` section -> chameleon PS (19112: legs_01/arm_02/arm_01 blue; 22961: armor_01/armor_02/legs_02/inner_01 blue); `default` -> 29540 (inner_01 default 18688, cables/arm_02 default 19264); skin 21380; eyes 23521; ruby 33973 (blended). The mtl1-23 note "armor_01/arm_01/legs_02 and armor_02 blue are not drawn" was wrong (they are at eids 3130-3452; the earlier list stopped at 3027).
-- Rule (exe/capture evidence): variant = the section's own shading material name (`ShadingMaterialMaterial`, else default), per section, per texture's td — exactly what TemplateMeshReader already does. **No exporter change.** UE check: /Game/SM2_Work/Tests/mtl18/cc_hellbrute has UseChameleon on exactly slots 6, 8, 10, 17, 19, 26 (pilot_5), 30 = the blue sections.
+- Rule (exe/capture evidence): variant = the section's own shading material name (`ShadingMaterialMaterial`, else default), per section, per texture's td  -  exactly what TemplateMeshReader already does. **No exporter change.** UE check: /Game/SM2_Work/Tests/mtl18/cc_hellbrute has UseChameleon on exactly slots 6, 8, 10, 17, 19, 26 (pilot_5), 30 = the blue sections.
 - So the remaining colour difference (ours brighter/cyan on the blue panels) is shading/lighting, not section->variant: candidates are the chameleon/aniso/second-spec response in M_SM2 under UE lights and the per-instance DYNAMIC_GLT_BUFFER rgb (not dumped). HEURISTIC until a capture with that buffer and the chameleon draw CBs (3419-3452) is dumped.
 - Image: box /workspace/mtl_fix/mtl23/hellbrute_ue_after.png (capture final | UE lit 3/4 front | UE base colour, mtl18 import re-rendered with ue_cap_lit fit view=ref; before = after) + the 31-row mapping table. PC captures: Captures\mtl_fix\mtl24\{lit,base,ref,refbase}.
 
-## mtl1-25 (2026-10-28 KST): official Mod Tools — install blocked, public-docs comparison
+## mtl1-25 (2026-10-28 KST): official Mod Tools  -  install blocked, public-docs comparison
 - Install: Steam appid 3856330 (free sub 1356912, FreeToDownload=No). `steam://install/3856330` opened the dialog but no appmanifest/download after 13:08 KST → needs a user click in Steam. saber.games toolset page has no direct download (images only); Nexus mods/280 needs login. No DLL/ILSpy analysis yet.
 - Public docs (spacemarine2-modding.prismray.io, 76 pages, full-text grep): **no** mention of chameleon, anisotropic, second spec, colorization, DYNAMIC_GLT, .sani or sfx internals. Those still need the tool DLLs.
 - Confirmed by docs (first-party text): submaterial/texture override defaults = material name minus `_matN`, submaterial `default` → matches our variant rule. colorSets→glTF COLOR0, extraVertexColorData→COLOR1, ARGB, one byte per channel, set n = channels 4n..4n+3.
-- USF material schema (mesh_metadata): `layers[]{albedo_tint, subMaterial, textureName, type, isVisible, blending{weights{colorSetIdx,multiplier,useFromLayerAlpha,useFromMaskChannel}, heightmap{colorSetIdx,invert,softnessMultiplier,useHeightmapBlending}, upVector{angle,enabled,falloff}, normalAdditiveBlend}}`. Maps onto our binary `MaterialBlending` (weightMultiplier, useLayerAlpha, texChannelBlendMask, heightmapSoftness, useHeightmap, blendNormalAdd) — HEURISTIC name mapping. **Gap:** exporter uses only the first non-empty layer (`DiffuseLayer`); per-layer subMaterial/tint and weight blending are not exported (relevant to Calgar cape stripe lead).
+- USF material schema (mesh_metadata): `layers[]{albedo_tint, subMaterial, textureName, type, isVisible, blending{weights{colorSetIdx,multiplier,useFromLayerAlpha,useFromMaskChannel}, heightmap{colorSetIdx,invert,softnessMultiplier,useHeightmapBlending}, upVector{angle,enabled,falloff}, normalAdditiveBlend}}`. Maps onto our binary `MaterialBlending` (weightMultiplier, useLayerAlpha, texChannelBlendMask, heightmapSoftness, useHeightmap, blendNormalAdd)  -  HEURISTIC name mapping. **Gap:** exporter uses only the first non-empty layer (`DiffuseLayer`); per-layer subMaterial/tint and weight blending are not exported (relevant to Calgar cape stripe lead).
 - Cloth (docs): "if SIM mesh does not cover the REND mesh completely (influenceDistance), the cloth is skipped from simulation entirely and appears rigid". Our preview binds per vertex with (maxInfluenceDist/d)^distanceRemapPower falloff. Mismatch noted; not changed (docs do not define "completely"; no exe evidence).
 
 ## mtl1-42 physics/materials batch (2026-10-28 KST): Calgar cape stripe = detail tiling, 60 Hz Calgar clips, PA assign, cloth bone cap 4096, CDT sweep
 - **Cape red/white stripe (data; tiling rule HEURISTIC):** `ch_calgar_coat_01.td` glt has `detail = { density = 16, scale = 0.75 }` with `tex.det = "cloth_04_det"`. M_SM2 sampled the weave detail normal at UV×1 and lerp-replaced the normal, which magnified the weave into diagonal stripes over the whole cape. New `SpecLayers.Detail` → `MeshPart.Detail` → sidecar `slots[].detail {density, scale}`; M_SM2 gains `DetailDensity` (Detail UV = UV0 × density) and `DetailScale` (blend = saturate(mask.g × scale)), defaults 1/1. Retail survey (18690 .td): 1535 glt.detail blocks, density 5 (589×) / 1 (326×) / up to 20, scale absent in 666 (default 1 assumed). The CPU packer/shader use of density was not located (shader GLSL has no symbol names) → HEURISTIC. UE A/B (scratch `/Game/SM2_Work/Tests/mtl42_detail`, `<MI>_off` swaps, no project asset changed): stripes gone at 16/0.75; cape red-channel high-frequency energy 15.9 → 12.5 (side view). Image: box /workspace/mtl_fix/mtl42/m42_detail_ab.png (top density 1, bottom .td values), PC Captures\mtl_fix\mtl42\det_{d1,td}\*.png. Existing imports pick it up on the next re-export + material import.
-- Second cape lead (not shipped, HEURISTIC): cloak_REND_01 as decoded samples texture padding at the lower corners; V-flipped it maps cleanly (alpha-cut 3.9 % → 0.4 %), cloak_REND_02 is better as decoded. UvScaling 0:1, tiling 1 — cause unknown. Sheet: /workspace/mtl_fix/mtl42/m42_cape_sheet.png.
+- Second cape lead (not shipped, HEURISTIC): cloak_REND_01 as decoded samples texture padding at the lower corners; V-flipped it maps cleanly (alpha-cut 3.9 % → 0.4 %), cloak_REND_02 is better as decoded. UvScaling 0:1, tiling 1  -  cause unknown. Sheet: /workspace/mtl_fix/mtl42/m42_cape_sheet.png.
 - **Calgar 60 Hz:** `/Game/SM2_Work/Tests/physics/cc_calgar/Anims60/…start_run_calgar` 398 frames / 6.633 s (Anims: 199 frames). `ue_bulk.py` already imports at `physics.json` `baked_rate`, so new imports are 60 Hz automatically. Capture: /workspace/mtl_fix/mtl42/m42_ue_calgar60.png.
 - **PA assign:** `ue_sm2_physics.py <json> <mesh> <folder> assign` sets `PA_<mesh>_sm2[_N]` only when the mesh slot is empty or already ours (a user PA is kept); `physasset` now also assigns. cc_calgar/cc_titus: None → PA_*_sm2 (meshes backed up as .uasset.bak1); verify: 0 missing jiggle/helper bones. The plugin's `SetupFromJson` already assigned the PA at runtime.
 - **Spiky hem:** `PhysicsBake.MaxBonesPerCloth` 1024 → 4096 (calgar cloak_SIM has 1133 free particles): helpers 1294 → 1403, cloak fit error 3.9 → 0.0 cm. Edge-stretch > 2× unchanged (baked 0.157 % vs live 0.191 %): the late-clip spikes are in the sim itself (ribbon_R stretch 8.3, ribbon_02_L 7.9, cloak 2.2; no self-collision/drag, HEURISTIC).
-- **Jetpack/CDT sweep** (62 tpls with cls physics): 15243 shape bone refs, 14820 resolved (97.2 %), 1 via locator, 423 missing. Raider jetpack bones resolve as template objects. Missing: suffix/typo variants (`CENTREs`, `BACKupS`, `knee_LS`, `ARM2Rs`…; already handled by the name remap/reject) and names in no tpl/markup (`LEG_L_Gun`, `Hip_gun_CDT`, `Backpack_cl_cdt`, `weapon_box`, `wpn_grapling_hook_01_chaos` ×36, cine_calgar `Backpack_CDT_L`) — likely on attached weapon/equipment templates (HEURISTIC, unresolved). Output /workspace/mtl_fix/mtl42/cdt_sweep.txt.
+- **Jetpack/CDT sweep** (62 tpls with cls physics): 15243 shape bone refs, 14820 resolved (97.2 %), 1 via locator, 423 missing. Raider jetpack bones resolve as template objects. Missing: suffix/typo variants (`CENTREs`, `BACKupS`, `knee_LS`, `ARM2Rs`…; already handled by the name remap/reject) and names in no tpl/markup (`LEG_L_Gun`, `Hip_gun_CDT`, `Backpack_cl_cdt`, `weapon_box`, `wpn_grapling_hook_01_chaos` ×36, cine_calgar `Backpack_CDT_L`)  -  likely on attached weapon/equipment templates (HEURISTIC, unresolved). Output /workspace/mtl_fix/mtl42/cdt_sweep.txt.
 - **Krak textures:** plasma_clouds_menu_01 + scorch_meltagun_sml1 fetched (8 pct + 2 td) into /workspace/vfx3_raw/texall/tex; CPU reference not re-rendered yet.
 - **`ue_cap_lit.py`** waits via `AutomationLibrary.finish_loading_before_screenshot()` (shaders + textures compiled and streamed; `nowait` skips).
 - Tests: SM2.Assets 203 pass (+1 large-cloth bone cap, +1 detail parse), Extractor 42, LibSaber 5, python.
@@ -497,7 +505,7 @@ Evidence: box /workspace/rdc/NOTES.md and /workspace/rdc/<scene>/{nightly,deep} 
 - **cc_titus white tabard (LOD0 only):** cloth `*_SIM` shells (`_SIM(_|$)`, carry `__default_material__`, the game never draws them) were visible because the LOD0 "all parts" path adds every level with visible parts and the SIM shells live in the LOD5 (titus/calgar) / LOD8 (sorcerer) pool. `TemplateMeshReader` now hides them (reason `clothSim`, toggle tooltip explains). Before: titus 6, calgar 8, sorcerer_exalted 4 visible SIM shells → 0. The UE export already hid them (`--include-cloth-sim` re-shows).
 - **Physics drift with In place:** `MeshPreviewScene` now steps physics after the In-place rebase / RemoveRootMotion, so cloth/seals simulate in display space. UE bake samples `ClipPose`, unaffected unless the export In place option is chosen (then it bakes in place consistently).
 - **Export In place vs Root motion:** `AnimationClip.InPlace` → `ClipPose.Apply` removes the ROOT (else first parentless bone) horizontal XZ world travel since frame 0 from parentless locals (height + turns kept; same as the preview's In place). Browser Export window "Root" combo (Root motion (default) / In place), CLI `--anim-root <motion|in-place>` (export only), applies to normal, multi-clip and Anim Only (Manny) exports. Default unchanged (root motion).
-- **UI:** mouse wheel over a closed Anim/LOD/Part combo no longer changes the selection. File list: resizable columns (header splitters; TYPE/SIZE/ARCHIVE widths persisted, PATH takes the rest), full-path tooltip, middle ellipsis (`PrefixCharacterEllipsis`; Avalonia 11.2 has no PathSegmentEllipsis — it throws at startup), pane split persisted, tab underline, section labels, dimmed secondary text. **Show all files** (persisted, `BrowserSettings.ShowAllFiles`): off = only previewable types (`AssetClassification.IsPreviewable`: .tpl, .pct/.pct.resource, .sani, .sfx) in folder view and search when the type filter is All; status bar reports "N auxiliary files hidden". Screenshot: /workspace/fix42b_shots/ui_after.png.
+- **UI:** mouse wheel over a closed Anim/LOD/Part combo no longer changes the selection. File list: resizable columns (header splitters; TYPE/SIZE/ARCHIVE widths persisted, PATH takes the rest), full-path tooltip, middle ellipsis (`PrefixCharacterEllipsis`; Avalonia 11.2 has no PathSegmentEllipsis  -  it throws at startup), pane split persisted, tab underline, section labels, dimmed secondary text. **Show all files** (persisted, `BrowserSettings.ShowAllFiles`): off = only previewable types (`AssetClassification.IsPreviewable`: .tpl, .pct/.pct.resource, .sani, .sfx) in folder view and search when the type filter is All; status bar reports "N auxiliary files hidden". Screenshot: /workspace/fix42b_shots/ui_after.png.
 - **Browser state memory:** settings.json now also keeps the expanded folder-tree nodes, selected folder and file (with archive), file list scroll, search text, type filter and Include subfolders (plus the column/pane widths above); restored when the last game folder reopens (saved scroll kept while the selected file stays on screen; the restored row gets keyboard focus). Clicking a row or moving with Up/Down previews it immediately (Ctrl/Shift-adding rows previews the newest one). Default column widths TYPE 72 / SIZE 64 / ARCHIVE 112, file pane 1.35*. Checked under Xvfb with a synthetic pak: /workspace/fix42b_shots/ui_restore.png, ui_arrow.png.
 - Tests: SM2.Assets 218 pass (+17 Mtl42Tests), Extractor 43 (+1 `--anim-root`).
 
@@ -519,7 +527,7 @@ Evidence: box /workspace/rdc/NOTES.md and /workspace/rdc/<scene>/{nightly,deep} 
 ## mtl1-39 (2026-10-28 KST): UE scene rebuilt with mtl1-38 masters, RGBA8 VFX textures, light RE (spec flag / sfx blend still HEURISTIC)
 - **UE rebuild:** fresh `/Game/SM2_Work/VfxUe` (old → `VfxUe_bak2`), masters rebuilt on import (PROVEN tint/contrast, falloff exp 1). Exports `Exports\mtl39\fx`, captures `Captures\mtl_fix\mtl39\` (BC) and `...\mtl39\tc\` (RGBA8). Rule scene unchanged: all patches ≤ 0.41/255.
 - **Texture compression fix (`ue_vfx_frame.py`):** the PNGs are already decoded game BCn; UE re-encoding to BC1/3 adds a second block error that additionalContrast (cine_bomb 41×) amplifies (fireball blue +11/255). VFX textures now import as uncompressed RGBA8 (`TC_EDITOR_ICON`, sRGB + mips kept); `SM2_UE_TEX_BC=1` restores BC. Mean |UE − CPU ref| /255 (UE36 → UE39 BC → UE39 RGBA8): grenade 2.57 → 1.29 → **0.89** (p99 23), acid 1.10 → 1.12 → **0.30** (p99 5), cine_bomb 18.32 → 4.37 → **0.40** (p99 8). Sheet `/workspace/mtl_fix/mtl39/m39_sheet.png` (UE36 / UE39 BC / UE39 RGBA8 / CPU ref / diff×4).
-- **Spec-map flag writer (OBJ_MTLBLEND_LAYER_CONST[15].x):** light RE without full auto-analysis (`/workspace/mtl_fix/mtl39/re/`: `xref.py` .pdata+capstone RIP xrefs, `immscan.py`, `callers.py`, Ghidra `-noanalysis` + `DecompFn.java` on Convert.exe, `-readOnly -noanalysis` on retail proj3). New evidence (PROVEN facts, not the rule): retail texture-usage channel table 0x144ccee10 (27 names, idx 0 MD … 21 MSCRGHAO, 25 MMRAOT, 26 MTRAO); `FUN_14267baf0` parses a usage string split on `_` into `mask |= 1<<idx`; `FUN_14267b210` = td usage serializer (hdr_scale only for MLM|HDR); `FUN_14267aaa0` mask → name. OBJ_MTLBLEND_LAYER_CONST / CB_OBJ_MATERIAL_DATA strings only in CB-registration code (retail 0x1421ca290…, Convert 0x14116c–0x1411a0) ⇒ CB filled by layout. No function tests MSCRGHAO/MMRAOT/MTRAO/MSCG immediates outside the shader-permutation cluster (only 0x142a1e600, a bit table). Convert.exe mtl-suffix path (`FUN_14151a6b0` ← 0x140e35c90, `_mtlSetSplitMaterialImpl` FUN_1416f77c0 ← 0x1416ee416) = material-library suffix deduction, not the flag. **Writer still NOT FOUND → UseSpecMap stays HEURISTIC.**
+- **Spec-map flag writer (OBJ_MTLBLEND_LAYER_CONST[15].x):** light RE without full auto-analysis (`/workspace/mtl_fix/mtl39/re/`: `xref.py` .pdata+capstone RIP xrefs, `immscan.py`, `callers.py`, Ghidra `-noanalysis` + `DecompFn.java` on Convert.exe, `-readOnly -noanalysis` on retail proj3). New evidence (PROVEN facts, not the rule): retail texture-usage channel table 0x144ccee10 (27 names, idx 0 MD … 21 MSCRGHAO, 25 MMRAOT, 26 MTRAO); `FUN_14267baf0` parses a usage string split on `_` into `mask |= 1<<idx`; `FUN_14267b210` = td usage serializer (hdr_scale only for MLM|HDR); `FUN_14267aaa0` mask → name. OBJ_MTLBLEND_LAYER_CONST / CB_OBJ_MATERIAL_DATA strings only in CB-registration code (retail 0x1421ca290…, Convert 0x14116c-0x1411a0) ⇒ CB filled by layout. No function tests MSCRGHAO/MMRAOT/MTRAO/MSCG immediates outside the shader-permutation cluster (only 0x142a1e600, a bit table). Convert.exe mtl-suffix path (`FUN_14151a6b0` ← 0x140e35c90, `_mtlSetSplitMaterialImpl` FUN_1416f77c0 ← 0x1416ee416) = material-library suffix deduction, not the flag. **Writer still NOT FOUND → UseSpecMap stays HEURISTIC.**
 - **SFX material → blend define:** PROVEN pieces: sfx define slots (0x142450650) bit0 SFX_ALPHA_BLEND, bit1 SFX_BLEND_ADD_NO_ALPHA, bit2 SFX_IS_DECAL; game_material `shaders.sfx` section parser `FUN_1426212d0` (pass 0x38, caller 0x142619ef0): blendMode absent/"none" 0, "add" 1, "blend" 2, "premul_a" 3 (+ tint packed RGBA8, emissive.intensity/adaptiveIntensity/bloomIntensity, writeDepth, tex); entry stored 0x28-stride (manager+0x150), serialized by 0x1426192c0. The enum → define-bit consumer was not located (no direct reader found) ⇒ "add → ADD_NO_ALPHA, blend → ALPHA_BLEND, premul_a → neither" remains **HEURISTIC**; code unchanged. (mtl1-44: superseded. FUN_1426212d0 is the game_material parser; the td sfx loader is FUN_1425fd580 and the selector FUN_142451840 is PROVEN.)
 - **Particle 0x400 CPU path:** emitter parser 0x14178f3b0: `blendType` at +0xe4 ("blend" 0, "add" 1, "blend_add" 2), `isBlendAlphaMultiply` bool at +0xe8 (PROVEN). No function touching +0xe4/+0xe8 with 0x400 found (2 unrelated hits) ⇒ the shared-flags builder and whether vertex colour carries age alpha stay **HEURISTIC**; unchanged.
 - Tests: SM2.Assets 195 pass. Browser builds.
@@ -527,10 +535,10 @@ Evidence: box /workspace/rdc/NOTES.md and /workspace/rdc/<scene>/{nightly,deep} 
 ## mtl1-38 (2026-10-28 KST): shaders-1 integrated, static-shader formulas applied (HEURISTIC → PROVEN)
 - shaders-1.patch applied (SHADERS.md, `tools/shaders/*`, RE_NOTES "Shader bundles" section).
 - **LUT apply PROVEN** (hdr PS 44/47): `CaptureLut.Coordinate` + `GradingLut.Lookup` texel centre = PS uvw exactly (new test `CoordinateMatchesHdrPs44Uvw`, 6 values, 1e-5). Relabelled in CaptureGrading.cs, vfxframe_scene.py, vfxframe_ref.py, ue_vfx_frame.py TONEMAP. Not modelled: PS 47 dither, 64512 pre-exposure clamp (no effect after sat).
-- **textureTintControl + additionalContrast PROVEN** (particles PS 281): `rgb = mix(tex·V·boost, t·V·tex.a, t)`, `boost = 1 + sat(1 − |key/255 − tex|)·additionalContrast`. Browser `SM2_VFX_TINT_EXACT` / `SM2_VFX_CONTRAST` now **default on** (`=0` = old). UE master material (`ue_vfx_frame.py` PARTICLE) and the CPU reference switched from the luminance-lerp heuristic to the PROVEN form. Visible change: t = 0 now keeps texture colour (cine_bomb fireball orange instead of grey; grenade core warmer; acid unchanged) — CPU ref mean |diff| grenade 2.4, acid 0.0, cine_bomb 32.8 /255. Sheet `/workspace/mtl_fix/mtl38/m38_sheet.png`.
+- **textureTintControl + additionalContrast PROVEN** (particles PS 281): `rgb = mix(tex·V·boost, t·V·tex.a, t)`, `boost = 1 + sat(1 − |key/255 − tex|)·additionalContrast`. Browser `SM2_VFX_TINT_EXACT` / `SM2_VFX_CONTRAST` now **default on** (`=0` = old). UE master material (`ue_vfx_frame.py` PARTICLE) and the CPU reference switched from the luminance-lerp heuristic to the PROVEN form. Visible change: t = 0 now keeps texture colour (cine_bomb fireball orange instead of grey; grenade core warmer; acid unchanged)  -  CPU ref mean |diff| grenade 2.4, acid 0.0, cine_bomb 32.8 /255. Sheet `/workspace/mtl_fix/mtl38/m38_sheet.png`.
 - **Particle flags PROVEN** (PS 281 GLSL 127-131, 788-790, 1077-1091): ac = sat((texA·vertA − clip)/(1 − 0.5·clip)), clip = 0x400 ? 0 : clip; rgb ×= sat(ac + 0x400); alpha = 0x20 ? 0 : ac. blend_add = blend: browser legacy fallback (`uMode == 2`) removed. **Open (HEURISTIC):** for 0x400 our rgb keeps ×vertexAlpha; the PS does not apply it, but whether the CPU folds age alpha into vertex colour (VS 248: TEXCOORD.rgb = COLOR_1·TEXCOORD_1.w·exposure) is untraced, so unchanged.
-- **SFX blend:** PSO states per define PROVEN (ADD_NO_ALPHA One/One alpha Zero/One; ALPHA_BLEND SrcAlpha/InvSrcAlpha; neither SrcAlpha/InvSrcAlpha alpha Zero/Zero — mtl1-44: that is the DUDV pass only; colour-pass neither = One/InvSrcAlpha alpha One/Zero). Material → define selection not found (mtl1-44: PROVEN, FUN_142451840) (only the define table 0x142450650 / caller 0x142332e80), so "every sfx mesh = ADD_NO_ALPHA" (plasma capture) stays HEURISTIC; code unchanged, labels updated.
-- **Light falloff d⁴:** browser (EffectRenderer light loop), `CaptureLightUnits.Attenuation`, `vfxframe_scene.attenuation` all use sat(1 − d⁴/r⁴)² (PROVEN PS 214). UE point lights cannot express it: UE 5.7 `RadialAttenuation` = (1 − d²/r²)^n (DynamicLightingCommon.ush). Exponent changed 4 → **1** (best fit, max error 0.13 vs 0.59) — APPROXIMATION.
+- **SFX blend:** PSO states per define PROVEN (ADD_NO_ALPHA One/One alpha Zero/One; ALPHA_BLEND SrcAlpha/InvSrcAlpha; neither SrcAlpha/InvSrcAlpha alpha Zero/Zero  -  mtl1-44: that is the DUDV pass only; colour-pass neither = One/InvSrcAlpha alpha One/Zero). Material → define selection not found (mtl1-44: PROVEN, FUN_142451840) (only the define table 0x142450650 / caller 0x142332e80), so "every sfx mesh = ADD_NO_ALPHA" (plasma capture) stays HEURISTIC; code unchanged, labels updated.
+- **Light falloff d⁴:** browser (EffectRenderer light loop), `CaptureLightUnits.Attenuation`, `vfxframe_scene.attenuation` all use sat(1 − d⁴/r⁴)² (PROVEN PS 214). UE point lights cannot express it: UE 5.7 `RadialAttenuation` = (1 − d²/r²)^n (DynamicLightingCommon.ush). Exponent changed 4 → **1** (best fit, max error 0.13 vs 0.59)  -  APPROXIMATION.
 - Tests: SM2.Assets 195 pass (+6). Browser builds.
 
 ## mtl1-37 (2026-10-28 KST): CDT bones via tpl_markup locators, retail remap defaults
@@ -616,7 +624,7 @@ Evidence: box /workspace/rdc/NOTES.md and /workspace/rdc/<scene>/{nightly,deep} 
 - **Saved tech_priest:** `ue_chaos_cloth.py cc_tech_priest,chars_cloth` from the mtl31 json; old asset -> `cc_tech_priest_ChaosCloth_bak15`. 4/4 cloths, 5 assets, collision shapes 15/16/16/16 (missingBones 0), 4 collision PAs, bound 5/5, PA_..._SM2_15 + ABP_..._15. SIE on the saved mesh = the diag numbers above.
 - Image: box /workspace/mtl_fix/mtl32/m32_sheet.png; PC `Captures\mtl_fix\mtl28\c28_m32_*.png`.
 - Open: regenerate the saved calgar ChaosCloth from the adopted json; fix calgar's missing shared-shape bone; a wrong-side (behind-limb) test for the skin metric.
-## mtl1-31 (2026-10-28 KST): tech_priest cloth penetration — per-cloth collision PA, shared CDT union
+## mtl1-31 (2026-10-28 KST): tech_priest cloth penetration  -  per-cloth collision PA, shared CDT union
 - **Root cause (UE A/B):** every cloth of a mesh shared ONE collision PhysicsAsset, so the skirt also collided with the tabards' leg capsules (rest-fitted to the tabard particles, up to 30 cm). The skirt was pulled between the legs and the legs showed through. **Generic fix (cpp, build31):** one collision PA per cloth (`PA_<mesh>_ClothCollision_<sim>`); the extra render-slot assets of a cloth reuse it. Sidecar `ue.chaosCloth.collisionPerCloth=false` restores the shared PA. MeasureClothPenetration tests each cloth only against its own asset's PA (or the override); `collisionPAs` = unique PAs.
 - **Parser (HEURISTIC, data evidence):** prop `sharedCDT*` shapes are added to **every** cloth on top of its own cdt lists (skipping no-bone, radius<=0, zero boxes and duplicates of own shapes). This replaces the mtl1-30 "no lists → all shared" fallback. Retail: 282 cls with prop_cloth_sim; cdt references are never name-only (306 items, all with bones); 217 define shared shapes; 2995 cloths have own+shared, 1014 own only, 538 shared only. Sidecar `collision.source` = config | sharedCDT (HEURISTIC) | config+sharedCDT (HEURISTIC), `sharedShapesAdded`. Test PhysicsTests.SharedCdtShapesApplyToEveryCloth.
 - **Data:** `Bin\SM2Extractor_mtl31` → `Exports\mtl31\cc_tech_priest` (--include-cloth-sim; 4 cloths, skirt 3→15 shapes, others 4→16). This replaced `Exports\chars_cloth\cc_tech_priest\...\cc_tech_priest.physics.json` (old one kept as `.bak2`). The saved `cc_tech_priest_ChaosCloth` asset was **not** regenerated.
@@ -670,13 +678,13 @@ Evidence: box /workspace/rdc/NOTES.md and /workspace/rdc/<scene>/{nightly,deep} 
   - models are a clay render (HEURISTIC look);
   - effects are a CPU splat approximation (HEURISTIC);
   - clips without an owner model show a glyph.
-- Tests: SM2.Assets 233, Extractor 43, LibSaber.Tests 5, chameleon python 8 — all pass.
+- Tests: SM2.Assets 233, Extractor 43, LibSaber.Tests 5, chameleon python 8  -  all pass.
 - Open: close-time state saving is unverified under Xvfb.
 
 ## ui-44 (2026-10-28 KST): Kitbasher
 - `KitbashLibrary` (Customization/Kitbash.cs) + right-column **Kitbash** tab. Preview and export share `ArmorVariant`. Tank preset 1 preview and export: 978 hidden / 54 shown. Kitbash spec export checked (996 / 36).
 - HEURISTIC: STORY_X → loyalist constructor; champion preset → `cc_*_champion_x_NN`; about half of the shared-part objects are not in a given constructor tpl (marked `⚠ not in tpl`).
-- Tests: SM2.Assets 237, Extractor 43, LibSaber.Tests 5, python 8 — all pass.
+- Tests: SM2.Assets 237, Extractor 43, LibSaber.Tests 5, python 8  -  all pass.
 
 ## mtl1-49 (2026-10-29 KST): firearm uid rule, colour schemes, context playback
 - Bolt rifle vs auto-bolt fixed by a generic uid rule; colour-scheme picker with game names and swatches (bddd777).
