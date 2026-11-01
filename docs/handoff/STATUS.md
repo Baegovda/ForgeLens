@@ -1,3 +1,5 @@
+> **STALE.** Current handoff: [docs/HANDOFF_NEW_BOT.md](../HANDOFF_NEW_BOT.md) (wins over this file and AGENTS.md). Tip as of 2026-11-02 KST cleanup: `1461bbf`.
+
 # STATUS — SM2 pipeline (as of 2026-10-27 ~05:15 KST, tip 57c38f9)
 
 Repo `Baegovda/ForgeLens` (private), branch `cursor/sm2-pck-extractor-4420`. Always confirm the current state with `git fetch && git log --oneline -30 origin/cursor/sm2-pck-extractor-4420`.

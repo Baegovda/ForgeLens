@@ -1,6 +1,6 @@
 # HANDOFF_NEW_BOT - ForgeLens + Bong* projects, transfer to a new Grok Bot account
 
-> **NEW BOT: START HERE. The owner's usage on the old account is nearly exhausted (2026-10-31). Read this whole file first, then section 0.** Last update: 2026-10-31 ~17:40 KST (6th, final verification pass; origin tip before this doc commit = `50dbf5b`).
+> **NEW BOT: START HERE. The owner's usage on the old account is nearly exhausted (2026-10-31). Read this whole file first, then section 0.** Last update: 2026-11-02 ~01:55 KST (cleanup pass; origin tip = `1461bbf`). See section "2026-11-02 정리" below — it wins over older sections here when they disagree.
 
 Written 2026-10-31 ~16:00-16:30 KST by the previous assistant ("ForgeLens" bot, Grok Bot) because the owner's usage is running out.
 Owner request (t279u, verbatim): "이제 사용량이 얼마 안남아서 다른 계정의 봇에게 인계할 인수인계문서를 아주아주 꼼꼼하게 모든걸 전달할수있게 남겨줘 5번 재확인하고 보강해줘"
@@ -9,6 +9,66 @@ Labels: **[V]** = VERIFIED this session (file/commit/command output read 2026-10
 Where this file and older docs disagree, THIS file wins (it is the newest). Older docs: `docs/BOT_TRANSFER.md` (10/29, SM2-only, partly stale), `docs/RULES_CORE.md`, `HANDOFF.md` (2,872 lines, ledger + per-round notes).
 
 ---------------------------------------------------------------------------------------------------
+
+---------------------------------------------------------------------------------------------------
+## 2026-11-02 정리 (KST ~01:55)
+
+Owner-approved cleanup on Revaptor-FX. **This section wins** over older STATUS.md / AGENTS.md content; those two are stale — follow this file.
+
+### Tip
+- Branch `cursor/sm2-pck-extractor-4420` tip: **`1461bbf`** (`1461bbf4404c2b2ad4f3c852b0020d1e018a895b`)
+- Previous tip was `2bd616b`.
+
+### Commits pushed this session
+| SHA | What | Status |
+|---|---|---|
+| [`edf8e92`](https://github.com/Baegovda/ForgeLens/commit/edf8e9256273951bbb2965c10bbc0dd5bccb3dd2) | **P1** PoE2 M2 H VFX leftovers (glow Add, FXLit tint, SIM shade, gradient white, radial glow fade, ground depth, short fit) | C# Release build OK (warnings only) |
+| [`760c055`](https://github.com/Baegovda/ForgeLens/commit/760c055cc6b33abbbb30e52f9752658ff1d8ea0c) | **P2** SM2PhysicsSetup `SetBodiesKinematic` + `ListBodies` (BellCrow); `ue_poe2_pie` kin API; `ue_poe2_quit.py` | **code only, UE plugin build/PIE unverified** |
+| [`1461bbf`](https://github.com/Baegovda/ForgeLens/commit/1461bbf4404c2b2ad4f3c852b0020d1e018a895b) | **Wukong M1 draft** BmwGlb + BmwWindow + toolbar button + `ue_bmw_import.py` | C# build OK; draft only. Pak readers **not** committed (hard-coded AES key literals in `tools/bmw/Program.cs` + `bmw_pak.py` — left untracked on `fl_bmw`; use `BMW_AES_KEY` / `docs/WUKONG_M0.md`) |
+
+### Excluded (left untracked on purpose)
+- `docs/handoff/poe2_m2/viewer_fx2/` (~97 PNGs, ~15.5 MB capture dumps)
+- `*.bak1` / `*.bak2` source backups under `src/`
+- `fl_bmw/tools/bmw/Program.cs`, `bmw_pak.py` (AES key literals)
+- No game data/binaries committed
+
+### Editor lock
+- File: `C:\Users\Revaptor_FX\ue_editor_busy.txt`
+- Old: `poe2m3 btl25 deploy+editor launch 2026-10-31T18:16:42`
+- Confirmed no `UnrealEditor*` process → set to: `editor-free 2026-11-02T01:52:10`
+
+### ForgeLens_latest
+- Path: `C:\Users\Revaptor_FX\Desktop\SM2_Work\Bin\ForgeLens_latest\ForgeLens.exe`
+- Fresh `dotnet publish` from tip **1461bbf** (app code changed)
+- Exe LastWriteTime (KST): **2026-11-02 01:52:25**, size 47997887
+- Previous folder renamed (not deleted): `Bin\ForgeLens_latest_old_20261029`
+- Also kept: `Bin\ForgeLens_1461bbf`, prior `Bin\ForgeLens_2bd616b`
+
+### Remaining worktree state
+- **PoE2\dev** (`cursor/sm2-pck-extractor-4420` @ 1461bbf, clean tracked): only untracked `viewer_fx2/` + `*.bak*` backups
+- **fl_bmw** (branch `wukong-m1-draft` @ local draft base): untracked `tools/bmw/Program.cs`, `bmw_pak.py` only (AES keys)
+- **ls_push**: push clone at tip
+
+### P-list status (from §5; updated)
+| P | Item | Status after 2026-11-02 |
+|---|---|---|
+| P1 | PoE2 VFX leftovers | **DONE** (edf8e92). Captures still untracked in viewer_fx2 |
+| P2 | BellCrow kinematic C++ API | **code pushed** (760c055); UE plugin rebuild + PIE still open |
+| P3 | BongThumbLive dots spinner | unchanged / pending |
+| P4 | PoE2 levels beyond hideout | unchanged / pending |
+| P5 | Wukong M1 | **draft UI+Glb+import** (1461bbf); pak decrypt tools not in repo (keys) |
+| P6–P10 | as before | unchanged |
+| P11 | PoE2 → Niagara | **owner go/no-go still needed** |
+
+### Docs note
+- `docs/handoff/STATUS.md` and `AGENTS.md` are **stale**. **HANDOFF_NEW_BOT.md wins.** STATUS.md now has a one-line pointer at the top to this file.
+
+### Open owner questions
+1. **Niagara P11** go/no-go?
+2. Next focus: **PoE2 polish** vs **Wukong M1** (finish pak reader without committing key literals)?
+3. **Chaplain test folder** deletion (still needs moving ~34 materials first)?
+4. **master** cleanup vs keep working branch (`cursor/sm2-pck-extractor-4420` ≈ **372 ahead** / 1 behind `master` as of this pass)?
+
 ## 0. First 30 minutes checklist (new bot)
 
 1. **Connect the PC.** Ask the owner (Korean, one line) to add his Windows PC to your account. `ListMachines` -> pick the one named **Revaptor-FX** (Windows user `Revaptor_FX`). The old machineId `d3fb99ad-25ca-45c1-81af-41e5ca09104a` belongs to the OLD account; yours will differ. Smoke test (PowerShell via Shell + machineId):
