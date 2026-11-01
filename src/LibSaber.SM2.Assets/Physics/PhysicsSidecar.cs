@@ -141,6 +141,14 @@ public static class PhysicsSidecar
           chaosCloth = new
           {
             note = "Live Chaos Cloth alternative to the baked helper bones: Create Cloth Asset from Selection on the render sections, paint MaxDistance from maxDistanceMeters (x100 cm, nearest sim vertex), then set these on the ChaosClothConfig. Stiffness values are NvCloth per-iteration fractions; Chaos uses 0..1 stiffness too, so they are copied, not converted.",
+            // HEURISTIC rest-fit (R76/R91/R93/R97k): plugin prefers these over sm2.RestFit* CVar defaults so reimport keeps the decision.
+            restFit = new
+            {
+              evidence = RestFitPolicy.Evidence,
+              floor = RestFitPolicy.Floor,
+              deepFrac = RestFitPolicy.DeepFrac,
+              shallowFrac = RestFitPolicy.ShallowFracFor(c.SimMeshName),
+            },
             maxDistanceScaleCm = cfg.Motion.DistanceScale * 100f,
             edgeStiffness = Math.Clamp((cfg.Vertical.Stiffness + cfg.Horizontal.Stiffness) * 0.5f * cfg.StiffnessMultiplier, 0f, 1f),
             bendingStiffness = Math.Clamp(cfg.Bend.Stiffness * cfg.StiffnessMultiplier, 0f, 1f),
@@ -167,6 +175,11 @@ public static class PhysicsSidecar
               source = cfg.SharedShapesAdded == 0 ? "config" : cfg.CollisionFromShared ? "sharedCDT (HEURISTIC)" : "config+sharedCDT (HEURISTIC)",
               sharedShapesAdded = cfg.SharedShapesAdded,
               space = "boneLocal", // mtl1-14d: bone-local offsets are NOT mirrored (imported bone frames absorb the X reflection; mirroring blew up the sorcerer cloak). Plugin also shrinks shapes off free rest particles.
+              // Duplicated from chaosCloth.restFit so AddCollision(Coll) can read without the parent object.
+              restFitFloor = RestFitPolicy.Floor,
+              restFitDeepFrac = RestFitPolicy.DeepFrac,
+              restFitShallowFrac = RestFitPolicy.ShallowFracFor(c.SimMeshName),
+              restFitEvidence = RestFitPolicy.Evidence,
               capsules = cfg.Capsules.Select(k => new { k.Name, k.ResolvedFrom, k.BoneFirst, radiusFirstCm = k.RadiusFirst * 100f, offsetFirstCm = Ue(k.BoneFirstOffset), k.BoneSecond, radiusSecondCm = k.RadiusSecond * 100f, offsetSecondCm = Ue(k.BoneSecondOffset) }),
               spheres = cfg.Spheres.Select(k => new { k.Name, k.ResolvedFrom, k.Bone, radiusCm = k.Radius * 100f, offsetCm = Ue(k.BoneOffset) }),
               boxes = cfg.Boxes.Select(k => new { k.Name, k.ResolvedFrom, k.Bone, sizeCm = V(new Vector3(k.Size.X, k.Size.Z, k.Size.Y) * 100f), offsetCm = Ue(k.BoneOffset), axesUe = BoxAxes(k.Rotation) }),

@@ -793,18 +793,27 @@ int32 AddCollision(UPhysicsAsset* PA, const TSharedPtr<FJsonObject>& Coll, const
   // the fit; shallow ones may shrink the shape to at most RestFitFloor. The raw (old) scale is kept only for remap rejection.
   // R91: A/B knobs without a rebuild. sm2.RestFitFloor (default 0.9) and sm2.RestFitDeepFrac (default 0.5; 0 = legacy:
   // every particle drives the fit, as before R76). Legacy pre-R76 behaviour = RestFitFloor 0.25 + RestFitDeepFrac 0.
-  static TAutoConsoleVariable<float> CVarFitFloor(TEXT("sm2.RestFitFloor"), 0.9f, TEXT("SM2 cloth rest-fit radius floor (R76 default 0.9; legacy 0.25)"));
-  static TAutoConsoleVariable<float> CVarDeepFrac(TEXT("sm2.RestFitDeepFrac"), 0.5f, TEXT("SM2 cloth rest-fit: particles deeper than this fraction of the radius are ignored (0 = legacy, none ignored)"));
-  const float RestFitFloor = FMath::Clamp(CVarFitFloor.GetValueOnGameThread(), 0.0f, 1.0f), DeepFrac = FMath::Clamp(CVarDeepFrac.GetValueOnGameThread(), 0.0f, 1.0f);
+  // Sidecar collision.restFit* (PhysicsSidecar / RestFitPolicy) is the shared source of truth; CVars remain A/B overrides.
+  // HEURISTIC R76/R91/R93/R97k — not from game data. F45 motion unverified.
+  static TAutoConsoleVariable<float> CVarFitFloor(TEXT("sm2.RestFitFloor"), 0.9f, TEXT("SM2 cloth rest-fit radius floor (R76 default 0.9; legacy 0.25); overridden by sidecar collision.restFitFloor when present"));
+  static TAutoConsoleVariable<float> CVarDeepFrac(TEXT("sm2.RestFitDeepFrac"), 0.5f, TEXT("SM2 cloth rest-fit: particles deeper than this fraction of the radius are ignored (0 = legacy, none ignored); overridden by sidecar collision.restFitDeepFrac"));
+  float RestFitFloor = FMath::Clamp(CVarFitFloor.GetValueOnGameThread(), 0.0f, 1.0f), DeepFrac = FMath::Clamp(CVarDeepFrac.GetValueOnGameThread(), 0.0f, 1.0f);
   // R93 A/B: the floor is only applied when fewer than this fraction of the free rest particles sit shallowly inside the shape
   // (many shallow hits = the authored shape is really too big for this mesh, e.g. a single coat capsule). 1 = always floor (R91).
-  static TAutoConsoleVariable<float> CVarShallowFrac(TEXT("sm2.RestFitShallowFrac"), 1.0f, TEXT("SM2 cloth rest-fit: skip the radius floor when the shallow-inside fraction of free particles is >= this (1 = always floor)"));
+  static TAutoConsoleVariable<float> CVarShallowFrac(TEXT("sm2.RestFitShallowFrac"), 1.0f, TEXT("SM2 cloth rest-fit: skip the radius floor when the shallow-inside fraction of free particles is >= this (1 = always floor); overridden by sidecar collision.restFitShallowFrac"));
   float ShallowFrac = FMath::Clamp(CVarShallowFrac.GetValueOnGameThread(), 0.0f, 1.0f);
   // R97k: per-cloth override "name=frac;name=frac" (exact cloth name). Commissar coat_SIM_01 + straps_SIM_01 (names unique to the commissar) need the floor skipped
-  // (R97j A/B: global 0.04 fixed the coat but hurt titus/tech_priest/chaplain/straps).
+  // (R97j A/B: global 0.04 fixed the coat but hurt titus/tech_priest/chaplain/straps). Prefer sidecar per-cloth restFitShallowFrac when set.
   static TAutoConsoleVariable<FString> CVarShallowOverride(TEXT("sm2.RestFitShallowOverride"), TEXT("coat_SIM_01=0.04;straps_SIM_01=0.04"), TEXT("SM2 cloth rest-fit: per-cloth ShallowFrac overrides, 'cloth=frac;cloth=frac' ('' = none)"));
   { TArray<FString> Ents; CVarShallowOverride.GetValueOnGameThread().ParseIntoArray(Ents, TEXT(";"), true);
     for (const FString& E : Ents) { FString K, V; if (E.Split(TEXT("="), &K, &V) && K.TrimStartAndEnd().Equals(Who, ESearchCase::IgnoreCase)) { ShallowFrac = FMath::Clamp(FCString::Atof(*V), 0.0f, 1.0f); Log.Add(FString::Printf(TEXT("%s: shallowFrac override %.3f"), *Who, ShallowFrac)); } } }
+  if (Coll.IsValid())
+  {
+    double V = 0.0;
+    if (Coll->TryGetNumberField(TEXT("restFitFloor"), V)) RestFitFloor = FMath::Clamp((float)V, 0.0f, 1.0f);
+    if (Coll->TryGetNumberField(TEXT("restFitDeepFrac"), V)) DeepFrac = FMath::Clamp((float)V, 0.0f, 1.0f);
+    if (Coll->TryGetNumberField(TEXT("restFitShallowFrac"), V)) { ShallowFrac = FMath::Clamp((float)V, 0.0f, 1.0f); Log.Add(FString::Printf(TEXT("%s: restFit from sidecar floor=%.2f deep=%.2f shallow=%.3f"), *Who, RestFitFloor, DeepFrac, ShallowFrac)); }
+  }
   int32 DeepIgnored = 0, FloorSkipped = 0;
   float LastRawScale = 1.0f;
   // R97g: per-shape rest-fit log (raw S before the floor, shallow/deep/free particle counts) for the commissar coat A/B.
