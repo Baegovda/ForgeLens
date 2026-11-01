@@ -8,6 +8,16 @@ public partial class MainWindow
 {
   private Poe2Window? _poe2;
 
+  private BmwWindow? _bmw;
+
+  /// <summary>BMW M1: Black Myth: Wukong export browser.</summary>
+  internal void OpenBmw()
+  {
+    if (_bmw is { IsVisible: true }) { _bmw.Activate(); return; }
+    _bmw = new BmwWindow(this);
+    _bmw.Show(this);
+  }
+
   internal void OpenPoe2()
   {
     if (_poe2 is { IsVisible: true }) { _poe2.Activate(); return; }
@@ -72,7 +82,7 @@ public partial class MainWindow
     SkeletonToggle.IsVisible = mesh.Bones.Count > 0;
     WireToggle.IsVisible = mesh.HasTriangles;
     GpuToggle.IsVisible = true;
-    PreviewNote.Text = "PoE2: " + path;
+    PreviewNote.Text = (path.EndsWith(".glb", StringComparison.OrdinalIgnoreCase) ? "Wukong: " : "PoE2: ") + path;
     var clip = mesh.Clip;
     _clip = clip;
     _clipIndex = -1;

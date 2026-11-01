@@ -120,6 +120,9 @@ public partial class MainWindow
     var poe2Btn = new Button { Content = "PoE2", FontSize = 11, Height = 26, Padding = new Thickness(8, 0) }; // POE2 M2
     ToolTip.SetTip(poe2Btn, "Path of Exile 2: browse the GGPK, skills and effects");
     poe2Btn.Click += (_, _) => OpenPoe2();
+    var bmwBtn = new Button { Content = "Wukong", FontSize = 11, Height = 26, Padding = new Thickness(8, 0) }; // BMW M1
+    ToolTip.SetTip(bmwBtn, "Black Myth: Wukong: meshes exported from the game paks");
+    bmwBtn.Click += (_, _) => OpenBmw();
     var help = new Button { Content = "?", FontSize = 11, Height = 26, Width = 26, Padding = new Thickness(0) };
     ToolTip.SetTip(help, "Shortcuts (F1)");
     help.Click += (_, _) => UeToggleHelp();
@@ -127,7 +130,7 @@ public partial class MainWindow
     {
       Background = new SolidColorBrush(Color.Parse("#99101216")), CornerRadius = new CornerRadius(4), Padding = new Thickness(4), Margin = new Thickness(8),
       HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Top,
-      Child = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 4, Children = { _ueViewBox, show, BuildUePanelsButton(), settingsBtn, poe2Btn, help } },
+      Child = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 4, Children = { _ueViewBox, show, BuildUePanelsButton(), settingsBtn, poe2Btn, bmwBtn, help } },
     };
     bar.AddHandler(PointerPressedEvent, (_, e) => e.Handled = true, RoutingStrategies.Bubble);
     bar.Bind(IsVisibleProperty, HudInfo.GetObservable(IsVisibleProperty));
