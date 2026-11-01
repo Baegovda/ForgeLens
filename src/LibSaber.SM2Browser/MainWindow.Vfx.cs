@@ -114,6 +114,7 @@ public partial class MainWindow
 
   private async Task<bool> ShowEffectAsync(string name, int generation, Func<(EffectDefinition Def, EffectInstance Instance)?>? make = null)
   {
+    if (make is null) Gpu.EffectRenderer.GroundWritesDepth = true; // M2 H: SM2 effects keep the depth-writing ground
     var aspect = VfxViewAspect();
     var built = await Task.Run(() =>
     {
@@ -286,6 +287,20 @@ public partial class MainWindow
 
   /// <summary>mtl1-42: Fit button / F key: re-frame the whole effect (keeps the current orbit angles).</summary>
   private void VfxFitClicked(object? sender, RoutedEventArgs e) => VfxFit();
+
+  /// <summary>M2 H: PoE2 effects fly root-attached parts along +X at 40 m/s; fitting the whole duration put the camera hundreds of metres away. Frame only the first part.</summary>
+  internal bool VfxFitSpan(float seconds)
+  {
+    if (_fx is not { } fx) return false;
+    var aspect = VfxViewAspect();
+    lock (fx)
+    {
+      var probe = EffectInstance.Standalone(fx.Definition, 1);
+      fx.Camera = EffectCamera.FitAll(probe, Math.Min(fx.Definition.Duration, seconds), aspect, fx.Camera.Yaw, fx.Camera.Pitch);
+    }
+    GpuView.ShowEffect(GpuView.Effect);
+    return true;
+  }
 
   private bool VfxFit()
   {

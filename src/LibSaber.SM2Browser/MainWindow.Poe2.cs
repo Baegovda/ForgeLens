@@ -33,6 +33,7 @@ public partial class MainWindow
     _texture = null;
     var why = "";
     var gen = 0;
+    Gpu.EffectRenderer.GroundWritesDepth = false; // M2 H (reset to true by the SM2 effect path)
     bool ok;
     try
     {
@@ -47,6 +48,7 @@ public partial class MainWindow
     catch (Exception x) { ok = false; why = x.ToString(); }
     try { File.AppendAllText(Path.Combine(Path.GetTempPath(), "fl_poe2fx.txt"), $"{DateTime.Now:HH:mm:ss} {ao} ok={ok} gpuFailed={GpuView.HasFailed} gpuToggle={GpuToggle.IsChecked} {why}\n"); } catch (IOException) { }
     if (!ok && gen != _previewGeneration) return true; // superseded by a newer selection: no fallback view
+    if (ok && Environment.GetEnvironmentVariable("FL_POE2_FULLFIT") != "1") VfxFitSpan(LibSaber.SM2.Assets.Games.Poe2.Poe2Particles.Env("FL_POE2_FIT_SEC", 0.6f)); // M2 H
     if (ok) PreviewNote.Text = "PoE2 particles: " + ao + " (HEURISTIC sizes/colours, see docs/POE2_M2.md). " + PreviewNote.Text;
     return ok;
   }

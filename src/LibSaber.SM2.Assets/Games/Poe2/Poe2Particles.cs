@@ -28,13 +28,15 @@ public static class Poe2Particles
     /// <summary>M2 G: FL_POE2_FX_LEGACYPLATE=1 restores the old untextured / alpha glow cards (before/after captures only).</summary>
     /// <summary>M2 G: terrain / PBR / model material textures used as sprites have no sprite alpha mask and draw as square plates (frost bomb, glacial bolt).</summary>
     private static bool PlateTexture(string? t) => t is not null && (t.Contains("/PBR/", StringComparison.OrdinalIgnoreCase) || t.Contains("/Terrain/", StringComparison.OrdinalIgnoreCase) || t.Contains("Art/Models/", StringComparison.OrdinalIgnoreCase));
+    /// <summary>M2 H debug: FL_POE2_FX_HIDE=name1,name2 hides GPU emitters by name (bench isolation only).</summary>
+    private static bool DebugHidden(string name) => (Environment.GetEnvironmentVariable("FL_POE2_FX_HIDE") ?? "").Split(',', StringSplitOptions.RemoveEmptyEntries).Any(s => name.StartsWith(s, StringComparison.OrdinalIgnoreCase));
     private static readonly bool LegacyPlates = Environment.GetEnvironmentVariable("FL_POE2_FX_LEGACYPLATE") == "1";
   public static float SizeUnit = Env("FL_POE2_FX_SIZE", 0.05f);
   public static float Intensity = Env("FL_POE2_FX_INTENSITY", 60f);
   public static float TrailWidthUnit = Env("FL_POE2_FX_TRAILW", 0.05f);
   public static float FlySpeed = Env("FL_POE2_FX_SPEED", 8f);
 
-  private static float Env(string n, float d) => float.TryParse(Environment.GetEnvironmentVariable(n), System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out var v) ? v : d;
+  public static float Env(string n, float d) => float.TryParse(Environment.GetEnvironmentVariable(n), System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out var v) ? v : d;
 
   public sealed class Result
   {
@@ -209,7 +211,7 @@ public static class Poe2Particles
         if (r.Any(x => x.Graph.StartsWith("FlipbookRandomPick", StringComparison.Ordinal))) frameOffset = new Vector2(0, fx * fy - 0.01f);
         else { frameMode = FrameMode.AgeSpline; frameSpline = new ScalarParam(new Curve1([0f, 0f, 1f, fx * fy - 0.01f]), Vector2.Zero); }
       }
-      if (!LegacyPlates && blend == EffectBlend.Blend && (tex ?? "").Contains("/glow/", StringComparison.OrdinalIgnoreCase)) blend = EffectBlend.BlendAdd; // M2 G: alpha-blended glow card drew a grey plate (stormblast e1) // M2 G: alpha-blended glow card drew a grey plate (stormblast e1)
+      if (!LegacyPlates && blend is EffectBlend.Blend or EffectBlend.BlendAdd && (tex ?? "").Contains("/glow/", StringComparison.OrdinalIgnoreCase)) { blend = EffectBlend.Add; intensity *= Env("FL_POE2_GLOW_ADD", 0.15f); } // M2 H (HEURISTIC 0.15: alpha no longer limits the card): BlendAdd let dark-tinted glow cards darken the scene (Glacial Bolt black blobs); glow art is black-background RGB, pure Add never darkens // M2 G: alpha-blended glow card drew a grey plate (stormblast e1) // M2 G: alpha-blended glow card drew a grey plate (stormblast e1)
             var distortion = (render ?? "").Contains("distortion", StringComparison.OrdinalIgnoreCase) || (tex ?? "").Contains("/distortion/", StringComparison.OrdinalIgnoreCase) || r.Any(x => x.Graph.Contains("Distort", StringComparison.Ordinal));
       var meshFile = Str(em, "particle_mesh");
       var c0 = color;
@@ -218,7 +220,7 @@ public static class Poe2Particles
         Name = $"{Path.GetFileNameWithoutExtension(pet)}_e{n}" + (string.IsNullOrEmpty(meshFile) ? "" : "_meshsprite"),
         Path = pet + "#" + n,
         IsGpu = true,
-        Visible = !distortion && !hidden && (LegacyPlates || (!string.IsNullOrEmpty(tex) && !PlateTexture(tex) && !((tex ?? "").Contains("/glow/", StringComparison.OrdinalIgnoreCase) && size.Curve.Max >= 20))) /* M2 G: untextured cards, material textures and huge glow cards drew plates behind the effect */,
+        Visible = !DebugHidden($"{Path.GetFileNameWithoutExtension(pet)}_e{n}") && !distortion && !hidden && (LegacyPlates || (!string.IsNullOrEmpty(tex) && !PlateTexture(tex) && !((tex ?? "").Contains("/glow/", StringComparison.OrdinalIgnoreCase) && size.Curve.Max >= 20))) /* M2 G: untextured cards, material textures and huge glow cards drew plates behind the effect */,
         Transform = at,
         EmitDuration = continuous ? 0 : F(em, "emitter_duration_max", 1),
         Emission = kind,
@@ -403,6 +405,14 @@ public static class Poe2Particles
           }
         case "COLORV_Albedo" when ps.TryGetValue("00. Color", out var cc) && Vec(cc) is { } cv: tint *= cv; break;
         case "SIM_Smoke2" when ps.TryGetValue("04.Albedo_RGB", out var al) && Vec(al) is { } av: tint *= av; break;
+        case "FXLit_Init" when ps.TryGetValue("Albedo Color Override", out var ao) && Vec(ao) is { } aov:
+          {
+            // M2 H HEURISTIC: lit particles (crossbow_permafrost snow/mist) carry a dark linear albedo that the game lights; unlit here it drew
+            // black blobs. Use the hue (normalised to max 1) half-way to white as a lit-looking tint.
+            var mx = MathF.Max(aov.X, MathF.Max(aov.Y, aov.Z));
+            if (mx > 1e-4f) tint *= Vector3.Lerp(Vector3.One, aov / mx, 0.5f);
+            break;
+          }
       }
   }
 

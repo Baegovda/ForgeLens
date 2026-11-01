@@ -41,6 +41,9 @@ internal sealed class EffectLayer
 /// </summary>
 internal sealed unsafe class EffectRenderer : IDisposable
 {
+  /// <summary>M2 H: PoE2 effects turn this off: the preview ground has no soft-particle fade, so ground-level glow cards (Frost Bomb) were cut by the floor.</summary>
+  public static bool GroundWritesDepth = true;
+
   private readonly GL _gl;
   private readonly uint _sprite, _ground, _mesh, _distort, _cover;
   private CoveringDemo? _coverDemo;
@@ -307,7 +310,7 @@ internal sealed unsafe class EffectRenderer : IDisposable
       }
 
       _gl.Enable(EnableCap.DepthTest);
-      _gl.DepthMask(true);
+      _gl.DepthMask(GroundWritesDepth);
       _gl.Disable(EnableCap.Blend);
       _gl.BindVertexArray(_groundVao);
       _gl.DrawArrays(PrimitiveType.Triangles, 0, 6);

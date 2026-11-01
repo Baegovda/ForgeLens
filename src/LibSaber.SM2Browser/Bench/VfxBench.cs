@@ -40,6 +40,7 @@ internal static class VfxBench
     var library = new EffectLibrary(new DirectoryEffectSource(poe2 is null ? args[1] : Directory.CreateDirectory(Path.Combine(Path.GetTempPath(), "fl_poe2_nosfx")).FullName));
     var aliases = PartAliases.Load(args[2]);
     var textures = poe2 is null ? EffectTextures.FromDirectory(args[3]) : Effects.Poe2FxTextures.For(poe2);
+    LibSaber.SM2Browser.Gpu.EffectRenderer.GroundWritesDepth = poe2 is null; // M2 H
     var meshes = EffectMeshes.FromDirectory(Environment.GetEnvironmentVariable("SM2_VFX_MESHES") is { Length: > 0 } md ? md : Path.Combine(Path.GetDirectoryName(Path.GetFullPath(args[3]).TrimEnd('/')) ?? ".", "mesh"), args[3]);
     var output = args[4];
     var names = args.Skip(5).ToList();
