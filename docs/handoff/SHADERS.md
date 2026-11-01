@@ -69,6 +69,8 @@ hdr lut distort distort_postproc particles particles_gpu sfx trail combine_mater
    same bits {2,4,32..32768}; the 164 GLT_IS_DECAL perms omit bit 512. No permutation hard-codes it ⇒ it is a pure
    CPU per-material value; the UseSpecMap writer cannot be settled from shaders. mtl1-39: exe light RE (usage table
    0x144ccee10, parser FUN_14267baf0) did not find the writer either; still HEURISTIC.
+   2026-11-02: decision centralized in LibSaber.SM2.Assets.Meshes.UseSpecMapPolicy + materials.json useSpecMap
+   (viewer GlPreview + import_sm2_materials.py consume it). Writer hunt remains open (SYMBOL_DB materials).
 6. Clustered light falloff (particles PS 214/215 PASS_LIGHT_ATLAS_DRAW, CB_COMMON_LIGHTNG light i = regs 4i+1..4i+3):
      k = sat(P.w·400); L = P.xyz − k·x; d2 = |L|²; win = sat(1 − (k·d2)²·C1.w)²; spot = sat(dot(−L̂, D.xyz)·S + D.w)²
      I = spot·win·((1−k)+P.w)·C1.rgb  (no 1/d² in the point path; area/tube branch uses 1/(d²+P.w)·0.25).

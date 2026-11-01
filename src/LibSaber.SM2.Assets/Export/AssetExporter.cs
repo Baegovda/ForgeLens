@@ -1489,7 +1489,13 @@ public static class AssetExporter
 
   private static string WriteMaterialSidecar(string fbxPath, ExportedMesh mesh, IReadOnlyDictionary<string, string> files, ExportReport report)
   {
-    var slots = MaterialMaps.Slots(mesh).Select(slot => new
+    var slots = MaterialMaps.Slots(mesh).Select(slot =>
+    {
+      var hasSpec = slot.Part.Maps.Any(m => string.Equals(m.Role, "specular", StringComparison.OrdinalIgnoreCase)
+        && !string.IsNullOrEmpty(m.Name) && !m.Missing)
+        || !string.IsNullOrEmpty(slot.Part.Specular);
+      var useSpecMap = UseSpecMapPolicy.Decide(hasSpec, slot.Part.Chameleon is not null);
+      return new
     {
       slot = slot.Name,
       variant = slot.Part.Variant,
@@ -1497,6 +1503,9 @@ public static class AssetExporter
       albedoTint = slot.Part.AlbedoTint,
       tdScalars = slot.Part.TdScalars.Count == 0 ? null : slot.Part.TdScalars,
       blendMode = slot.Part.BlendMode,
+      // F49 / mtl1-26: shared UseSpecMap decision (HEURISTIC — writer of OBJ_MTLBLEND_LAYER_CONST[15].x not found).
+      useSpecMap,
+      useSpecMapEvidence = UseSpecMapPolicy.Evidence,
       // glt.second_spec / glt.anisotropic_spec (null when the variant leaves them disabled). Tints are R, G, B, A in 0..1.
       secondSpec = slot.Part.SecondSpec is { } second ? new
       {
@@ -1569,13 +1578,14 @@ public static class AssetExporter
         stored = map.StoredChannels,
         packing = map.Packing.Select(pack => new { channel = pack.Channel, meaning = pack.Meaning, stored = pack.Stored.Length == 0 ? pack.Channel : pack.Stored }),
       }),
+    };
     });
     var jsonPath = Path.Combine(Path.GetDirectoryName(fbxPath)!, Path.GetFileNameWithoutExtension(fbxPath) + ".materials.json");
     File.WriteAllText(jsonPath, JsonSerializer.Serialize(new
     {
       mesh = mesh.Name,
       fbx = Path.GetFileName(fbxPath),
-      note = "Each map's channels are the .td format_descr (logical channels). stored/packing[].stored say where each one physically is in the exported PNG: BC5 (DXN) keeps two channels, so Roughness(a) is in g; BC4 (DXT5A) keeps one, so AO(a) is in r. The game swizzles these in its shader (swizzleTexInShader). srgb false is a normal or a packed mask, so Unreal imports it linear. The FBX links diffuse, normal, and specular. import_sm2_materials.py builds a master material and one instance per slot from this file. secondSpec and anisotropicSpec are the variant's glt.second_spec and glt.anisotropic_spec (second lobe metalness/roughness = saturate(packed * scale + bias)); absent means disabled. baseLayer is the glt-level metallicTint, reflectance and metalness/roughness {scale, bias} (base metal/rough = saturate(packed * scale + bias), albedo *= lerp(albedo_tint, metallicTint, metal), dielectric F0 = 0.16 * reflectance^2). detail is glt.detail {density, scale} (absent = no block): the script tiles the detail normal UVs by density and scales its blend by scale (HEURISTIC). With Substrate the script builds base + second as two added Slabs (SecondSpecGain 4 without aniso, 1 with aniso; aniso extra{} drives the second slab).",
+      note = "Each map's channels are the .td format_descr (logical channels). stored/packing[].stored say where each one physically is in the exported PNG: BC5 (DXN) keeps two channels, so Roughness(a) is in g; BC4 (DXT5A) keeps one, so AO(a) is in r. The game swizzles these in its shader (swizzleTexInShader). srgb false is a normal or a packed mask, so Unreal imports it linear. The FBX links diffuse, normal, and specular. import_sm2_materials.py builds a master material and one instance per slot from this file. secondSpec and anisotropicSpec are the variant's glt.second_spec and glt.anisotropic_spec (second lobe metalness/roughness = saturate(packed * scale + bias)); absent means disabled. baseLayer is the glt-level metallicTint, reflectance and metalness/roughness {scale, bias} (base metal/rough = saturate(packed * scale + bias), albedo *= lerp(albedo_tint, metallicTint, metal), dielectric F0 = 0.16 * reflectance^2). detail is glt.detail {density, scale} (absent = no block): the script tiles the detail normal UVs by density and scales its blend by scale (HEURISTIC). With Substrate the script builds base + second as two added Slabs (SecondSpecGain 4 without aniso, 1 with aniso; aniso extra{} drives the second slab). useSpecMap is HEURISTIC (DATA correlation; OBJ_MTLBLEND_LAYER_CONST[15].x writer not found — SHADERS.md §5).",
       slots,
     }, JsonOptions));
     report.Written++;
