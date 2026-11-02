@@ -1,6 +1,6 @@
 # HANDOFF_NEW_BOT - ForgeLens + Bong* projects, transfer to a new Grok Bot account
 
-> **NEW BOT: START HERE.** Owner usage nearly exhausted (2026-11-02). Read this whole file first, then section 0. **Current tip `3a6ba3f`**. Winning section: **"2026-11-02 ~04:55 KST  -  usage-cutoff handoff"**. Also read `docs/handoff/NEXT_BOT_PROMPT.md`. Prior cleanup tip `1461bbf` is historical.
+> **SUPERSEDED as the winning handoff (2026-11-02 reconciliation).** Read [`HANDOFF_CURRENT.md`](HANDOFF_CURRENT.md) first — it wins, including over the usage-cutoff section below. This file is the 10/31–11/02 transfer log. Code tip remains `3a6ba3f`; branch HEAD moved with docs commits (`8790595`, `33a8cda`, `f82bb4b`, then the reconciliation). Ahead/behind **390 / 1** was measured at `f82bb4b` (the "~387" line below is that older count). Paste prompt: `docs/handoff/NEXT_BOT_PROMPT.md`.
 
 Written 2026-10-31 ~16:00-16:30 KST by the previous assistant ("ForgeLens" bot, Grok Bot) because the owner's usage is running out.
 Owner request (t279u, verbatim): "이제 사용량이 얼마 안남아서 다른 계정의 봇에게 인계할 인수인계문서를 아주아주 꼼꼼하게 모든걸 전달할수있게 남겨줘 5번 재확인하고 보강해줘"
@@ -15,12 +15,12 @@ Where this file and older docs disagree, THIS file wins (it is the newest). Olde
 ---------------------------------------------------------------------------------------------------
 ## 2026-11-02 ~04:55 KST  -  usage-cutoff handoff (tip **3a6ba3f**)
 
-> **This section wins** over older HANDOFF sections / STATUS tip lines when they disagree. Written so the next bot can resume without chat history.
+> **Historical as of the reconciliation.** [`HANDOFF_CURRENT.md`](HANDOFF_CURRENT.md) wins over this section. Written so a bot without chat could resume at tip `3a6ba3f`. PC disk claims (editor-free, folders still present, PID 102852) were not re-checked later.
 
 ### Git tip [V]
 - Branch `cursor/sm2-pck-extractor-4420` @ **`3a6ba3f`** (`3a6ba3f725fc79a9b89ef892b7365a7e0db745c4`)  -  *R99: SM2PhysicsSetup BuildPlugin deploy + commissar coat PIE A/B*
 - Clean checkout for docs/push: `C:\Users\Revaptor_FX\ls_push` on **Revaptor-FX** (`machineId` `d3fb99ad-25ca-45c1-81af-41e5ca09104a`)
-- vs `origin/master`: working branch **~387 ahead / 1 behind** (do **not** push/merge master without owner decision)
+- vs `origin/master` **at this section's tip `3a6ba3f`**: **~387 ahead / 1 behind**. Measured again at `f82bb4b`: **390 ahead / 1 behind** (`docs/HANDOFF_CURRENT.md`). Do **not** push/merge master without owner decision.
 - Recent commits after prior docs tip `eddf91e`:
   | SHA | What |
   |---|---|
@@ -310,7 +310,7 @@ Owner-approved cleanup on Revaptor-FX. **This section wins** over older STATUS.m
 ## 3. Architecture and pipeline
 
 - **ForgeLens** = multi-game asset browser/viewer (Avalonia, .NET 8) + exporter (glTF/FBX/PNG + JSON sidecars) + Unreal importers (Python in editor) + UE plugin `SM2PhysicsSetup` (bone physics / cloth rest-fit). Code map [I BOT_TRANSFER]: `src/LibSaber.SM2.Assets` (formats; PoE2 in `Games/Poe2/` e.g. `Poe2Reader`, `Poe2Particles.cs`, `Poe2Terrain.cs`), `src/LibSaber.SM2Browser` (GUI, exe `ForgeLens.exe`, `MainWindow.axaml.cs`, `SettingsWindow.cs`, `PerfBudget.cs`), `src/LibSaber.SM2Extractor` (CLI), `tools/ue/*.py`, `tools/ue/SM2PhysicsSetup`, `tools/poe2/*`, `tools/re/*`, `tools/watch/*`, `tools/vfx*`, `tools/level/*`.
-- **Per-game readers:** SM2 (.pak/.td/.tpl/.sfx/.cls...), PoE2 (GGPK via LibGGPK3 copy + Oodle `oo2core_9_win64.dll` taken from `C:\Program Files\Epic Games\UE_5.4\Engine\Binaries\DotNET\AutomationTool`; formats .sm/.smd/.fmt/.ast/.mat/.dds/.ao/.pet/.arm/.tdt/.tgt/.tgm, tables .datc64; reference `adamthedash/poe_data_tools`). Wukong reader not written yet.
+- **Per-game readers:** SM2 (.pak/.td/.tpl/.sfx/.cls...), PoE2 (GGPK via LibGGPK3 copy + Oodle `oo2core_9_win64.dll` taken from `C:\Program Files\Epic Games\UE_5.4\Engine\Binaries\DotNET\AutomationTool`; formats .sm/.smd/.fmt/.ast/.mat/.dds/.ao/.pet/.arm/.tdt/.tgt/.tgm, tables .datc64; reference `adamthedash/poe_data_tools`). Wukong: M1 draft `BmwGlb` / `BmwWindow` is in tree (`1461bbf`); pak decrypt reader is **not** in git (corrected 2026-11-02 — this line used to say the reader was unwritten).
 - **PoE2 CLI switches** (ForgeLens exe): `--poe2skills`, `--poe2export <prepared> <out> <mesh.sm> <rig.ast> <clips|*>` (`FL_POE2_ALLCLIPS=1` = all clips), `--vfxue poe2:<prepared> - - <out> <effect.ao>@start:end:step`, `--poe2level <prepared> <out> <room.arm> [<ggpk> <tool dir>]`; viewer PoE2 window tabs incl. Skills and Levels; test hook `FL_POE2_LEVEL=<arm>`. Mesh prep: `tools/poe2/mesh_prep.ps1`, `prep.ps1`. [V POE2_M2/M3]
 - **Unreal bridge:** EngineWire / McpAutomationBridge 0.5.30 on 127.0.0.1:3000 (token file). Scripts run inside the editor's Python.
 - **PoE2 UE scripts** (`tools/poe2/`): `ue_poe2_import.py`, `ue_poe2_import_safe.py` (own saves only, no deletes), `ue_poe2_check.py`, `ue_poe2_probe.py`, `ue_poe2_physics.py` (phys_ bones -> SM2 physics JSON -> `unreal.SM2PhysicsSetupLibrary.setup_from_json`), `ue_poe2_vfx_frame.py` (frozen-frame VFX, limited to /Game/ForgeLens/POE), `ue_poe2_level.py`, `ue_poe2_pie.py` (PIE swing check), runners `ue_poe2_call.ps1` (private args), `ue_poe2_go.ps1` (locked), `ue_poe2_run.ps1`; Blender checks `bl_check.py`, `bl_stretch.py`; `poe2_clicks.ps1` (real-click viewer test). [V listing]
@@ -328,9 +328,9 @@ Measured results [V HANDOFF]: orb ring average 201,180,216 vs game 194,177,217; 
 Remaining:
 - **F45** physics motion vs game - needs owner's in-game captures (don't ask; wait).
 - **Muzzle flash position / aim pose** (R51) visual check - needs owner's captures.
-- **F49 REA:** writer of the UseSpecMap flag (`OBJ_MTLBLEND_LAYER_CONST[15].x`) not found; switch stays HEURISTIC. Multi-hour Ghidra/REA work, no new lead.
+- **F49 REA:** writer of the UseSpecMap flag was open on 2026-10-31. **Superseded:** `FUN_14217da70` PROVEN, in code since `ddc8f88` (`docs/HANDOFF_CURRENT.md`).
 - Orb: game's hot yellow-white centre not reproduced; bloom card faces only the capture camera (not a billboard).
-- Hub: intensity scale K=10 and fill light 3 are FITS; spot lights placed as points (no direction in data), no shadows; red slightly low.
+- Hub (2026-10-31 snapshot): intensity scale K=10 and fill light 3 were FITS; spots were placed as points. **Superseded in code:** K=10 removed (`LevelLightUe`, `e9ad274` / `ddc8f88`); spots keep cones; direction and UE unit bridge still open (`docs/HANDOFF_CURRENT.md`).
 - **Chaplain test assets kept**: `/Game/ForgeLens/SM2/Tests/chars_cloth2/cc_chaplain` (used by 8 r90_cloth test meshes) and `Tests/chars_phys/cc_chaplain` (its ~34 MI_* used by main `Characters/cc_chaplain/cc_chaplain`). To delete, first move those materials; owner said keep (15:06). [V HANDOFF R98]
 - Older small items [I]: F27 artificer presets, pauldron colour-section matching (HEURISTIC), commissar coat beyond the override, model UV scroll, cinematic sequences.
 

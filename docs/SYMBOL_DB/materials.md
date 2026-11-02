@@ -10,7 +10,7 @@
 - Skin material = diffuse td `materials.<suffix>` variant: ApplyMaterialSuffix → FUN_141342870 → FUN_141ef5170 → FUN_1420bfa40 → FUN_14261c830 (list FUN_14261c000 / FUN_14261b0c0, td reader FUN_14262abb0) → FUN_1421dc890 (mtl1-48).
 - Colour schemes (mtl1-49): td `materials` names + game display names + armor_color_library swatches (data).
 
-**HEURISTIC / open:** UseSpecMap flag writer, material → define consumer, multi-layer shading in UE.
+**HEURISTIC / open:** material → define consumer, multi-layer shading in UE. UseSpecMap writer is **PROVEN** `FUN_14217da70` (bit 21 MSCRGHAO / bit 18 MSCG) and implemented in `UseSpecMapPolicy` (`ddc8f88`). The generated row below that still says "CPU writer not found" is the rea-batch 4 sentence; the later row `FUN_1421aa940` is the current one.
 
 **Code:** `A/Meshes/MaterialMaps.cs`, `SpecLayers.cs`, `A/Customization/SkinMaterial.cs`, `ColourSchemes.cs`, UE `import_sm2_materials.py`.
 
@@ -79,7 +79,7 @@ Long-form: RE_NOTES "Materials / shaders", HANDOFF Item 2, mtl1-26/27, mtl1-47/4
 | FUN_1425ef600 | 0x1425ef600 | DECOMPILED | strings: speedScaleY / speedScaleX / distortTexture / distortTextureScaleX / distortTextureScaleY / distortTextureRotation | /workspace/rea/vfxy_1.c |
 | FUN_1425fc510 | 0x1425fc510 | DECOMPILED | strings: speedScaleY / enable / source_texture / speedScaleX / texScaleX / texScaleY | /workspace/rea/vfxy_1.c |
 | FUN_1421aa940 | 0x1421aa940 | NOTED | CB_OBJ_MATERIAL_DATA layout initialiser incl. OBJ_MTLBLEND_LAYER_CONST (0x40 float4); ~40 siblings FUN_14219f000…FUN_1421d19a0; UseSpecMap writer PROVEN FUN_14217da70 (REA 2026-11-02); raw [15].x flags DATA in rea-batch 3 (8200/4424/4168/…, bit 8 on all non-zero but one) | RE_NOTES#rea-batch-3 |
-| OBJ_MTLBLEND_LAYER_CONST[15].x | — | DATA | per-draw material bit mask vs bound PS textures (armory 128197, 140 draws): 0x2000 ↔ packed MSCRGHAO spec td 68/68, 0x40 ↔ legacy *_spec td 66/67, 0x8 ↔ MNM normal 133/134, 0x100 → MH height bound 31/31, 0x800 → MEM 7/7 (+4 without), 0x1000 → MAO 40/41 (+4), 0x10 ↔ detail partial; CPU writer not found (rea-batch 4) | RE_NOTES#rea-batch-4 |
+| OBJ_MTLBLEND_LAYER_CONST[15].x | — | PROVEN | per-draw mask vs bound PS textures (armory 128197): 0x2000 ↔ MSCRGHAO, 0x40 ↔ MSCG. CPU writer **PROVEN** `FUN_14217da70` (2026-11-02, `ddc8f88`). rea-batch 4 "writer not found" is historical. | docs/re/REA_FINDINGS.md |
 
 ## Texture usage bit table (PROVEN, `0x144ccee10`, FUN_14267baf0)
 

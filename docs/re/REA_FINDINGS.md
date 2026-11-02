@@ -48,10 +48,11 @@ Usage table `0x144ccee10`: **bit 21 = MSCRGHAO** (`0x200000`). Matches armory DA
 - Legacy DATA `0x40↔*_spec` is consistent with MSCG (or co-bound spec) on the `+0xb0` texture; precise legacy-only predicate not separately named in exe.
 - `UseSpecMapPolicy.Decide(hasSpecularMap && !chameleon)` ≈ outcome but **not** the CPU predicate.
 
-### ForgeLens changes (**do not apply yet**)
-1. Replace `UseSpecMapPolicy` HEURISTIC with: **UseSpecMap iff material GPU record’s specular/packed texture (`+0xb0`) usage mask has bit 21 (MSCRGHAO)**; optionally also treat bit 18 (MSCG) / legacy spec slot like `0x40` for metal/rough path if viewer needs parity.
-2. Evidence string → cite `FUN_14217da70` / bit 21 / `param_1[0x3c]`.
-3. Keep chameleon off as derived (no MSCRGHAO) rather than a separate hard rule, or keep as safety if asset pipeline omits usage bits.
+### ForgeLens changes (**applied** `ddc8f88`, viewer `4be1d4e`)
+1. `UseSpecMapPolicy.Decide` is on when usage has MSCRGHAO (bit 21 → `0x2000`) or MSCG (bit 18 → `0x40`). Evidence string cites `FUN_14217da70`.
+2. Sidecar `materials.json` `useSpecMap` + `import_sm2_materials.py` + `GlPreview` use that decision.
+3. Chameleon stays off when those bits are absent (no separate chameleon branch).
+4. Still open: re-export/reimport existing UE material instances (PC). The "do not apply yet" line was stale after `ddc8f88`.
 
 ### Evidence
 - Decomp `FUN_14217da70.c` L244–263; siblings `FUN_14217e330.c`, `FUN_14217ebf0.c`
@@ -84,11 +85,11 @@ Usage table `0x144ccee10`: **bit 21 = MSCRGHAO** (`0x200000`). Matches armory DA
 
 Shader window (prior): `sat(1-(d²·P1.w))²` — not UE candela InverseSquare.
 
-### ForgeLens changes (**do not apply yet**)
-1. `LevelLightUe` / `ue_level_lights_core.py`: **remove FIT K=10**; colour=`(c/255)^2.2*I`; ×400 only if `useInverseSquaredFalloff`.
-2. Keep **spot** + direction + inner/outer cone; stop blind spot→point.
-3. Apply `attenCurveParam`→P0.w in viewer/bench.
-4. Adaptive: ×`clamp(avgLum,0.05,50)` when set.
+### ForgeLens changes (**applied** `e9ad274` / `ddc8f88`)
+1. `LevelLightUe.UeIntensity` = I × colorScale (×400 only if `useInverseSquaredFalloff`). **FIT K=10 removed.** Do not restore it.
+2. Spots keep cones (`SpotConeDegrees`). **Direction is still missing** from the lights TSV (default spot forward).
+3. `attenCurveParam` → P0.w is in `LevelLightUe.P0w` / `CaptureLightUnits`.
+4. Adaptive factor remains `clamp(avgLum, 0.05, 50)` on the capture path. UE candela/exponent bridge stays **INFERRED**.
 
 ### Evidence
 - `/workspace/sm2_re/decomp/FUN_14224ecf0.c`, `FUN_14224f010.c`, `FUN_141384090.c`

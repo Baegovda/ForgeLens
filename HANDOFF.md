@@ -1,12 +1,12 @@
 > **⭐ CORE CONCEPT:** Every supported game (SM2, PoE2, Black Myth: Wukong, Stellar Blade, Elden Ring) is **the SM2 feature set with only the game changed** — same models, skeletons, animations, textures, materials, physics/cloth, levels/props, viewer, and Unreal import under `/Game/ForgeLens/<CODE>/`. **Shared pipeline; only game-specific readers/parsers differ.** PoE2 skills (effects/animations) must be viewable in the viewer. Full text: `docs/RULES_CORE.md`.
-> **For AI agents: 2026-10-29 20:50 KST — SM2 was transferred to a NEW Grok Bot: read [`docs/BOT_TRANSFER.md`](docs/BOT_TRANSFER.md) first** (BongThumbLive stays with the original bot).
+> **For AI agents (2026-11-02): read [`docs/HANDOFF_CURRENT.md`](docs/HANDOFF_CURRENT.md) first.** It wins over the bootstrap lines below. `docs/BOT_TRANSFER.md` is a 10/29 box-rebuild note. BongThumbLive is in scope when the owner asks.
 
 > **Standing rules: `docs/RULES_CORE.md` (read once per session + after summary; then run `tools/re/pc/rules_check.ps1`). Subagent preamble: `docs/SUBAGENT_PREAMBLE.md`.**
 
 > **Conversation notes & naming (2026-10-29):** in Korean chat use 기드라 = Ghidra and 레아 = REA. When the owner is away, PC jobs may run at High priority.
 > Details: [`docs/BOT_TRANSFER.md` §11](docs/BOT_TRANSFER.md).
 
-> **New assistant: start at [`docs/handoff/START_HERE.md`](docs/handoff/START_HERE.md)** (single entry point, 2026-10-29). Everything below is the request ledger and chronological log.
+> **New assistant: start at [`docs/HANDOFF_CURRENT.md`](docs/HANDOFF_CURRENT.md).** [`docs/handoff/START_HERE.md`](docs/handoff/START_HERE.md) is the 2026-10-29 snapshot. Everything below is the request ledger and chronological log (append only).
 
 > **Then read [`AGENTS.md`](AGENTS.md)** (entry point, rules, user preferences), then `docs/handoff/` (STATUS, ROADMAP, WORKFLOW, RE_NOTES, FORMATS). Where this file's bootstrap below conflicts with them (push method, next step, owner), AGENTS.md / docs/handoff win. This file stays the chronological log: append a dated section per stage.
 
@@ -2881,3 +2881,14 @@ Remains: orb ~15 % dimmer, no large soft bloom sprite (template size not settabl
 ## Update SM2 oddities A/B/C (2026-11-02 KST)
 
 See docs/HANDOFF_NEW_BOT.md section "2026-11-02 SM2 oddities A/B/C". UseSpecMap/RestFit/hub-light decisions moved into LibSaber.SM2.Assets sidecars + shared UE core; writer of OBJ_MTLBLEND_LAYER_CONST[15].x and RestFit/F45/K=10 remain HEURISTIC.
+
+## 2026-11-02 reconciliation (docs only — supersedes the two sections above where they name the current tip or an open UseSpecMap writer)
+
+- Source of truth: **`docs/HANDOFF_CURRENT.md`**. Prompt: `docs/handoff/NEXT_BOT_PROMPT.md` (same text as HANDOFF_CURRENT §10).
+- Last runtime commit stays **`3a6ba3f`**. At `f82bb4b` the branch was **390 ahead / 1 behind** `origin/master` (the "~387" and "`1461bbf` app tip" lines above are older).
+- UseSpecMap writer **PROVEN** `FUN_14217da70` and in `UseSpecMapPolicy` (`ddc8f88`, viewer `4be1d4e`). FIT K=10 **removed** (`LevelLightUe`). `RestFitPolicy.Enabled` is false. `collisionThickness` default 0.
+- nmb ops `c4`/`98`/`95` meanings are in `docs/re/REA_DEEP.md` §6 and are **not** in `nmb_reader.py` / `PlayerFireClips.cs`. `SM2_MUZZLE_SHOOTTIP` still defaults off.
+- PoE2 P1 visual leftovers remain open in `docs/POE2_M2.md` even though `edf8e92` is in git. BellCrow PIE after the R99 plugin build is unverified.
+- UE `/Game/ForgeLens` old-asset delete: **pending PC verification** (04:52 KST snapshot claimed zero deletes; chat size ~817 files / ~4.0 GB is not in the repo).
+- `ForgeLens_latest` publish commit not re-checked (docs disagreed: `1461bbf` vs `eddf91e`).
+- No runtime code in this commit.

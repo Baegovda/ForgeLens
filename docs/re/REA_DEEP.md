@@ -1,7 +1,7 @@
 # SM2 REA Deep Pass — ForgeLens peel (static)
 
 - Target: `/workspace/sm2_re/sm2_retail.exe` sha256 `4c4fb3a009a803ea5c27e9ced0a36e7c401ef95eb6dd7d651a629f54ee0252fc`
-- Mode: **static only**; game never run; **no ForgeLens code changes**
+- Mode: **static only**; game never run. The "no ForgeLens code changes" line was true for the RE session. Later commits `ddc8f88` / `4be1d4e` / `e9ad274` / `3a6ba3f` applied UseSpecMap, removed FIT K=10, and defaulted cloth thickness to 0. nmb §6 is **not** applied in `nmb_reader.py` yet.
 - Tools: REA `binary_session{}` → `open_binary` (ghidra) OK; `search_strings`/`analyze_function` MCP **-32001 timeout** → headless Ghidra `/workspace/rea/gh/proj` `-noanalysis` + pefile/capstone
 - Evidence: `/workspace/sm2_re/evidence/*` (decomp IDs = filenames; REA MCP Evidence IDs pending cold analyze)
 - Zone: Asia/Seoul; started 2026-11-02 ~03:16 KST
@@ -270,7 +270,7 @@ Spot: type 1; `cos(angle*π/360)`; cone scale/offset in P3/P2; falloff window sh
 ### Fire-clip / nmb ops 95 / 98 / c4
 - Strings: `nmb`, `nmbLocks`, `Expression: %s`, `NodeDef.cpp`.
 - lea `nmb` → `0x140e37ce8` / `0x140e37f05`; `nmbLocks` → `0x14137c489`… (decomp `evidence/deep_batch5b_nmb.c`).
-- **Opcodes 95/98/c4 still not identified** in those functions this pass — needs dedicated bytecode/dispatcher peel. Status: **open / U8–U9**.
+- This pass (deep pass 1) did **not** identify opcodes 95/98/c4. **Superseded by §6** (DATA-PROVEN `c4` / `98`, `95` ALU INFERRED). Exe dispatch table still not found. `nmb_reader.py` has not been updated to §6.
 
 ### Muzzle tip vs shootTip
 - `muzzle` string `@0x1435520c8` — only lea hit `0x1402365c0` is an **empty stub** (decomp returns).

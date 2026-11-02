@@ -14,7 +14,7 @@ Source of detail: BOT_TRANSFER §0/§5, HANDOFF ledger R01–R43. Newest dated o
 
 ## Talk
 - Short Korean 해요체. Write Ghidra = 기드라, REA = 레아. Code/paths/file names in English. Times in KST.
-- **Final results only** (interim % + ETA superseded 2026-11-02 / HANDOFF_NEW_BOT). "상황보고"/"하는중?" → answer at once with what is running and what is done.
+- **Final results only** (interim % + ETA superseded 2026-11-02). Current status: `docs/HANDOFF_CURRENT.md` (HANDOFF_NEW_BOT is the prior transfer log). "상황보고"/"하는중?" → answer at once with what is running and what is done.
 - Evidence labels PROVEN / INFERRED / HEURISTIC (HEURISTIC last, labelled, say what was searched).
 - NEVER state a number/name not measured this session → "아직 안 쟀어요".
 - Request → industry term + short Korean explanation. Handoff docs short, core-only.

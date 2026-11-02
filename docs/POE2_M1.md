@@ -1,4 +1,4 @@
-> **Status pointer (2026-11-02):** M1 done. Later: M2–M3 + P1/P2; BellCrow kinematic is code-only (`760c055`); see `HANDOFF_NEW_BOT.md`.
+> **Status pointer (2026-11-02, reconciled):** M1 done. Later: M2–M3. BellCrow kinematic API is in the plugin (`760c055`); PIE after the R99 build is unverified. See `docs/HANDOFF_CURRENT.md`.
 
 # POE2 M1 - meshes, skeleton, animation, textures, materials into the shared ForgeLens pipeline
 

@@ -1,4 +1,4 @@
-> **PARTLY SUPERSEDED (2026-11-02).** Current transfer / status of truth: [`HANDOFF_NEW_BOT.md`](HANDOFF_NEW_BOT.md) (incl. "2026-11-02 정리"). This file remains useful for **box rebuild recipes** (§0.2–0.5) and SM2-era environment notes; ignore its "BongThumbLive is NOT part of this handoff", "read START_HERE first", and 10/29 tip/`sm2-20` assumptions when they conflict with HANDOFF_NEW_BOT. BTL is in scope when the owner asks (P3).
+> **PARTLY SUPERSEDED (2026-11-02).** Current status: [`HANDOFF_CURRENT.md`](HANDOFF_CURRENT.md). This file remains useful for **box rebuild recipes** (§0.2–0.5) and SM2-era environment notes. Ignore "BongThumbLive is NOT part of this handoff", "read START_HERE first", ops 95/98/c4 still fully open, and 10/29 tip/`sm2-20` when they conflict with HANDOFF_CURRENT. BTL is in scope when the owner asks (P3). nmb op **meanings** are in `docs/re/REA_DEEP.md` §6; the reader still does not apply them.
 
 # BOT_TRANSFER — SM2 / Forge Lens: transfer to a new Grok Bot
 

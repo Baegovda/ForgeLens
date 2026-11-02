@@ -1,5 +1,7 @@
 # RE_NOTES — sm2_retail.exe evidence index
 
+> **2026-11-02 correction (do not rewrite the old paragraphs):** UseSpecMap writer is **PROVEN** `FUN_14217da70` (`docs/re/REA_FINDINGS.md`, code `UseSpecMapPolicy`). Sentences below that say the writer was not found (mtl1-50, rea-batch 4) were true on that date. nmb ops 95/98/c4: see `docs/re/REA_DEEP.md` §6. FIT K=10 is not engine math and is not in `LevelLightUe`.
+
 > Quick lookup: `docs/SYMBOL_DB/index.tsv` / `docs/SYMBOL_DB/INDEX.md` (generated from this file, HANDOFF and the box Ghidra dumps).
 
 All addresses are virtual addresses in `sm2_retail.exe` (retail Steam build, 81 MB; box copy `/workspace/rea/sm2_retail.exe`, Ghidra project `/workspace/rea/ghidra_proj2.gpr`, program `sm2_retail.exe` since the 2026-10-27 box rebuild; older notes said `sm2`).
