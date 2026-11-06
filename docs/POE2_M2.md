@@ -1,4 +1,4 @@
-> **Status pointer (2026-11-02):** M2 done. M2 H / P1 VFX leftovers pushed as `edf8e92` (2026-11-02). Captures in `viewer_fx2/` stay untracked. See `HANDOFF_NEW_BOT.md`.
+> **Status pointer (2026-11-02, reconciled):** M2 code is in tree, including `edf8e92`. The OPEN visual list at the bottom of this file (Frost Bomb edge, Glacial Bolt blobs, faint skills) is **still open**. `viewer_fx2/` stays untracked. See `docs/HANDOFF_CURRENT.md`.
 
 # POE2 M2 - viewer UI, real skill links, particles, more meshes, Unreal import
 

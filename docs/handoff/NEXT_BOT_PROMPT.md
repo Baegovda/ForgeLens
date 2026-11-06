@@ -1,19 +1,21 @@
 # NEXT_BOT_PROMPT  -  paste this to the next Grok Bot
 
-You are taking over **ForgeLens** for owner **Baegovda** on PC **Revaptor-FX**. Usage on the previous account was about to run out; do not rely on prior chat  -  use the docs and git tip below.
+The full prompt is **`docs/HANDOFF_CURRENT.md` §10**. This file is the short copy.
+
+You are taking over **ForgeLens** for owner **Baegovda** on PC **Revaptor-FX**. Do not rely on prior chat.
 
 ## Read first (in order)
-1. `docs/HANDOFF_NEW_BOT.md`  -  section **"2026-11-02 ~04:55 KST  -  usage-cutoff handoff"** wins over older sections.
-2. `AGENTS.md`
-3. `docs/handoff/STATUS.md`, `docs/handoff/START_HERE.md`, `docs/handoff/WORKFLOW.md`
-4. REA: `docs/re/REA_FINDINGS.md`, `docs/re/REA_DEEP.md`
+1. `docs/HANDOFF_CURRENT.md` (wins).
+2. `AGENTS.md`, `docs/RULES_CORE.md`
+3. `docs/re/REA_FINDINGS.md`, `docs/re/REA_DEEP.md` (**§6 wins over §4** on nmb ops)
+4. `docs/POE2_M2.md`, `docs/POE2_M3.md`, `docs/WUKONG_M0.md`
 
 ## Repo / branch / tip
 - GitHub: **Baegovda/ForgeLens** (private)
 - Branch: **`cursor/sm2-pck-extractor-4420`**
-- Code tip before docs handoff: **`3a6ba3f`**. Docs tip (this file): **`33a8cda`** (`33a8cdaabcf0ee2be2d76be2c9cd6380f65d0ec7`). Confirm with `git fetch && git log --oneline -5`
-- Push clone (clean): `C:\Users\Revaptor_FX\ls_push` on machineId **`d3fb99ad-25ca-45c1-81af-41e5ca09104a`**
-- vs master: ~**387 ahead / 1 behind**  -  **do not** push/merge `master` without an explicit owner decision
+- Last **runtime** commit: **`3a6ba3f`**. At `f82bb4b` the branch was **390 ahead / 1 behind** `origin/master`. Re-measure with `git fetch && git rev-list --left-right --count origin/master...HEAD`.
+- Push clone: `C:\Users\Revaptor_FX\ls_push`. Pick machine **Revaptor-FX** by name (id `d3fb99ad-25ca-45c1-81af-41e5ca09104a` was the previous account).
+- Do **not** push/merge `master` without an explicit owner decision.
 
 ## PC paths
 - Work root: `C:\Users\Revaptor_FX\Desktop\SM2_Work\`
@@ -32,23 +34,27 @@ You are taking over **ForgeLens** for owner **Baegovda** on PC **Revaptor-FX**. 
 - **Ghidra only on the user PC** with max resources (target ~96GB heap, 32 CPU)  -  **never** on the bot box.
 - Secrets: never print EngineWire token; no key literals in docs/commits.
 
-## Current state (handoff-time)
-- R99: SM2PhysicsSetup deployed via RunUAT BuildPlugin; KawaiiPhysics **disabled** in host uproject (`bak_r99_kawaii`) due to UBT RulesError.
-- Commissar coat A/B: thickness 0 + restFit off → measured penetrations **206→303**; heuristics **not** re-enabled; capsule data suspected.
-- REA PROVEN: UseSpecMap `FUN_14217da70` (bit21 MSCRGHAO / bit18 MSCG); lights `FUN_14224ecf0`/`FUN_14224f010`; tonemap `FUN_1423bfc00`; cloth defaults; nmb `c4`/`98`/`95`; muzzle from cls locator; SFX `FUN_1425fd580`.
-- Open REA: IBL values, shadow bias/cascades, spot directions, intensity→UE units (INFERRED).
-- Ghidra PID **102852** was left running; log had **Import failed (Negative delay)** / empty `sm2.gpr`  -  verify/restart on PC if needed; do not kill casually.
-- UE old-asset cleanup **interrupted**: all listed delete folders **still exist**; KEEP list verified present (r92_floor, r54_level, r72_mats, chars_cloth2, vortex_orb, r90_cloth, chaplain folders, cc_titus_assault, physics, pre_step3, sani_before, VfxUe_bak3, cc_chaplain_bak1, POE/Tests).
+## Current state
+- UseSpecMap **in code** (`UseSpecMapPolicy`, `FUN_14217da70`). K=10 **removed** (`LevelLightUe`). Rest-fit **off**. `collisionThickness` default **0**.
+- nmb `c4`/`98`/`95` meanings are in `REA_DEEP.md` §6 only. `nmb_reader.py` and `PlayerFireClips.cs` still treat them as undecoded. `SM2_MUZZLE_SHOOTTIP` defaults **off** even though cls `shootTip.locator` is parsed.
+- Coat A/B (DOC, not re-measured here): penetrations 206→303 with thickness 0; do not restore heuristics. Next: capsules.
+- Open REA: IBL numbers, shadow bias/cascades, spot directions, UE intensity units (INFERRED).
+- Ghidra: last note was PID **102852**, log **Import failed (Negative delay)**, empty `sm2.gpr`. **Pending PC check.** Do not kill casually.
+- UE old-asset cleanup: **pending PC verification.** Chat figure ~817 files / ~4.0 GB is **not in the repo**. The 04:52 KST snapshot claimed nothing was deleted. CSV `C:\Users\Revaptor_FX\sm2_re\ue_old_assets_candidates.csv`.
+- `ForgeLens_latest` publish commit is **unconfirmed** (docs said both `1461bbf` and `eddf91e`).
+- R99 notes: KawaiiPhysics disabled in the host uproject (`bak_r99_kawaii`); SM2PhysicsSetup via RunUAT. **PC, not re-checked.**
 
 ## Prioritized next steps
-1. Coat penetration via **collision capsules** (Chaos / cdt data)  -  do not silently restore thickness/restFit heuristics.
-2. Resume **CSV-approved UE deletes** when `editor-free`; log `docs/handoff/CLEANUP_DELETED.tsv`.
-3. Code: apply **nmb ops** + **muzzle locator** path; then full **material re-export/reimport**.
-4. After healthy Ghidra analyze: close REA open items; re-cite Evidence IDs.
-5. Owner-gated only: PoE2 P1-P4, Wukong M1, Niagara.
+1. PC: Ghidra full analyze (confirm the failed import), then REA for IBL, shadow bias/cascades, spot direction. Re-cite Evidence IDs.
+2. Coat penetration via **collision capsules** — do not silently restore thickness/restFit.
+3. Finish the UE intensity unit bridge (no K=10). Spot direction is part of step 1.
+4. Apply **nmb ops** in `nmb_reader.py` / `PlayerFireClips`, then default muzzle attach to `shootTip.locator` (`SM2_MUZZLE_SHOOTTIP` is opt-in today).
+5. Full **material re-export/reimport** after UseSpecMap.
+6. UE deletes only after a live disk check (`editor-free`, referencers, CSV). Log `docs/handoff/CLEANUP_DELETED.tsv`.
+7. Owner-gated: PoE2 P1–P4, Wukong M1, Niagara.
 
 ## How to work
 - Prefer Shell with machineId on Revaptor-FX for git/UE/Ghidra.
 - Take/release editor lock; use EngineWire when editor up, else headless Cmd.
 - Commit docs/code carefully; push fast-forward only (no --force) with the push lock held.
-- If anything in HANDOFF conflicts with older STATUS/ledger text, **HANDOFF usage-cutoff section wins**.
+- If older STATUS / HANDOFF_NEW_BOT / ledger text conflicts, **`docs/HANDOFF_CURRENT.md` wins**.

@@ -1,5 +1,7 @@
 # SM2 REA Deep Pass — ForgeLens peel (static)
 
+> **Mirror.** Prefer `docs/re/REA_DEEP.md`. §6 (nmb ops) wins over the earlier "opcodes not identified" paragraph. ForgeLens **did** apply UseSpecMap / K=10 removal / thickness 0 after this note's "no code changes" line.
+
 - Target: `/workspace/sm2_re/sm2_retail.exe` sha256 `4c4fb3a009a803ea5c27e9ced0a36e7c401ef95eb6dd7d651a629f54ee0252fc`
 - Mode: **static only**; game never run; **no ForgeLens code changes**
 - Tools: REA `binary_session{}` → `open_binary` (ghidra) OK; `search_strings`/`analyze_function` MCP **-32001 timeout** → headless Ghidra `/workspace/rea/gh/proj` `-noanalysis` + pefile/capstone

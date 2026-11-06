@@ -1,17 +1,17 @@
-> **Current handoff (wins):** [`docs/HANDOFF_NEW_BOT.md`](../HANDOFF_NEW_BOT.md) § "2026-11-02 ~04:55 KST  -  usage-cutoff handoff". Tip **`3a6ba3f`**. Next-bot prompt: [`NEXT_BOT_PROMPT.md`](NEXT_BOT_PROMPT.md). Confirm with `git fetch && git log --oneline -5 origin/cursor/sm2-pck-extractor-4420`.
+> **Current handoff (wins):** [`docs/HANDOFF_CURRENT.md`](../HANDOFF_CURRENT.md). Next-bot prompt: [`NEXT_BOT_PROMPT.md`](NEXT_BOT_PROMPT.md). `HANDOFF_NEW_BOT.md` is the prior transfer log. Confirm with `git fetch && git log --oneline -8 origin/cursor/sm2-pck-extractor-4420`.
 
-# STATUS  -  ForgeLens / multi-game (current summary 2026-11-02 ~04:55 KST)
+# STATUS  -  ForgeLens / multi-game (pointer 2026-11-02, reconciled)
 
-Repo `Baegovda/ForgeLens` (private), branch `cursor/sm2-pck-extractor-4420`. App version **0.97.0**. Deployed: `Desktop\SM2_Work\Bin\ForgeLens_latest` = publish of **1461bbf** (app tip for Wukong M1 draft; later REA/R99 commits are on branch  -  republish if owner wants latest viewer). Editor lock: **`editor-free`**. **Do not push to `master`** (owner decision; working branch ~**387 ahead / 1 behind** master as of 2026-11-02 04:55 KST).
+Repo `Baegovda/ForgeLens` (private), branch `cursor/sm2-pck-extractor-4420`. App version **0.97.0**. Last runtime commit **`3a6ba3f`** (R99). At docs commit `f82bb4b` the branch was **390 ahead / 1 behind** `origin/master` (the old "~387" count was `3a6ba3f`). **Do not push to `master`.** Deployed `ForgeLens_latest`: old notes disagree (`1461bbf` vs `eddf91e`); **not re-checked on disk** — see `HANDOFF_CURRENT.md`. Editor lock was `editor-free` at the 04:52 KST snapshot only. UE old-asset delete: **pending PC verification**.
 
-## Live snapshot (2026-11-02 ~04:55 KST)
-- Tip **`3a6ba3f`**: R99 SM2PhysicsSetup BuildPlugin + commissar coat PIE A/B (thickness 0 → penetrations 206→303; heuristics left off).
-- REA docs: `docs/re/REA_FINDINGS.md`, `docs/re/REA_DEEP.md`  -  UseSpecMap `FUN_14217da70`, lights `FUN_14224ecf0`/`FUN_14224f010`, tonemap `FUN_1423bfc00`, cloth defaults, nmb c4/98/95, muzzle locator DATA, SFX `FUN_1425fd580`.
-- Ghidra full import on PC PID **102852** (96G/32CPU): log showed **Import failed (Negative delay)**; leave process; may need restart with sane timeout.
-- UE CSV cleanup: **all delete candidates still on disk** (interrupted); KEEP list intact.
-- KawaiiPhysics disabled in host uproject (`bak_r99_kawaii`); SM2PhysicsSetup via RunUAT BuildPlugin.
+## Live snapshot (2026-11-02 ~04:55 KST — PC facts not re-checked in the reconciliation)
+- Runtime commit **`3a6ba3f`**: R99 notes (plugin build + commissar coat A/B). Documented penetrations 206→303; heuristics left off. **Not re-measured** in the docs pass.
+- REA docs: `docs/re/REA_FINDINGS.md`, `docs/re/REA_DEEP.md`. UseSpecMap and lights are **in code**. nmb c4/98/95 meanings are §6 only — reader not updated. Muzzle locator is parsed; `SM2_MUZZLE_SHOOTTIP` defaults off.
+- Ghidra: last note PID **102852**, import failed (Negative delay). **Pending PC check.** Do not kill casually.
+- UE CSV cleanup: **pending PC verification.** The 04:52 KST note claimed nothing was deleted. Chat-only size ~817 files / ~4.0 GB is not in git.
+- KawaiiPhysics / RunUAT: **PC notes only.**
 
-## Tracks (authoritative detail in HANDOFF_NEW_BOT §4-5 + usage-cutoff section)
+## Tracks (detail in `docs/HANDOFF_CURRENT.md`; older narrative in HANDOFF_NEW_BOT)
 
 | Track | State | Notes |
 |---|---|---|
@@ -19,7 +19,7 @@ Repo `Baegovda/ForgeLens` (private), branch `cursor/sm2-pck-extractor-4420`. App
 | **PoE2 M0** | done (`5c48c8f`) | GGPK probe  -  `docs/POE2_M0.md` |
 | **PoE2 M1** | done | meshes/skel/anim/mat  -  `docs/POE2_M1.md` |
 | **PoE2 M2** | done + VFX leftovers **P1 DONE** (`edf8e92`) | `docs/POE2_M2.md` |
-| **PoE2 M3** | done + BellCrow kin **P2 code** (`760c055`) | plugin rebuild+PIE still verify  -  `docs/POE2_M3.md` |
+| **PoE2 M3** | done + BellCrow kin API (`760c055`) | plugin **binary** claimed built in R99 (`3a6ba3f`, commissar coat — **DOC**); BellCrow PIE still unverified — `docs/POE2_M3.md` |
 | **Wukong M0** | done (`f4dc100`) | `docs/WUKONG_M0.md` |
 | **Wukong M1** | **draft** (`1461bbf`) | BmwGlb + window + `ue_bmw_import.py`; pak tools **not** in repo (`BMW_AES_KEY`) |
 | Stellar Blade / Elden Ring | not started | |

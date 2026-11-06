@@ -1,5 +1,7 @@
 # Player fire clip selection (R38, 2026-10-30 KST)
 
+> **2026-11-02:** `docs/re/REA_DEEP.md` §6 assigns `c4` = jump-if-falsey, `98` = jump-if-truthy, `95` = prep/coerce (ALU INFERRED). Exe dispatch table still missing. **`tools/re/nmb_reader.py` and `PlayerFireClips.cs` still treat 95/98/c4 as undecoded** (both branches / HEURISTIC rows for wpnType 1.5 and 1.7). Apply §6 before trusting those rows. Muzzle node `shootTip` is parsed from cls but `SM2_MUZZLE_SHOOTTIP` defaults off (`ContextResolver`).
+
 Source: `morpheme/primaris/primaris.nmb` (Primaris actor Morpheme network). Read-only extraction on the PC: `SM2_Work\Raw\fireclip\`.
 Reader: `tools/re/nmb_reader.py <primaris.nmb>` dumps the states. `--map wpn.tsv` evaluates the mapping (TSV columns: name, wpnType).
 Code: `PlayerFireClips` (src/LibSaber.SM2.Assets/Animation/PlayerFireClips.cs), used by `PropAnimStates.AutoPlays` step 3b.

@@ -1,5 +1,7 @@
 # Black Myth: Wukong — M0 (format survey)
 
+> **2026-11-02:** M1 draft is in tree (`BmwGlb`, `BmwWindow`, `tools/bmw/ue_bmw_import.py`, commit `1461bbf`). Pak decrypt reader is not in git. Current handoff: `docs/HANDOFF_CURRENT.md`. The "Not verified / key not tested" section below is still true for the pak index.
+
 Game code: `BMW` (Unreal import root `/Game/ForgeLens/BMW/`). Same SM2 feature set as every game
 (models, skeletons, animations, textures, materials, physics/cloth, levels/props, viewer, Unreal import);
 only the reader differs. The game was NOT launched for this survey (rule t265u).

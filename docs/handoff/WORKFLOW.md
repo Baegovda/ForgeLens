@@ -1,5 +1,7 @@
 # WORKFLOW — how the work is done
 
+> **2026-11-02 correction:** full Ghidra analyze of Retail.exe and REA against that exe run on **Revaptor-FX only** (`docs/HANDOFF_CURRENT.md`). The table below that lists "Ghidra/rizin RE" on the bot box is the 10/29 split and is **not** the current rule for a full analyze (the box OOM'd; the owner asked for max RAM/CPU on the PC). Light unit tests and doc edits still run wherever the checkout is. Current handoff: `docs/HANDOFF_CURRENT.md`.
+
 ## 0. Evidence first (standing rule R32, 2026-10-29)
 - Base every rule on evidence, in this order: game data (survey the retail files, count matches and exceptions), the exe (REA, or the headless Ghidra DecompAt fallback when REA is OOM), RenderDoc captures (`/workspace/rdc`).
 - Use HEURISTIC only as a last resort, after that search failed. Label it HEURISTIC in code and docs, say what was searched, and add the open question to HANDOFF "REA 일괄 처리 목록".

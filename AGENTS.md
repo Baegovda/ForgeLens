@@ -1,6 +1,6 @@
 # AGENTS.md — start here (new agent / Grok Bot entry point)
 
-> **NEW BOT / CURRENT HANDOFF (2026-11-02): read [`docs/HANDOFF_NEW_BOT.md`](docs/HANDOFF_NEW_BOT.md) FIRST.** It wins over this file, START_HERE, BOT_TRANSFER, STATUS, and RULES_CORE where they disagree. See its "2026-11-02 정리" section for tip, P1–P11, ForgeLens_latest, editor lock.
+> **NEW BOT / CURRENT HANDOFF (2026-11-02): read [`docs/HANDOFF_CURRENT.md`](docs/HANDOFF_CURRENT.md) FIRST.** It wins over this file, HANDOFF_NEW_BOT, START_HERE, BOT_TRANSFER, STATUS, and RULES_CORE where they disagree. `HANDOFF_NEW_BOT.md` is the prior transfer log (its "정리" and usage-cutoff sections are historical relative to HANDOFF_CURRENT).
 
 > Older cold-start notes: [`docs/handoff/START_HERE.md`](docs/handoff/START_HERE.md) (10/29, partly stale) and [`docs/BOT_TRANSFER.md`](docs/BOT_TRANSFER.md) (10/29 SM2-only transfer; partly superseded).
 
@@ -18,7 +18,7 @@
 - **Not a bulk ripper.** Explorer that exports what the user selects. App version **0.97.0** (`LibSaber.SM2Browser.csproj` `<Version>`).
 
 ## 2. Read order
-1. **`docs/HANDOFF_NEW_BOT.md`** (source of truth; "2026-11-02 정리" first).
+1. **`docs/HANDOFF_CURRENT.md`** (source of truth). Then `docs/HANDOFF_NEW_BOT.md` only for the 10/31–11/02 transfer log.
 2. `docs/RULES_CORE.md` + `docs/SUBAGENT_PREAMBLE.md` (give preamble to every worker).
 3. `docs/POE2_M0.md` … `M3.md`, `docs/WUKONG_M0.md` as needed for the track.
 4. `docs/handoff/STATUS.md` (historical SM2 stage log + current pointer at top).

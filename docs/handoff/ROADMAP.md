@@ -1,4 +1,4 @@
-> **Partly historical (2026-11-02).** Live priority list = `docs/HANDOFF_NEW_BOT.md` §5 (P1–P11). SM2 VFX/% rows below are 10/26–10/29 era; PoE2/Wukong work is tracked in HANDOFF_NEW_BOT + `docs/POE2_*.md` / `WUKONG_M0.md`. Niagara is **P11 owner-gated**, not "out of roadmap forever".
+> **Partly historical (2026-11-02).** Live priority list = `docs/HANDOFF_CURRENT.md` §5. SM2 VFX/% rows below are 10/26–10/29 era. Niagara is **P11 owner-gated** (the "removed from the roadmap" bullet further down is stale). UseSpecMap writer was found (`FUN_14217da70`); do not treat the chameleon "writer not found" sentence as current.
 
 # ROADMAP — approved work order and next steps
 
@@ -57,7 +57,7 @@ Pushed so far: sockets/bone attach, anim-event cues and stop cues, distortion, d
 ## Leads from the mtl1-23 captures
 - Armory per-instance customization colours (LWI_INST_DATA_BUF, see HANDOFF mtl1-23): map slots +21..23 / +28..30 to the _cc mask channels (HEURISTIC today) and apply in UE/browser.
 - Hellbrute: sections -> draws **done** (mtl1-24: 31/31 by index count, variants already correct, no exporter change). Open: dump DYNAMIC_GLT_BUFFER rgb and the chameleon draw CBs (eids 3419-3452, PS 22961) in the next capture; compare M_SM2 chameleon/aniso response under matched lighting.
-- Chameleon **done** (mtl1-26). InstanceTint param + sidecar layers[] **done** (mtl1-27). Open: writer of OBJ_MTLBLEND_LAYER_CONST[15].x (mtl1-39 light RE: usage table/parser found, writer not; flags 0 on 16/16 Hellbrute draws; needs a non-Hellbrute capture, UseSpecMap still HEURISTIC); importer shading of layers[] (dirt / dirt_no_spec AO layers, vertex-colour weights); Calgar cape stripe source (not a material layer); matched-lighting UE vs game comparison.
+- Chameleon **done** (mtl1-26). InstanceTint param + sidecar layers[] **done** (mtl1-27). UseSpecMap writer **found** (`FUN_14217da70`, in `UseSpecMapPolicy` since `ddc8f88`); the 10/29 "writer not found / still HEURISTIC" note is historical. Still open: importer shading of layers[] (dirt / dirt_no_spec AO layers, vertex-colour weights); Calgar cape stripe source (not a material layer); matched-lighting UE vs game comparison; UE material reimport so instances pick up the sidecar.
 - Mod Tools (appid 3856330): click Install in Steam, then ilspycmd the managed DLLs for TD/material (chameleon, aniso, second spec, colorization, DYNAMIC_GLT), .sani, cloth, sfx. Then multi-layer material export (layers[].blending weights) and cloth coverage rule (rigid if SIM does not cover REND).
 - Trails and sparks are not drawn by the browser GPU renderer yet; blend rules are ready in VfxBlendRules.
 
@@ -71,5 +71,5 @@ Pushed so far: sockets/bone attach, anim-event cues and stop cues, distortion, d
 - CPU renderer: blend modes and physics (low priority; GPU is the default).
 
 ## Possible future development (not on the roadmap)
-- Niagara conversion (`.sfx` → UE Niagara). Removed from the roadmap by the user (2026-10-27). Only start if the user asks for it again.
+- Niagara conversion (`.sfx` → UE Niagara). Taken off the 2026-10-27 SM2 list. **2026-11-02:** PoE2→Niagara is owner-gated **P11** (`docs/HANDOFF_CURRENT.md`). Do not start without an explicit go. `.sfx.json` / `.niagara.json` export is data only, not a Niagara system.
 - UE multi-game extraction (generic Unreal Engine `.pak`/IoStore extraction for other games, beyond SM2/Swarm). Added by the user (2026-10-28) as a possible future item only; not started.

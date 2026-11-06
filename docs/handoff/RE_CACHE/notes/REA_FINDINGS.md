@@ -1,5 +1,7 @@
 # SM2 REA Findings — ForgeLens unknowns A/B
 
+> **Mirror.** Prefer `docs/re/REA_FINDINGS.md`. The "do not apply yet" lines in this copy are **stale**: UseSpecMap and the K=10 removal landed in `ddc8f88` / `e9ad274` / `4be1d4e`. Spot direction is still open.
+
 - Target: `/workspace/sm2_re/sm2_retail.exe` sha256 `4c4fb3a009a803ea5c27e9ced0a36e7c401ef95eb6dd7d651a629f54ee0252fc` (= Steam Retail Revaptor-FX)
 - Tools: headless Ghidra 12.1.4 on retained `/workspace/rea/gh/proj` + pefile/capstone; `user-rea` open_binary OK but analyze_* MCP timed out (cold import) — Evidence IDs below are **headless decomp artifact IDs** pending REA re-cite
 - Mode: static only; game never run; **no code changes**

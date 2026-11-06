@@ -1,4 +1,4 @@
-> **SUPERSEDED as entry point (2026-11-02).** Read [`../HANDOFF_NEW_BOT.md`](../HANDOFF_NEW_BOT.md) first — it wins. This file remains as a 2026-10-29 SM2 cold-start snapshot (tip then `bd5fc0c`; interim-% / `sm2-20` / `/Game/SM2_Work` only / "Niagara out of roadmap" / BongThumbLive "not ours" lines are stale — see HANDOFF_NEW_BOT "2026-11-02 정리" + §2.4).
+> **SUPERSEDED as entry point (2026-11-02).** Read [`../HANDOFF_CURRENT.md`](../HANDOFF_CURRENT.md) first — it wins. This file remains a 2026-10-29 SM2 cold-start snapshot (tip then `bd5fc0c`). Its "next work" list (ribbon writer, adaptive light, UseSpecMap-open, `/Game/SM2` paths, Niagara-later, `sm2-20`) is historical.
 
 # START HERE — cold-start handoff for a new assistant (Grok Bot)
 
